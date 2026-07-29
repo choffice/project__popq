@@ -1,0 +1,17 @@
+.git
+.codex
+.agents
+.idea
+.vscode
+**/node_modules
+**/dist
+**/build
+**/.gradle
+**/.dart_tool
+**/.flutter-plugins*
+**/coverage
+**/playwright-report
+**/test-results
+uploads
+*.log
+.env

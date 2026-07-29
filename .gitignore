@@ -1,0 +1,11 @@
+.env
+**/.gradle/
+**/build/
+**/bin/
+**/node_modules/
+**/dist/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.git.nested-backup/
+uploads/

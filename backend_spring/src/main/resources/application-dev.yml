@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+
+popq:
+  auth:
+    dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+  qr:
+    cookie-secure: false

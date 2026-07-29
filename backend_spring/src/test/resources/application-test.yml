@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:popq;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+popq:
+  auth:
+    dev-login-enabled: true
+  security:
+    jwt:
+      issuer: popq-test
+      secret: popq-test-secret-must-be-at-least-32-bytes-long
+      access-token-expiration: PT15M
+  qr:
+    public-base-url: http://localhost:5173
+    guest-session-ttl: PT1H
+    cookie-secure: false
+
