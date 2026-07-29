@@ -54,3 +54,11 @@ cd mobile_flutter\apps\customer_app
 flutter build apk --debug
 # build\app\outputs\flutter-apk\app-debug.apk
 ```
+
+판매자 앱은 별도 application ID와 보안 세션 키를 사용한다. 디버그 APK는 다음 경로에서 생성한다.
+
+```powershell
+cd mobile_flutter\apps\seller_app
+flutter build apk --debug
+# build\app\outputs\flutter-apk\app-debug.apk
+```
