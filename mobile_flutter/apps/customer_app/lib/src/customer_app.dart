@@ -13,6 +13,7 @@ import 'features/onboarding/onboarding_controller.dart';
 import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/permissions/customer_permission_gateway.dart';
+import 'features/profile/customer_engagement_repository.dart';
 
 class PopqCustomerApp extends StatefulWidget {
   const PopqCustomerApp({
@@ -22,6 +23,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.storeDiscoveryRepository,
     this.catalogRepository,
     this.orderRepository,
+    this.engagementRepository,
     this.cartController,
     this.permissionGateway,
     super.key,
@@ -33,6 +35,7 @@ class PopqCustomerApp extends StatefulWidget {
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
   final CustomerOrderRepository? orderRepository;
+  final CustomerEngagementRepository? engagementRepository;
   final CartController? cartController;
   final CustomerPermissionGateway? permissionGateway;
 
@@ -69,6 +72,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.catalogRepository ?? ApiCatalogRepository(_apiClient);
     final orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
+    final engagementRepository =
+        widget.engagementRepository ??
+        ApiCustomerEngagementRepository(_apiClient);
     _cartController = widget.cartController ?? CartController();
     _router = createCustomerRouter(
       sessionController: _sessionController,
@@ -76,6 +82,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       storeDiscoveryRepository: repository,
       catalogRepository: catalogRepository,
       orderRepository: orderRepository,
+      engagementRepository: engagementRepository,
       cartController: _cartController,
       permissionGateway: permissionGateway,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development

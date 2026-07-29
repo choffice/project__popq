@@ -6,6 +6,7 @@ import 'package:popq_customer_app/src/features/discovery/store_discovery_reposit
 import 'package:popq_customer_app/src/features/onboarding/onboarding_store.dart';
 import 'package:popq_customer_app/src/features/orders/customer_order_repository.dart';
 import 'package:popq_customer_app/src/features/permissions/customer_permission_gateway.dart';
+import 'package:popq_customer_app/src/features/profile/customer_engagement_repository.dart';
 
 void main() {
   testWidgets('first launch completes optional permission onboarding', (
@@ -17,6 +18,7 @@ void main() {
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -46,6 +48,7 @@ void main() {
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -76,6 +79,7 @@ void main() {
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -103,6 +107,7 @@ void main() {
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         orderRepository: MemoryCustomerOrderRepository(),
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -134,6 +139,7 @@ void main() {
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         catalogRepository: MemoryCatalogRepository(),
         orderRepository: orderRepository,
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -174,6 +180,7 @@ void main() {
         sessionStore: const _FailingSessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        engagementRepository: MemoryCustomerEngagementRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -181,6 +188,68 @@ void main() {
 
     expect(find.text('잠시 문제가 생겼어요.'), findsOneWidget);
     expect(find.text('다시 시도'), findsOneWidget);
+  });
+
+  testWidgets('signed-in customer sees interests reviews and profile counts', (
+    tester,
+  ) async {
+    final engagementRepository = MemoryCustomerEngagementRepository(
+      profile: const CustomerProfile(
+        userId: 7,
+        email: 'tester@popq.test',
+        name: 'POPQ 테스터',
+        interestCount: 1,
+        reviewCount: 1,
+        orderCount: 3,
+      ),
+      interests: const [
+        InterestedStore(
+          storeId: 1,
+          name: '단골 카페',
+          businessStatus: 'OPEN',
+          address: '서울 성동구',
+        ),
+      ],
+      reviews: [
+        CustomerReview(
+          reviewId: 1,
+          orderPublicId: 'order-1',
+          storeId: 1,
+          storeName: '단골 카페',
+          authorName: 'POPQ 테스터',
+          rating: 5,
+          content: '다시 주문할게요.',
+          status: 'ACTIVE',
+          createdAt: DateTime(2026),
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      PopqCustomerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(
+          AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ),
+        ),
+        onboardingStore: MemoryOnboardingStore.complete(),
+        storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        orderRepository: MemoryCustomerOrderRepository(),
+        engagementRepository: engagementRepository,
+        permissionGateway: MemoryCustomerPermissionGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('마이'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('POPQ 테스터'), findsOneWidget);
+    expect(find.text('단골 카페'), findsNWidgets(2));
+    expect(find.text('다시 주문할게요.'), findsOneWidget);
+    expect(find.text('3'), findsOneWidget);
   });
 }
 

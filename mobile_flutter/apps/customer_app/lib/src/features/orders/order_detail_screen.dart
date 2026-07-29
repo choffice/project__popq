@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../routing/customer_router.dart';
 import 'customer_order_repository.dart';
 
 class OrderDetailScreen extends StatefulWidget {
@@ -97,6 +99,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ),
           const SizedBox(height: PopqSpacing.lg),
+          if (order.status == 'COMPLETED') ...[
+            FilledButton.icon(
+              onPressed: () async {
+                final created = await context.push<bool>(
+                  '${CustomerRoutes.orders}/${order.orderPublicId}/review',
+                );
+                if (!mounted) return;
+                if (created == true) {
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text('리뷰를 등록했어요.')));
+                }
+              },
+              icon: const Icon(Icons.rate_review_rounded),
+              label: const Text('리뷰 작성'),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+          ],
           OutlinedButton.icon(
             onPressed: _syncing ? null : _sync,
             icon: const Icon(Icons.sync_rounded),

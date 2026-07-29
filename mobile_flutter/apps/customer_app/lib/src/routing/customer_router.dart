@@ -10,7 +10,6 @@ import '../features/cart/cart_screen.dart';
 import '../features/catalog/catalog_repository.dart';
 import '../features/catalog/product_detail_screen.dart';
 import '../features/catalog/product_list_screen.dart';
-import '../features/common/section_placeholder_screen.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
@@ -22,6 +21,9 @@ import '../features/orders/customer_order_repository.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
 import '../features/permissions/customer_permission_gateway.dart';
+import '../features/profile/customer_engagement_repository.dart';
+import '../features/profile/customer_profile_screen.dart';
+import '../features/profile/review_editor_screen.dart';
 
 abstract final class CustomerRoutes {
   static const bootstrap = '/bootstrap';
@@ -44,6 +46,7 @@ GoRouter createCustomerRouter({
   required StoreDiscoveryRepository storeDiscoveryRepository,
   required CatalogRepository catalogRepository,
   required CustomerOrderRepository orderRepository,
+  required CustomerEngagementRepository engagementRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   Future<void> Function()? onDevelopmentSignIn,
@@ -190,6 +193,8 @@ GoRouter createCustomerRouter({
           return StoreDetailScreen(
             storeId: storeId,
             repository: storeDiscoveryRepository,
+            engagementRepository: engagementRepository,
+            sessionController: sessionController,
           );
         },
       ),
@@ -203,6 +208,15 @@ GoRouter createCustomerRouter({
           return CheckoutScreen(
             cartController: cartController,
             orderRepository: orderRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: '${CustomerRoutes.orders}/:orderPublicId/review',
+        builder: (context, state) {
+          return ReviewEditorScreen(
+            orderPublicId: state.pathParameters['orderPublicId'] ?? '',
+            repository: engagementRepository,
           );
         },
       ),
@@ -241,10 +255,9 @@ GoRouter createCustomerRouter({
           GoRoute(
             path: CustomerRoutes.profile,
             builder: (context, state) {
-              return const SectionPlaceholderScreen(
-                icon: Icons.person_outline_rounded,
-                title: '마이 POPQ',
-                description: '관심 스토어와 리뷰는 9.4에서 연결합니다.',
+              return CustomerProfileScreen(
+                repository: engagementRepository,
+                onSignOut: sessionController.signOut,
               );
             },
           ),

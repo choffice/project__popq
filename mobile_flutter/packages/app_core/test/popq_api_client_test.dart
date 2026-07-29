@@ -62,4 +62,40 @@ void main() {
       throwsA(isA<AuthenticationFailure>()),
     );
   });
+
+  test('API client sends JSON PUT and authenticated DELETE requests', () async {
+    final requests = <http.Request>[];
+    final apiClient = PopqApiClient(
+      baseUrl: 'https://api.popq.test',
+      accessTokenReader: () async => 'access-token',
+      httpClient: MockClient((request) async {
+        requests.add(request);
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {'updated': true},
+            'error': null,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }),
+    );
+
+    await apiClient.put<Map<String, Object?>>(
+      '/api/v1/customer/reviews/7',
+      body: {'rating': 5},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+    await apiClient.delete<Map<String, Object?>>(
+      '/api/v1/customer/reviews/7',
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+
+    expect(requests[0].method, 'PUT');
+    expect(requests[0].headers['Authorization'], 'Bearer access-token');
+    expect(jsonDecode(requests[0].body), {'rating': 5});
+    expect(requests[1].method, 'DELETE');
+    expect(requests[1].headers['Authorization'], 'Bearer access-token');
+  });
 }

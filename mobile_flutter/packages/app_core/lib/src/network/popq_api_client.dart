@@ -39,6 +39,18 @@ class PopqApiClient {
     return _send(method: 'POST', path: path, body: body, decode: decode);
   }
 
+  Future<T> put<T>(
+    String path, {
+    Object? body,
+    required ApiDataDecoder<T> decode,
+  }) {
+    return _send(method: 'PUT', path: path, body: body, decode: decode);
+  }
+
+  Future<T> delete<T>(String path, {required ApiDataDecoder<T> decode}) {
+    return _send(method: 'DELETE', path: path, decode: decode);
+  }
+
   Future<T> _send<T>({
     required String method,
     required String path,
@@ -67,6 +79,18 @@ class PopqApiClient {
                 headers: headers,
                 body: body == null ? null : jsonEncode(body),
               )
+              .timeout(requestTimeout),
+        'PUT' =>
+          await _httpClient
+              .put(
+                uri,
+                headers: headers,
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(requestTimeout),
+        'DELETE' =>
+          await _httpClient
+              .delete(uri, headers: headers)
               .timeout(requestTimeout),
         _ => throw ArgumentError.value(method, 'method'),
       };
