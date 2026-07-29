@@ -82,6 +82,36 @@ class AuthApiIntegrationTests {
     }
 
     @Test
+    void sameEmailCannotSwitchBetweenSellerAndCustomerRoles()
+            throws Exception {
+        String accessToken = login(
+                "role-boundary@popq.test",
+                "역할 경계 판매자",
+                "SELLER"
+        );
+
+        mockMvc.perform(post("/api/v1/dev/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "ROLE-BOUNDARY@POPQ.TEST",
+                                  "name": "역할 변경 시도",
+                                  "role": "CUSTOMER"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("DUPLICATE_USER"));
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.email")
+                        .value("role-boundary@popq.test"))
+                .andExpect(jsonPath("$.data.role").value("SELLER"));
+    }
+
+    @Test
     void devLoginRejectsAdminRole() throws Exception {
         mockMvc.perform(post("/api/v1/dev/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
