@@ -70,6 +70,7 @@ class OrderRealtimeCommitIntegrationTests {
                 "order-public-id",
                 1L,
                 2L,
+                null,
                 OrderStatus.CREATED,
                 OrderStatus.PLACED,
                 Instant.parse("2026-07-29T00:00:00Z"),

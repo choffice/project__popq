@@ -17,12 +17,16 @@ public class OrderDomainEventPublisher {
         Long guestSessionId = order.getGuestSession() == null
                 ? null
                 : order.getGuestSession().getId();
+        Long userId = order.getUser() == null
+                ? null
+                : order.getUser().getId();
         applicationEventPublisher.publishEvent(new OrderRealtimeEvent(
                 UUID.randomUUID().toString(),
                 OrderRealtimeEventType.from(transition.currentStatus()),
                 order.getOrderPublicId(),
                 order.getStore().getId(),
                 guestSessionId,
+                userId,
                 transition.previousStatus(),
                 transition.currentStatus(),
                 transition.occurredAt(),

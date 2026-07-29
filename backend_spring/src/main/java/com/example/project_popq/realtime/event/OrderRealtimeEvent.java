@@ -9,6 +9,7 @@ public record OrderRealtimeEvent(
         String orderPublicId,
         Long storeId,
         Long guestSessionId,
+        Long userId,
         OrderStatus previousStatus,
         OrderStatus currentStatus,
         Instant occurredAt,
