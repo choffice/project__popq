@@ -5,11 +5,12 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
-import '../features/common/seller_section_placeholder.dart';
 import '../features/home/seller_home_screen.dart';
 import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
+import '../features/products/seller_product_list_screen.dart';
+import '../features/products/seller_product_repository.dart';
 import '../features/stores/seller_store_repository.dart';
 import '../features/stores/seller_store_selection_controller.dart';
 import '../features/stores/store_selection_screen.dart';
@@ -31,6 +32,7 @@ GoRouter createSellerRouter({
   required SellerStoreSelectionController storeSelectionController,
   required SellerStoreRepository storeRepository,
   required SellerOrderRepository orderRepository,
+  required SellerProductRepository productRepository,
   required Future<void> Function() onSignOut,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -149,10 +151,9 @@ GoRouter createSellerRouter({
           GoRoute(
             path: SellerRoutes.products,
             builder: (context, state) {
-              return const SellerSectionPlaceholder(
-                icon: Icons.inventory_2_outlined,
-                title: '상품·품절',
-                description: '판매 상태와 빠른 품절 처리는 9.6C에서 연결합니다.',
+              return SellerProductListScreen(
+                repository: productRepository,
+                selectionController: storeSelectionController,
               );
             },
           ),

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dart';
 import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
+import 'package:popq_seller_app/src/features/products/seller_product_repository.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_repository.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_selection_store.dart';
 import 'package:popq_seller_app/src/seller_app.dart';
@@ -19,6 +20,7 @@ void main() {
         storeRepository: MemorySellerStoreRepository(),
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -39,6 +41,7 @@ void main() {
         storeRepository: MemorySellerStoreRepository(),
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -71,6 +74,7 @@ void main() {
           ),
         ),
         orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -113,6 +117,7 @@ void main() {
         storeRepository: repository,
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -157,6 +162,7 @@ void main() {
           storeRepository: MemorySellerStoreRepository(),
           identityRepository: const MemorySellerIdentityRepository(),
           orderRepository: orderRepository,
+          productRepository: MemorySellerProductRepository(),
         ),
       );
       await tester.pumpAndSettle();
@@ -210,6 +216,85 @@ void main() {
       throwsStateError,
     );
   });
+
+  testWidgets(
+    'selected store manages sold-out and channel availability in isolation',
+    (tester) async {
+      final productRepository = MemorySellerProductRepository(
+        products: [
+          _product(productId: 101, storeId: 1, name: '성수 아메리카노'),
+          _product(productId: 202, storeId: 2, name: '다른 스토어 라떼'),
+        ],
+      );
+      await tester.pumpWidget(
+        PopqSellerApp(
+          environment: const AppEnvironment.local(),
+          sessionStore: _validSessionStore(),
+          storeSelectionStore: MemorySellerStoreSelectionStore(1),
+          storeRepository: MemorySellerStoreRepository(),
+          identityRepository: const MemorySellerIdentityRepository(),
+          orderRepository: MemorySellerOrderRepository(),
+          productRepository: productRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('상품'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('성수 아메리카노'), findsOneWidget);
+      expect(find.text('다른 스토어 라떼'), findsNothing);
+
+      final soldOutSwitch = find.byKey(const Key('sold-out-101'));
+      await tester.ensureVisible(soldOutSwitch);
+      await tester.tap(soldOutSwitch);
+      await tester.pumpAndSettle();
+
+      var updated = (await productRepository.findAll(1)).single;
+      expect(updated.soldOut, isTrue);
+      expect(updated.availableForCustomerApp, isFalse);
+      expect(updated.availableForQr, isFalse);
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      final customerSwitch = find.byKey(const Key('customer-app-101'));
+      await tester.ensureVisible(customerSwitch);
+      final customerControl = find.descendant(
+        of: customerSwitch,
+        matching: find.byType(Switch),
+      );
+      tester.widget<Switch>(customerControl).onChanged!(false);
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      final qrSwitch = find.byKey(const Key('qr-web-101'));
+      await tester.ensureVisible(qrSwitch);
+      final qrControl = find.descendant(
+        of: qrSwitch,
+        matching: find.byType(Switch),
+      );
+      tester.widget<Switch>(qrControl).onChanged!(false);
+      await tester.pumpAndSettle();
+
+      updated = (await productRepository.findAll(1)).single;
+      expect(updated.customerAppEnabled, isFalse);
+      expect(updated.qrWebEnabled, isFalse);
+      expect(updated.soldOut, isTrue);
+    },
+  );
+
+  test('repository denies a product outside the selected store', () async {
+    final repository = MemorySellerProductRepository(
+      products: [_product(productId: 7, storeId: 2, name: '타 스토어 상품')],
+    );
+    final foreignProduct = (await repository.findAll(2)).single;
+
+    await expectLater(
+      repository.updateAvailability(1, foreignProduct, soldOut: true),
+      throwsStateError,
+    );
+  });
 }
 
 MemorySessionStore _validSessionStore() {
@@ -248,5 +333,26 @@ SellerOrder _order({
         options: [],
       ),
     ],
+  );
+}
+
+SellerProduct _product({
+  required int productId,
+  required int storeId,
+  required String name,
+}) {
+  return SellerProduct(
+    productId: productId,
+    storeId: storeId,
+    categoryId: 1,
+    categoryName: '커피',
+    name: name,
+    basePrice: 4500,
+    status: 'ACTIVE',
+    soldOut: false,
+    availableForQr: true,
+    availableForCustomerApp: true,
+    qrWebEnabled: true,
+    customerAppEnabled: true,
   );
 }

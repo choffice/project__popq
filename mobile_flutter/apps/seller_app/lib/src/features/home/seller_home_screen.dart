@@ -117,7 +117,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               const PopqFeatureCard(
                 icon: Icons.inventory_2_outlined,
                 title: '빠른 품절 관리',
-                description: '상품 판매 상태는 9.6C에서 연결합니다.',
+                description: '상품 탭에서 품절과 채널별 판매 상태를 관리할 수 있습니다.',
               ),
               const SizedBox(height: PopqSpacing.sm),
               const PopqFeatureCard(
