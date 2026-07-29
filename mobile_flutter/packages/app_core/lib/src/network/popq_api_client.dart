@@ -47,6 +47,14 @@ class PopqApiClient {
     return _send(method: 'PUT', path: path, body: body, decode: decode);
   }
 
+  Future<T> patch<T>(
+    String path, {
+    Object? body,
+    required ApiDataDecoder<T> decode,
+  }) {
+    return _send(method: 'PATCH', path: path, body: body, decode: decode);
+  }
+
   Future<T> delete<T>(String path, {required ApiDataDecoder<T> decode}) {
     return _send(method: 'DELETE', path: path, decode: decode);
   }
@@ -83,6 +91,14 @@ class PopqApiClient {
         'PUT' =>
           await _httpClient
               .put(
+                uri,
+                headers: headers,
+                body: body == null ? null : jsonEncode(body),
+              )
+              .timeout(requestTimeout),
+        'PATCH' =>
+          await _httpClient
+              .patch(
                 uri,
                 headers: headers,
                 body: body == null ? null : jsonEncode(body),
