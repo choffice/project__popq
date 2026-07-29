@@ -731,4 +731,5 @@ Flyway를 사용하고 운영에서는 `ddl-auto=validate`를 적용한다.
 - Flutter 9.4에서 관심 스토어, 완료 주문당 1개 리뷰, 공개 리뷰, 마이페이지 집계·수정·삭제를 구현하고 Spring 테스트 51개, Flutter 테스트 19개 및 소비자 Android APK 빌드 통과
 - Flutter 9.5 기반에서 기기 토큰·주문 알림 내역·읽음 상태·알림 배지·주문 딥링크를 구현하고 Spring 테스트 52개, Flutter 테스트 20개 및 소비자 Android APK 빌드 통과. 실제 FCM 송수신은 Firebase 프로젝트 설정 대기
 - Flutter 9.6A에서 판매자 전용 세션·역할 재검증·스토어 선택·계정 전환 정리를 구현하고 Spring 테스트 53개, Flutter 테스트 23개 및 판매자 Android APK 빌드 통과
+- Flutter 9.6B에서 선택 스토어 주문 목록·필터·상세·버전 동기화와 접수·거절·준비·완료 상태 전이를 구현하고 타 스토어 주문 격리를 검증해 Spring 테스트 53개, Flutter 테스트 25개 및 판매자 Android APK 빌드 통과
 - 상위 CRA 루트 앱은 참고용으로 보존하고 `web_react/popq`는 QR 주문 웹, `web_react/seller-web`은 판매자 웹으로 사용한다.
