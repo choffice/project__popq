@@ -11,6 +11,7 @@ import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/onboarding/onboarding_controller.dart';
 import 'features/onboarding/onboarding_store.dart';
+import 'features/notifications/customer_notification_repository.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_engagement_repository.dart';
@@ -24,6 +25,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.catalogRepository,
     this.orderRepository,
     this.engagementRepository,
+    this.notificationRepository,
     this.cartController,
     this.permissionGateway,
     super.key,
@@ -36,6 +38,7 @@ class PopqCustomerApp extends StatefulWidget {
   final CatalogRepository? catalogRepository;
   final CustomerOrderRepository? orderRepository;
   final CustomerEngagementRepository? engagementRepository;
+  final CustomerNotificationRepository? notificationRepository;
   final CartController? cartController;
   final CustomerPermissionGateway? permissionGateway;
 
@@ -75,6 +78,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     final engagementRepository =
         widget.engagementRepository ??
         ApiCustomerEngagementRepository(_apiClient);
+    final notificationRepository =
+        widget.notificationRepository ??
+        ApiCustomerNotificationRepository(_apiClient);
     _cartController = widget.cartController ?? CartController();
     _router = createCustomerRouter(
       sessionController: _sessionController,
@@ -83,6 +89,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       catalogRepository: catalogRepository,
       orderRepository: orderRepository,
       engagementRepository: engagementRepository,
+      notificationRepository: notificationRepository,
       cartController: _cartController,
       permissionGateway: permissionGateway,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development

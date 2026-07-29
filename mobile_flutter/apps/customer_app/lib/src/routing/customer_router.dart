@@ -16,6 +16,8 @@ import '../features/discovery/store_discovery_screen.dart';
 import '../features/home/customer_home_screen.dart';
 import '../features/onboarding/onboarding_controller.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/notifications/customer_notification_repository.dart';
+import '../features/notifications/notification_list_screen.dart';
 import '../features/orders/checkout_screen.dart';
 import '../features/orders/customer_order_repository.dart';
 import '../features/orders/order_detail_screen.dart';
@@ -38,6 +40,7 @@ abstract final class CustomerRoutes {
   static const checkout = '/checkout';
   static const orders = '/orders';
   static const profile = '/profile';
+  static const notifications = '/notifications';
 }
 
 GoRouter createCustomerRouter({
@@ -47,6 +50,7 @@ GoRouter createCustomerRouter({
   required CatalogRepository catalogRepository,
   required CustomerOrderRepository orderRepository,
   required CustomerEngagementRepository engagementRepository,
+  required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   Future<void> Function()? onDevelopmentSignIn,
@@ -88,7 +92,8 @@ GoRouter createCustomerRouter({
           location == CustomerRoutes.checkout ||
           location == CustomerRoutes.orders ||
           location.startsWith('${CustomerRoutes.orders}/') ||
-          location == CustomerRoutes.profile;
+          location == CustomerRoutes.profile ||
+          location == CustomerRoutes.notifications;
       if (requiresSession && !sessionController.isSignedIn) {
         final from = Uri.encodeComponent(state.uri.toString());
         return '${CustomerRoutes.signIn}?from=$from';
@@ -212,6 +217,12 @@ GoRouter createCustomerRouter({
         },
       ),
       GoRoute(
+        path: CustomerRoutes.notifications,
+        builder: (context, state) {
+          return NotificationListScreen(repository: notificationRepository);
+        },
+      ),
+      GoRoute(
         path: '${CustomerRoutes.orders}/:orderPublicId/review',
         builder: (context, state) {
           return ReviewEditorScreen(
@@ -231,7 +242,12 @@ GoRouter createCustomerRouter({
       ),
       ShellRoute(
         builder: (context, state, child) {
-          return CustomerRootScreen(location: state.uri.path, child: child);
+          return CustomerRootScreen(
+            location: state.uri.path,
+            notificationRepository: notificationRepository,
+            sessionController: sessionController,
+            child: child,
+          );
         },
         routes: [
           GoRoute(

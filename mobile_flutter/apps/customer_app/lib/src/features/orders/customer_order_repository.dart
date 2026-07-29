@@ -183,7 +183,10 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
 }
 
 class MemoryCustomerOrderRepository implements CustomerOrderRepository {
-  final List<CustomerOrder> _orders = [];
+  MemoryCustomerOrderRepository({List<CustomerOrder> orders = const []})
+    : _orders = List.of(orders);
+
+  final List<CustomerOrder> _orders;
 
   @override
   Future<CustomerOrder> create({

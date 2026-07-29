@@ -3,6 +3,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_customer_app/src/customer_app.dart';
 import 'package:popq_customer_app/src/features/catalog/catalog_repository.dart';
 import 'package:popq_customer_app/src/features/discovery/store_discovery_repository.dart';
+import 'package:popq_customer_app/src/features/notifications/customer_notification_repository.dart';
 import 'package:popq_customer_app/src/features/onboarding/onboarding_store.dart';
 import 'package:popq_customer_app/src/features/orders/customer_order_repository.dart';
 import 'package:popq_customer_app/src/features/permissions/customer_permission_gateway.dart';
@@ -19,6 +20,7 @@ void main() {
         onboardingStore: MemoryOnboardingStore(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -49,6 +51,7 @@ void main() {
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -80,6 +83,7 @@ void main() {
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -108,6 +112,7 @@ void main() {
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         orderRepository: MemoryCustomerOrderRepository(),
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -140,6 +145,7 @@ void main() {
         catalogRepository: MemoryCatalogRepository(),
         orderRepository: orderRepository,
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -181,6 +187,7 @@ void main() {
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -238,6 +245,7 @@ void main() {
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
         orderRepository: MemoryCustomerOrderRepository(),
         engagementRepository: engagementRepository,
+        notificationRepository: MemoryCustomerNotificationRepository(),
         permissionGateway: MemoryCustomerPermissionGateway(),
       ),
     );
@@ -250,6 +258,76 @@ void main() {
     expect(find.text('단골 카페'), findsNWidgets(2));
     expect(find.text('다시 주문할게요.'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
+  });
+
+  testWidgets('notification opens order detail and marks itself read', (
+    tester,
+  ) async {
+    final notificationRepository = MemoryCustomerNotificationRepository(
+      notifications: [
+        CustomerNotification(
+          notificationId: 1,
+          type: 'ORDER_STATUS',
+          targetType: 'ORDER',
+          targetId: 'memory-order-1',
+          title: '주문 상품이 준비됐어요',
+          message: '스토어에서 상품을 수령해 주세요.',
+          deepLink: '/orders/memory-order-1',
+          read: false,
+          occurredAt: DateTime(2026, 7, 29, 17, 30),
+        ),
+      ],
+    );
+    final orderRepository = MemoryCustomerOrderRepository(
+      orders: const [
+        CustomerOrder(
+          orderPublicId: 'memory-order-1',
+          storeId: 1,
+          storeName: '단골 카페',
+          status: 'READY',
+          totalAmount: 5000,
+          version: 4,
+          items: [
+            CustomerOrderItem(
+              productName: '아메리카노',
+              quantity: 1,
+              itemTotalPrice: 5000,
+            ),
+          ],
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      PopqCustomerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(
+          AuthSession(
+            accessToken: 'access',
+            refreshToken: 'refresh',
+            expiresAt: DateTime.now().add(const Duration(hours: 1)),
+          ),
+        ),
+        onboardingStore: MemoryOnboardingStore.complete(),
+        storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
+        orderRepository: orderRepository,
+        engagementRepository: MemoryCustomerEngagementRepository(),
+        notificationRepository: notificationRepository,
+        permissionGateway: MemoryCustomerPermissionGateway(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('1'), findsOneWidget);
+    await tester.tap(find.byTooltip('알림'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('주문 상품이 준비됐어요'), findsOneWidget);
+    await tester.tap(find.text('주문 상품이 준비됐어요'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('주문 상세'), findsOneWidget);
+    expect(find.text('준비가 완료됐어요'), findsOneWidget);
+    expect(await notificationRepository.unreadCount(), 0);
   });
 }
 

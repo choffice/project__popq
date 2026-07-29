@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 
+import 'features/notifications/customer_notification_repository.dart';
+import 'features/notifications/notification_action.dart';
 import 'routing/customer_router.dart';
 
 class CustomerRootScreen extends StatelessWidget {
   const CustomerRootScreen({
     required this.location,
     required this.child,
+    required this.notificationRepository,
+    required this.sessionController,
     super.key,
   });
 
@@ -21,12 +26,20 @@ class CustomerRootScreen extends StatelessWidget {
 
   final String location;
   final Widget child;
+  final CustomerNotificationRepository notificationRepository;
+  final SessionController sessionController;
 
   @override
   Widget build(BuildContext context) {
     final selectedIndex = _indexForLocation(location);
     return PopqAppScaffold(
       title: _titles[selectedIndex],
+      actions: [
+        NotificationAction(
+          repository: notificationRepository,
+          sessionController: sessionController,
+        ),
+      ],
       selectedIndex: selectedIndex,
       onDestinationSelected: (index) => context.go(_locations[index]),
       destinations: const [
