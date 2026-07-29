@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dart';
+import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_repository.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_selection_store.dart';
 import 'package:popq_seller_app/src/seller_app.dart';
@@ -16,6 +18,7 @@ void main() {
         storeSelectionStore: MemorySellerStoreSelectionStore(),
         storeRepository: MemorySellerStoreRepository(),
         identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -35,6 +38,7 @@ void main() {
         storeSelectionStore: MemorySellerStoreSelectionStore(1),
         storeRepository: MemorySellerStoreRepository(),
         identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -44,8 +48,7 @@ void main() {
 
     await tester.tap(find.text('주문'));
     await tester.pumpAndSettle();
-    expect(find.text('신규 주문'), findsWidgets);
-    expect(find.textContaining('9.6B'), findsOneWidget);
+    expect(find.text('아직 주문이 없어요.'), findsOneWidget);
   });
 
   testWidgets('customer identity is rejected and account state is cleared', (
@@ -67,6 +70,7 @@ void main() {
             role: 'CUSTOMER',
           ),
         ),
+        orderRepository: MemorySellerOrderRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -108,6 +112,7 @@ void main() {
         storeSelectionStore: selectionStore,
         storeRepository: repository,
         identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -126,6 +131,85 @@ void main() {
     expect(await sessionStore.read(), isNull);
     expect(await selectionStore.read(), isNull);
   });
+
+  testWidgets(
+    'selected store sees only its orders and completes the valid lifecycle',
+    (tester) async {
+      final orderRepository = MemorySellerOrderRepository(
+        orders: [
+          _order(
+            orderPublicId: 'store-one-order',
+            storeId: 1,
+            storeName: '성수 커피 연구소',
+          ),
+          _order(
+            orderPublicId: 'store-two-order',
+            storeId: 2,
+            storeName: '다른 판매자 스토어',
+          ),
+        ],
+      );
+      await tester.pumpWidget(
+        PopqSellerApp(
+          environment: const AppEnvironment.local(),
+          sessionStore: _validSessionStore(),
+          storeSelectionStore: MemorySellerStoreSelectionStore(1),
+          storeRepository: MemorySellerStoreRepository(),
+          identityRepository: const MemorySellerIdentityRepository(),
+          orderRepository: orderRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('주문'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('store-one-order'), findsOneWidget);
+      expect(find.textContaining('store-two-order'), findsNothing);
+
+      await tester.tap(find.textContaining('store-one-order'));
+      await tester.pumpAndSettle();
+      expect(find.text('접수 대기'), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('accept-order')));
+      await tester.pumpAndSettle();
+      expect(find.text('접수 완료'), findsAtLeastNWidgets(1));
+
+      await tester.tap(find.byKey(const Key('prepare-order')));
+      await tester.pumpAndSettle();
+      expect(find.text('준비 중'), findsAtLeastNWidgets(1));
+
+      await tester.tap(find.byKey(const Key('ready-order')));
+      await tester.pumpAndSettle();
+      expect(find.text('준비 완료'), findsAtLeastNWidgets(1));
+
+      await tester.tap(find.byKey(const Key('complete-order')));
+      await tester.pumpAndSettle();
+      expect(find.text('주문 완료'), findsAtLeastNWidgets(1));
+      expect(find.byKey(const Key('complete-order')), findsNothing);
+
+      final completed = await orderRepository.findOne(1, 'store-one-order');
+      expect(completed.status, 'COMPLETED');
+      expect(completed.version, 5);
+    },
+  );
+
+  test('repository denies an order outside the selected store', () async {
+    final repository = MemorySellerOrderRepository(
+      orders: [
+        _order(
+          orderPublicId: 'other-store-order',
+          storeId: 2,
+          storeName: '다른 판매자 스토어',
+        ),
+      ],
+    );
+
+    await expectLater(
+      repository.findOne(1, 'other-store-order'),
+      throwsStateError,
+    );
+  });
 }
 
 MemorySessionStore _validSessionStore() {
@@ -135,5 +219,34 @@ MemorySessionStore _validSessionStore() {
       refreshToken: 'seller-refresh',
       expiresAt: DateTime.now().add(const Duration(hours: 1)),
     ),
+  );
+}
+
+SellerOrder _order({
+  required String orderPublicId,
+  required int storeId,
+  required String storeName,
+}) {
+  return SellerOrder(
+    orderPublicId: orderPublicId,
+    storeId: storeId,
+    storeName: storeName,
+    orderType: 'TAKEOUT',
+    status: 'PLACED',
+    subtotalAmount: 6500,
+    discountAmount: 0,
+    taxAmount: 0,
+    serviceFeeAmount: 0,
+    totalAmount: 6500,
+    version: 1,
+    items: const [
+      SellerOrderItem(
+        productName: '아메리카노',
+        quantity: 1,
+        unitPrice: 6500,
+        itemTotalPrice: 6500,
+        options: [],
+      ),
+    ],
   );
 }

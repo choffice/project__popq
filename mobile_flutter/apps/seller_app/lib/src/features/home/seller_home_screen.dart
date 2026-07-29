@@ -110,7 +110,7 @@ class _SellerHomeScreenState extends State<SellerHomeScreen> {
               const PopqFeatureCard(
                 icon: Icons.notifications_active_outlined,
                 title: '신규 주문 확인',
-                description: '주문 처리 기능은 9.6B에서 연결합니다.',
+                description: '주문 탭에서 접수부터 완료까지 처리할 수 있습니다.',
                 accent: Color(0xFFFFD2C9),
               ),
               const SizedBox(height: PopqSpacing.sm),

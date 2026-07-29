@@ -7,6 +7,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/auth/seller_bootstrap_controller.dart';
 import 'features/auth/seller_identity_repository.dart';
+import 'features/orders/seller_order_repository.dart';
 import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
@@ -19,6 +20,7 @@ class PopqSellerApp extends StatefulWidget {
     this.storeSelectionStore,
     this.storeRepository,
     this.identityRepository,
+    this.orderRepository,
     super.key,
   });
 
@@ -27,6 +29,7 @@ class PopqSellerApp extends StatefulWidget {
   final SellerStoreSelectionStore? storeSelectionStore;
   final SellerStoreRepository? storeRepository;
   final SellerIdentityRepository? identityRepository;
+  final SellerOrderRepository? orderRepository;
 
   @override
   State<PopqSellerApp> createState() => _PopqSellerAppState();
@@ -38,6 +41,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final SellerStoreSelectionController _storeSelectionController;
   late final SellerBootstrapController _bootstrapController;
   late final SellerStoreRepository _storeRepository;
+  late final SellerOrderRepository _orderRepository;
   late final PopqApiClient _apiClient;
   late final GoRouter _router;
 
@@ -58,6 +62,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     );
     _storeRepository =
         widget.storeRepository ?? ApiSellerStoreRepository(_apiClient);
+    _orderRepository =
+        widget.orderRepository ?? ApiSellerOrderRepository(_apiClient);
     final identityRepository =
         widget.identityRepository ?? ApiSellerIdentityRepository(_apiClient);
     _bootstrapController = SellerBootstrapController(
@@ -70,6 +76,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       bootstrapController: _bootstrapController,
       storeSelectionController: _storeSelectionController,
       storeRepository: _storeRepository,
+      orderRepository: _orderRepository,
       onSignOut: _bootstrapController.signOut,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn

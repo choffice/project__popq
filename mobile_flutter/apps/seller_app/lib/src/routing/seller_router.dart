@@ -7,6 +7,9 @@ import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
 import '../features/common/seller_section_placeholder.dart';
 import '../features/home/seller_home_screen.dart';
+import '../features/orders/seller_order_detail_screen.dart';
+import '../features/orders/seller_order_list_screen.dart';
+import '../features/orders/seller_order_repository.dart';
 import '../features/stores/seller_store_repository.dart';
 import '../features/stores/seller_store_selection_controller.dart';
 import '../features/stores/store_selection_screen.dart';
@@ -27,6 +30,7 @@ GoRouter createSellerRouter({
   required SellerBootstrapController bootstrapController,
   required SellerStoreSelectionController storeSelectionController,
   required SellerStoreRepository storeRepository,
+  required SellerOrderRepository orderRepository,
   required Future<void> Function() onSignOut,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -105,6 +109,16 @@ GoRouter createSellerRouter({
           );
         },
       ),
+      GoRoute(
+        path: '${SellerRoutes.orders}/:orderPublicId',
+        builder: (context, state) {
+          return SellerOrderDetailScreen(
+            orderPublicId: state.pathParameters['orderPublicId']!,
+            repository: orderRepository,
+            selectionController: storeSelectionController,
+          );
+        },
+      ),
       ShellRoute(
         builder: (context, state, child) {
           return SellerRootScreen(
@@ -126,10 +140,9 @@ GoRouter createSellerRouter({
           GoRoute(
             path: SellerRoutes.orders,
             builder: (context, state) {
-              return const SellerSectionPlaceholder(
-                icon: Icons.notifications_active_outlined,
-                title: '신규 주문',
-                description: '주문 조회와 상태 처리는 9.6B에서 연결합니다.',
+              return SellerOrderListScreen(
+                repository: orderRepository,
+                selectionController: storeSelectionController,
               );
             },
           ),
