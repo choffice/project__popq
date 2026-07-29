@@ -42,6 +42,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 
+    long countByUserId(Long userId);
+
     @EntityGraph(attributePaths = "statusHistories")
     @Query("""
             select o
