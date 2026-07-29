@@ -13,12 +13,13 @@ class SellerRootScreen extends StatelessWidget {
   });
 
   static const _locations = [
-    SellerRoutes.home,
+    SellerRoutes.dashboard,
+    SellerRoutes.operations,
     SellerRoutes.orders,
-    SellerRoutes.products,
-    SellerRoutes.stores,
+    SellerRoutes.customers,
+    SellerRoutes.sales,
   ];
-  static const _titles = ['오늘의 운영', '주문', '상품', '내 스토어'];
+  static const _titles = ['대시보드', '운영', '주문 관리', '고객', '매출'];
 
   final String location;
   final Future<void> Function() onSignOut;
@@ -30,10 +31,10 @@ class SellerRootScreen extends StatelessWidget {
     return PopqAppScaffold(
       title: _titles[selectedIndex],
       actions: [
-        if (location != SellerRoutes.stores)
+        if (location != SellerRoutes.dashboard)
           IconButton(
-            tooltip: '스토어 전환',
-            onPressed: () => context.go(SellerRoutes.stores),
+            tooltip: '사업장 전환',
+            onPressed: () => context.go(SellerRoutes.dashboard),
             icon: const Icon(Icons.swap_horiz_rounded),
           ),
         IconButton(
@@ -46,8 +47,13 @@ class SellerRootScreen extends StatelessWidget {
       onDestinationSelected: (index) => context.go(_locations[index]),
       destinations: const [
         NavigationDestination(
-          icon: Icon(Icons.space_dashboard_outlined),
-          selectedIcon: Icon(Icons.space_dashboard_rounded),
+          icon: Icon(Icons.business_outlined),
+          selectedIcon: Icon(Icons.business_rounded),
+          label: '대시보드',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.tune_outlined),
+          selectedIcon: Icon(Icons.tune_rounded),
           label: '운영',
         ),
         NavigationDestination(
@@ -56,14 +62,14 @@ class SellerRootScreen extends StatelessWidget {
           label: '주문',
         ),
         NavigationDestination(
-          icon: Icon(Icons.inventory_2_outlined),
-          selectedIcon: Icon(Icons.inventory_2_rounded),
-          label: '상품',
+          icon: Icon(Icons.forum_outlined),
+          selectedIcon: Icon(Icons.forum_rounded),
+          label: '고객',
         ),
         NavigationDestination(
-          icon: Icon(Icons.storefront_outlined),
-          selectedIcon: Icon(Icons.storefront_rounded),
-          label: '스토어',
+          icon: Icon(Icons.query_stats_outlined),
+          selectedIcon: Icon(Icons.query_stats_rounded),
+          label: '매출',
         ),
       ],
       body: child,

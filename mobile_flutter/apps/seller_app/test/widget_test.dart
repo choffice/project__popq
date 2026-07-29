@@ -50,7 +50,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('성수 커피 연구소'), findsOneWidget);
-    expect(find.text('영업 준비'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('영업 준비'), findsAtLeastNWidgets(1));
 
     await tester.tap(find.text('주문'));
     await tester.pumpAndSettle();
@@ -127,7 +127,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('운영할 스토어를 선택하세요.'), findsOneWidget);
+    expect(find.text('사업장 대시보드'), findsOneWidget);
     await tester.tap(find.text('두 번째 팝업'));
     await tester.pumpAndSettle();
 
@@ -246,7 +246,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('상품'));
+      await tester.tap(find.text('운영'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('메뉴 관리'));
       await tester.pumpAndSettle();
 
       expect(find.text('성수 아메리카노'), findsOneWidget);
@@ -349,14 +351,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('12,000원'), findsOneWidget);
+      await tester.tap(find.text('매출'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('12,000원'), findsAtLeastNWidgets(1));
       expect(find.text('2건'), findsOneWidget);
       expect(find.text('999,999원'), findsNothing);
       await tester.drag(find.byType(ListView), const Offset(0, -500));
       await tester.pumpAndSettle();
       expect(find.text('아메리카노'), findsOneWidget);
 
-      await tester.drag(find.byType(ListView), const Offset(0, 500));
+      await tester.tap(find.text('운영'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('영업 중'));
       await tester.pumpAndSettle();
@@ -366,6 +371,35 @@ void main() {
       expect(find.text('영업 중'), findsAtLeastNWidgets(1));
     },
   );
+
+  testWidgets('dashboard registers and selects a new business', (tester) async {
+    final storeRepository = MemorySellerStoreRepository(stores: []);
+    final selectionStore = MemorySellerStoreSelectionStore();
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: _validSessionStore(),
+        storeSelectionStore: selectionStore,
+        storeRepository: storeRepository,
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('등록된 사업장이 없어요.'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('add-store')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('store-name')), '신규 강남 사업장');
+    await tester.tap(find.byKey(const Key('submit-store')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('신규 강남 사업장'), findsOneWidget);
+    expect(await selectionStore.read(), 1);
+    expect((await storeRepository.findAll()).single.name, '신규 강남 사업장');
+  });
 }
 
 MemorySessionStore _validSessionStore() {

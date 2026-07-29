@@ -5,13 +5,14 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
-import '../features/home/seller_home_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
+import '../features/customers/seller_customer_screen.dart';
+import '../features/operations/seller_operation_screen.dart';
 import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
-import '../features/products/seller_product_list_screen.dart';
 import '../features/products/seller_product_repository.dart';
+import '../features/sales/seller_sales_screen.dart';
 import '../features/stores/seller_store_repository.dart';
 import '../features/stores/seller_store_selection_controller.dart';
 import '../features/stores/store_selection_screen.dart';
@@ -21,10 +22,11 @@ abstract final class SellerRoutes {
   static const bootstrap = '/bootstrap';
   static const bootstrapError = '/bootstrap-error';
   static const signIn = '/sign-in';
-  static const home = '/home';
+  static const dashboard = '/dashboard';
+  static const operations = '/operations';
   static const orders = '/orders';
-  static const products = '/products';
-  static const stores = '/stores';
+  static const customers = '/customers';
+  static const sales = '/sales';
 }
 
 GoRouter createSellerRouter({
@@ -39,7 +41,7 @@ GoRouter createSellerRouter({
   Future<void> Function()? onDevelopmentSignIn,
 }) {
   return GoRouter(
-    initialLocation: SellerRoutes.home,
+    initialLocation: SellerRoutes.dashboard,
     refreshListenable: Listenable.merge([
       bootstrapController,
       sessionController,
@@ -59,29 +61,25 @@ GoRouter createSellerRouter({
       }
       if (isBootstrap || isBootstrapError) {
         if (!sessionController.isSignedIn) return SellerRoutes.signIn;
-        return storeSelectionController.hasSelection
-            ? SellerRoutes.home
-            : SellerRoutes.stores;
+        return SellerRoutes.dashboard;
       }
       if (!sessionController.isSignedIn) {
         return isSignIn ? null : SellerRoutes.signIn;
       }
       if (isSignIn) {
-        if (!storeSelectionController.hasSelection) {
-          return SellerRoutes.stores;
-        }
-        return state.uri.queryParameters['from'] ?? SellerRoutes.home;
+        return state.uri.queryParameters['from'] ?? SellerRoutes.dashboard;
       }
       if (!storeSelectionController.hasSelection &&
-          location != SellerRoutes.stores) {
-        return SellerRoutes.stores;
+          location != SellerRoutes.dashboard &&
+          location != SellerRoutes.customers) {
+        return SellerRoutes.dashboard;
       }
       return null;
     },
     errorBuilder: (context, state) {
       return PopqErrorView(
         message: '요청한 판매자 화면을 찾을 수 없어요.',
-        onRetry: () => context.go(SellerRoutes.home),
+        onRetry: () => context.go(SellerRoutes.dashboard),
       );
     },
     routes: [
@@ -133,11 +131,20 @@ GoRouter createSellerRouter({
         },
         routes: [
           GoRoute(
-            path: SellerRoutes.home,
+            path: SellerRoutes.dashboard,
             builder: (context, state) {
-              return SellerHomeScreen(
+              return StoreSelectionScreen(
+                repository: storeRepository,
+                controller: storeSelectionController,
+              );
+            },
+          ),
+          GoRoute(
+            path: SellerRoutes.operations,
+            builder: (context, state) {
+              return SellerOperationScreen(
                 storeRepository: storeRepository,
-                analyticsRepository: analyticsRepository,
+                productRepository: productRepository,
                 selectionController: storeSelectionController,
               );
             },
@@ -152,20 +159,17 @@ GoRouter createSellerRouter({
             },
           ),
           GoRoute(
-            path: SellerRoutes.products,
+            path: SellerRoutes.customers,
             builder: (context, state) {
-              return SellerProductListScreen(
-                repository: productRepository,
-                selectionController: storeSelectionController,
-              );
+              return const SellerCustomerScreen();
             },
           ),
           GoRoute(
-            path: SellerRoutes.stores,
+            path: SellerRoutes.sales,
             builder: (context, state) {
-              return StoreSelectionScreen(
-                repository: storeRepository,
-                controller: storeSelectionController,
+              return SellerSalesScreen(
+                storeRepository: storeRepository,
+                analyticsRepository: analyticsRepository,
               );
             },
           ),
