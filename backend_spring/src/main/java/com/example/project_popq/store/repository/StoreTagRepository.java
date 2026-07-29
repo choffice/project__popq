@@ -13,4 +13,6 @@ public interface StoreTagRepository extends JpaRepository<StoreTag, Long> {
 
     @EntityGraph(attributePaths = "tag")
     List<StoreTag> findAllByStoreId(Long storeId);
+
+    void deleteAllByStoreId(Long storeId);
 }

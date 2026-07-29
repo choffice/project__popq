@@ -15,8 +15,10 @@ import com.example.project_popq.product.repository.TagRepository;
 import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
+import com.example.project_popq.store.dto.SellerStoreDetailResponse;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
+import com.example.project_popq.store.dto.UpdateStoreRequest;
 import com.example.project_popq.store.repository.StoreMemberRepository;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTableRepository;
@@ -78,6 +80,45 @@ public class StoreApplicationService {
                         member.getRole()
                 ))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SellerStoreDetailResponse findOne(User currentUser, Long storeId) {
+        StoreMember member = storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER,
+                StoreRole.STAFF
+        );
+        return detail(member);
+    }
+
+    @Transactional
+    public SellerStoreDetailResponse update(
+            User currentUser,
+            Long storeId,
+            UpdateStoreRequest request
+    ) {
+        StoreMember member = storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER
+        );
+        validateLocation(request.latitude(), request.longitude());
+        Store store = member.getStore();
+        store.updateSellerProfile(
+                request.name().trim(),
+                normalizeDescription(request.description()),
+                normalizeDescription(request.address()),
+                request.latitude(),
+                request.longitude()
+        );
+        storeTagRepository.deleteAllByStoreId(storeId);
+        storeTagRepository.flush();
+        saveTags(store, request.tags());
+        return detail(member);
     }
 
     @Transactional
@@ -175,5 +216,18 @@ public class StoreApplicationService {
                         )))
                 .map(tag -> StoreTag.create(store, tag))
                 .forEach(storeTagRepository::save);
+    }
+
+    private SellerStoreDetailResponse detail(StoreMember member) {
+        List<String> tags = storeTagRepository
+                .findAllByStoreId(member.getStore().getId())
+                .stream()
+                .map(storeTag -> storeTag.getTag().getName())
+                .toList();
+        return SellerStoreDetailResponse.of(
+                member.getStore(),
+                member.getRole(),
+                tags
+        );
     }
 }

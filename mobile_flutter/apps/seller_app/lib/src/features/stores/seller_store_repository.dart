@@ -9,6 +9,10 @@ class SellerStore {
     required this.businessStatus,
     required this.myRole,
     this.description,
+    this.address,
+    this.latitude,
+    this.longitude,
+    this.tags = const [],
   });
 
   factory SellerStore.fromJson(Map<String, Object?> json) {
@@ -20,6 +24,12 @@ class SellerStore {
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
       myRole: json['myRole'] as String,
+      address: json['address'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      tags: (json['tags'] as List<Object?>? ?? const [])
+          .cast<String>()
+          .toList(),
     );
   }
 
@@ -30,13 +40,29 @@ class SellerStore {
   final String status;
   final String businessStatus;
   final String myRole;
+  final String? address;
+  final double? latitude;
+  final double? longitude;
+  final List<String> tags;
 
-  SellerStore copyWith({String? businessStatus}) {
+  SellerStore copyWith({
+    String? name,
+    String? description,
+    String? address,
+    double? latitude,
+    double? longitude,
+    List<String>? tags,
+    String? businessStatus,
+  }) {
     return SellerStore(
       storeId: storeId,
       storeType: storeType,
-      name: name,
-      description: description,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      address: address ?? this.address,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      tags: tags ?? this.tags,
       status: status,
       businessStatus: businessStatus ?? this.businessStatus,
       myRole: myRole,
@@ -46,6 +72,8 @@ class SellerStore {
 
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
+
+  Future<SellerStore> findOne(int storeId);
 
   Future<SellerStore> createDevelopmentStore();
 
@@ -57,6 +85,16 @@ abstract interface class SellerStoreRepository {
   });
 
   Future<SellerStore> changeBusinessStatus(int storeId, String status);
+
+  Future<SellerStore> update(
+    int storeId, {
+    required String name,
+    String? description,
+    String? address,
+    double? latitude,
+    double? longitude,
+    List<String> tags,
+  });
 }
 
 class ApiSellerStoreRepository implements SellerStoreRepository {
@@ -74,6 +112,15 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
                 SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
           )
           .toList(),
+    );
+  }
+
+  @override
+  Future<SellerStore> findOne(int storeId) {
+    return _apiClient.get(
+      '/api/v1/seller/stores/$storeId',
+      decode: (value) =>
+          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -116,6 +163,31 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
           SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
+
+  @override
+  Future<SellerStore> update(
+    int storeId, {
+    required String name,
+    String? description,
+    String? address,
+    double? latitude,
+    double? longitude,
+    List<String> tags = const [],
+  }) {
+    return _apiClient.patch(
+      '/api/v1/seller/stores/$storeId',
+      body: {
+        'name': name,
+        'description': description,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'tags': tags,
+      },
+      decode: (value) =>
+          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
 }
 
 class MemorySellerStoreRepository implements SellerStoreRepository {
@@ -138,6 +210,11 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
 
   @override
   Future<List<SellerStore>> findAll() async => List.unmodifiable(_stores);
+
+  @override
+  Future<SellerStore> findOne(int storeId) async {
+    return _stores.firstWhere((store) => store.storeId == storeId);
+  }
 
   @override
   Future<SellerStore> createDevelopmentStore() async {
@@ -177,6 +254,39 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
       throw StateError('store manager role is required');
     }
     final updated = store.copyWith(businessStatus: status);
+    _stores[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<SellerStore> update(
+    int storeId, {
+    required String name,
+    String? description,
+    String? address,
+    double? latitude,
+    double? longitude,
+    List<String> tags = const [],
+  }) async {
+    final index = _stores.indexWhere((store) => store.storeId == storeId);
+    if (index < 0) throw StateError('store not found');
+    final store = _stores[index];
+    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
+      throw StateError('store manager role is required');
+    }
+    final updated = SellerStore(
+      storeId: store.storeId,
+      storeType: store.storeType,
+      name: name,
+      description: description,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      tags: List.unmodifiable(tags),
+      status: store.status,
+      businessStatus: store.businessStatus,
+      myRole: store.myRole,
+    );
     _stores[index] = updated;
     return updated;
   }

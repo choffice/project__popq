@@ -5,8 +5,10 @@ import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
+import com.example.project_popq.store.dto.SellerStoreDetailResponse;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
+import com.example.project_popq.store.dto.UpdateStoreRequest;
 import com.example.project_popq.store.service.StoreApplicationService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -44,6 +46,19 @@ public class SellerStoreController {
         );
     }
 
+    @GetMapping("/{storeId}")
+    public ApiResponse<SellerStoreDetailResponse> findOne(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId
+    ) {
+        return ApiResponse.success(
+                storeApplicationService.findOne(
+                        currentUserService.getRequired(jwt),
+                        storeId
+                )
+        );
+    }
+
     @PostMapping
     public ResponseEntity<ApiResponse<StoreSummaryResponse>> create(
             @AuthenticationPrincipal Jwt jwt,
@@ -55,6 +70,21 @@ public class SellerStoreController {
         );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(created));
+    }
+
+    @PatchMapping("/{storeId}")
+    public ApiResponse<SellerStoreDetailResponse> update(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @Valid @RequestBody UpdateStoreRequest request
+    ) {
+        return ApiResponse.success(
+                storeApplicationService.update(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        request
+                )
+        );
     }
 
     @PatchMapping("/{storeId}/business-status")

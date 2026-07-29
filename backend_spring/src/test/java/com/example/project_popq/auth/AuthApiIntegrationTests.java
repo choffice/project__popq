@@ -2,6 +2,7 @@ package com.example.project_popq.auth;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -79,6 +80,70 @@ class AuthApiIntegrationTests {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.error.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void ownerCanUpdateStoreDetailAndOtherSellerCannotAccessIt()
+            throws Exception {
+        String ownerToken = login(
+                "store-detail-owner@popq.test",
+                "사업장 소유자",
+                "SELLER"
+        );
+        Long storeId = createStore(ownerToken, "수정 전 사업장");
+
+        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "수정된 성수 사업장",
+                                  "description": "운영정보 수정 완료",
+                                  "address": "서울 성동구 연무장길 1",
+                                  "latitude": 37.5445000,
+                                  "longitude": 127.0560000,
+                                  "tags": ["Coffee", "Dessert", "coffee"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
+                .andExpect(jsonPath("$.data.address")
+                        .value("서울 성동구 연무장길 1"))
+                .andExpect(jsonPath("$.data.latitude").value(37.5445))
+                .andExpect(jsonPath("$.data.longitude").value(127.056))
+                .andExpect(jsonPath("$.data.tags.length()").value(2))
+                .andExpect(jsonPath("$.data.tags[0]").value("coffee"))
+                .andExpect(jsonPath("$.data.tags[1]").value("dessert"))
+                .andExpect(jsonPath("$.data.myRole").value("OWNER"));
+
+        mockMvc.perform(get("/api/v1/seller/stores/{storeId}", storeId)
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
+                .andExpect(jsonPath("$.data.tags.length()").value(2));
+
+        String otherToken = login(
+                "store-detail-other@popq.test",
+                "다른 판매자",
+                "SELLER"
+        );
+        mockMvc.perform(get("/api/v1/seller/stores/{storeId}", storeId)
+                        .header("Authorization", "Bearer " + otherToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code")
+                        .value("STORE_ACCESS_DENIED"));
+        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "침범 시도",
+                                  "tags": []
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code")
+                        .value("STORE_ACCESS_DENIED"));
     }
 
     @Test
@@ -181,5 +246,23 @@ class AuthApiIntegrationTests {
                 .getContentAsString();
 
         return JsonPath.read(response, "$.data.accessToken");
+    }
+
+    private Long createStore(String accessToken, String name) throws Exception {
+        String response = mockMvc.perform(post("/api/v1/seller/stores")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "storeType": "LOCAL_STORE",
+                                  "name": "%s",
+                                  "tags": ["initial"]
+                                }
+                                """.formatted(name)))
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        return ((Number) JsonPath.read(response, "$.data.storeId")).longValue();
     }
 }

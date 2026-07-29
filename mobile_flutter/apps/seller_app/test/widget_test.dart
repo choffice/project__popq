@@ -369,8 +369,55 @@ void main() {
       final updatedStore = (await storeRepository.findAll()).single;
       expect(updatedStore.businessStatus, 'OPEN');
       expect(find.text('영업 중'), findsAtLeastNWidgets(1));
+
+      await tester.drag(
+        find.byType(ListView).last,
+        const Offset(0, -400),
+      );
+      await tester.pumpAndSettle();
+      final editButton = find.byKey(const Key('edit-store'));
+      await tester.ensureVisible(editButton);
+      await tester.tap(editButton);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('edit-store-name')),
+        '성수 리뉴얼 사업장',
+      );
+      await tester.enterText(
+        find.byKey(const Key('edit-store-address')),
+        '서울 성동구 연무장길 1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('edit-store-tags')),
+        'Coffee, Dessert, coffee',
+      );
+      await tester.tap(find.byKey(const Key('submit-store-edit')));
+      await tester.pumpAndSettle();
+
+      final editedStore = (await storeRepository.findAll()).single;
+      expect(editedStore.name, '성수 리뉴얼 사업장');
+      expect(editedStore.address, '서울 성동구 연무장길 1');
+      expect(editedStore.tags, ['coffee', 'dessert']);
+      expect(find.text('성수 리뉴얼 사업장'), findsOneWidget);
     },
   );
+
+  test('staff cannot update business profile', () async {
+    final repository = MemorySellerStoreRepository(
+      stores: const [
+        SellerStore(
+          storeId: 1,
+          storeType: 'LOCAL_STORE',
+          name: '스태프 사업장',
+          status: 'ACTIVE',
+          businessStatus: 'OPEN',
+          myRole: 'STAFF',
+        ),
+      ],
+    );
+
+    await expectLater(repository.update(1, name: '권한 없는 수정'), throwsStateError);
+  });
 
   testWidgets('dashboard registers and selects a new business', (tester) async {
     final storeRepository = MemorySellerStoreRepository(stores: []);

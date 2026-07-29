@@ -73,6 +73,18 @@ public class Store extends BaseTimeEntity {
         this.longitude = longitude;
     }
 
+    public void updateSellerProfile(
+            String name,
+            String description,
+            String address,
+            java.math.BigDecimal latitude,
+            java.math.BigDecimal longitude
+    ) {
+        this.name = name;
+        this.description = description;
+        updateDiscoveryProfile(address, latitude, longitude);
+    }
+
     public void changeBusinessStatus(BusinessStatus businessStatus) {
         this.businessStatus = businessStatus;
     }
