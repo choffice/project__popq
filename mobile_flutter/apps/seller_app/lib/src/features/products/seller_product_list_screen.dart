@@ -3,6 +3,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../orders/seller_order_list_screen.dart';
 import '../stores/seller_store_selection_controller.dart';
+import 'seller_product_editor.dart';
 import 'seller_product_repository.dart';
 
 enum _ProductFilter { all, selling, soldOut, channelOff }
@@ -24,6 +25,7 @@ class SellerProductListScreen extends StatefulWidget {
 
 class _SellerProductListScreenState extends State<SellerProductListScreen> {
   List<SellerProduct>? _products;
+  List<SellerCategory>? _categories;
   Object? _error;
   var _loading = true;
   var _query = '';
@@ -73,6 +75,63 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              PopqSpacing.md,
+              PopqSpacing.md,
+              PopqSpacing.md,
+              PopqSpacing.sm,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '메뉴 구성',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('add-category'),
+                        onPressed: () => _editCategory(),
+                        icon: const Icon(Icons.create_new_folder_outlined),
+                        label: const Text('카테고리'),
+                      ),
+                      const SizedBox(width: PopqSpacing.xs),
+                      FilledButton.icon(
+                        key: const Key('add-product'),
+                        onPressed: (_categories ?? const []).isEmpty
+                            ? null
+                            : () => _editProduct(),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('메뉴'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  Wrap(
+                    spacing: PopqSpacing.xs,
+                    runSpacing: PopqSpacing.xs,
+                    children: (_categories ?? const [])
+                        .map(
+                          (category) => ActionChip(
+                            key: Key('category-${category.categoryId}'),
+                            avatar: const Icon(Icons.edit_outlined, size: 16),
+                            label: Text(
+                              '${category.displayOrder}. ${category.name}',
+                            ),
+                            onPressed: () => _editCategory(category),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               PopqSpacing.md,
@@ -188,6 +247,20 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
                   : const Color(0xFFD7F0E3),
             ),
           ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: PopqSpacing.sm,
+              ),
+              child: TextButton.icon(
+                key: Key('edit-product-${product.productId}'),
+                onPressed: isUpdating ? null : () => _editProduct(product),
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('기본정보 수정'),
+              ),
+            ),
+          ),
           const Divider(height: 1),
           SwitchListTile(
             key: Key('sold-out-${product.productId}'),
@@ -228,10 +301,14 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
       _error = null;
     });
     try {
-      final products = await widget.repository.findAll(_storeId);
+      final result = await Future.wait([
+        widget.repository.findCategories(_storeId),
+        widget.repository.findAll(_storeId),
+      ]);
       if (!mounted) return;
       setState(() {
-        _products = List.of(products);
+        _categories = List.of(result[0] as List<SellerCategory>);
+        _products = List.of(result[1] as List<SellerProduct>);
         _loading = false;
       });
     } catch (error) {
@@ -240,6 +317,99 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
         _error = error;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _editCategory([SellerCategory? category]) async {
+    final draft = await showSellerCategoryEditor(
+      context,
+      category: category,
+      suggestedOrder: _categories?.length ?? 0,
+    );
+    if (draft == null) return;
+    try {
+      final saved = category == null
+          ? await widget.repository.createCategory(
+              _storeId,
+              name: draft.name,
+              displayOrder: draft.displayOrder,
+            )
+          : await widget.repository.updateCategory(
+              _storeId,
+              category.categoryId,
+              name: draft.name,
+              displayOrder: draft.displayOrder,
+            );
+      if (!mounted) return;
+      setState(() {
+        final index = _categories!.indexWhere(
+          (item) => item.categoryId == saved.categoryId,
+        );
+        if (index < 0) {
+          _categories!.add(saved);
+        } else {
+          _categories![index] = saved;
+        }
+        _categories!.sort(
+          (left, right) => left.displayOrder.compareTo(right.displayOrder),
+        );
+        for (var i = 0; i < _products!.length; i++) {
+          final product = _products![i];
+          if (product.categoryId == saved.categoryId) {
+            _products![i] = product.copyWith(categoryName: saved.name);
+          }
+        }
+      });
+      _showMessage('${saved.name} 카테고리를 저장했습니다.');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('카테고리를 저장하지 못했습니다.');
+    }
+  }
+
+  Future<void> _editProduct([SellerProduct? product]) async {
+    final categories = _categories ?? const <SellerCategory>[];
+    if (categories.isEmpty) return;
+    final draft = await showSellerProductEditor(
+      context,
+      categories: categories,
+      product: product,
+    );
+    if (draft == null) return;
+    try {
+      final saved = product == null
+          ? await widget.repository.create(
+              _storeId,
+              categoryId: draft.categoryId,
+              name: draft.name,
+              description: draft.description,
+              imageUrl: draft.imageUrl,
+              basePrice: draft.basePrice,
+            )
+          : await widget.repository.update(
+              _storeId,
+              product,
+              categoryId: draft.categoryId,
+              name: draft.name,
+              description: draft.description,
+              imageUrl: draft.imageUrl,
+              basePrice: draft.basePrice,
+            );
+      if (!mounted) return;
+      setState(() {
+        final index = _products!.indexWhere(
+          (item) => item.productId == saved.productId,
+        );
+        if (index < 0) {
+          _products!.add(saved);
+        } else {
+          _products![index] = saved;
+        }
+      });
+      _showMessage('${saved.name} 메뉴를 저장했습니다.');
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('메뉴를 저장하지 못했습니다.');
     }
   }
 

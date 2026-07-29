@@ -147,6 +147,122 @@ class AuthApiIntegrationTests {
     }
 
     @Test
+    void ownerCanUpdateCategoryAndProductInsideOwnStore() throws Exception {
+        String ownerToken = login(
+                "catalog-editor@popq.test",
+                "Catalog Editor",
+                "SELLER"
+        );
+        Long storeId = createStore(ownerToken, "Catalog Store");
+
+        String categoryResponse = mockMvc.perform(
+                        post("/api/v1/seller/stores/{storeId}/categories", storeId)
+                                .header("Authorization", "Bearer " + ownerToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "name": "Coffee",
+                                          "displayOrder": 0
+                                        }
+                                        """)
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long categoryId = ((Number) JsonPath.read(
+                categoryResponse,
+                "$.data.categoryId"
+        )).longValue();
+
+        String productResponse = mockMvc.perform(
+                        post("/api/v1/seller/stores/{storeId}/products", storeId)
+                                .header("Authorization", "Bearer " + ownerToken)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("""
+                                        {
+                                          "categoryId": %d,
+                                          "name": "Americano",
+                                          "description": "Original",
+                                          "imageUrl": null,
+                                          "basePrice": 4500
+                                        }
+                                        """.formatted(categoryId))
+                )
+                .andExpect(status().isCreated())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long productId = ((Number) JsonPath.read(
+                productResponse,
+                "$.data.product.productId"
+        )).longValue();
+
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/categories/{categoryId}",
+                        storeId,
+                        categoryId
+                )
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Signature Coffee",
+                                  "displayOrder": 2
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.name").value("Signature Coffee"))
+                .andExpect(jsonPath("$.data.displayOrder").value(2));
+
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/products/{productId}",
+                        storeId,
+                        productId
+                )
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "categoryId": %d,
+                                  "name": "Cream Americano",
+                                  "description": "Updated",
+                                  "imageUrl": "https://example.test/menu.jpg",
+                                  "basePrice": 6000
+                                }
+                                """.formatted(categoryId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.product.name")
+                        .value("Cream Americano"))
+                .andExpect(jsonPath("$.data.product.categoryName")
+                        .value("Signature Coffee"))
+                .andExpect(jsonPath("$.data.product.basePrice").value(6000));
+
+        String otherToken = login(
+                "catalog-intruder@popq.test",
+                "Catalog Intruder",
+                "SELLER"
+        );
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/products/{productId}",
+                        storeId,
+                        productId
+                )
+                        .header("Authorization", "Bearer " + otherToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "categoryId": %d,
+                                  "name": "Intrusion",
+                                  "basePrice": 0
+                                }
+                                """.formatted(categoryId)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code")
+                        .value("STORE_ACCESS_DENIED"));
+    }
+
+    @Test
     void sameEmailCannotSwitchBetweenSellerAndCustomerRoles()
             throws Exception {
         String accessToken = login(

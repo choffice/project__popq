@@ -5,7 +5,9 @@ import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dar
 import 'package:popq_seller_app/src/features/home/seller_analytics_repository.dart';
 import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
 import 'package:popq_seller_app/src/features/products/seller_product_repository.dart';
+import 'package:popq_seller_app/src/features/products/seller_product_list_screen.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_repository.dart';
+import 'package:popq_seller_app/src/features/stores/seller_store_selection_controller.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_selection_store.dart';
 import 'package:popq_seller_app/src/seller_app.dart';
 
@@ -255,8 +257,11 @@ void main() {
       expect(find.text('다른 스토어 라떼'), findsNothing);
 
       final soldOutSwitch = find.byKey(const Key('sold-out-101'));
-      await tester.ensureVisible(soldOutSwitch);
-      await tester.tap(soldOutSwitch);
+      final soldOutControl = find.descendant(
+        of: soldOutSwitch,
+        matching: find.byType(Switch),
+      );
+      tester.widget<Switch>(soldOutControl).onChanged!(true);
       await tester.pumpAndSettle();
 
       var updated = (await productRepository.findAll(1)).single;
@@ -303,6 +308,65 @@ void main() {
       repository.updateAvailability(1, foreignProduct, soldOut: true),
       throwsStateError,
     );
+  });
+
+  testWidgets('seller creates a category and edits a menu', (tester) async {
+    final repository = MemorySellerProductRepository();
+    final selectionController = SellerStoreSelectionController(
+      MemorySellerStoreSelectionStore(1),
+    );
+    await selectionController.restore();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SellerProductListScreen(
+            repository: repository,
+            selectionController: selectionController,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-category')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('category-name')),
+      '시즌 메뉴',
+    );
+    await tester.enterText(find.byKey(const Key('category-order')), '1');
+    await tester.tap(find.byKey(const Key('save-category')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('add-product')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('product-name')),
+      '딸기 라떼',
+    );
+    await tester.enterText(find.byKey(const Key('product-price')), '6500');
+    await tester.tap(find.byKey(const Key('save-product')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('딸기 라떼'), findsOneWidget);
+    var saved = (await repository.findAll(1)).single;
+    expect(saved.basePrice, 6500);
+
+    final edit = find.byKey(Key('edit-product-${saved.productId}'));
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('product-name')),
+      '딸기 크림 라떼',
+    );
+    await tester.enterText(find.byKey(const Key('product-price')), '7000');
+    await tester.tap(find.byKey(const Key('save-product')));
+    await tester.pumpAndSettle();
+
+    saved = (await repository.findAll(1)).single;
+    expect(saved.name, '딸기 크림 라떼');
+    expect(saved.basePrice, 7000);
   });
 
   testWidgets(

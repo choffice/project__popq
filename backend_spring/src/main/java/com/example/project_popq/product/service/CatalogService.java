@@ -15,6 +15,8 @@ import com.example.project_popq.product.dto.ReplaceProductOptionsRequest;
 import com.example.project_popq.product.dto.ReplaceProductOptionsRequest.OptionGroupRequest;
 import com.example.project_popq.product.dto.ReplaceProductOptionsRequest.OptionRequest;
 import com.example.project_popq.product.dto.UpdateAvailabilityRequest;
+import com.example.project_popq.product.dto.UpdateCategoryRequest;
+import com.example.project_popq.product.dto.UpdateProductRequest;
 import com.example.project_popq.product.repository.ProductCategoryRepository;
 import com.example.project_popq.product.repository.ProductRepository;
 import com.example.project_popq.store.domain.Store;
@@ -66,6 +68,29 @@ public class CatalogService {
                 .stream()
                 .map(CategoryResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public CategoryResponse updateCategory(
+            User user,
+            Long storeId,
+            Long categoryId,
+            UpdateCategoryRequest request
+    ) {
+        requireCatalogManager(user, storeId);
+        ProductCategory category = categoryRepository
+                .findByIdAndStoreId(categoryId, storeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        String name = request.name().trim();
+        if (categoryRepository.existsByStoreIdAndNameIgnoreCaseAndIdNot(
+                storeId,
+                name,
+                categoryId
+        )) {
+            throw new BusinessException(ErrorCode.DUPLICATE_CATEGORY);
+        }
+        category.update(name, request.displayOrder());
+        return CategoryResponse.from(category);
     }
 
     @Transactional
@@ -121,6 +146,28 @@ public class CatalogService {
                 getDetailedProduct(storeId, productId),
                 Instant.now()
         );
+    }
+
+    @Transactional
+    public ProductDetailResponse updateProduct(
+            User user,
+            Long storeId,
+            Long productId,
+            UpdateProductRequest request
+    ) {
+        requireCatalogManager(user, storeId);
+        Product product = getDetailedProduct(storeId, productId);
+        ProductCategory category = categoryRepository
+                .findByIdAndStoreId(request.categoryId(), storeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.CATEGORY_NOT_FOUND));
+        product.update(
+                category,
+                request.name().trim(),
+                normalize(request.description()),
+                normalize(request.imageUrl()),
+                request.basePrice()
+        );
+        return ProductDetailResponse.from(product, Instant.now());
     }
 
     @Transactional

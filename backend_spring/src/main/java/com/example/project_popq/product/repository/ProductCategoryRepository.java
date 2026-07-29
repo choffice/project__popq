@@ -10,8 +10,13 @@ public interface ProductCategoryRepository
 
     boolean existsByStoreIdAndNameIgnoreCase(Long storeId, String name);
 
+    boolean existsByStoreIdAndNameIgnoreCaseAndIdNot(
+            Long storeId,
+            String name,
+            Long id
+    );
+
     Optional<ProductCategory> findByIdAndStoreId(Long id, Long storeId);
 
     List<ProductCategory> findAllByStoreIdOrderByDisplayOrderAscIdAsc(Long storeId);
 }
-

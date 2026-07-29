@@ -59,5 +59,9 @@ public class ProductCategory extends BaseTimeEntity {
     public static ProductCategory create(Store store, String name, int displayOrder) {
         return new ProductCategory(store, name, displayOrder);
     }
-}
 
+    public void update(String name, int displayOrder) {
+        this.name = name;
+        this.displayOrder = displayOrder;
+    }
+}

@@ -9,6 +9,8 @@ import com.example.project_popq.product.dto.ProductDetailResponse;
 import com.example.project_popq.product.dto.ProductSummaryResponse;
 import com.example.project_popq.product.dto.ReplaceProductOptionsRequest;
 import com.example.project_popq.product.dto.UpdateAvailabilityRequest;
+import com.example.project_popq.product.dto.UpdateCategoryRequest;
+import com.example.project_popq.product.dto.UpdateProductRequest;
 import com.example.project_popq.product.service.CatalogService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -64,6 +66,23 @@ public class SellerCatalogController {
                 .body(ApiResponse.success(created));
     }
 
+    @PatchMapping("/categories/{categoryId}")
+    public ApiResponse<CategoryResponse> updateCategory(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long categoryId,
+            @Valid @RequestBody UpdateCategoryRequest request
+    ) {
+        return ApiResponse.success(
+                catalogService.updateCategory(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        categoryId,
+                        request
+                )
+        );
+    }
+
     @GetMapping("/products")
     public ApiResponse<List<ProductSummaryResponse>> findProducts(
             @AuthenticationPrincipal Jwt jwt,
@@ -103,6 +122,23 @@ public class SellerCatalogController {
                         currentUserService.getRequired(jwt),
                         storeId,
                         productId
+                )
+        );
+    }
+
+    @PatchMapping("/products/{productId}")
+    public ApiResponse<ProductDetailResponse> updateProduct(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long productId,
+            @Valid @RequestBody UpdateProductRequest request
+    ) {
+        return ApiResponse.success(
+                catalogService.updateProduct(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        productId,
+                        request
                 )
         );
     }

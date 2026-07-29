@@ -108,5 +108,18 @@ public class Product extends BaseTimeEntity {
         optionGroups.clear();
         optionGroups.addAll(newGroups);
     }
-}
 
+    public void update(
+            ProductCategory category,
+            String name,
+            String description,
+            String imageUrl,
+            long basePrice
+    ) {
+        this.category = category;
+        this.name = name;
+        this.description = description;
+        this.imageUrl = imageUrl;
+        this.basePrice = basePrice;
+    }
+}
