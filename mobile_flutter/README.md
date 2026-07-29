@@ -47,3 +47,10 @@ powershell -ExecutionPolicy Bypass -File mobile_flutter\tool\verify.ps1
 
 Docker는 Flutter 화면·단위 테스트에 필요하지 않다. 실제 Spring Boot 계약을 검증할 때만 통합 스택을 실행한다.
 
+소비자 앱 디버그 APK는 다음 명령과 경로에서 확인한다.
+
+```powershell
+cd mobile_flutter\apps\customer_app
+flutter build apk --debug
+# build\app\outputs\flutter-apk\app-debug.apk
+```

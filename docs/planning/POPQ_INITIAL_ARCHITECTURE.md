@@ -728,4 +728,5 @@ Flyway를 사용하고 운영에서는 `ddl-auto=validate`를 적용한다.
 - Flutter 9.1에서 URL 라우팅·인증 가드·보안 세션·Bearer API 클라이언트·비동기 상태 UI를 구현하고 테스트 14개 및 두 Android APK 빌드 통과
 - Flutter 9.2에서 온보딩·위치/알림 권한·공개 매장 위치/키워드/태그 검색·상세를 구현하고 Spring 전체 회귀 테스트, Flutter 테스트 16개 및 소비자 Android APK 빌드 통과
 - Flutter 9.3에서 공개 상품·옵션, 단일 스토어 장바구니, 회원 주문·테스트 결제·멱등성 재시도·버전 동기화를 구현하고 Spring 테스트 50개, Flutter 테스트 17개 및 소비자 Android APK 빌드 통과
+- Flutter 9.4에서 관심 스토어, 완료 주문당 1개 리뷰, 공개 리뷰, 마이페이지 집계·수정·삭제를 구현하고 Spring 테스트 51개, Flutter 테스트 19개 및 소비자 Android APK 빌드 통과
 - 상위 CRA 루트 앱은 참고용으로 보존하고 `web_react/popq`는 QR 주문 웹, `web_react/seller-web`은 판매자 웹으로 사용한다.
