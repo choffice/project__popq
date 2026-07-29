@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dart';
+import 'package:popq_seller_app/src/features/home/seller_analytics_repository.dart';
 import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
 import 'package:popq_seller_app/src/features/products/seller_product_repository.dart';
 import 'package:popq_seller_app/src/features/stores/seller_store_repository.dart';
@@ -21,6 +22,7 @@ void main() {
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
         productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -42,12 +44,13 @@ void main() {
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
         productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('성수 커피 연구소'), findsOneWidget);
-    expect(find.text('영업 준비'), findsOneWidget);
+    expect(find.text('영업 준비'), findsAtLeastNWidgets(1));
 
     await tester.tap(find.text('주문'));
     await tester.pumpAndSettle();
@@ -75,6 +78,7 @@ void main() {
         ),
         orderRepository: MemorySellerOrderRepository(),
         productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -118,6 +122,7 @@ void main() {
         identityRepository: const MemorySellerIdentityRepository(),
         orderRepository: MemorySellerOrderRepository(),
         productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
       ),
     );
     await tester.pumpAndSettle();
@@ -163,6 +168,7 @@ void main() {
           identityRepository: const MemorySellerIdentityRepository(),
           orderRepository: orderRepository,
           productRepository: MemorySellerProductRepository(),
+          analyticsRepository: MemorySellerAnalyticsRepository(),
         ),
       );
       await tester.pumpAndSettle();
@@ -235,6 +241,7 @@ void main() {
           identityRepository: const MemorySellerIdentityRepository(),
           orderRepository: MemorySellerOrderRepository(),
           productRepository: productRepository,
+          analyticsRepository: MemorySellerAnalyticsRepository(),
         ),
       );
       await tester.pumpAndSettle();
@@ -295,6 +302,70 @@ void main() {
       throwsStateError,
     );
   });
+
+  testWidgets(
+    'operations dashboard uses the selected store and changes business status',
+    (tester) async {
+      final storeRepository = MemorySellerStoreRepository();
+      final analyticsRepository = MemorySellerAnalyticsRepository(
+        summaries: {
+          1: const SellerSalesSummary(
+            storeId: 1,
+            from: '2026-07-29',
+            to: '2026-07-29',
+            netSales: 12000,
+            completedOrderCount: 2,
+            averageOrderAmount: 6000,
+            dineInSales: 4500,
+            takeoutSales: 7500,
+            topProducts: [
+              SellerTopProduct(name: '아메리카노', quantity: 2, sales: 9000),
+            ],
+          ),
+          2: const SellerSalesSummary(
+            storeId: 2,
+            from: '2026-07-29',
+            to: '2026-07-29',
+            netSales: 999999,
+            completedOrderCount: 99,
+            averageOrderAmount: 10101,
+            dineInSales: 999999,
+            takeoutSales: 0,
+            topProducts: [],
+          ),
+        },
+      );
+      await tester.pumpWidget(
+        PopqSellerApp(
+          environment: const AppEnvironment.local(),
+          sessionStore: _validSessionStore(),
+          storeSelectionStore: MemorySellerStoreSelectionStore(1),
+          storeRepository: storeRepository,
+          identityRepository: const MemorySellerIdentityRepository(),
+          orderRepository: MemorySellerOrderRepository(),
+          productRepository: MemorySellerProductRepository(),
+          analyticsRepository: analyticsRepository,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('12,000원'), findsOneWidget);
+      expect(find.text('2건'), findsOneWidget);
+      expect(find.text('999,999원'), findsNothing);
+      await tester.drag(find.byType(ListView), const Offset(0, -500));
+      await tester.pumpAndSettle();
+      expect(find.text('아메리카노'), findsOneWidget);
+
+      await tester.drag(find.byType(ListView), const Offset(0, 500));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('영업 중'));
+      await tester.pumpAndSettle();
+
+      final updatedStore = (await storeRepository.findAll()).single;
+      expect(updatedStore.businessStatus, 'OPEN');
+      expect(find.text('영업 중'), findsAtLeastNWidgets(1));
+    },
+  );
 }
 
 MemorySessionStore _validSessionStore() {

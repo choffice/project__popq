@@ -6,6 +6,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
 import '../features/home/seller_home_screen.dart';
+import '../features/home/seller_analytics_repository.dart';
 import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
@@ -33,6 +34,7 @@ GoRouter createSellerRouter({
   required SellerStoreRepository storeRepository,
   required SellerOrderRepository orderRepository,
   required SellerProductRepository productRepository,
+  required SellerAnalyticsRepository analyticsRepository,
   required Future<void> Function() onSignOut,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -134,7 +136,8 @@ GoRouter createSellerRouter({
             path: SellerRoutes.home,
             builder: (context, state) {
               return SellerHomeScreen(
-                repository: storeRepository,
+                storeRepository: storeRepository,
+                analyticsRepository: analyticsRepository,
                 selectionController: storeSelectionController,
               );
             },

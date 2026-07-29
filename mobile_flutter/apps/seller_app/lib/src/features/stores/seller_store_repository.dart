@@ -30,12 +30,26 @@ class SellerStore {
   final String status;
   final String businessStatus;
   final String myRole;
+
+  SellerStore copyWith({String? businessStatus}) {
+    return SellerStore(
+      storeId: storeId,
+      storeType: storeType,
+      name: name,
+      description: description,
+      status: status,
+      businessStatus: businessStatus ?? this.businessStatus,
+      myRole: myRole,
+    );
+  }
 }
 
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
 
   Future<SellerStore> createDevelopmentStore();
+
+  Future<SellerStore> changeBusinessStatus(int storeId, String status);
 }
 
 class ApiSellerStoreRepository implements SellerStoreRepository {
@@ -65,6 +79,16 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'name': 'POPQ 개발 스토어',
         'description': '판매자 앱 개발용 자동 생성 스토어',
       },
+      decode: (value) =>
+          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<SellerStore> changeBusinessStatus(int storeId, String status) {
+    return _apiClient.patch(
+      '/api/v1/seller/stores/$storeId/business-status',
+      body: {'businessStatus': status},
       decode: (value) =>
           SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
@@ -105,5 +129,18 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
     );
     _stores.add(store);
     return store;
+  }
+
+  @override
+  Future<SellerStore> changeBusinessStatus(int storeId, String status) async {
+    final index = _stores.indexWhere((store) => store.storeId == storeId);
+    if (index < 0) throw StateError('store not found');
+    final store = _stores[index];
+    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
+      throw StateError('store manager role is required');
+    }
+    final updated = store.copyWith(businessStatus: status);
+    _stores[index] = updated;
+    return updated;
   }
 }
