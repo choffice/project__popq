@@ -5,18 +5,20 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'auth_session.dart';
 
 class SecureSessionStore implements SessionStore {
-  SecureSessionStore({FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage(),
-      _storageKey = _defaultStorageKey;
+  SecureSessionStore({
+    FlutterSecureStorage? storage,
+    this.storageKey = _defaultStorageKey,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       assert(storageKey != '');
 
   static const _defaultStorageKey = 'popq.auth.session';
 
   final FlutterSecureStorage _storage;
-  final String _storageKey;
+  final String storageKey;
 
   @override
   Future<AuthSession?> read() async {
-    final value = await _storage.read(key: _storageKey);
+    final value = await _storage.read(key: storageKey);
     if (value == null || value.isEmpty) {
       return null;
     }
@@ -39,14 +41,11 @@ class SecureSessionStore implements SessionStore {
 
   @override
   Future<void> write(AuthSession session) {
-    return _storage.write(
-      key: _storageKey,
-      value: jsonEncode(session.toJson()),
-    );
+    return _storage.write(key: storageKey, value: jsonEncode(session.toJson()));
   }
 
   @override
   Future<void> clear() {
-    return _storage.delete(key: _storageKey);
+    return _storage.delete(key: storageKey);
   }
 }
