@@ -733,4 +733,5 @@ Flyway를 사용하고 운영에서는 `ddl-auto=validate`를 적용한다.
 - Flutter 9.6A에서 판매자 전용 세션·역할 재검증·스토어 선택·계정 전환 정리를 구현하고 Spring 테스트 53개, Flutter 테스트 23개 및 판매자 Android APK 빌드 통과
 - Flutter 9.6B에서 선택 스토어 주문 목록·필터·상세·버전 동기화와 접수·거절·준비·완료 상태 전이를 구현하고 타 스토어 주문 격리를 검증해 Spring 테스트 53개, Flutter 테스트 25개 및 판매자 Android APK 빌드 통과
 - Flutter 9.6C에서 선택 스토어 상품 검색·필터, 즉시 품절, 고객 앱·QR 웹 채널 노출 제어를 구현하고 타 스토어 상품 격리를 검증해 Spring 테스트 53개, Flutter 테스트 27개 및 판매자 Android APK 빌드 통과
+- Flutter 9.6D에서 선택 스토어 영업 상태와 오늘 순매출·주문·객단가·채널 매출·상위 상품 운영 대시보드를 구현하고 권한·스토어 격리를 검증해 Spring 테스트 53개, Flutter 테스트 28개 및 판매자 Android APK 빌드 통과
 - 상위 CRA 루트 앱은 참고용으로 보존하고 `web_react/popq`는 QR 주문 웹, `web_react/seller-web`은 판매자 웹으로 사용한다.
