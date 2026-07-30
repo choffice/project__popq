@@ -30,7 +30,7 @@ cd mobile_flutter\apps\seller_app
 flutter run
 ```
 
-Android 에뮬레이터의 기본 백엔드 주소는 `http://10.0.2.2:8082`다. 다른 환경은 Dart define으로 주입한다.
+Android 에뮬레이터의 기본 백엔드 주소는 `http://10.0.2.2:8082`다. Flutter Web은 `http://localhost:8082`를 기본으로 사용한다. 다른 환경은 Dart define으로 주입한다.
 
 ```powershell
 flutter run `
@@ -38,6 +38,29 @@ flutter run `
   --dart-define=POPQ_API_BASE_URL=https://api.example.com `
   --dart-define=POPQ_ENABLE_NETWORK_LOGS=false
 ```
+
+### Chrome 통합 실행
+
+React 앱과 충돌하지 않도록 Flutter Web 개발 포트를 다음과 같이 고정한다.
+
+```text
+React popq              http://localhost:5173
+React seller-web        http://localhost:5174
+Flutter customer_app    http://localhost:5183
+Flutter seller_app      http://localhost:5184
+Spring Boot API         http://localhost:8082
+```
+
+서로 다른 터미널에서 다음 명령을 실행한다.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\run-flutter-web.ps1 -App customer
+powershell -ExecutionPolicy Bypass -File scripts\run-flutter-web.ps1 -App seller
+```
+
+Android Studio에서는 상단 Run Configuration 목록에서 `Flutter Web - Customer (5183)` 또는 `Flutter Web - Seller (5184)`를 선택한 뒤 Chrome 기기로 실행한다. `main.dart (1)`처럼 자동 생성된 임시 구성은 고정 포트 인자를 포함하지 않는다.
+
+Android 에뮬레이터에서는 `Flutter Android Emulator - Customer` 또는 `Flutter Android Emulator - Seller`를 선택한다. 이 구성은 에뮬레이터에서 호스트의 Spring Boot에 접근할 수 있도록 `http://10.0.2.2:8082`를 사용한다.
 
 ## 전체 검증
 
