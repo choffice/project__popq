@@ -117,6 +117,7 @@ GoRouter createSellerRouter({
           return SellerOrderDetailScreen(
             orderPublicId: state.pathParameters['orderPublicId']!,
             repository: orderRepository,
+            storeRepository: storeRepository,
             selectionController: storeSelectionController,
           );
         },

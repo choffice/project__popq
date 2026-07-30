@@ -125,6 +125,84 @@ class SellerOrderItemOption {
   final int price;
 }
 
+class SellerRefund {
+  const SellerRefund({
+    required this.refundId,
+    required this.amount,
+    required this.reason,
+    required this.requesterType,
+    required this.status,
+    required this.requestedAt,
+    this.completedAt,
+    this.failureCode,
+    this.failureMessage,
+  });
+
+  factory SellerRefund.fromJson(Map<String, Object?> json) {
+    return SellerRefund(
+      refundId: (json['refundId'] as num).toInt(),
+      amount: (json['amount'] as num).toInt(),
+      reason: json['reason'] as String,
+      requesterType: json['requesterType'] as String,
+      status: json['status'] as String,
+      requestedAt: DateTime.parse(json['requestedAt'] as String),
+      completedAt: json['completedAt'] == null
+          ? null
+          : DateTime.parse(json['completedAt'] as String),
+      failureCode: json['failureCode'] as String?,
+      failureMessage: json['failureMessage'] as String?,
+    );
+  }
+
+  final int refundId;
+  final int amount;
+  final String reason;
+  final String requesterType;
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? completedAt;
+  final String? failureCode;
+  final String? failureMessage;
+}
+
+class SellerPaymentSummary {
+  const SellerPaymentSummary({
+    required this.orderPublicId,
+    required this.paymentStatus,
+    required this.paymentMethod,
+    required this.approvedAmount,
+    required this.refundedAmount,
+    required this.refundableAmount,
+    required this.refunds,
+  });
+
+  factory SellerPaymentSummary.fromJson(Map<String, Object?> json) {
+    return SellerPaymentSummary(
+      orderPublicId: json['orderPublicId'] as String,
+      paymentStatus: json['paymentStatus'] as String,
+      paymentMethod: json['paymentMethod'] as String,
+      approvedAmount: (json['approvedAmount'] as num).toInt(),
+      refundedAmount: (json['refundedAmount'] as num).toInt(),
+      refundableAmount: (json['refundableAmount'] as num).toInt(),
+      refunds: (json['refunds'] as List<Object?>? ?? const [])
+          .map(
+            (item) => SellerRefund.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String orderPublicId;
+  final String paymentStatus;
+  final String paymentMethod;
+  final int approvedAmount;
+  final int refundedAmount;
+  final int refundableAmount;
+  final List<SellerRefund> refunds;
+}
+
 enum SellerOrderCommand {
   accept('accept', 'ACCEPTED'),
   reject('reject', 'REJECTED'),
@@ -166,6 +244,18 @@ abstract interface class SellerOrderRepository {
     String orderPublicId,
     SellerOrderCommand command, {
     String? reason,
+  });
+
+  Future<SellerPaymentSummary> findPayment(
+    int storeId,
+    String orderPublicId,
+  );
+
+  Future<SellerPaymentSummary> refund(
+    int storeId,
+    String orderPublicId, {
+    required int amount,
+    required String reason,
   });
 }
 
@@ -236,13 +326,46 @@ class ApiSellerOrderRepository implements SellerOrderRepository {
           SellerOrder.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
+
+  @override
+  Future<SellerPaymentSummary> findPayment(
+    int storeId,
+    String orderPublicId,
+  ) {
+    return _apiClient.get(
+      '${_basePath(storeId)}/$orderPublicId/payment',
+      decode: (value) => SellerPaymentSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerPaymentSummary> refund(
+    int storeId,
+    String orderPublicId, {
+    required int amount,
+    required String reason,
+  }) {
+    return _apiClient.post(
+      '${_basePath(storeId)}/$orderPublicId/refunds',
+      body: {'amount': amount, 'reason': reason},
+      decode: (value) => SellerPaymentSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
 }
 
 class MemorySellerOrderRepository implements SellerOrderRepository {
-  MemorySellerOrderRepository({List<SellerOrder> orders = const []})
-    : _orders = List.of(orders);
+  MemorySellerOrderRepository({
+    List<SellerOrder> orders = const [],
+    Map<String, SellerPaymentSummary> payments = const {},
+  }) : _orders = List.of(orders),
+       _payments = Map.of(payments);
 
   final List<SellerOrder> _orders;
+  final Map<String, SellerPaymentSummary> _payments;
 
   @override
   Future<List<SellerOrder>> findAll(int storeId, {String? status}) async {
@@ -301,6 +424,70 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
       version: order.version + 1,
     );
     _orders[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<SellerPaymentSummary> findPayment(
+    int storeId,
+    String orderPublicId,
+  ) async {
+    final order = await findOne(storeId, orderPublicId);
+    final existing = _payments[orderPublicId];
+    if (existing != null) return existing;
+    if (order.status != 'COMPLETED') {
+      throw StateError('payment is only available for a completed order');
+    }
+    final created = SellerPaymentSummary(
+      orderPublicId: orderPublicId,
+      paymentStatus: 'PAID',
+      paymentMethod: 'CARD',
+      approvedAmount: order.totalAmount,
+      refundedAmount: 0,
+      refundableAmount: order.totalAmount,
+      refunds: const [],
+    );
+    _payments[orderPublicId] = created;
+    return created;
+  }
+
+  @override
+  Future<SellerPaymentSummary> refund(
+    int storeId,
+    String orderPublicId, {
+    required int amount,
+    required String reason,
+  }) async {
+    final order = await findOne(storeId, orderPublicId);
+    final payment = await findPayment(storeId, orderPublicId);
+    if (order.status != 'COMPLETED' ||
+        payment.paymentStatus != 'PAID' ||
+        amount != payment.approvedAmount ||
+        reason.trim().isEmpty) {
+      throw StateError('refund is not allowed');
+    }
+    final now = DateTime.now().toUtc();
+    final updated = SellerPaymentSummary(
+      orderPublicId: orderPublicId,
+      paymentStatus: 'REFUNDED',
+      paymentMethod: payment.paymentMethod,
+      approvedAmount: payment.approvedAmount,
+      refundedAmount: amount,
+      refundableAmount: 0,
+      refunds: [
+        ...payment.refunds,
+        SellerRefund(
+          refundId: payment.refunds.length + 1,
+          amount: amount,
+          reason: reason.trim(),
+          requesterType: 'SELLER',
+          status: 'SUCCEEDED',
+          requestedAt: now,
+          completedAt: now,
+        ),
+      ],
+    );
+    _payments[orderPublicId] = updated;
     return updated;
   }
 

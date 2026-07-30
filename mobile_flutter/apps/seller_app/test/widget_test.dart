@@ -202,11 +202,90 @@ void main() {
       expect(find.text('주문 완료'), findsAtLeastNWidgets(1));
       expect(find.byKey(const Key('complete-order')), findsNothing);
 
+      final refundButton = find.byKey(const Key('refund-order'));
+      await tester.drag(
+        find.byKey(const Key('order-detail-scroll')),
+        const Offset(0, -500),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('결제 완료'), findsOneWidget);
+      await tester.tap(refundButton);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('refund-reason')),
+        '고객 요청 전액 환불',
+      );
+      await tester.tap(find.byKey(const Key('confirm-refund')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('환불 완료'), findsAtLeastNWidgets(1));
+      expect(find.text('고객 요청 전액 환불'), findsOneWidget);
+      final payment = await orderRepository.findPayment(1, 'store-one-order');
+      expect(payment.paymentStatus, 'REFUNDED');
+      expect(payment.refundableAmount, 0);
+
       final completed = await orderRepository.findOne(1, 'store-one-order');
       expect(completed.status, 'COMPLETED');
       expect(completed.version, 5);
     },
   );
+
+  testWidgets('staff can view payment but cannot request a refund', (
+    tester,
+  ) async {
+    final orderRepository = MemorySellerOrderRepository(
+      orders: [
+        _order(
+          orderPublicId: 'staff-completed-order',
+          storeId: 1,
+          storeName: '직원 운영 매장',
+          status: 'COMPLETED',
+          version: 5,
+        ),
+      ],
+    );
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: _validSessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(1),
+        storeRepository: MemorySellerStoreRepository(
+          stores: const [
+            SellerStore(
+              storeId: 1,
+              storeType: 'LOCAL_STORE',
+              name: '직원 운영 매장',
+              status: 'ACTIVE',
+              businessStatus: 'OPEN',
+              myRole: 'STAFF',
+            ),
+          ],
+        ),
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: orderRepository,
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('주문'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('staff-completed-order'));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const Key('order-detail-scroll')),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('결제 완료'), findsOneWidget);
+    expect(find.byKey(const Key('refund-order')), findsNothing);
+    expect(
+      find.textContaining('OWNER 또는 MANAGER만'),
+      findsOneWidget,
+    );
+  });
 
   test('repository denies an order outside the selected store', () async {
     final repository = MemorySellerOrderRepository(
@@ -556,19 +635,21 @@ SellerOrder _order({
   required String orderPublicId,
   required int storeId,
   required String storeName,
+  String status = 'PLACED',
+  int version = 1,
 }) {
   return SellerOrder(
     orderPublicId: orderPublicId,
     storeId: storeId,
     storeName: storeName,
     orderType: 'TAKEOUT',
-    status: 'PLACED',
+    status: status,
     subtotalAmount: 6500,
     discountAmount: 0,
     taxAmount: 0,
     serviceFeeAmount: 0,
     totalAmount: 6500,
-    version: 1,
+    version: version,
     items: const [
       SellerOrderItem(
         productName: '아메리카노',
