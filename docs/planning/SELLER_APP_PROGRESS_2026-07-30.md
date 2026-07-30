@@ -18,13 +18,22 @@
 - 서버 수정 API와 타 사업장 접근 차단 계약 테스트를 추가했다.
 - 기능 커밋 `e576466`, `ae5b05e`를 `origin/main`에 반영했다.
 
+## 오늘 완료: SELLER-03 결제 상세·전액 환불
+
+- 완료 주문 상세에 결제 상태·수단·승인 금액·환불 금액·환불 가능 금액을 연결했다.
+- 환불 사유, 요청 주체, 처리 상태와 금액을 환불 이력으로 표시한다.
+- OWNER/MANAGER는 사유 입력 후 남은 승인 금액 전액을 환불할 수 있다.
+- STAFF는 결제·환불 정보를 조회하지만 환불 실행 UI는 사용할 수 없다.
+- 타 사업장 주문 조회·환불은 기존 `storeId`와 `StoreMember` 검증으로 차단한다.
+- 기능 커밋 `6f54f51`을 `origin/main`에 반영했다.
+
 ## 검증 결과
 
 | 대상 | 결과 |
 |---|---:|
 | Spring Boot 전체 테스트 | 55/55 통과 |
-| Flutter 전체 테스트 | 31/31 통과 |
-| Flutter 판매자 앱 테스트 | 12/12 통과 |
+| Flutter 전체 테스트 | 32/32 통과 |
+| Flutter 판매자 앱 테스트 | 13/13 통과 |
 | Flutter 전체 정적 분석 | 오류 없음 |
 | 판매자 Android Debug APK | 빌드 통과 |
 
@@ -32,7 +41,7 @@ APK:
 
 - 경로: `mobile_flutter/apps/seller_app/build/app/outputs/flutter-apk/app-debug.apk`
 - 크기: 193,535,858 bytes
-- SHA-256: `9AE980AF51A95230A890A6CCF48FA34521B3558028AF7F9FC54ADBC0B79AD450`
+- SHA-256: `D27669E3A0E4EFB5F524B378D0E8682F6843D0ED35F0D812CB60E231DD44D9D4`
 
 ## 판매자·소비자 데이터 격리 점검
 
@@ -44,9 +53,9 @@ APK:
 
 ## 다음 구현 순서
 
-1. `SELLER-03`: 완료 주문의 결제 상세와 환불 처리
+1. `SELLER-05`: 공지사항 서버 계약과 운영 탭 작성·조회
 2. `SELLER-10`: Docker 통합 환경에서 판매자 웹·Flutter 교차 E2E
-3. `SELLER-05`: 공지사항 서버 계약과 운영 탭 작성·조회
+3. `SELLER-08`: QR·테이블 Flutter 운영
 4. 외부 설정 확보 후 실제 로그인과 Firebase 판매자 알림 연결
 
 ## 사람이 직접 확인할 항목
