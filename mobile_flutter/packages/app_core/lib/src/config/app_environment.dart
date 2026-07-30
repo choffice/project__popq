@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 enum AppFlavor {
   development,
   staging,
@@ -29,14 +31,19 @@ class AppEnvironment {
       'POPQ_FLAVOR',
       defaultValue: 'development',
     );
-    const apiBaseUrl = String.fromEnvironment(
+    const configuredApiBaseUrl = String.fromEnvironment(
       'POPQ_API_BASE_URL',
-      defaultValue: 'http://10.0.2.2:8082',
+      defaultValue: '',
     );
     const enableNetworkLogs = bool.fromEnvironment(
       'POPQ_ENABLE_NETWORK_LOGS',
       defaultValue: true,
     );
+    final apiBaseUrl = configuredApiBaseUrl.isNotEmpty
+        ? configuredApiBaseUrl
+        : kIsWeb
+        ? 'http://localhost:8082'
+        : 'http://10.0.2.2:8082';
 
     return AppEnvironment(
       flavor: AppFlavor.parse(flavor),
