@@ -5,7 +5,7 @@
 ## 권한
 
 - 조회: OWNER, MANAGER, STAFF
-- 카테고리·상품 생성, 옵션 교체: OWNER, MANAGER
+- 카테고리·상품 생성·수정, 옵션 교체: OWNER, MANAGER
 - 품절·판매 기간·채널 상태 변경: OWNER, MANAGER, STAFF
 
 다른 스토어의 카테고리나 상품 ID를 전달해도 현재 스토어 범위를 벗어나 조회하거나 변경할 수 없다.
@@ -16,9 +16,11 @@
 |---|---|---|
 | GET | `/api/v1/seller/stores/{storeId}/categories` | 카테고리 목록 |
 | POST | `/api/v1/seller/stores/{storeId}/categories` | 카테고리 생성 |
+| PATCH | `/api/v1/seller/stores/{storeId}/categories/{categoryId}` | 카테고리 이름·정렬 순서 수정 |
 | GET | `/api/v1/seller/stores/{storeId}/products` | 활성 상품 요약 목록 |
 | POST | `/api/v1/seller/stores/{storeId}/products` | 기본 상품 생성 |
 | GET | `/api/v1/seller/stores/{storeId}/products/{productId}` | 옵션을 포함한 상품 상세 |
+| PATCH | `/api/v1/seller/stores/{storeId}/products/{productId}` | 카테고리·이름·설명·이미지·가격 수정 |
 | PUT | `/api/v1/seller/stores/{storeId}/products/{productId}/options` | 옵션 구조 전체 교체 |
 | PATCH | `/api/v1/seller/stores/{storeId}/products/{productId}/availability` | 품절·판매 기간·채널 상태 변경 |
 
@@ -35,6 +37,7 @@
 ```
 
 `basePrice`는 0 이상의 정수 금액이다. `categoryId`는 같은 스토어의 카테고리여야 한다.
+상품 수정도 같은 필드 구조를 사용하며 기존 옵션과 판매 가능 상태는 보존한다.
 
 ## 옵션 전체 교체
 
