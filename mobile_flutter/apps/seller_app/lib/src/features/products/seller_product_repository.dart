@@ -26,6 +26,86 @@ class SellerCategory {
   final String status;
 }
 
+class SellerProductOption {
+  const SellerProductOption({
+    required this.name,
+    required this.additionalPrice,
+    required this.displayOrder,
+  });
+
+  factory SellerProductOption.fromJson(Map<String, Object?> json) {
+    return SellerProductOption(
+      name: json['name'] as String,
+      additionalPrice: (json['additionalPrice'] as num).toInt(),
+      displayOrder: (json['displayOrder'] as num).toInt(),
+    );
+  }
+
+  final String name;
+  final int additionalPrice;
+  final int displayOrder;
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'additionalPrice': additionalPrice,
+    'displayOrder': displayOrder,
+  };
+}
+
+class SellerProductOptionGroup {
+  const SellerProductOptionGroup({
+    required this.name,
+    required this.minSelect,
+    required this.maxSelect,
+    required this.required,
+    required this.displayOrder,
+    required this.options,
+  });
+
+  factory SellerProductOptionGroup.fromJson(Map<String, Object?> json) {
+    return SellerProductOptionGroup(
+      name: json['name'] as String,
+      minSelect: (json['minSelect'] as num).toInt(),
+      maxSelect: (json['maxSelect'] as num).toInt(),
+      required: json['required'] as bool,
+      displayOrder: (json['displayOrder'] as num).toInt(),
+      options: (json['options'] as List<Object?>)
+          .map(
+            (item) => SellerProductOption.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String name;
+  final int minSelect;
+  final int maxSelect;
+  final bool required;
+  final int displayOrder;
+  final List<SellerProductOption> options;
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'minSelect': minSelect,
+    'maxSelect': maxSelect,
+    'required': required,
+    'displayOrder': displayOrder,
+    'options': options.map((item) => item.toJson()).toList(),
+  };
+}
+
+class SellerProductDetail {
+  const SellerProductDetail({
+    required this.product,
+    required this.optionGroups,
+  });
+
+  final SellerProduct product;
+  final List<SellerProductOptionGroup> optionGroups;
+}
+
 class SellerProduct {
   const SellerProduct({
     required this.productId,
@@ -155,6 +235,14 @@ abstract interface class SellerProductRepository {
     String? imageUrl,
     required int basePrice,
   });
+
+  Future<SellerProductDetail> findOne(int storeId, SellerProduct product);
+
+  Future<SellerProductDetail> replaceOptions(
+    int storeId,
+    SellerProduct product,
+    List<SellerProductOptionGroup> groups,
+  );
 
   Future<SellerProduct> updateAvailability(
     int storeId,
@@ -294,6 +382,53 @@ class ApiSellerProductRepository implements SellerProductRepository {
     );
   }
 
+  SellerProductDetail _decodeDetail(int storeId, Object? value) {
+    final detail = Map<String, Object?>.from(value as Map);
+    return SellerProductDetail(
+      product: SellerProduct.fromJson(
+        storeId,
+        Map<String, Object?>.from(detail['product'] as Map),
+      ),
+      optionGroups: (detail['optionGroups'] as List<Object?>)
+          .map(
+            (item) => SellerProductOptionGroup.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<SellerProductDetail> findOne(
+    int storeId,
+    SellerProduct product,
+  ) {
+    if (product.storeId != storeId) {
+      throw StateError('product does not belong to selected store');
+    }
+    return _apiClient.get(
+      '${_basePath(storeId)}/${product.productId}',
+      decode: (value) => _decodeDetail(storeId, value),
+    );
+  }
+
+  @override
+  Future<SellerProductDetail> replaceOptions(
+    int storeId,
+    SellerProduct product,
+    List<SellerProductOptionGroup> groups,
+  ) {
+    if (product.storeId != storeId) {
+      throw StateError('product does not belong to selected store');
+    }
+    return _apiClient.put(
+      '${_basePath(storeId)}/${product.productId}/options',
+      body: {'groups': groups.map((item) => item.toJson()).toList()},
+      decode: (value) => _decodeDetail(storeId, value),
+    );
+  }
+
   @override
   Future<SellerProduct> updateAvailability(
     int storeId,
@@ -329,8 +464,12 @@ class MemorySellerProductRepository implements SellerProductRepository {
   MemorySellerProductRepository({
     List<SellerProduct> products = const [],
     List<SellerCategory> categories = const [],
+    Map<int, List<SellerProductOptionGroup>> optionGroups = const {},
   }) : _products = List.of(products),
-       _categories = List.of(categories) {
+       _categories = List.of(categories),
+       _optionGroups = optionGroups.map(
+         (key, value) => MapEntry(key, List.of(value)),
+       ) {
     for (final product in products) {
       if (_categories.every(
         (item) =>
@@ -353,6 +492,7 @@ class MemorySellerProductRepository implements SellerProductRepository {
 
   final List<SellerProduct> _products;
   final List<SellerCategory> _categories;
+  final Map<int, List<SellerProductOptionGroup>> _optionGroups;
 
   @override
   Future<List<SellerCategory>> findCategories(int storeId) async {
@@ -495,6 +635,39 @@ class MemorySellerProductRepository implements SellerProductRepository {
     );
     _products[index] = updated;
     return updated;
+  }
+
+  @override
+  Future<SellerProductDetail> findOne(
+    int storeId,
+    SellerProduct product,
+  ) async {
+    final stored = _products.where(
+      (item) => item.storeId == storeId && item.productId == product.productId,
+    );
+    if (stored.isEmpty || product.storeId != storeId) {
+      throw StateError('product not found in selected store');
+    }
+    return SellerProductDetail(
+      product: stored.single,
+      optionGroups: List.unmodifiable(
+        _optionGroups[product.productId] ?? const [],
+      ),
+    );
+  }
+
+  @override
+  Future<SellerProductDetail> replaceOptions(
+    int storeId,
+    SellerProduct product,
+    List<SellerProductOptionGroup> groups,
+  ) async {
+    final detail = await findOne(storeId, product);
+    _optionGroups[product.productId] = List.of(groups);
+    return SellerProductDetail(
+      product: detail.product,
+      optionGroups: List.unmodifiable(groups),
+    );
   }
 
   @override

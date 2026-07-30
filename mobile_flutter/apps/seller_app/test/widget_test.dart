@@ -308,6 +308,10 @@ void main() {
       repository.updateAvailability(1, foreignProduct, soldOut: true),
       throwsStateError,
     );
+    await expectLater(
+      repository.replaceOptions(1, foreignProduct, const []),
+      throwsStateError,
+    );
   });
 
   testWidgets('seller creates a category and edits a menu', (tester) async {
@@ -367,6 +371,31 @@ void main() {
     saved = (await repository.findAll(1)).single;
     expect(saved.name, '딸기 크림 라떼');
     expect(saved.basePrice, 7000);
+
+    final optionEdit = find.byKey(Key('edit-options-${saved.productId}'));
+    await tester.ensureVisible(optionEdit);
+    await tester.tap(optionEdit);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-option-group')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('option-group-name-0')),
+      '우유 선택',
+    );
+    await tester.enterText(
+      find.byKey(const Key('option-name-0-0')),
+      '오트 밀크',
+    );
+    await tester.enterText(
+      find.byKey(const Key('option-price-0-0')),
+      '800',
+    );
+    await tester.tap(find.byKey(const Key('save-options')));
+    await tester.pumpAndSettle();
+
+    final detail = await repository.findOne(1, saved);
+    expect(detail.optionGroups.single.name, '우유 선택');
+    expect(detail.optionGroups.single.options.single.additionalPrice, 800);
   });
 
   testWidgets(

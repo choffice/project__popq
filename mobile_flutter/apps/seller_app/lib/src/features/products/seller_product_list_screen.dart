@@ -253,11 +253,22 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
               padding: const EdgeInsets.symmetric(
                 horizontal: PopqSpacing.sm,
               ),
-              child: TextButton.icon(
-                key: Key('edit-product-${product.productId}'),
-                onPressed: isUpdating ? null : () => _editProduct(product),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('기본정보 수정'),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                children: [
+                  TextButton.icon(
+                    key: Key('edit-options-${product.productId}'),
+                    onPressed: isUpdating ? null : () => _editOptions(product),
+                    icon: const Icon(Icons.tune_rounded),
+                    label: const Text('옵션 편집'),
+                  ),
+                  TextButton.icon(
+                    key: Key('edit-product-${product.productId}'),
+                    onPressed: isUpdating ? null : () => _editProduct(product),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('기본정보 수정'),
+                  ),
+                ],
               ),
             ),
           ),
@@ -410,6 +421,36 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
     } catch (_) {
       if (!mounted) return;
       _showMessage('메뉴를 저장하지 못했습니다.');
+    }
+  }
+
+  Future<void> _editOptions(SellerProduct product) async {
+    setState(() => _updatingIds.add(product.productId));
+    try {
+      final detail = await widget.repository.findOne(_storeId, product);
+      if (!mounted) return;
+      setState(() => _updatingIds.remove(product.productId));
+      final groups = await showSellerOptionEditor(
+        context,
+        product: detail.product,
+        groups: detail.optionGroups,
+      );
+      if (groups == null || !mounted) return;
+      setState(() => _updatingIds.add(product.productId));
+      final saved = await widget.repository.replaceOptions(
+        _storeId,
+        product,
+        groups,
+      );
+      if (!mounted) return;
+      setState(() => _updatingIds.remove(product.productId));
+      _showMessage(
+        '${saved.product.name} 옵션 그룹 ${saved.optionGroups.length}개를 저장했습니다.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _updatingIds.remove(product.productId));
+      _showMessage('옵션을 저장하지 못했습니다.');
     }
   }
 
