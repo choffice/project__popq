@@ -9,3 +9,4 @@
 **/.flutter-plugins-dependencies
 **/.git.nested-backup/
 uploads/
+.env.intellij
