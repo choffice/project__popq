@@ -4,6 +4,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../features/auth/seller_bootstrap_controller.dart';
+import '../features/announcements/seller_announcement_repository.dart';
 import '../features/auth/seller_sign_in_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
 import '../features/customers/seller_customer_screen.dart';
@@ -34,6 +35,7 @@ GoRouter createSellerRouter({
   required SellerBootstrapController bootstrapController,
   required SellerStoreSelectionController storeSelectionController,
   required SellerStoreRepository storeRepository,
+  required SellerAnnouncementRepository announcementRepository,
   required SellerOrderRepository orderRepository,
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
@@ -145,6 +147,7 @@ GoRouter createSellerRouter({
             builder: (context, state) {
               return SellerOperationScreen(
                 storeRepository: storeRepository,
+                announcementRepository: announcementRepository,
                 productRepository: productRepository,
                 selectionController: storeSelectionController,
               );
