@@ -1,5 +1,17 @@
 # POPQ Seller Web
 
+## 개발용 판매자 토큰 한 번에 발급
+
+프로젝트 루트에서 다음 명령을 실행한다.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\dev-seller-token.ps1
+```
+
+스크립트는 로컬 MySQL과 백엔드를 시작하고, 개발용 판매자와 테스트
+스토어를 준비한 뒤 10년짜리 Access Token을 클립보드에 복사한다.
+출력된 Store ID와 복사된 토큰을 판매자 웹의 `백엔드 연결` 창에 입력한다.
+
 판매자가 신규 주문을 접수하고 준비·전달 완료까지 실시간으로 운영하는 React 웹이다.
 
 ## 바로 보기
