@@ -27,13 +27,23 @@
 - 타 사업장 주문 조회·환불은 기존 `storeId`와 `StoreMember` 검증으로 차단한다.
 - 기능 커밋 `6f54f51`을 `origin/main`에 반영했다.
 
+## 오늘 완료: SELLER-05 공지사항 관리
+
+- `announcements` Flyway 스키마와 Spring 도메인·판매자 API를 추가했다.
+- 공지는 사업장별 `DRAFT`, `PUBLISHED`, `HIDDEN` 상태로 관리한다.
+- OWNER/MANAGER는 작성·수정·게시·숨김을 수행하고 STAFF는 목록을 조회한다.
+- Flutter `운영 > 공지사항`의 placeholder를 실제 목록·편집 화면으로 교체했다.
+- 타 판매자의 사업장 접근과 타 사업장 공지 변경을 차단했다.
+- 고객 앱·QR 공개 노출, 예약·만료는 정책 확정 전까지 후속 범위로 유지한다.
+- 기능 커밋 `8a1a30e`을 `origin/main`에 반영했다.
+
 ## 검증 결과
 
 | 대상 | 결과 |
 |---|---:|
-| Spring Boot 전체 테스트 | 55/55 통과 |
-| Flutter 전체 테스트 | 32/32 통과 |
-| Flutter 판매자 앱 테스트 | 13/13 통과 |
+| Spring Boot 전체 테스트 | 56/56 통과 |
+| Flutter 전체 테스트 | 34/34 통과 |
+| Flutter 판매자 앱 테스트 | 15/15 통과 |
 | Flutter 전체 정적 분석 | 오류 없음 |
 | 판매자 Android Debug APK | 빌드 통과 |
 
@@ -41,7 +51,7 @@ APK:
 
 - 경로: `mobile_flutter/apps/seller_app/build/app/outputs/flutter-apk/app-debug.apk`
 - 크기: 193,535,858 bytes
-- SHA-256: `D27669E3A0E4EFB5F524B378D0E8682F6843D0ED35F0D812CB60E231DD44D9D4`
+- SHA-256: `18D9DA04D8B9636716159A5FDA7F7BCE35D951D19235A704904F71980408FD16`
 
 ## 판매자·소비자 데이터 격리 점검
 
@@ -53,9 +63,9 @@ APK:
 
 ## 다음 구현 순서
 
-1. `SELLER-05`: 공지사항 서버 계약과 운영 탭 작성·조회
+1. `SELLER-08`: QR·테이블 Flutter 운영
 2. `SELLER-10`: Docker 통합 환경에서 판매자 웹·Flutter 교차 E2E
-3. `SELLER-08`: QR·테이블 Flutter 운영
+3. `SELLER-07`: 매출 일별 차트·사용자 지정 기간·정산 연결
 4. 외부 설정 확보 후 실제 로그인과 Firebase 판매자 알림 연결
 
 ## 사람이 직접 확인할 항목
