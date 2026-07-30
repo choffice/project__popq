@@ -9,6 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.example.project_popq.store.domain.StoreMember;
+import com.example.project_popq.store.domain.StoreRole;
+import com.example.project_popq.store.repository.StoreMemberRepository;
+import com.example.project_popq.store.repository.StoreRepository;
+import com.example.project_popq.user.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +29,15 @@ class AuthApiIntegrationTests {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private StoreRepository storeRepository;
+
+    @Autowired
+    private StoreMemberRepository storeMemberRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Test
     void unauthenticatedRequestUsesCommonErrorResponse() throws Exception {
@@ -257,6 +271,124 @@ class AuthApiIntegrationTests {
                                   "basePrice": 0
                                 }
                                 """.formatted(categoryId)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code")
+                        .value("STORE_ACCESS_DENIED"));
+    }
+
+    @Test
+    void ownerManagesAnnouncementsWhileStaffCanOnlyRead() throws Exception {
+        String ownerToken = login(
+                "announcement-owner@popq.test",
+                "Announcement Owner",
+                "SELLER"
+        );
+        Long storeId = createStore(ownerToken, "Announcement Store");
+
+        String createResponse = mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/announcements",
+                        storeId
+                )
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Holiday hours",
+                                  "content": "We close at 6 PM."
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        Long announcementId = ((Number) JsonPath.read(
+                createResponse,
+                "$.data.announcementId"
+        )).longValue();
+
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}",
+                        storeId,
+                        announcementId
+                )
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "Updated holiday hours",
+                                  "content": "We close at 5 PM."
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title")
+                        .value("Updated holiday hours"));
+
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
+                        storeId,
+                        announcementId
+                )
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "PUBLISHED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.publishedAt").isNotEmpty());
+
+        String staffEmail = "announcement-staff@popq.test";
+        String staffToken = login(
+                staffEmail,
+                "Announcement Staff",
+                "SELLER"
+        );
+        storeMemberRepository.save(
+                StoreMember.create(
+                        storeRepository.findById(storeId).orElseThrow(),
+                        userRepository.findByEmailIgnoreCase(staffEmail)
+                                .orElseThrow(),
+                        StoreRole.STAFF
+                )
+        );
+
+        mockMvc.perform(get(
+                        "/api/v1/seller/stores/{storeId}/announcements",
+                        storeId
+                )
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"));
+
+        mockMvc.perform(patch(
+                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
+                        storeId,
+                        announcementId
+                )
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "status": "HIDDEN"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code")
+                        .value("STORE_ACCESS_DENIED"));
+
+        String otherToken = login(
+                "announcement-other@popq.test",
+                "Announcement Other",
+                "SELLER"
+        );
+        mockMvc.perform(get(
+                        "/api/v1/seller/stores/{storeId}/announcements",
+                        storeId
+                )
+                        .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error.code")
                         .value("STORE_ACCESS_DENIED"));

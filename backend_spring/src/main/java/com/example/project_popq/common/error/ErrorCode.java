@@ -47,6 +47,7 @@ public enum ErrorCode {
     REVIEW_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 리뷰가 작성된 주문입니다."),
     PUSH_DEVICE_NOT_FOUND(HttpStatus.NOT_FOUND, "푸시 알림 기기를 찾을 수 없습니다."),
     NOTIFICATION_NOT_FOUND(HttpStatus.NOT_FOUND, "알림을 찾을 수 없습니다."),
+    ANNOUNCEMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "공지사항을 찾을 수 없습니다."),
     PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
     PAYMENT_FAILED(HttpStatus.PAYMENT_REQUIRED, "결제 승인에 실패했습니다."),
     PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 승인 금액이 주문 금액과 일치하지 않습니다."),

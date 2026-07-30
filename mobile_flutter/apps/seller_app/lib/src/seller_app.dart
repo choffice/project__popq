@@ -6,6 +6,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/auth/seller_bootstrap_controller.dart';
+import 'features/announcements/seller_announcement_repository.dart';
 import 'features/auth/seller_identity_repository.dart';
 import 'features/home/seller_analytics_repository.dart';
 import 'features/orders/seller_order_repository.dart';
@@ -21,6 +22,7 @@ class PopqSellerApp extends StatefulWidget {
     this.sessionStore,
     this.storeSelectionStore,
     this.storeRepository,
+    this.announcementRepository,
     this.identityRepository,
     this.orderRepository,
     this.productRepository,
@@ -32,6 +34,7 @@ class PopqSellerApp extends StatefulWidget {
   final SessionStore? sessionStore;
   final SellerStoreSelectionStore? storeSelectionStore;
   final SellerStoreRepository? storeRepository;
+  final SellerAnnouncementRepository? announcementRepository;
   final SellerIdentityRepository? identityRepository;
   final SellerOrderRepository? orderRepository;
   final SellerProductRepository? productRepository;
@@ -47,6 +50,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final SellerStoreSelectionController _storeSelectionController;
   late final SellerBootstrapController _bootstrapController;
   late final SellerStoreRepository _storeRepository;
+  late final SellerAnnouncementRepository _announcementRepository;
   late final SellerOrderRepository _orderRepository;
   late final SellerProductRepository _productRepository;
   late final SellerAnalyticsRepository _analyticsRepository;
@@ -70,6 +74,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     );
     _storeRepository =
         widget.storeRepository ?? ApiSellerStoreRepository(_apiClient);
+    _announcementRepository =
+        widget.announcementRepository ??
+        ApiSellerAnnouncementRepository(_apiClient);
     _orderRepository =
         widget.orderRepository ?? ApiSellerOrderRepository(_apiClient);
     _productRepository =
@@ -88,6 +95,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       bootstrapController: _bootstrapController,
       storeSelectionController: _storeSelectionController,
       storeRepository: _storeRepository,
+      announcementRepository: _announcementRepository,
       orderRepository: _orderRepository,
       productRepository: _productRepository,
       analyticsRepository: _analyticsRepository,

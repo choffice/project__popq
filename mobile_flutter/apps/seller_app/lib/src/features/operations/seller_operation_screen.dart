@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../announcements/seller_announcement_repository.dart';
+import '../announcements/seller_announcement_screen.dart';
 import '../products/seller_product_list_screen.dart';
 import '../products/seller_product_repository.dart';
 import '../stores/seller_store_repository.dart';
@@ -9,12 +11,14 @@ import '../stores/seller_store_selection_controller.dart';
 class SellerOperationScreen extends StatefulWidget {
   const SellerOperationScreen({
     required this.storeRepository,
+    required this.announcementRepository,
     required this.productRepository,
     required this.selectionController,
     super.key,
   });
 
   final SellerStoreRepository storeRepository;
+  final SellerAnnouncementRepository announcementRepository;
   final SellerProductRepository productRepository;
   final SellerStoreSelectionController selectionController;
 
@@ -62,10 +66,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         Expanded(
           child: switch (_section) {
             0 => _operationInfo(),
-            1 => const PopqEmptyView(
-              icon: Icons.campaign_outlined,
-              title: '등록된 공지사항이 없어요.',
-              description: '공지 작성·게시 API를 연결하면 이곳에서 사업장 공지를 관리합니다.',
+            1 => SellerAnnouncementScreen(
+              storeId: _storeId,
+              canManage:
+                  _store!.myRole == 'OWNER' || _store!.myRole == 'MANAGER',
+              repository: widget.announcementRepository,
             ),
             _ => SellerProductListScreen(
               repository: widget.productRepository,

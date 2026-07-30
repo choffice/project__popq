@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_seller_app/src/features/announcements/seller_announcement_repository.dart';
 import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dart';
 import 'package:popq_seller_app/src/features/home/seller_analytics_repository.dart';
 import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
@@ -573,6 +574,86 @@ void main() {
       expect(find.text('성수 리뉴얼 사업장'), findsOneWidget);
     },
   );
+
+  testWidgets('owner creates edits and publishes a store announcement', (
+    tester,
+  ) async {
+    final announcementRepository = MemorySellerAnnouncementRepository();
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: _validSessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(1),
+        storeRepository: MemorySellerStoreRepository(),
+        announcementRepository: announcementRepository,
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('운영'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('공지사항'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('add-announcement')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('announcement-title')),
+      '여름 운영시간',
+    );
+    await tester.enterText(
+      find.byKey(const Key('announcement-content')),
+      '주말에는 오후 6시에 마감합니다.',
+    );
+    await tester.tap(find.byKey(const Key('save-announcement')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('작성 중'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('edit-announcement-1')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('announcement-title')),
+      '여름 운영시간 변경',
+    );
+    await tester.tap(find.byKey(const Key('save-announcement')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('toggle-announcement-1')));
+    await tester.pumpAndSettle();
+
+    final saved = (await announcementRepository.findAll(1)).single;
+    expect(saved.title, '여름 운영시간 변경');
+    expect(saved.status, 'PUBLISHED');
+    expect(find.text('게시 중'), findsOneWidget);
+  });
+
+  test('repository denies an announcement outside the selected store', () async {
+    final now = DateTime.now().toUtc();
+    final foreign = SellerAnnouncement(
+      announcementId: 7,
+      storeId: 2,
+      title: '다른 사업장 공지',
+      content: '격리 대상',
+      status: 'DRAFT',
+      createdAt: now,
+      updatedAt: now,
+    );
+    final repository = MemorySellerAnnouncementRepository(
+      announcements: [foreign],
+    );
+
+    await expectLater(
+      repository.update(
+        1,
+        foreign,
+        title: '침범',
+        content: '허용되지 않음',
+      ),
+      throwsStateError,
+    );
+  });
 
   test('staff cannot update business profile', () async {
     final repository = MemorySellerStoreRepository(
