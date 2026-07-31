@@ -8,5 +8,9 @@ spring:
 popq:
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+
   qr:
     cookie-secure: false
+
+  seed:
+    enabled: true
