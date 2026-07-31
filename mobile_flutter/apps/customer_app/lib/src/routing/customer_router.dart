@@ -53,6 +53,7 @@ GoRouter createCustomerRouter({
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
+  required String tossClientKey,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
   return GoRouter(
@@ -213,6 +214,7 @@ GoRouter createCustomerRouter({
           return CheckoutScreen(
             cartController: cartController,
             orderRepository: orderRepository,
+            tossClientKey: tossClientKey,
           );
         },
       ),
