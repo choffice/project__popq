@@ -53,6 +53,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final PopqApiClient _apiClient;
   late final CartController _cartController;
   late final GoRouter _router;
+  late final GoogleAuthService _googleAuthService;
 
   @override
   void initState() {
@@ -65,6 +66,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     _apiClient = PopqApiClient(
       baseUrl: widget.environment.apiBaseUrl,
       accessTokenReader: () async => (await _sessionStore.read())?.accessToken,
+    );
+    _googleAuthService = GoogleAuthService(
+      webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
     );
     final permissionGateway =
         widget.permissionGateway ?? DeviceCustomerPermissionGateway();
@@ -95,7 +99,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
+      onGoogleSignIn: _googleSignIn,
     );
+
     unawaited(
       Future.wait([
         _sessionController.restore(),
@@ -122,6 +128,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
       ),
     );
+  }
+  Future<void> _googleSignIn() async {
+    final idToken = await _googleAuthService.signInAndGetIdToken();
+    debugPrint('Google idToken: $idToken');
+    // TODO(backend): Spring Security 엔드포인트 확정되면
+    // idToken을 body에 담아 POST 요청 → 응답의 accessToken/refreshToken을
+    // _sessionController.save(AuthSession(...))에 저장하는 코드로 교체
   }
 
   @override

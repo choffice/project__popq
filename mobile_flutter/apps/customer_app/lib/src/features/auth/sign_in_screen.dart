@@ -4,11 +4,13 @@ import 'package:popq_design_system/popq_design_system.dart';
 class SignInScreen extends StatefulWidget {
   const SignInScreen({
     required this.onBackHome,
+    this.onGoogleSignIn,
     this.onDevelopmentSignIn,
     super.key,
   });
 
   final VoidCallback onBackHome;
+  final Future<void> Function()? onGoogleSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   @override
@@ -53,7 +55,12 @@ class _SignInScreenState extends State<SignInScreen> {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: PopqSpacing.xl),
-            const _ProviderButton(label: 'Google로 계속하기'),
+            _ProviderButton(
+              label: 'Google로 계속하기',
+              onPressed: widget.onGoogleSignIn == null || _busy
+                  ? null
+                  : _handleGoogleSignIn,
+            ),
             const SizedBox(height: PopqSpacing.sm),
             const _ProviderButton(label: 'Kakao로 계속하기'),
             const SizedBox(height: PopqSpacing.sm),
@@ -107,17 +114,35 @@ class _SignInScreenState extends State<SignInScreen> {
       });
     }
   }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      await widget.onGoogleSignIn!();
+    } catch (e) {
+      debugPrint('Google 로그인 에러: $e');
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = 'Google 로그인에 실패했습니다.';
+      });
+    }
+  }
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({required this.label});
+  const _ProviderButton({required this.label, this.onPressed});
 
   final String label;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: null,
+      onPressed: onPressed,
       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       child: Text(label),
     );

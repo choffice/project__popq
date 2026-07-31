@@ -54,6 +54,7 @@ GoRouter createCustomerRouter({
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   Future<void> Function()? onDevelopmentSignIn,
+  Future<void> Function()? onGoogleSignIn,
 }) {
   return GoRouter(
     initialLocation: CustomerRoutes.home,
@@ -153,6 +154,7 @@ GoRouter createCustomerRouter({
           return SignInScreen(
             onBackHome: () => context.go(CustomerRoutes.home),
             onDevelopmentSignIn: onDevelopmentSignIn,
+            onGoogleSignIn: onGoogleSignIn,
           );
         },
       ),
