@@ -7,7 +7,7 @@ spring:
 
 popq:
   auth:
-    dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+    dev-login-enabled: true
 
   qr:
     cookie-secure: false
