@@ -24,6 +24,7 @@ import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.user.domain.User;
+import com.example.project_popq.payment.config.PaymentProperties;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -39,6 +40,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final PaymentProvider paymentProvider;
     private final OrderDomainEventPublisher orderEventPublisher;
+    private final PaymentProperties paymentProperties;
 
     @Transactional(noRollbackFor = PaymentProcessingException.class)
     public PaymentResponse confirm(
@@ -117,12 +119,20 @@ public class PaymentService {
             throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
         }
 
+        PaymentProviderType providerType =
+            paymentProperties.provider();
+
+        PaymentMethod paymentMethod = switch (providerType) {
+            case TEST -> PaymentMethod.TEST;
+            case TOSS_PAYMENTS -> PaymentMethod.CARD;
+        };
+
         Payment payment = Payment.ready(
-                order,
-                PaymentProviderType.TEST,
-                PaymentMethod.TEST,
-                order.getTotalAmount(),
-                request.idempotencyKey()
+            order,
+            providerType,
+            paymentMethod,
+            order.getTotalAmount(),
+            request.idempotencyKey()
         );
         payment.markInProgress();
         paymentRepository.save(payment);

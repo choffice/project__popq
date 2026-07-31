@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Flutter Android Emulator - Customer" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.30:8082" />
+    <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.30:8082--dart-define=POPQ_TOSS_CLIENT_KEY=test_ck_QbgMGZzorzqqZ7MqB5nNVl5E1em4" />
     <option name="filePath" value="$PROJECT_DIR$/apps/customer_app/lib/main.dart" />
     <method v="2" />
   </configuration>
