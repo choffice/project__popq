@@ -128,9 +128,10 @@ public class PaymentService {
         paymentRepository.save(payment);
 
         PaymentApprovalCommand command = new PaymentApprovalCommand(
-                orderPublicId,
-                order.getTotalAmount(),
-                request.simulateFailure()
+            orderPublicId,
+            order.getTotalAmount(),
+            request.paymentKey(),
+            request.simulateFailure()
         );
         PaymentApprovalResult result = paymentProvider.approve(command);
         Instant processedAt = Instant.now();
