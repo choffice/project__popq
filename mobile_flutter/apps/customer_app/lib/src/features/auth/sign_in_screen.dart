@@ -97,13 +97,20 @@ class _SignInScreenState extends State<SignInScreen> {
       _busy = true;
       _errorMessage = null;
     });
+
     try {
       await widget.onDevelopmentSignIn!();
-    } catch (_) {
-      if (!mounted) return;
+    } catch (error, stackTrace) {
+      debugPrint('개발 로그인 오류: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _busy = false;
-        _errorMessage = '개발 로그인에 실패했습니다. 로컬 백엔드 상태를 확인해 주세요.';
+        _errorMessage = '로그인 실패: $error';
       });
     }
   }

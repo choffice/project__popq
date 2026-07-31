@@ -111,8 +111,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     final response = await _apiClient.post<Map<String, Object?>>(
       '/api/v1/dev/auth/login',
       body: {
-        'email': 'seller-app-dev@popq.local',
-        'name': 'POPQ 개발 판매자',
+        'email': 'seller@popq.local',
+        'name': 'POPQ 테스트 판매자',
         'role': 'SELLER',
       },
       decode: (value) => Map<String, Object?>.from(value as Map),
