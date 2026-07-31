@@ -92,6 +92,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       notificationRepository: notificationRepository,
       cartController: _cartController,
       permissionGateway: permissionGateway,
+      tossClientKey: widget.environment.tossClientKey,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,

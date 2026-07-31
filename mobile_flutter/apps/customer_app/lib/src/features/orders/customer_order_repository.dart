@@ -80,9 +80,10 @@ abstract interface class CustomerOrderRepository {
   });
 
   Future<CustomerOrder> confirmPayment(
-    CustomerOrder order, {
-    required String idempotencyKey,
-  });
+      CustomerOrder order, {
+        required String idempotencyKey,
+        String? paymentKey,
+      });
 
   Future<List<CustomerOrder>> findAll();
 
@@ -126,14 +127,20 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
 
   @override
   Future<CustomerOrder> confirmPayment(
-    CustomerOrder order, {
-    required String idempotencyKey,
-  }) async {
+      CustomerOrder order, {
+        required String idempotencyKey,
+        String? paymentKey,
+      }) async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/customer/orders/${order.orderPublicId}/payments',
-      body: {'idempotencyKey': idempotencyKey, 'simulateFailure': false},
+      body: {
+        'idempotencyKey': idempotencyKey,
+        'simulateFailure': false,
+        'paymentKey': paymentKey,
+      },
       decode: (value) => Map<String, Object?>.from(value as Map),
     );
+
     return findOne(order.orderPublicId);
   }
 
@@ -217,9 +224,10 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
 
   @override
   Future<CustomerOrder> confirmPayment(
-    CustomerOrder order, {
-    required String idempotencyKey,
-  }) async {
+      CustomerOrder order, {
+        required String idempotencyKey,
+        String? paymentKey,
+      }) async {
     final paid = CustomerOrder(
       orderPublicId: order.orderPublicId,
       storeId: order.storeId,

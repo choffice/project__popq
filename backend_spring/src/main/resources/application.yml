@@ -1,11 +1,13 @@
 spring:
   application:
     name: popq
+
   datasource:
     url: ${POPQ_DB_URL:jdbc:mysql://localhost:3306/popq?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
     username: ${POPQ_DB_USERNAME:popq}
     password: ${POPQ_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     open-in-view: false
     hibernate:
@@ -15,9 +17,11 @@ spring:
         format_sql: true
         jdbc:
           time_zone: UTC
+
   flyway:
     enabled: true
     locations: classpath:db/migration
+
   servlet:
     multipart:
       enabled: true
@@ -43,20 +47,32 @@ management:
 popq:
   upload:
     path: ${POPQ_UPLOAD_PATH:./uploads}
+
   security:
     jwt:
       issuer: ${POPQ_JWT_ISSUER:popq}
       secret: ${POPQ_JWT_SECRET}
       access-token-expiration: ${POPQ_ACCESS_TOKEN_EXPIRATION:PT1H}
+
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}
     guest-session-ttl: ${POPQ_GUEST_SESSION_TTL:PT12H}
     cookie-secure: ${POPQ_COOKIE_SECURE:true}
+
   order:
     payment-deadline: ${POPQ_ORDER_PAYMENT_DEADLINE:PT15M}
+
+  payment:
+    provider: ${POPQ_PAYMENT_PROVIDER:TEST}
+    toss:
+      api-base-url: https://api.tosspayments.com
+      secret-key: ${POPQ_TOSS_SECRET_KEY:}
+
   realtime:
     allowed-origin-patterns: ${POPQ_REALTIME_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184}
+
   web:
     allowed-origin-patterns: ${POPQ_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184}
