@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Flutter Web - Customer (5183)" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--web-port=5183 --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://192.168.55.217:8082" />
+    <option name="additionalArgs" value="--web-port=5183 --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://192.168.55.217:8082 --dart-define=POPQ_TOSS_CLIENT_KEY=test_ck_QbgMGZzorzqqZ7MqB5nNVl5E1em4" />
     <option name="filePath" value="$PROJECT_DIR$/apps/customer_app/lib/main.dart" />
     <method v="2" />
   </configuration>
