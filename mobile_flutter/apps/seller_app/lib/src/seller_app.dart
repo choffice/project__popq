@@ -28,6 +28,7 @@ class PopqSellerApp extends StatefulWidget {
     this.orderRepository,
     this.productRepository,
     this.analyticsRepository,
+    this.themeController,
     super.key,
   });
 
@@ -40,21 +41,37 @@ class PopqSellerApp extends StatefulWidget {
   final SellerOrderRepository? orderRepository;
   final SellerProductRepository? productRepository;
   final SellerAnalyticsRepository? analyticsRepository;
+  final PopqThemeController? themeController;
 
   @override
-  State<PopqSellerApp> createState() => _PopqSellerAppState();
+  State<PopqSellerApp> createState() =>
+      _PopqSellerAppState();
 }
 
 class _PopqSellerAppState extends State<PopqSellerApp> {
   late final SessionStore _sessionStore;
   late final SessionController _sessionController;
-  late final SellerStoreSelectionController _storeSelectionController;
-  late final SellerBootstrapController _bootstrapController;
+
+  late final SellerStoreSelectionController
+  _storeSelectionController;
+
+  late final SellerBootstrapController
+  _bootstrapController;
+
   late final SellerStoreRepository _storeRepository;
-  late final SellerAnnouncementRepository _announcementRepository;
+
+  late final SellerAnnouncementRepository
+  _announcementRepository;
+
   late final SellerOrderRepository _orderRepository;
   late final SellerProductRepository _productRepository;
-  late final SellerAnalyticsRepository _analyticsRepository;
+
+  late final SellerAnalyticsRepository
+  _analyticsRepository;
+
+  late final PopqThemeController _themeController;
+  late final bool _ownsThemeController;
+
   late final PopqApiClient _apiClient;
   late final GoRouter _router;
 
@@ -63,26 +80,40 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     super.initState();
 
     final useMemoryStorage =
-        kIsWeb && widget.environment.flavor == AppFlavor.development;
+        kIsWeb &&
+            widget.environment.flavor ==
+                AppFlavor.development;
 
     _sessionStore =
         widget.sessionStore ??
             (useMemoryStorage
                 ? MemorySessionStore()
                 : SecureSessionStore(
-              storageKey: 'popq.seller.auth.session.v1',
+              storageKey:
+              'popq.seller.auth.session.v1',
             ));
 
     _sessionController = SessionController(
       sessionStore: _sessionStore,
     );
 
-    _storeSelectionController = SellerStoreSelectionController(
-      widget.storeSelectionStore ??
-          (useMemoryStorage
-              ? MemorySellerStoreSelectionStore()
-              : SharedPreferencesSellerStoreSelectionStore()),
-    );
+    _storeSelectionController =
+        SellerStoreSelectionController(
+          widget.storeSelectionStore ??
+              (useMemoryStorage
+                  ? MemorySellerStoreSelectionStore()
+                  : SharedPreferencesSellerStoreSelectionStore()),
+        );
+
+    _ownsThemeController =
+        widget.themeController == null;
+
+    _themeController =
+        widget.themeController ??
+            PopqThemeController(
+              storageKey:
+              'popq.seller.theme.preference.v1',
+            );
 
     _apiClient = PopqApiClient(
       baseUrl: widget.environment.apiBaseUrl,
@@ -116,33 +147,46 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         widget.identityRepository ??
             ApiSellerIdentityRepository(_apiClient);
 
-    _bootstrapController = SellerBootstrapController(
-      sessionController: _sessionController,
-      storeSelectionController: _storeSelectionController,
-      identityRepository: identityRepository,
-    );
+    _bootstrapController =
+        SellerBootstrapController(
+          sessionController: _sessionController,
+          storeSelectionController:
+          _storeSelectionController,
+          identityRepository: identityRepository,
+        );
 
     _router = createSellerRouter(
       sessionController: _sessionController,
       bootstrapController: _bootstrapController,
-      storeSelectionController: _storeSelectionController,
+      storeSelectionController:
+      _storeSelectionController,
       storeRepository: _storeRepository,
-      announcementRepository: _announcementRepository,
+      announcementRepository:
+      _announcementRepository,
       orderRepository: _orderRepository,
       productRepository: _productRepository,
-      analyticsRepository: _analyticsRepository,
+      analyticsRepository:
+      _analyticsRepository,
       onSignOut: _bootstrapController.signOut,
+      themeController: _themeController,
       onDevelopmentSignIn:
-      widget.environment.flavor == AppFlavor.development
+      widget.environment.flavor ==
+          AppFlavor.development
           ? _developmentSignIn
           : null,
     );
 
-    unawaited(_bootstrapController.restore());
+    unawaited(
+      Future.wait([
+        _bootstrapController.restore(),
+        _themeController.restore(),
+      ]),
+    );
   }
 
   Future<void> _developmentSignIn() async {
-    final response = await _apiClient.post<Map<String, Object?>>(
+    final response =
+    await _apiClient.post<Map<String, Object?>>(
       '/api/v1/dev/auth/login',
       body: {
         'email': 'seller@popq.local',
@@ -150,7 +194,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         'role': 'SELLER',
       },
       decode: (value) {
-        return Map<String, Object?>.from(value as Map);
+        return Map<String, Object?>.from(
+          value as Map,
+        );
       },
     );
 
@@ -159,30 +205,39 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     );
 
     if (user['role'] != 'SELLER') {
-      throw StateError('seller role is required');
+      throw StateError(
+        'seller role is required',
+      );
     }
 
-    final expiresIn = (response['expiresIn'] as num).toInt();
+    final expiresIn =
+    (response['expiresIn'] as num).toInt();
 
     await _storeSelectionController.clear();
 
     await _sessionController.save(
       AuthSession(
-        accessToken: response['accessToken'] as String,
+        accessToken:
+        response['accessToken'] as String,
         refreshToken: '',
         expiresAt: DateTime.now()
             .toUtc()
-            .add(Duration(seconds: expiresIn)),
+            .add(
+          Duration(seconds: expiresIn),
+        ),
       ),
     );
 
-    _bootstrapController.acknowledgeSellerSignIn();
+    _bootstrapController
+        .acknowledgeSellerSignIn();
 
-    final stores = await _storeRepository.findAll();
+    final stores =
+    await _storeRepository.findAll();
 
     if (stores.isEmpty) {
       final created =
-      await _storeRepository.createDevelopmentStore();
+      await _storeRepository
+          .createDevelopmentStore();
 
       await _storeSelectionController.select(
         created.storeId,
@@ -201,17 +256,30 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     _bootstrapController.dispose();
     _storeSelectionController.dispose();
     _sessionController.dispose();
+
+    if (_ownsThemeController) {
+      _themeController.dispose();
+    }
+
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'POPQ Seller',
-      debugShowCheckedModeBanner:
-      !widget.environment.isProduction,
-      theme: PopqTheme.light(),
-      routerConfig: _router,
+    return AnimatedBuilder(
+      animation: _themeController,
+      builder: (context, child) {
+        return MaterialApp.router(
+          title: 'POPQ Seller',
+          debugShowCheckedModeBanner:
+          !widget.environment.isProduction,
+          theme: PopqTheme.light(),
+          darkTheme: PopqTheme.dark(),
+          themeMode:
+          _themeController.themeMode,
+          routerConfig: _router,
+        );
+      },
     );
   }
 }
