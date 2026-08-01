@@ -59,13 +59,16 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     if (_loading) {
       return const PopqLoadingView(message: '최신 주문 상태를 확인하고 있어요.');
     }
+
     if (_error != null || _order == null) {
       return PopqErrorView(
         message: '선택한 스토어의 주문 상세를 불러오지 못했습니다.',
         onRetry: _load,
       );
     }
+
     final order = _order!;
+
     return RefreshIndicator(
       onRefresh: _sync,
       child: ListView(
@@ -95,12 +98,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   sellerOrderStatusLabel(order.status),
                   style: Theme.of(
                     context,
-                  ).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                  ).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
                   '${sellerOrderTypeLabel(order.orderType)} · '
-                  '${order.orderPublicId}',
+                      '${order.orderPublicId}',
                   style: const TextStyle(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
@@ -108,7 +113,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
             ),
           ),
           const SizedBox(height: PopqSpacing.lg),
-          Text('주문 상품', style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            '주문 상품',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           const SizedBox(height: PopqSpacing.sm),
           for (final item in order.items)
             ListTile(
@@ -119,20 +127,35 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   '${item.quantity}개 · 단가 ${sellerWon(item.unitPrice)}',
                   if (item.options.isNotEmpty)
                     item.options
-                        .map((option) => '${option.groupName}: ${option.name}')
+                        .map(
+                          (option) =>
+                      '${option.groupName}: ${option.name}',
+                    )
                         .join(', '),
                 ].join('\n'),
               ),
               trailing: Text(sellerWon(item.itemTotalPrice)),
             ),
           const Divider(),
-          _AmountRow(label: '상품 금액', amount: order.subtotalAmount),
+          _AmountRow(
+            label: '상품 금액',
+            amount: order.subtotalAmount,
+          ),
           if (order.discountAmount != 0)
-            _AmountRow(label: '할인', amount: -order.discountAmount),
+            _AmountRow(
+              label: '할인',
+              amount: -order.discountAmount,
+            ),
           if (order.taxAmount != 0)
-            _AmountRow(label: '세금', amount: order.taxAmount),
+            _AmountRow(
+              label: '세금',
+              amount: order.taxAmount,
+            ),
           if (order.serviceFeeAmount != 0)
-            _AmountRow(label: '서비스 수수료', amount: order.serviceFeeAmount),
+            _AmountRow(
+              label: '서비스 수수료',
+              amount: order.serviceFeeAmount,
+            ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
@@ -157,7 +180,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           ),
           const SizedBox(height: PopqSpacing.sm),
           Text(
-            '서버 버전 ${order.version} · 선택된 스토어 #${order.storeId} 전용 주문',
+            '서버 버전 ${order.version} · '
+                '선택된 스토어 #${order.storeId} 전용 주문',
             textAlign: TextAlign.center,
           ),
         ],
@@ -180,6 +204,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         ),
       );
     }
+
     if (_paymentError != null || _payment == null) {
       return Card(
         child: Padding(
@@ -197,11 +222,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         ),
       );
     }
+
     final payment = _payment!;
+
     final canRequestRefund =
         _canRefund &&
-        payment.paymentStatus == 'PAID' &&
-        payment.refundableAmount > 0;
+            payment.paymentStatus == 'PAID' &&
+            payment.refundableAmount > 0;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(PopqSpacing.lg),
@@ -216,11 +244,18 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                Chip(label: Text(_paymentStatusLabel(payment.paymentStatus))),
+                Chip(
+                  label: Text(
+                    _paymentStatusLabel(payment.paymentStatus),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: PopqSpacing.sm),
-            _PaymentRow(label: '결제 수단', value: payment.paymentMethod),
+            _PaymentRow(
+              label: '결제 수단',
+              value: payment.paymentMethod,
+            ),
             _PaymentRow(
               label: '승인 금액',
               value: sellerWon(payment.approvedAmount),
@@ -251,7 +286,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   title: Text(refund.reason),
                   subtitle: Text(
                     '${_refundRequesterLabel(refund.requesterType)} · '
-                    '${_refundStatusLabel(refund.status)}',
+                        '${_refundStatusLabel(refund.status)}',
                   ),
                   trailing: Text(sellerWon(refund.amount)),
                 ),
@@ -260,13 +295,18 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
               const SizedBox(height: PopqSpacing.sm),
               FilledButton.icon(
                 key: const Key('refund-order'),
-                onPressed: _processing ? null : () => _refund(order),
-                icon: const Icon(Icons.currency_exchange_rounded),
+                onPressed: _processing
+                    ? null
+                    : () => _refund(order),
+                icon: const Icon(
+                  Icons.currency_exchange_rounded,
+                ),
                 label: Text(
                   '${sellerWon(payment.refundableAmount)} 전액 환불',
                 ),
               ),
-            ] else if (!_canRefund && payment.refundableAmount > 0) ...[
+            ] else if (!_canRefund &&
+                payment.refundableAmount > 0) ...[
               const SizedBox(height: PopqSpacing.sm),
               const Text(
                 '환불은 사업장 OWNER 또는 MANAGER만 처리할 수 있습니다.',
@@ -286,8 +326,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('accept-order'),
           onPressed: _processing
               ? null
-              : () => _transition(SellerOrderCommand.accept),
-          icon: const Icon(Icons.check_circle_outline_rounded),
+              : () => _transition(
+            SellerOrderCommand.accept,
+          ),
+          icon: const Icon(
+            Icons.check_circle_outline_rounded,
+          ),
           label: const Text('주문 접수'),
         ),
         const SizedBox(height: PopqSpacing.sm),
@@ -303,7 +347,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('prepare-order'),
           onPressed: _processing
               ? null
-              : () => _transition(SellerOrderCommand.prepare),
+              : () => _transition(
+            SellerOrderCommand.prepare,
+          ),
           icon: const Icon(Icons.soup_kitchen_outlined),
           label: const Text('준비 시작'),
         ),
@@ -313,8 +359,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('ready-order'),
           onPressed: _processing
               ? null
-              : () => _transition(SellerOrderCommand.ready),
-          icon: const Icon(Icons.notifications_active_outlined),
+              : () => _transition(
+            SellerOrderCommand.ready,
+          ),
+          icon: const Icon(
+            Icons.notifications_active_outlined,
+          ),
           label: const Text('준비 완료'),
         ),
       ],
@@ -323,15 +373,24 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('complete-order'),
           onPressed: _processing
               ? null
-              : () => _transition(SellerOrderCommand.complete),
+              : () => _transition(
+            SellerOrderCommand.complete,
+          ),
           icon: const Icon(Icons.task_alt_rounded),
           label: const Text('주문 완료'),
         ),
       ],
       _ => <Widget>[],
     };
-    if (actions.isEmpty) return actions;
-    return [...actions, const SizedBox(height: PopqSpacing.sm)];
+
+    if (actions.isEmpty) {
+      return actions;
+    }
+
+    return [
+      ...actions,
+      const SizedBox(height: PopqSpacing.sm),
+    ];
   }
 
   Future<void> _load() async {
@@ -339,24 +398,39 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       _loading = true;
       _error = null;
     });
+
     try {
       final result = await Future.wait([
-        widget.repository.findOne(_storeId, widget.orderPublicId),
+        widget.repository.findOne(
+          _storeId,
+          widget.orderPublicId,
+        ),
         widget.storeRepository.findOne(_storeId),
       ]);
+
       final order = result[0] as SellerOrder;
       final store = result[1] as SellerStore;
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _order = order;
-        _canRefund = store.myRole == 'OWNER' || store.myRole == 'MANAGER';
+        _canRefund =
+            store.myRole == 'OWNER' ||
+                store.myRole == 'MANAGER';
         _loading = false;
       });
+
       if (order.status == 'COMPLETED') {
         await _loadPayment();
       }
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _error = error;
         _loading = false;
@@ -366,69 +440,76 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
   Future<void> _sync() async {
     final current = _order;
-    if (current == null || _processing) return;
+
+    if (current == null || _processing) {
+      return;
+    }
+
     setState(() => _processing = true);
+
     try {
       final result = await widget.repository.sync(
         _storeId,
         current.orderPublicId,
         current.version,
       );
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        if (result.order != null) _order = result.order;
+        if (result.order != null) {
+          _order = result.order;
+        }
+
         _processing = false;
       });
+
       _showMessage(
-        result.refreshRequired ? '최신 주문 상태로 갱신했습니다.' : '이미 최신 상태입니다.',
+        result.refreshRequired
+            ? '최신 주문 상태로 갱신했습니다.'
+            : '이미 최신 상태입니다.',
       );
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() => _processing = false);
+
       _showMessage('최신 상태를 확인하지 못했습니다.');
     }
   }
 
   Future<void> _reject() async {
-    final controller = TextEditingController();
     final reason = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('주문 거절'),
-        content: TextField(
-          controller: controller,
-          maxLength: 500,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: '거절 사유',
-            hintText: '예: 재료가 소진되었습니다.',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              Navigator.pop(context, value.isEmpty ? '판매자 주문 거절' : value);
-            },
-            child: const Text('거절 확정'),
-          ),
-        ],
-      ),
+      builder: (_) => const _RejectDialog(),
     );
-    controller.dispose();
-    if (reason != null && mounted) {
-      await _transition(SellerOrderCommand.reject, reason: reason);
+
+    if (reason == null || !mounted) {
+      return;
     }
+
+    await _transition(
+      SellerOrderCommand.reject,
+      reason: reason,
+    );
   }
 
-  Future<void> _transition(SellerOrderCommand command, {String? reason}) async {
+  Future<void> _transition(
+      SellerOrderCommand command, {
+        String? reason,
+      }) async {
     final current = _order;
-    if (current == null || _processing) return;
+
+    if (current == null || _processing) {
+      return;
+    }
+
     setState(() => _processing = true);
+
     try {
       final updated = await widget.repository.transition(
         _storeId,
@@ -436,41 +517,67 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         command,
         reason: reason,
       );
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _order = updated;
         _processing = false;
       });
-      _showMessage('${sellerOrderStatusLabel(updated.status)} 상태로 변경했습니다.');
+
+      _showMessage(
+        '${sellerOrderStatusLabel(updated.status)} 상태로 변경했습니다.',
+      );
+
       if (updated.status == 'COMPLETED') {
         await _loadPayment();
       }
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() => _processing = false);
-      _showMessage('주문 상태를 변경하지 못했습니다. 최신 상태를 확인해 주세요.');
+
+      _showMessage(
+        '주문 상태를 변경하지 못했습니다. 최신 상태를 확인해 주세요.',
+      );
     }
   }
 
   Future<void> _loadPayment() async {
     final order = _order;
-    if (order == null || order.status != 'COMPLETED') return;
+
+    if (order == null || order.status != 'COMPLETED') {
+      return;
+    }
+
     setState(() {
       _paymentLoading = true;
       _paymentError = null;
     });
+
     try {
       final payment = await widget.repository.findPayment(
         _storeId,
         order.orderPublicId,
       );
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _payment = payment;
         _paymentLoading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _paymentError = error;
         _paymentLoading = false;
@@ -480,17 +587,26 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
   Future<void> _refund(SellerOrder order) async {
     final payment = _payment;
-    if (payment == null || payment.refundableAmount <= 0 || _processing) {
+
+    if (payment == null ||
+        payment.refundableAmount <= 0 ||
+        _processing) {
       return;
     }
+
     final reason = await showDialog<String>(
       context: context,
       builder: (_) => _RefundDialog(
         amount: payment.refundableAmount,
       ),
     );
-    if (reason == null || !mounted) return;
+
+    if (reason == null || !mounted) {
+      return;
+    }
+
     setState(() => _processing = true);
+
     try {
       final updated = await widget.repository.refund(
         _storeId,
@@ -498,51 +614,69 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         amount: payment.refundableAmount,
         reason: reason,
       );
-      if (!mounted) return;
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _payment = updated;
         _processing = false;
       });
+
       _showMessage('전액 환불을 완료했습니다.');
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() => _processing = false);
+
       _showMessage('환불을 처리하지 못했습니다.');
     }
   }
 
-  String _paymentStatusLabel(String status) => switch (status) {
-    'PAID' => '결제 완료',
-    'REFUNDED' => '환불 완료',
-    'CANCELED' => '결제 취소',
-    'PARTIALLY_REFUNDED' => '부분 환불',
-    'FAILED' => '결제 실패',
-    _ => '결제 확인 중',
-  };
+  String _paymentStatusLabel(String status) {
+    return switch (status) {
+      'PAID' => '결제 완료',
+      'REFUNDED' => '환불 완료',
+      'CANCELED' => '결제 취소',
+      'PARTIALLY_REFUNDED' => '부분 환불',
+      'FAILED' => '결제 실패',
+      _ => '결제 확인 중',
+    };
+  }
 
-  String _refundStatusLabel(String status) => switch (status) {
-    'SUCCEEDED' => '환불 완료',
-    'FAILED' => '환불 실패',
-    'PROCESSING' => '처리 중',
-    _ => '요청됨',
-  };
+  String _refundStatusLabel(String status) {
+    return switch (status) {
+      'SUCCEEDED' => '환불 완료',
+      'FAILED' => '환불 실패',
+      'PROCESSING' => '처리 중',
+      _ => '요청됨',
+    };
+  }
 
-  String _refundRequesterLabel(String requester) => switch (requester) {
-    'SELLER' => '판매자 요청',
-    'ADMIN' => '관리자 요청',
-    'CUSTOMER' => '고객 요청',
-    _ => '비회원 요청',
-  };
+  String _refundRequesterLabel(String requester) {
+    return switch (requester) {
+      'SELLER' => '판매자 요청',
+      'ADMIN' => '관리자 요청',
+      'CUSTOMER' => '고객 요청',
+      _ => '비회원 요청',
+    };
+  }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
   }
 }
 
 class _AmountRow extends StatelessWidget {
-  const _AmountRow({required this.label, required this.amount});
+  const _AmountRow({
+    required this.label,
+    required this.amount,
+  });
 
   final String label;
   final int amount;
@@ -559,7 +693,10 @@ class _AmountRow extends StatelessWidget {
 }
 
 class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({required this.label, required this.value});
+  const _PaymentRow({
+    required this.label,
+    required this.value,
+  });
 
   final String label;
   final String value;
@@ -571,24 +708,89 @@ class _PaymentRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
+class _RejectDialog extends StatefulWidget {
+  const _RejectDialog();
+
+  @override
+  State<_RejectDialog> createState() =>
+      _RejectDialogState();
+}
+
+class _RejectDialogState extends State<_RejectDialog> {
+  final TextEditingController _controller =
+  TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('주문 거절'),
+      content: TextField(
+        key: const Key('reject-reason'),
+        controller: _controller,
+        maxLength: 500,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: '거절 사유',
+          hintText: '예: 재료가 소진되었습니다.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('취소'),
+        ),
+        FilledButton(
+          key: const Key('confirm-reject'),
+          onPressed: () {
+            final value = _controller.text.trim();
+
+            Navigator.pop(
+              context,
+              value.isEmpty
+                  ? '판매자 주문 거절'
+                  : value,
+            );
+          },
+          child: const Text('거절 확정'),
+        ),
+      ],
+    );
+  }
+}
+
 class _RefundDialog extends StatefulWidget {
-  const _RefundDialog({required this.amount});
+  const _RefundDialog({
+    required this.amount,
+  });
 
   final int amount;
 
   @override
-  State<_RefundDialog> createState() => _RefundDialogState();
+  State<_RefundDialog> createState() =>
+      _RefundDialogState();
 }
 
 class _RefundDialogState extends State<_RefundDialog> {
-  final _controller = TextEditingController();
+  final TextEditingController _controller =
+  TextEditingController();
 
   @override
   void dispose() {
@@ -604,7 +806,9 @@ class _RefundDialogState extends State<_RefundDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('${sellerWon(widget.amount)} 전액을 환불합니다.'),
+            Text(
+              '${sellerWon(widget.amount)} 전액을 환불합니다.',
+            ),
             const SizedBox(height: PopqSpacing.sm),
             TextField(
               key: const Key('refund-reason'),
@@ -628,7 +832,10 @@ class _RefundDialogState extends State<_RefundDialog> {
           key: const Key('confirm-refund'),
           onPressed: () {
             final value = _controller.text.trim();
-            if (value.isNotEmpty) Navigator.pop(context, value);
+
+            if (value.isNotEmpty) {
+              Navigator.pop(context, value);
+            }
           },
           child: const Text('전액 환불 확정'),
         ),
