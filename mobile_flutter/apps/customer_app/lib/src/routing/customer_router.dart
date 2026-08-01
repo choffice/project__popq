@@ -26,6 +26,7 @@ import '../features/permissions/customer_permission_gateway.dart';
 import '../features/profile/customer_engagement_repository.dart';
 import '../features/profile/customer_profile_screen.dart';
 import '../features/profile/review_editor_screen.dart';
+import '../features/qr/customer_qr_scanner_screen.dart';
 
 abstract final class CustomerRoutes {
   static const bootstrap = '/bootstrap';
@@ -131,8 +132,11 @@ GoRouter createCustomerRouter({
               location == CustomerRoutes.notifications;
 
       /*
-       * 장바구니에서는 로그인 여부를 직접 확인하므로
-       * 이 리다이렉트는 보호 화면에 직접 접근했을 때만 사용됩니다.
+       * 장바구니에서는 로그인 여부를 직접 확인합니다.
+       *
+       * 여기의 로그인 리다이렉트는 주문 목록,
+       * 알림, 마이페이지 등의 보호 화면에
+       * 직접 접근했을 때 사용됩니다.
        */
       if (requiresSession &&
           !sessionController.isSignedIn) {
@@ -145,11 +149,11 @@ GoRouter createCustomerRouter({
       }
 
       /*
-       * 라우터의 로그인 화면에서 로그인한 경우에는
-       * 원래 접근하려던 보호 화면으로 이동합니다.
+       * 라우터를 통해 로그인 화면에 들어온 경우,
+       * 로그인 성공 후 원래 접근하려던 화면으로 이동합니다.
        *
-       * 장바구니 로그인은 GoRouter 경로가 아니라
-       * 별도의 전체 화면 모달이므로 이 코드의 영향을 받지 않습니다.
+       * 장바구니 결제 로그인은 별도의 전체 화면 모달을
+       * 사용하므로 이 처리의 영향을 받지 않습니다.
        */
       if (isSignIn &&
           sessionController.isSignedIn) {
@@ -197,7 +201,8 @@ GoRouter createCustomerRouter({
             body: PopqErrorView(
               message:
               '앱 시작 정보를 불러오지 못했습니다.',
-              onRetry: onboardingController.restore,
+              onRetry:
+              onboardingController.restore,
             ),
           );
         },
@@ -385,6 +390,20 @@ GoRouter createCustomerRouter({
               );
             },
           ),
+
+          /*
+           * 기존 QR 화면 연결 복구
+           *
+           * QR 스캐너 화면 내부 코드는 수정하지 않고
+           * 라우터 경로만 연결합니다.
+           */
+          GoRoute(
+            path: CustomerRoutes.qrScanner,
+            builder: (context, state) {
+              return const CustomerQrScannerScreen();
+            },
+          ),
+
           GoRoute(
             path: CustomerRoutes.orders,
             builder: (context, state) {
