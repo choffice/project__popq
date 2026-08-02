@@ -57,7 +57,7 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
 
   @override
   void didUpdateWidget(
-      SellerRootScreen oldWidget,
+      covariant SellerRootScreen oldWidget,
       ) {
     super.didUpdateWidget(oldWidget);
 
@@ -86,8 +86,8 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       child: PopScope<Object?>(
         canPop: false,
         onPopInvokedWithResult: (
-            didPop,
-            result,
+            bool didPop,
+            Object? result,
             ) {
           if (didPop) {
             return;
@@ -211,7 +211,6 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       return;
     }
 
-    // 대시보드가 아닌 하단 탭에서는 대시보드로 돌아갑니다.
     if (widget.location != SellerRoutes.dashboard) {
       _lastBackPressedAt = null;
 
@@ -230,7 +229,6 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
             now.difference(previousPressedAt) <=
                 _exitConfirmDuration;
 
-    // 대시보드에서 2초 안에 두 번째로 누르면 앱을 종료합니다.
     if (shouldExit) {
       _lastBackPressedAt = null;
 
@@ -241,7 +239,6 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       return;
     }
 
-    // 대시보드에서 첫 번째 뒤로가기입니다.
     _lastBackPressedAt = now;
 
     final messenger = ScaffoldMessenger.of(context);

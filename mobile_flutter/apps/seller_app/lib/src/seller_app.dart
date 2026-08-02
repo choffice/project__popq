@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
-import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/announcements/seller_announcement_repository.dart';
 import 'features/auth/seller_bootstrap_controller.dart';
@@ -16,6 +16,7 @@ import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
 import 'routing/seller_router.dart';
+import 'theme/seller_theme.dart';
 
 class PopqSellerApp extends StatefulWidget {
   const PopqSellerApp({
@@ -44,11 +45,15 @@ class PopqSellerApp extends StatefulWidget {
   final PopqThemeController? themeController;
 
   @override
-  State<PopqSellerApp> createState() =>
-      _PopqSellerAppState();
+  State<PopqSellerApp> createState() {
+    return _PopqSellerAppState();
+  }
 }
 
 class _PopqSellerAppState extends State<PopqSellerApp> {
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+  GlobalKey<ScaffoldMessengerState>();
+
   late final SessionStore _sessionStore;
   late final SessionController _sessionController;
 
@@ -64,7 +69,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   _announcementRepository;
 
   late final SellerOrderRepository _orderRepository;
-  late final SellerProductRepository _productRepository;
+
+  late final SellerProductRepository
+  _productRepository;
 
   late final SellerAnalyticsRepository
   _analyticsRepository;
@@ -74,6 +81,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
   late final PopqApiClient _apiClient;
   late final GoRouter _router;
+
+  late final _SellerBackButtonDispatcher
+  _backButtonDispatcher;
 
   @override
   void initState() {
@@ -118,63 +128,92 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     _apiClient = PopqApiClient(
       baseUrl: widget.environment.apiBaseUrl,
       accessTokenReader: () async {
-        final session = await _sessionStore.read();
+        final session =
+        await _sessionStore.read();
+
         return session?.accessToken;
       },
     );
 
     _storeRepository =
         widget.storeRepository ??
-            ApiSellerStoreRepository(_apiClient);
+            ApiSellerStoreRepository(
+              _apiClient,
+            );
 
     _announcementRepository =
         widget.announcementRepository ??
-            ApiSellerAnnouncementRepository(_apiClient);
+            ApiSellerAnnouncementRepository(
+              _apiClient,
+            );
 
     _orderRepository =
         widget.orderRepository ??
-            ApiSellerOrderRepository(_apiClient);
+            ApiSellerOrderRepository(
+              _apiClient,
+            );
 
     _productRepository =
         widget.productRepository ??
-            ApiSellerProductRepository(_apiClient);
+            ApiSellerProductRepository(
+              _apiClient,
+            );
 
     _analyticsRepository =
         widget.analyticsRepository ??
-            ApiSellerAnalyticsRepository(_apiClient);
+            ApiSellerAnalyticsRepository(
+              _apiClient,
+            );
 
     final identityRepository =
         widget.identityRepository ??
-            ApiSellerIdentityRepository(_apiClient);
+            ApiSellerIdentityRepository(
+              _apiClient,
+            );
 
     _bootstrapController =
         SellerBootstrapController(
-          sessionController: _sessionController,
+          sessionController:
+          _sessionController,
           storeSelectionController:
           _storeSelectionController,
-          identityRepository: identityRepository,
+          identityRepository:
+          identityRepository,
         );
 
     _router = createSellerRouter(
-      sessionController: _sessionController,
-      bootstrapController: _bootstrapController,
+      sessionController:
+      _sessionController,
+      bootstrapController:
+      _bootstrapController,
       storeSelectionController:
       _storeSelectionController,
-      storeRepository: _storeRepository,
+      storeRepository:
+      _storeRepository,
       announcementRepository:
       _announcementRepository,
-      orderRepository: _orderRepository,
-      productRepository: _productRepository,
+      orderRepository:
+      _orderRepository,
+      productRepository:
+      _productRepository,
       analyticsRepository:
       _analyticsRepository,
-      onSignOut: _bootstrapController.signOut,
-      themeController: _themeController,
+      onSignOut:
+      _bootstrapController.signOut,
+      themeController:
+      _themeController,
       onDevelopmentSignIn:
       widget.environment.flavor ==
           AppFlavor.development
           ? _developmentSignIn
           : null,
     );
+
+    _backButtonDispatcher =
+        _SellerBackButtonDispatcher(
+          _router,
+          _scaffoldMessengerKey,
+        );
 
     unawaited(
       Future.wait([
@@ -186,11 +225,15 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
   Future<void> _developmentSignIn() async {
     final response =
-    await _apiClient.post<Map<String, Object?>>(
+    await _apiClient.post<
+        Map<String, Object?>
+    >(
       '/api/v1/dev/auth/login',
       body: {
-        'email': 'seller@popq.local',
-        'name': 'POPQ 테스트 판매자',
+        'email':
+        'seller@popq.local',
+        'name':
+        'POPQ 테스트 판매자',
         'role': 'SELLER',
       },
       decode: (value) {
@@ -200,7 +243,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       },
     );
 
-    final user = Map<String, Object?>.from(
+    final user =
+    Map<String, Object?>.from(
       response['user'] as Map,
     );
 
@@ -211,19 +255,23 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     }
 
     final expiresIn =
-    (response['expiresIn'] as num).toInt();
+    (response['expiresIn'] as num)
+        .toInt();
 
     await _storeSelectionController.clear();
 
     await _sessionController.save(
       AuthSession(
         accessToken:
-        response['accessToken'] as String,
+        response['accessToken']
+        as String,
         refreshToken: '',
         expiresAt: DateTime.now()
             .toUtc()
             .add(
-          Duration(seconds: expiresIn),
+          Duration(
+            seconds: expiresIn,
+          ),
         ),
       ),
     );
@@ -273,13 +321,141 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           title: 'POPQ Seller',
           debugShowCheckedModeBanner:
           !widget.environment.isProduction,
-          theme: PopqTheme.light(),
-          darkTheme: PopqTheme.dark(),
+          scaffoldMessengerKey:
+          _scaffoldMessengerKey,
+          theme: SellerTheme.light(),
+          darkTheme: SellerTheme.dark(),
           themeMode:
           _themeController.themeMode,
-          routerConfig: _router,
+          routeInformationProvider:
+          _router
+              .routeInformationProvider,
+          routeInformationParser:
+          _router
+              .routeInformationParser,
+          routerDelegate:
+          _router.routerDelegate,
+          backButtonDispatcher:
+          _backButtonDispatcher,
         );
       },
     );
+  }
+}
+
+class _SellerBackButtonDispatcher
+    extends RootBackButtonDispatcher {
+  _SellerBackButtonDispatcher(
+      this._router,
+      this._scaffoldMessengerKey,
+      );
+
+  static const Duration _exitConfirmDuration =
+  Duration(seconds: 2);
+
+  static const Set<String> _rootTabLocations = {
+    SellerRoutes.dashboard,
+    SellerRoutes.operations,
+    SellerRoutes.orders,
+    SellerRoutes.customers,
+    SellerRoutes.sales,
+  };
+
+  final GoRouter _router;
+
+  final GlobalKey<ScaffoldMessengerState>
+  _scaffoldMessengerKey;
+
+  DateTime? _lastBackPressedAt;
+
+  @override
+  Future<bool> invokeCallback(
+      Future<bool> defaultValue,
+      ) async {
+    final handledByRouter =
+    await super.invokeCallback(
+      defaultValue,
+    );
+
+    if (handledByRouter) {
+      _lastBackPressedAt = null;
+
+      return true;
+    }
+
+    final location = _normalizeLocation(
+      _router
+          .routeInformationProvider
+          .value
+          .uri
+          .path,
+    );
+
+    if (!_rootTabLocations.contains(location)) {
+      _lastBackPressedAt = null;
+
+      return false;
+    }
+
+    if (location != SellerRoutes.dashboard) {
+      _lastBackPressedAt = null;
+
+      _router.go(
+        SellerRoutes.dashboard,
+      );
+
+      return true;
+    }
+
+    final now = DateTime.now();
+
+    final previousPressedAt =
+        _lastBackPressedAt;
+
+    final shouldExit =
+        previousPressedAt != null &&
+            now.difference(previousPressedAt) <=
+                _exitConfirmDuration;
+
+    if (shouldExit) {
+      _lastBackPressedAt = null;
+
+      await SystemNavigator.pop();
+
+      return true;
+    }
+
+    _lastBackPressedAt = now;
+
+    final messenger =
+        _scaffoldMessengerKey.currentState;
+
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            '한 번 더 누르면 앱이 종료됩니다.',
+          ),
+          duration:
+          _exitConfirmDuration,
+        ),
+      );
+
+    return true;
+  }
+
+  String _normalizeLocation(
+      String location,
+      ) {
+    if (location.length > 1 &&
+        location.endsWith('/')) {
+      return location.substring(
+        0,
+        location.length - 1,
+      );
+    }
+
+    return location;
   }
 }

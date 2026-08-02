@@ -176,12 +176,14 @@ GoRouter createSellerRouter({
         builder: (context, state) {
           return SellerStoreRegistrationScreen(
             repository: storeRepository,
-            selectionController: storeSelectionController,
+            selectionController:
+            storeSelectionController,
           );
         },
       ),
       GoRoute(
-        path: '${SellerRoutes.orders}/:orderPublicId',
+        path:
+        '${SellerRoutes.orders}/:orderPublicId',
         builder: (context, state) {
           return SellerOrderDetailScreen(
             orderPublicId:
@@ -249,6 +251,8 @@ GoRouter createSellerRouter({
                 storeRepository: storeRepository,
                 analyticsRepository:
                 analyticsRepository,
+                selectionController:
+                storeSelectionController,
               );
             },
           ),

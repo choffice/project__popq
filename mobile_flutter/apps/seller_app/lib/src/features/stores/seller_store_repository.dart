@@ -141,11 +141,11 @@ abstract interface class SellerStoreRepository {
     double? longitude,
     String? openTime,
     String? closeTime,
-    List<String> closedDays,
-    bool takeoutAvailable,
-    bool dineInAvailable,
-    bool orderAcceptingEnabled,
-    List<String> tags,
+    List<String> closedDays = const [],
+    bool takeoutAvailable = true,
+    bool dineInAvailable = true,
+    bool orderAcceptingEnabled = true,
+    List<String> tags = const [],
   });
 
   Future<SellerStore> changeBusinessStatus(
@@ -170,7 +170,7 @@ abstract interface class SellerStoreRepository {
         bool? takeoutAvailable,
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
-        List<String> tags,
+        List<String> tags = const [],
       });
 }
 
@@ -185,8 +185,9 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
       '/api/v1/seller/stores',
       decode: (value) => (value as List<Object?>)
           .map(
-            (item) =>
-            SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
+            (item) => SellerStore.fromJson(
+          Map<String, Object?>.from(item as Map),
+        ),
       )
           .toList(),
     );
@@ -196,8 +197,9 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
   Future<SellerStore> findOne(int storeId) {
     return _apiClient.get(
       '/api/v1/seller/stores/$storeId',
-      decode: (value) =>
-          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
@@ -251,8 +253,9 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'orderAcceptingEnabled': orderAcceptingEnabled,
         'tags': tags,
       },
-      decode: (value) =>
-          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
@@ -263,9 +266,12 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
       ) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId/business-status',
-      body: {'businessStatus': status},
-      decode: (value) =>
-          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+      body: {
+        'businessStatus': status,
+      },
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
@@ -309,15 +315,17 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'orderAcceptingEnabled': orderAcceptingEnabled,
         'tags': tags,
       },
-      decode: (value) =>
-          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 }
 
 class MemorySellerStoreRepository implements SellerStoreRepository {
-  MemorySellerStoreRepository({List<SellerStore>? stores})
-      : _stores =
+  MemorySellerStoreRepository({
+    List<SellerStore>? stores,
+  }) : _stores =
       stores ??
           [
             const SellerStore(
