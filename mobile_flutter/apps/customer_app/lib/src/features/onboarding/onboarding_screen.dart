@@ -162,13 +162,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     await widget.controller.complete();
   }
 
-  String _permissionMessage(PermissionDecision decision, String label) {
+  String _permissionMessage(
+      PermissionDecision decision,
+      String label,
+      ) {
     return switch (decision) {
-      PermissionDecision.granted => '$label 권한이 허용되었습니다.',
-      PermissionDecision.denied => '$label 권한은 나중에 다시 허용할 수 있어요.',
+      PermissionDecision.granted =>
+      '$label 권한이 허용되었습니다.',
+
+      PermissionDecision.denied =>
+      '$label 권한은 나중에 다시 허용할 수 있어요.',
+
       PermissionDecision.permanentlyDenied =>
-        '$label 권한이 차단되어 있습니다. 기기 설정에서 변경할 수 있어요.',
-      PermissionDecision.serviceDisabled => '기기의 위치 서비스가 꺼져 있습니다.',
+      '$label 권한이 차단되어 있습니다. 기기 설정에서 변경할 수 있어요.',
+
+      PermissionDecision.serviceDisabled =>
+      '기기의 위치 서비스가 꺼져 있습니다.',
+
+      PermissionDecision.timeout =>
+      '현재 위치를 확인하지 못했습니다. 부산 지역을 기준으로 계속할게요.',
     };
   }
 }

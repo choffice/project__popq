@@ -1,3 +1,10 @@
+//- 검색창
+// - 로컬마켓/행사 필터
+// - 선택한 업체
+// - 하단 업체 카드
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -6,6 +13,7 @@ import '../../routing/customer_router.dart';
 import '../permissions/customer_permission_gateway.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
+import 'kakao_store_map.dart';
 
 class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
@@ -18,8 +26,7 @@ class StoreDiscoveryScreen extends StatefulWidget {
   final CustomerPermissionGateway permissionGateway;
 
   @override
-  State<StoreDiscoveryScreen> createState() =>
-      _StoreDiscoveryScreenState();
+  State<StoreDiscoveryScreen> createState() => _StoreDiscoveryScreenState();
 }
 
 class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
@@ -28,11 +35,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   static const _greenColor = Color(0xFF17643E);
 
   static const _filters = [
-    _StoreFilter(
-      label: '전체',
-      icon: Icons.apps_rounded,
-      storeType: null,
-    ),
+    _StoreFilter(label: '전체', icon: Icons.apps_rounded, storeType: null),
     _StoreFilter(
       label: '로컬마켓',
       icon: Icons.storefront_rounded,
@@ -47,8 +50,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   late final StoreDiscoveryController _controller;
 
-  final TextEditingController _queryController =
-  TextEditingController();
+  final TextEditingController _queryController = TextEditingController();
 
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -60,6 +62,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   bool _showSuggestions = false;
 
+  bool _showInitialLocationChoice = false;
+
+  bool _requestingInitialLocation = false;
+
+  Timer? _mapSearchDebounce;
+
+  Object? _lastShownRefreshError;
+
   @override
   void initState() {
     super.initState();
@@ -69,11 +79,13 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       permissionGateway: widget.permissionGateway,
     )..addListener(_onControllerChanged);
 
-    _controller.search();
+    _initializeDiscovery();
   }
 
   @override
   void dispose() {
+    _mapSearchDebounce?.cancel();
+
     _controller
       ..removeListener(_onControllerChanged)
       ..dispose();
@@ -84,20 +96,91 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     super.dispose();
   }
 
+  Future<void> _initializeDiscovery() async {
+    /*
+   * 부산 기본 위치를 기준으로 업체 API를 호출합니다.
+   *
+   * 요청이 성공하면 인터넷과 백엔드 연결이 된 것으로 보고
+   * 현재 위치 사용 여부를 묻는 안내를 표시합니다.
+   */
+    await _controller.initializeAtBusan(query: _queryController.text.trim());
+
+    if (!mounted) {
+      return;
+    }
+
+    /*
+   * API 요청 자체가 실패한 경우에는
+   * 위치 안내를 띄우지 않고 연결 오류 화면을 유지합니다.
+   */
+    if (_controller.status == DiscoveryStatus.failure) {
+      return;
+    }
+
+    setState(() {
+      _showInitialLocationChoice = true;
+    });
+  }
+
   void _onControllerChanged() {
     if (!mounted) {
       return;
     }
 
+    final refreshError = _controller.error;
+
+    /*
+   * 새 검색이 시작되면서 오류가 초기화되면
+   * 다음 오류를 다시 표시할 수 있도록 상태를 정리합니다.
+   */
+    if (refreshError == null) {
+      _lastShownRefreshError = null;
+    } else if (
+    _controller.hasCompletedInitialLoad &&
+        !_controller.isRefreshing &&
+        !identical(
+          _lastShownRefreshError,
+          refreshError,
+        )) {
+      /*
+     * 최초 연결 실패는 중앙 오류 화면에서 처리합니다.
+     *
+     * 이미 지도가 표시된 뒤의 재검색 실패만
+     * SnackBar로 알려주고 기존 핀은 유지합니다.
+     */
+      _lastShownRefreshError = refreshError;
+
+      WidgetsBinding.instance.addPostFrameCallback(
+            (_) {
+          if (!mounted) {
+            return;
+          }
+
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+            const SnackBar(
+              content: Text(
+                '새 지역의 업체를 불러오지 못했습니다. '
+                    '기존 검색 결과를 유지합니다.',
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     setState(() {
-      final selectedStoreId = _selectedStore?.storeId;
+      final selectedStoreId =
+          _selectedStore?.storeId;
 
       if (selectedStoreId == null) {
         return;
       }
 
-      final selectedStoreStillExists = _filteredStores.any(
-            (store) => store.storeId == selectedStoreId,
+      final selectedStoreStillExists =
+      _filteredStores.any(
+            (store) =>
+        store.storeId == selectedStoreId,
       );
 
       if (!selectedStoreStillExists) {
@@ -112,9 +195,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     return _controller.stores
-        .where(
-          (store) => store.storeType == _selectedStoreType,
-    )
+        .where((store) => store.storeType == _selectedStoreType)
         .toList();
   }
 
@@ -125,25 +206,27 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return const [];
     }
 
-    return _filteredStores.where((store) {
-      final nameMatches =
-      store.name.toLowerCase().contains(query);
+    return _filteredStores
+        .where((store) {
+          final nameMatches = store.name.toLowerCase().contains(query);
 
-      final descriptionMatches =
-          store.description?.toLowerCase().contains(query) ?? false;
+          final descriptionMatches =
+              store.description?.toLowerCase().contains(query) ?? false;
 
-      final addressMatches =
-          store.address?.toLowerCase().contains(query) ?? false;
+          final addressMatches =
+              store.address?.toLowerCase().contains(query) ?? false;
 
-      final tagMatches = store.tags.any(
+          final tagMatches = store.tags.any(
             (tag) => tag.toLowerCase().contains(query),
-      );
+          );
 
-      return nameMatches ||
-          descriptionMatches ||
-          addressMatches ||
-          tagMatches;
-    }).take(5).toList();
+          return nameMatches ||
+              descriptionMatches ||
+              addressMatches ||
+              tagMatches;
+        })
+        .take(5)
+        .toList();
   }
 
   @override
@@ -153,24 +236,22 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _DiscoveryMapStage(
+        KakaoStoreMap(
           stores: stores,
+          currentLocation: _controller.location,
+          searchCenter: _controller.searchCenter,
           selectedStoreId: _selectedStore?.storeId,
           onStoreSelected: _selectStore,
+          onViewportIdle: _onMapViewportIdle,
         ),
 
         _buildStatusOverlay(stores),
 
-        Positioned(
-          top: 12,
-          left: 12,
-          right: 12,
-          child: _buildTopControls(),
-        ),
+        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
 
         Positioned(
           right: 16,
-          bottom: _selectedStore == null ? 20 : 188,
+          bottom: _selectedStore == null ? 20 : 102,
           child: _CurrentLocationButton(
             active: _controller.location != null,
             onPressed: _useCurrentLocation,
@@ -184,9 +265,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             bottom: 12,
             child: _SelectedStoreCard(
               store: _selectedStore!,
-              favorite: _favoriteStoreIds.contains(
-                _selectedStore!.storeId,
-              ),
+              favorite: _favoriteStoreIds.contains(_selectedStore!.storeId),
+              favoriteUpdating: false,
               onFavoritePressed: _toggleFavorite,
               onDetailsPressed: _openStoreDetail,
               onClose: () {
@@ -194,6 +274,15 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
                   _selectedStore = null;
                 });
               },
+            ),
+          ),
+
+        if (_showInitialLocationChoice)
+          Positioned.fill(
+            child: _InitialLocationChoice(
+              requestingLocation: _requestingInitialLocation,
+              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
+              onContinueWithBusan: _continueWithBusan,
             ),
           ),
       ],
@@ -235,8 +324,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
         const SizedBox(height: PopqSpacing.sm),
 
-        if (_showSuggestions &&
-            _queryController.text.trim().isNotEmpty)
+        if (_showSuggestions && _queryController.text.trim().isNotEmpty)
           _SearchSuggestionPanel(
             suggestions: _searchSuggestions,
             onSelected: _selectSearchSuggestion,
@@ -248,41 +336,46 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             onSelected: _selectFilter,
           ),
 
-        if (_controller.location != null &&
-            !_showSuggestions) ...[
+        if (_controller.location != null && !_showSuggestions) ...[
           const SizedBox(height: PopqSpacing.sm),
           Align(
             alignment: Alignment.centerLeft,
             child: Material(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surface
-                  .withOpacity(0.94),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
               borderRadius: BorderRadius.circular(999),
               elevation: 1,
               child: const Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 child: Text(
                   '현재 위치 기준 10km 이내 · 가까운 순',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
+          ),
+        ],
+
+        if (_controller.isRefreshing &&
+            !_showSuggestions) ...[
+          const SizedBox(height: 6),
+          const Align(
+            alignment: Alignment.center,
+            child: _MapRefreshIndicator(),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildStatusOverlay(
-      List<CustomerStore> filteredStores,
-      ) {
+  Widget _buildStatusOverlay(List<CustomerStore> filteredStores) {
+    /*
+   * 최초 조회가 아닌 지도 이동 재검색에서는
+   * 중앙의 큰 로딩·빈 결과 카드를 표시하지 않습니다.
+   */
+    if (_controller.isRefreshing) {
+      return const SizedBox.shrink();
+    }
+
     return switch (_controller.status) {
       DiscoveryStatus.loading => const Center(
         child: _MapStatusCard(
@@ -294,12 +387,12 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       DiscoveryStatus.failure => Center(
         child: _MapStatusCard(
           icon: Icons.cloud_off_rounded,
-          message: '업체 정보를 불러오지 못했습니다.',
+          message:
+              '인터넷 또는 서버에 연결할 수 없습니다.\n'
+              '연결 상태를 확인한 뒤 다시 시도해 주세요.',
           buttonLabel: '다시 시도',
           onPressed: () {
-            _controller.search(
-              query: _queryController.text,
-            );
+            _initializeDiscovery();
           },
         ),
       ),
@@ -309,8 +402,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           message: '검색 조건에 맞는 업체가 없습니다.',
         ),
       ),
-      DiscoveryStatus.data when filteredStores.isEmpty =>
-      const Center(
+      DiscoveryStatus.data when filteredStores.isEmpty => const Center(
         child: _MapStatusCard(
           icon: Icons.filter_alt_off_rounded,
           message: '선택한 분류의 업체가 없습니다.',
@@ -368,9 +460,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _selectSearchSuggestion(CustomerStore store) {
     _queryController
       ..text = store.name
-      ..selection = TextSelection.collapsed(
-        offset: store.name.length,
-      );
+      ..selection = TextSelection.collapsed(offset: store.name.length);
 
     _searchFocusNode.unfocus();
 
@@ -378,6 +468,51 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       _showSuggestions = false;
       _selectedStore = store;
     });
+  }
+
+  void _onMapViewportIdle(
+      KakaoMapViewport viewport,
+      ) {
+    /*
+   * 이전에 예약해 둔 지도 검색이 있다면 취소합니다.
+   *
+   * 사용자가 연속해서 지도를 움직일 때
+   * 중간 위치마다 API를 호출하지 않기 위한 처리입니다.
+   */
+    _mapSearchDebounce?.cancel();
+
+    /*
+   * 지도를 다른 지역으로 옮기면 기존에 선택했던
+   * 업체 카드는 닫습니다.
+   */
+    if (_selectedStore != null ||
+        _showSuggestions) {
+      setState(() {
+        _selectedStore = null;
+        _showSuggestions = false;
+      });
+    }
+
+    _searchFocusNode.unfocus();
+
+    /*
+   * 지도가 멈춘 뒤 500ms 동안 추가 조작이 없을 때만
+   * 현재 지도 영역의 업체를 다시 조회합니다.
+   */
+    _mapSearchDebounce = Timer(
+      const Duration(milliseconds: 500),
+          () async {
+        if (!mounted) {
+          return;
+        }
+
+        await _controller.searchAround(
+          center: viewport.center,
+          radiusKm: viewport.radiusKm,
+          query: _queryController.text.trim(),
+        );
+      },
+    );
   }
 
   void _selectStore(CustomerStore store) {
@@ -410,14 +545,58 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
-    context.push(
-      '${CustomerRoutes.stores}/$storeId',
+    context.push('${CustomerRoutes.stores}/$storeId');
+  }
+
+  Future<void> _useCurrentLocationFromInitialChoice() async {
+    if (_requestingInitialLocation) {
+      return;
+    }
+
+    _mapSearchDebounce?.cancel();
+
+    setState(() {
+      _requestingInitialLocation = true;
+    });
+
+    final decision = await _controller.useCurrentLocation(
+      query: _queryController.text.trim(),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    /*
+   * 권한 허용 여부와 관계없이 최초 안내는 닫습니다.
+   *
+   * 허용하면 GPS 위치로 재조회되며,
+   * 허용하지 않으면 이미 조회한 부산 위치를 그대로 사용합니다.
+   */
+    setState(() {
+      _requestingInitialLocation = false;
+      _showInitialLocationChoice = false;
+    });
+
+    if (decision == PermissionDecision.granted) {
+      return;
+    }
+
+    _showLocationDecisionMessage(decision);
+  }
+
+  void _continueWithBusan() {
+    setState(() {
+      _showInitialLocationChoice = false;
+    });
   }
 
   Future<void> _useCurrentLocation() async {
-    final decision = await _controller.useCurrentLocation(
-      query: _queryController.text,
+    _mapSearchDebounce?.cancel();
+
+    final decision =
+    await _controller.useCurrentLocation(
+      query: _queryController.text.trim(),
     );
 
     if (!mounted) {
@@ -425,37 +604,41 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (decision == PermissionDecision.granted) {
-      final stores = _filteredStores;
-
-      if (stores.isNotEmpty) {
-        setState(() {
-          _selectedStore = stores.first;
-        });
-      }
-
       return;
     }
 
+    _showLocationDecisionMessage(decision);
+  }
+
+  void _showLocationDecisionMessage(PermissionDecision decision) {
     final message = switch (decision) {
       PermissionDecision.denied =>
-      '위치 권한을 허용하면 가까운 업체를 볼 수 있어요.',
+      '위치 권한을 허용하지 않아 부산 지역을 계속 보여드려요.',
+
       PermissionDecision.permanentlyDenied =>
-      '기기 설정에서 위치 권한을 허용해 주세요.',
+      '현재 위치를 사용하려면 기기 설정에서 위치 권한을 허용해 주세요.',
+
       PermissionDecision.serviceDisabled =>
-      '기기의 위치 서비스를 켜 주세요.',
+      '기기의 위치 서비스가 꺼져 있어요.',
+
+      PermissionDecision.timeout =>
+      '현재 위치를 확인하지 못해 부산 지역을 보여드려요.',
+
       PermissionDecision.granted => '',
     };
+
+    if (message.isEmpty) {
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        action: decision ==
-            PermissionDecision.permanentlyDenied
+        action: decision == PermissionDecision.permanentlyDenied
             ? SnackBarAction(
-          label: '설정',
-          onPressed:
-          widget.permissionGateway.openSettings,
-        )
+                label: '설정',
+                onPressed: widget.permissionGateway.openSettings,
+              )
             : null,
       ),
     );
@@ -491,68 +674,56 @@ class _StoreFilterBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Theme.of(context)
-          .colorScheme
-          .surface
-          .withOpacity(0.96),
-      borderRadius: BorderRadius.circular(20),
-      elevation: 3,
+      color: Theme.of(context).colorScheme.surface.withOpacity(0.96),
+      borderRadius: BorderRadius.circular(16),
+      elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(7),
+        padding: const EdgeInsets.all(4),
         child: Row(
           children: filters.map((filter) {
-            final selected =
-                filter.storeType == selectedStoreType;
+            final selected = filter.storeType == selectedStoreType;
 
             return Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 3,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: InkWell(
                   onTap: () {
                     onSelected(filter.storeType);
                   },
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
-                    duration: const Duration(
-                      milliseconds: 180,
-                    ),
+                    duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 9,
+                      horizontal: 6,
+                      vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: selected
-                          ? _accentColor
-                          : Colors.transparent,
-                      borderRadius:
-                      BorderRadius.circular(15),
+                      color: selected ? _accentColor : Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           filter.icon,
-                          size: 22,
+                          size: 17,
                           color: selected
                               ? _darkColor
-                              : Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          filter.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color:
-                            selected ? _darkColor : null,
-                            fontSize: 11,
-                            fontWeight: selected
-                                ? FontWeight.w900
-                                : FontWeight.w600,
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            filter.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: selected ? _darkColor : null,
+                              fontSize: 11,
+                              fontWeight: selected
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -588,68 +759,52 @@ class _SearchSuggestionPanel extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxHeight: 260,
-        ),
+        constraints: const BoxConstraints(maxHeight: 260),
         child: suggestions.isEmpty
             ? const Padding(
-          padding: EdgeInsets.all(PopqSpacing.md),
-          child: Row(
-            children: [
-              Icon(Icons.search_off_rounded),
-              SizedBox(width: PopqSpacing.sm),
-              Expanded(
-                child: Text(
-                  '현재 목록에서 일치하는 업체가 없습니다.',
+                padding: EdgeInsets.all(PopqSpacing.md),
+                child: Row(
+                  children: [
+                    Icon(Icons.search_off_rounded),
+                    SizedBox(width: PopqSpacing.sm),
+                    Expanded(child: Text('현재 목록에서 일치하는 업체가 없습니다.')),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        )
+              )
             : ListView.separated(
-          padding: const EdgeInsets.symmetric(
-            vertical: PopqSpacing.xs,
-          ),
-          shrinkWrap: true,
-          itemCount: suggestions.length,
-          separatorBuilder: (_, _) =>
-          const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final store = suggestions[index];
+                padding: const EdgeInsets.symmetric(vertical: PopqSpacing.xs),
+                shrinkWrap: true,
+                itemCount: suggestions.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final store = suggestions[index];
 
-            return ListTile(
-              onTap: () => onSelected(store),
-              leading: CircleAvatar(
-                backgroundColor: _accentColor,
-                foregroundColor: _darkColor,
-                child: Icon(
-                  _storeTypeIcon(store.storeType),
-                ),
-              ),
-              title: Text(
-                store.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(
-                [
-                  _storeTypeLabel(store.storeType),
-                  if (store.address != null)
-                    store.address!,
-                  if (store.distanceMeters != null)
-                    _formatDistance(
-                      store.distanceMeters!,
+                  return ListTile(
+                    onTap: () => onSelected(store),
+                    leading: CircleAvatar(
+                      backgroundColor: _accentColor,
+                      foregroundColor: _darkColor,
+                      child: Icon(_storeTypeIcon(store.storeType)),
                     ),
-                ].join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                    title: Text(
+                      store.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      [
+                        _storeTypeLabel(store.storeType),
+                        if (store.address != null) store.address!,
+                        if (store.distanceMeters != null)
+                          _formatDistance(store.distanceMeters!),
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                  );
+                },
               ),
-              trailing: const Icon(
-                Icons.chevron_right_rounded,
-              ),
-            );
-          },
-        ),
       ),
     );
   }
@@ -679,34 +834,19 @@ class _DiscoveryMapStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final visibleStores = stores.take(
-      _fallbackMarkerPositions.length,
-    ).toList();
+    final visibleStores = stores.take(_fallbackMarkerPositions.length).toList();
 
-    final markerPositions = _createMarkerPositions(
-      visibleStores,
-    );
+    final markerPositions = _createMarkerPositions(visibleStores);
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        CustomPaint(
-          painter: _TemporaryMapPainter(
-            darkMode: Theme.of(context).brightness ==
-                Brightness.dark,
-          ),
-        ),
-
-        for (var index = 0;
-        index < visibleStores.length;
-        index++)
+        for (var index = 0; index < visibleStores.length; index++)
           Align(
             alignment: markerPositions[index],
             child: _StoreMapMarker(
               store: visibleStores[index],
-              selected:
-              visibleStores[index].storeId ==
-                  selectedStoreId,
+              selected: visibleStores[index].storeId == selectedStoreId,
               onPressed: () {
                 onStoreSelected(visibleStores[index]);
               },
@@ -717,30 +857,18 @@ class _DiscoveryMapStage extends StatelessWidget {
           left: 14,
           bottom: 14,
           child: Material(
-            color: Theme.of(context)
-                .colorScheme
-                .surface
-                .withOpacity(0.92),
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.92),
             borderRadius: BorderRadius.circular(10),
             child: const Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 7,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.map_outlined,
-                    size: 15,
-                  ),
+                  Icon(Icons.map_outlined, size: 15),
                   SizedBox(width: 5),
                   Text(
                     '카카오맵 연결 영역',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
@@ -751,35 +879,27 @@ class _DiscoveryMapStage extends StatelessWidget {
     );
   }
 
-  List<Alignment> _createMarkerPositions(
-      List<CustomerStore> stores,
-      ) {
+  List<Alignment> _createMarkerPositions(List<CustomerStore> stores) {
     if (stores.isEmpty) {
       return const [];
     }
 
     final storesWithCoordinates = stores.where(
-          (store) =>
-      store.latitude != null &&
-          store.longitude != null,
+      (store) => store.latitude != null && store.longitude != null,
     );
 
     if (storesWithCoordinates.length < 2) {
       return List.generate(
         stores.length,
-            (index) => _fallbackMarkerPositions[
-        index % _fallbackMarkerPositions.length],
+        (index) =>
+            _fallbackMarkerPositions[index % _fallbackMarkerPositions.length],
       );
     }
 
-    var minLatitude =
-    storesWithCoordinates.first.latitude!;
-    var maxLatitude =
-    storesWithCoordinates.first.latitude!;
-    var minLongitude =
-    storesWithCoordinates.first.longitude!;
-    var maxLongitude =
-    storesWithCoordinates.first.longitude!;
+    var minLatitude = storesWithCoordinates.first.latitude!;
+    var maxLatitude = storesWithCoordinates.first.latitude!;
+    var minLongitude = storesWithCoordinates.first.longitude!;
+    var maxLongitude = storesWithCoordinates.first.longitude!;
 
     for (final store in storesWithCoordinates) {
       final latitude = store.latitude!;
@@ -805,12 +925,11 @@ class _DiscoveryMapStage extends StatelessWidget {
     final latitudeRange = maxLatitude - minLatitude;
     final longitudeRange = maxLongitude - minLongitude;
 
-    if (latitudeRange == 0 ||
-        longitudeRange == 0) {
+    if (latitudeRange == 0 || longitudeRange == 0) {
       return List.generate(
         stores.length,
-            (index) => _fallbackMarkerPositions[
-        index % _fallbackMarkerPositions.length],
+        (index) =>
+            _fallbackMarkerPositions[index % _fallbackMarkerPositions.length],
       );
     }
 
@@ -820,25 +939,17 @@ class _DiscoveryMapStage extends StatelessWidget {
       final longitude = store.longitude;
 
       if (latitude == null || longitude == null) {
-        return _fallbackMarkerPositions[
-        index % _fallbackMarkerPositions.length];
+        return _fallbackMarkerPositions[index %
+            _fallbackMarkerPositions.length];
       }
 
-      final normalizedX =
-          (longitude - minLongitude) /
-              longitudeRange;
+      final normalizedX = (longitude - minLongitude) / longitudeRange;
 
-      final normalizedY =
-          (latitude - minLatitude) /
-              latitudeRange;
+      final normalizedY = (latitude - minLatitude) / latitudeRange;
 
-      final x = (normalizedX * 1.4 - 0.7)
-          .clamp(-0.78, 0.78)
-          .toDouble();
+      final x = (normalizedX * 1.4 - 0.7).clamp(-0.78, 0.78).toDouble();
 
-      final y = (0.65 - normalizedY * 1.25)
-          .clamp(-0.68, 0.72)
-          .toDouble();
+      final y = (0.65 - normalizedY * 1.25).clamp(-0.68, 0.72).toDouble();
 
       return Alignment(x, y);
     });
@@ -861,13 +972,9 @@ class _StoreMapMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = selected
-        ? _accentColor
-        : _darkColor;
+    final backgroundColor = selected ? _accentColor : _darkColor;
 
-    final foregroundColor = selected
-        ? _darkColor
-        : Colors.white;
+    final foregroundColor = selected ? _darkColor : Colors.white;
 
     return Material(
       color: backgroundColor,
@@ -877,14 +984,9 @@ class _StoreMapMarker extends StatelessWidget {
         onTap: onPressed,
         borderRadius: BorderRadius.circular(999),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: 165,
-          ),
+          constraints: const BoxConstraints(maxWidth: 165),
           child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -916,10 +1018,7 @@ class _StoreMapMarker extends StatelessWidget {
 }
 
 class _CurrentLocationButton extends StatelessWidget {
-  const _CurrentLocationButton({
-    required this.active,
-    required this.onPressed,
-  });
+  const _CurrentLocationButton({required this.active, required this.onPressed});
 
   static const _accentColor = Color(0xFFB7FF00);
   static const _darkColor = Color(0xFF08110E);
@@ -930,18 +1029,14 @@ class _CurrentLocationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: active
-          ? _accentColor
-          : Theme.of(context).colorScheme.surface,
+      color: active ? _accentColor : Theme.of(context).colorScheme.surface,
       elevation: 6,
       shape: const CircleBorder(),
       child: IconButton(
         tooltip: '현재 위치로 이동',
         onPressed: onPressed,
         icon: Icon(
-          active
-              ? Icons.my_location_rounded
-              : Icons.location_searching_rounded,
+          active ? Icons.my_location_rounded : Icons.location_searching_rounded,
           color: active ? _darkColor : null,
         ),
       ),
@@ -953,6 +1048,7 @@ class _SelectedStoreCard extends StatelessWidget {
   const _SelectedStoreCard({
     required this.store,
     required this.favorite,
+    required this.favoriteUpdating,
     required this.onFavoritePressed,
     required this.onDetailsPressed,
     required this.onClose,
@@ -964,131 +1060,388 @@ class _SelectedStoreCard extends StatelessWidget {
 
   final CustomerStore store;
   final bool favorite;
+  final bool favoriteUpdating;
   final VoidCallback onFavoritePressed;
   final VoidCallback onDetailsPressed;
   final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Card(
-      elevation: 10,
+      margin: EdgeInsets.zero,
+      elevation: 8,
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(PopqSpacing.md),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    '${_storeTypeLabel(store.storeType)}'
-                        ' · '
-                        '${_businessStatusLabel(store.businessStatus)}',
-                    style: const TextStyle(
-                      color: _greenColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w900,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: InkWell(
+        onTap: onDetailsPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: _accentColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  _storeTypeIcon(store.storeType),
+                  color: _darkColor,
+                  size: 24,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _storeTypeLabel(store.storeType),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: const BoxDecoration(
+                            color: _greenColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _businessStatusLabel(store.businessStatus),
+                          style: const TextStyle(
+                            color: _greenColor,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: favorite
-                      ? '관심 업체 해제'
-                      : '관심 업체 추가',
-                  onPressed: onFavoritePressed,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    favorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: favorite
-                        ? Colors.redAccent
-                        : null,
-                  ),
-                ),
-                IconButton(
-                  tooltip: '선택 닫기',
-                  onPressed: onClose,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(
-                    Icons.close_rounded,
-                  ),
-                ),
-              ],
-            ),
 
-            Text(
-              store.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style:
-              Theme.of(context).textTheme.titleLarge,
-            ),
+                    const SizedBox(height: 2),
 
-            const SizedBox(height: PopqSpacing.xs),
-
-            Row(
-              children: [
-                const Icon(
-                  Icons.place_outlined,
-                  size: 17,
-                ),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    store.address ?? '주소 정보 준비 중',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                if (store.distanceMeters != null) ...[
-                  const SizedBox(
-                    width: PopqSpacing.sm,
-                  ),
-                  Text(
-                    _formatDistance(
-                      store.distanceMeters!,
+                    Text(
+                      store.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ],
-            ),
 
-            if (store.description != null &&
-                store.description!.trim().isNotEmpty) ...[
-              const SizedBox(height: PopqSpacing.xs),
-              Text(
-                store.description!,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 3),
+
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.place_outlined,
+                          size: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            store.address ?? '주소 정보 준비 중',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                        if (store.distanceMeters != null) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            _formatDistance(store.distanceMeters!),
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(width: 4),
+
+              IconButton(
+                tooltip: favorite ? '관심 업체 해제' : '관심 업체 추가',
+                onPressed: favoriteUpdating ? null : onFavoritePressed,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 34,
+                ),
+                icon: favoriteUpdating
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        favorite
+                            ? Icons.favorite_rounded
+                            : Icons.favorite_border_rounded,
+                        size: 20,
+                        color: favorite ? Colors.redAccent : null,
+                      ),
+              ),
+
+              const Icon(Icons.chevron_right_rounded, size: 22),
+
+              IconButton(
+                tooltip: '선택 닫기',
+                onPressed: onClose,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 30,
+                  height: 34,
+                ),
+                icon: const Icon(Icons.close_rounded, size: 18),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-            const SizedBox(height: PopqSpacing.md),
+class _InitialLocationChoice extends StatelessWidget {
+  const _InitialLocationChoice({
+    required this.requestingLocation,
+    required this.onUseCurrentLocation,
+    required this.onContinueWithBusan,
+  });
 
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: _accentColor,
-                  foregroundColor: _darkColor,
+  static const _accentColor = Color(0xFFB7FF00);
+  static const _darkColor = Color(0xFF08110E);
+
+  final bool requestingLocation;
+  final VoidCallback onUseCurrentLocation;
+  final VoidCallback onContinueWithBusan;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black.withOpacity(0.42),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 420,
+              ),
+              child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 12,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                onPressed: onDetailsPressed,
-                child: const Text(
-                  '업체 상세보기',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: const BoxDecoration(
+                          color: _accentColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.near_me_rounded,
+                          color: _darkColor,
+                          size: 29,
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      Text(
+                        '내 주변 업체를 찾아볼까요?',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      Text(
+                        '현재 위치를 사용하면 가까운 로컬마켓과 '
+                            '행사·이벤트를 먼저 보여드려요.\n\n'
+                            '위치를 사용하지 않아도 부산 지역을 '
+                            '둘러볼 수 있습니다.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          height: 1.45,
+                        ),
+                      ),
+
+                      const SizedBox(height: 22),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: requestingLocation
+                              ? null
+                              : onUseCurrentLocation,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _accentColor,
+                            foregroundColor: _darkColor,
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                          icon: requestingLocation
+                              ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child:
+                            CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: _darkColor,
+                            ),
+                          )
+                              : const Icon(
+                            Icons.my_location_rounded,
+                          ),
+                          label: Text(
+                            requestingLocation
+                                ? '현재 위치 확인 중...'
+                                : '현재 위치로 보기',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: requestingLocation
+                              ? null
+                              : onContinueWithBusan,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 14,
+                            ),
+                          ),
+                          child: const Text(
+                            '부산에서 둘러보기',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      Text(
+                        '위치 설정은 지도 아래의 GPS 버튼에서 '
+                            '언제든 다시 변경할 수 있어요.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapRefreshIndicator
+    extends StatelessWidget {
+  const _MapRefreshIndicator();
+
+  static const _darkColor =
+  Color(0xFF08110E);
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Material(
+        color: Theme.of(context)
+            .colorScheme
+            .surface
+            .withOpacity(0.94),
+        borderRadius:
+        BorderRadius.circular(999),
+        elevation: 3,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 7,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 15,
+                height: 15,
+                child:
+                CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: _darkColor,
+                ),
+              ),
+              SizedBox(width: 8),
+              Text(
+                '이 지역의 업체를 찾고 있어요',
+                style: TextStyle(
+                  color: _darkColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1123,29 +1476,18 @@ class _MapStatusCard extends StatelessWidget {
               const SizedBox(
                 width: 28,
                 height: 28,
-                child: CircularProgressIndicator(
-                  strokeWidth: 3,
-                ),
+                child: CircularProgressIndicator(strokeWidth: 3),
               )
             else
               Icon(icon, size: 34),
 
             const SizedBox(height: PopqSpacing.sm),
 
-            Text(
-              message,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text(message, style: const TextStyle(fontWeight: FontWeight.w700)),
 
-            if (buttonLabel != null &&
-                onPressed != null) ...[
+            if (buttonLabel != null && onPressed != null) ...[
               const SizedBox(height: PopqSpacing.sm),
-              TextButton(
-                onPressed: onPressed,
-                child: Text(buttonLabel!),
-              ),
+              TextButton(onPressed: onPressed, child: Text(buttonLabel!)),
             ],
           ],
         ),
@@ -1155,9 +1497,7 @@ class _MapStatusCard extends StatelessWidget {
 }
 
 class _TemporaryMapPainter extends CustomPainter {
-  const _TemporaryMapPainter({
-    required this.darkMode,
-  });
+  const _TemporaryMapPainter({required this.darkMode});
 
   final bool darkMode;
 
@@ -1183,13 +1523,9 @@ class _TemporaryMapPainter extends CustomPainter {
         ? const Color(0xFF121917)
         : const Color(0xFFBDBCB5);
 
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()..color = backgroundColor,
-    );
+    canvas.drawRect(Offset.zero & size, Paint()..color = backgroundColor);
 
-    final blockPaint = Paint()
-      ..color = blockColor;
+    final blockPaint = Paint()..color = blockColor;
 
     for (var row = 0; row < 7; row++) {
       for (var column = 0; column < 5; column++) {
@@ -1198,12 +1534,7 @@ class _TemporaryMapPainter extends CustomPainter {
 
         canvas.drawRRect(
           RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              left,
-              top,
-              size.width * 0.17,
-              size.height * 0.09,
-            ),
+            Rect.fromLTWH(left, top, size.width * 0.17, size.height * 0.09),
             const Radius.circular(9),
           ),
           blockPaint,
@@ -1211,8 +1542,7 @@ class _TemporaryMapPainter extends CustomPainter {
       }
     }
 
-    final parkPaint = Paint()
-      ..color = parkColor;
+    final parkPaint = Paint()..color = parkColor;
 
     canvas.drawRRect(
       RRect.fromRectAndRadius(
@@ -1299,9 +1629,7 @@ class _TemporaryMapPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-      covariant _TemporaryMapPainter oldDelegate,
-      ) {
+  bool shouldRepaint(covariant _TemporaryMapPainter oldDelegate) {
     return oldDelegate.darkMode != darkMode;
   }
 }
