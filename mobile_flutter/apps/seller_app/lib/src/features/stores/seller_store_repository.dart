@@ -10,8 +10,18 @@ class SellerStore {
     required this.myRole,
     this.description,
     this.address,
+    this.detailAddress,
+    this.representativeCategory,
+    this.imageUrl,
+    this.phone,
     this.latitude,
     this.longitude,
+    this.openTime,
+    this.closeTime,
+    this.closedDays = const [],
+    this.takeoutAvailable = true,
+    this.dineInAvailable = true,
+    this.orderAcceptingEnabled = true,
     this.tags = const [],
   });
 
@@ -21,15 +31,24 @@ class SellerStore {
       storeType: json['storeType'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
+      address: json['address'] as String?,
+      detailAddress: json['detailAddress'] as String?,
+      representativeCategory: json['representativeCategory'] as String?,
+      imageUrl: json['imageUrl'] as String?,
+      phone: json['phone'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      openTime: json['openTime'] as String?,
+      closeTime: json['closeTime'] as String?,
+      closedDays: _readStringList(json['closedDays']),
+      takeoutAvailable: json['takeoutAvailable'] as bool? ?? true,
+      dineInAvailable: json['dineInAvailable'] as bool? ?? true,
+      orderAcceptingEnabled:
+      json['orderAcceptingEnabled'] as bool? ?? true,
+      tags: _readStringList(json['tags']),
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
       myRole: json['myRole'] as String,
-      address: json['address'] as String?,
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      tags: (json['tags'] as List<Object?>? ?? const [])
-          .cast<String>()
-          .toList(),
     );
   }
 
@@ -37,20 +56,40 @@ class SellerStore {
   final String storeType;
   final String name;
   final String? description;
+  final String? address;
+  final String? detailAddress;
+  final String? representativeCategory;
+  final String? imageUrl;
+  final String? phone;
+  final double? latitude;
+  final double? longitude;
+  final String? openTime;
+  final String? closeTime;
+  final List<String> closedDays;
+  final bool takeoutAvailable;
+  final bool dineInAvailable;
+  final bool orderAcceptingEnabled;
+  final List<String> tags;
   final String status;
   final String businessStatus;
   final String myRole;
-  final String? address;
-  final double? latitude;
-  final double? longitude;
-  final List<String> tags;
 
   SellerStore copyWith({
     String? name,
     String? description,
     String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
     double? latitude,
     double? longitude,
+    String? openTime,
+    String? closeTime,
+    List<String>? closedDays,
+    bool? takeoutAvailable,
+    bool? dineInAvailable,
+    bool? orderAcceptingEnabled,
     List<String>? tags,
     String? businessStatus,
   }) {
@@ -60,8 +99,20 @@ class SellerStore {
       name: name ?? this.name,
       description: description ?? this.description,
       address: address ?? this.address,
+      detailAddress: detailAddress ?? this.detailAddress,
+      representativeCategory:
+      representativeCategory ?? this.representativeCategory,
+      imageUrl: imageUrl ?? this.imageUrl,
+      phone: phone ?? this.phone,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
+      openTime: openTime ?? this.openTime,
+      closeTime: closeTime ?? this.closeTime,
+      closedDays: closedDays ?? this.closedDays,
+      takeoutAvailable: takeoutAvailable ?? this.takeoutAvailable,
+      dineInAvailable: dineInAvailable ?? this.dineInAvailable,
+      orderAcceptingEnabled:
+      orderAcceptingEnabled ?? this.orderAcceptingEnabled,
       tags: tags ?? this.tags,
       status: status,
       businessStatus: businessStatus ?? this.businessStatus,
@@ -82,19 +133,45 @@ abstract interface class SellerStoreRepository {
     required String name,
     String? description,
     String? address,
-  });
-
-  Future<SellerStore> changeBusinessStatus(int storeId, String status);
-
-  Future<SellerStore> update(
-    int storeId, {
-    required String name,
-    String? description,
-    String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
     double? latitude,
     double? longitude,
+    String? openTime,
+    String? closeTime,
+    List<String> closedDays,
+    bool takeoutAvailable,
+    bool dineInAvailable,
+    bool orderAcceptingEnabled,
     List<String> tags,
   });
+
+  Future<SellerStore> changeBusinessStatus(
+      int storeId,
+      String status,
+      );
+
+  Future<SellerStore> update(
+      int storeId, {
+        required String name,
+        String? description,
+        String? address,
+        String? detailAddress,
+        String? representativeCategory,
+        String? imageUrl,
+        String? phone,
+        double? latitude,
+        double? longitude,
+        String? openTime,
+        String? closeTime,
+        List<String>? closedDays,
+        bool? takeoutAvailable,
+        bool? dineInAvailable,
+        bool? orderAcceptingEnabled,
+        List<String> tags,
+      });
 }
 
 class ApiSellerStoreRepository implements SellerStoreRepository {
@@ -109,8 +186,8 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
       decode: (value) => (value as List<Object?>)
           .map(
             (item) =>
-                SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
-          )
+            SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
+      )
           .toList(),
     );
   }
@@ -139,6 +216,19 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
     required String name,
     String? description,
     String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
+    double? latitude,
+    double? longitude,
+    String? openTime,
+    String? closeTime,
+    List<String> closedDays = const [],
+    bool takeoutAvailable = true,
+    bool dineInAvailable = true,
+    bool orderAcceptingEnabled = true,
+    List<String> tags = const [],
   }) {
     return _apiClient.post(
       '/api/v1/seller/stores',
@@ -147,7 +237,19 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'name': name,
         'description': description,
         'address': address,
-        'tags': <String>[],
+        'detailAddress': detailAddress,
+        'representativeCategory': representativeCategory,
+        'imageUrl': imageUrl,
+        'phone': phone,
+        'latitude': latitude,
+        'longitude': longitude,
+        'openTime': openTime,
+        'closeTime': closeTime,
+        'closedDays': closedDays,
+        'takeoutAvailable': takeoutAvailable,
+        'dineInAvailable': dineInAvailable,
+        'orderAcceptingEnabled': orderAcceptingEnabled,
+        'tags': tags,
       },
       decode: (value) =>
           SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
@@ -155,7 +257,10 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
   }
 
   @override
-  Future<SellerStore> changeBusinessStatus(int storeId, String status) {
+  Future<SellerStore> changeBusinessStatus(
+      int storeId,
+      String status,
+      ) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId/business-status',
       body: {'businessStatus': status},
@@ -166,22 +271,42 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
 
   @override
   Future<SellerStore> update(
-    int storeId, {
-    required String name,
-    String? description,
-    String? address,
-    double? latitude,
-    double? longitude,
-    List<String> tags = const [],
-  }) {
+      int storeId, {
+        required String name,
+        String? description,
+        String? address,
+        String? detailAddress,
+        String? representativeCategory,
+        String? imageUrl,
+        String? phone,
+        double? latitude,
+        double? longitude,
+        String? openTime,
+        String? closeTime,
+        List<String>? closedDays,
+        bool? takeoutAvailable,
+        bool? dineInAvailable,
+        bool? orderAcceptingEnabled,
+        List<String> tags = const [],
+      }) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
       body: {
         'name': name,
         'description': description,
         'address': address,
+        'detailAddress': detailAddress,
+        'representativeCategory': representativeCategory,
+        'imageUrl': imageUrl,
+        'phone': phone,
         'latitude': latitude,
         'longitude': longitude,
+        'openTime': openTime,
+        'closeTime': closeTime,
+        'closedDays': closedDays,
+        'takeoutAvailable': takeoutAvailable,
+        'dineInAvailable': dineInAvailable,
+        'orderAcceptingEnabled': orderAcceptingEnabled,
         'tags': tags,
       },
       decode: (value) =>
@@ -192,14 +317,17 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
 
 class MemorySellerStoreRepository implements SellerStoreRepository {
   MemorySellerStoreRepository({List<SellerStore>? stores})
-    : _stores =
-          stores ??
+      : _stores =
+      stores ??
           [
             const SellerStore(
               storeId: 1,
               storeType: 'LOCAL_STORE',
               name: '성수 커피 연구소',
               description: 'POPQ 메모리 스토어',
+              representativeCategory: '카페',
+              openTime: '09:00:00',
+              closeTime: '21:00:00',
               status: 'ACTIVE',
               businessStatus: 'PRE_OPEN',
               myRole: 'OWNER',
@@ -209,15 +337,19 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
   final List<SellerStore> _stores;
 
   @override
-  Future<List<SellerStore>> findAll() async => List.unmodifiable(_stores);
-
-  @override
-  Future<SellerStore> findOne(int storeId) async {
-    return _stores.firstWhere((store) => store.storeId == storeId);
+  Future<List<SellerStore>> findAll() async {
+    return List.unmodifiable(_stores);
   }
 
   @override
-  Future<SellerStore> createDevelopmentStore() async {
+  Future<SellerStore> findOne(int storeId) async {
+    return _stores.firstWhere(
+          (store) => store.storeId == storeId,
+    );
+  }
+
+  @override
+  Future<SellerStore> createDevelopmentStore() {
     return create(
       storeType: 'LOCAL_STORE',
       name: 'POPQ 개발 스토어',
@@ -231,63 +363,148 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
     required String name,
     String? description,
     String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
+    double? latitude,
+    double? longitude,
+    String? openTime,
+    String? closeTime,
+    List<String> closedDays = const [],
+    bool takeoutAvailable = true,
+    bool dineInAvailable = true,
+    bool orderAcceptingEnabled = true,
+    List<String> tags = const [],
   }) async {
     final store = SellerStore(
       storeId: _stores.length + 1,
       storeType: storeType,
       name: name,
       description: description,
+      address: address,
+      detailAddress: detailAddress,
+      representativeCategory: representativeCategory,
+      imageUrl: imageUrl,
+      phone: phone,
+      latitude: latitude,
+      longitude: longitude,
+      openTime: openTime,
+      closeTime: closeTime,
+      closedDays: List.unmodifiable(closedDays),
+      takeoutAvailable: takeoutAvailable,
+      dineInAvailable: dineInAvailable,
+      orderAcceptingEnabled: orderAcceptingEnabled,
+      tags: List.unmodifiable(tags),
       status: 'ACTIVE',
       businessStatus: 'PRE_OPEN',
       myRole: 'OWNER',
     );
+
     _stores.add(store);
     return store;
   }
 
   @override
-  Future<SellerStore> changeBusinessStatus(int storeId, String status) async {
-    final index = _stores.indexWhere((store) => store.storeId == storeId);
-    if (index < 0) throw StateError('store not found');
+  Future<SellerStore> changeBusinessStatus(
+      int storeId,
+      String status,
+      ) async {
+    final index = _stores.indexWhere(
+          (store) => store.storeId == storeId,
+    );
+
+    if (index < 0) {
+      throw StateError('store not found');
+    }
+
     final store = _stores[index];
+
     if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
       throw StateError('store manager role is required');
     }
-    final updated = store.copyWith(businessStatus: status);
+
+    final updated = store.copyWith(
+      businessStatus: status,
+    );
+
     _stores[index] = updated;
     return updated;
   }
 
   @override
   Future<SellerStore> update(
-    int storeId, {
-    required String name,
-    String? description,
-    String? address,
-    double? latitude,
-    double? longitude,
-    List<String> tags = const [],
-  }) async {
-    final index = _stores.indexWhere((store) => store.storeId == storeId);
-    if (index < 0) throw StateError('store not found');
+      int storeId, {
+        required String name,
+        String? description,
+        String? address,
+        String? detailAddress,
+        String? representativeCategory,
+        String? imageUrl,
+        String? phone,
+        double? latitude,
+        double? longitude,
+        String? openTime,
+        String? closeTime,
+        List<String>? closedDays,
+        bool? takeoutAvailable,
+        bool? dineInAvailable,
+        bool? orderAcceptingEnabled,
+        List<String> tags = const [],
+      }) async {
+    final index = _stores.indexWhere(
+          (store) => store.storeId == storeId,
+    );
+
+    if (index < 0) {
+      throw StateError('store not found');
+    }
+
     final store = _stores[index];
+
     if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
       throw StateError('store manager role is required');
     }
+
     final updated = SellerStore(
       storeId: store.storeId,
       storeType: store.storeType,
       name: name,
       description: description,
       address: address,
+      detailAddress: detailAddress ?? store.detailAddress,
+      representativeCategory:
+      representativeCategory ?? store.representativeCategory,
+      imageUrl: imageUrl ?? store.imageUrl,
+      phone: phone ?? store.phone,
       latitude: latitude,
       longitude: longitude,
+      openTime: openTime ?? store.openTime,
+      closeTime: closeTime ?? store.closeTime,
+      closedDays: List.unmodifiable(
+        closedDays ?? store.closedDays,
+      ),
+      takeoutAvailable:
+      takeoutAvailable ?? store.takeoutAvailable,
+      dineInAvailable:
+      dineInAvailable ?? store.dineInAvailable,
+      orderAcceptingEnabled:
+      orderAcceptingEnabled ?? store.orderAcceptingEnabled,
       tags: List.unmodifiable(tags),
       status: store.status,
       businessStatus: store.businessStatus,
       myRole: store.myRole,
     );
+
     _stores[index] = updated;
     return updated;
   }
+}
+
+List<String> _readStringList(Object? value) {
+  if (value is! List) {
+    return const [];
+  }
+
+  return value.whereType<String>().toList(growable: false);
 }

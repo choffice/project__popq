@@ -15,6 +15,7 @@ import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
 import '../features/sales/seller_sales_screen.dart';
 import '../features/settings/seller_settings_screen.dart';
+import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
 import '../features/stores/seller_store_selection_controller.dart';
 import '../features/stores/store_selection_screen.dart';
@@ -26,6 +27,7 @@ abstract final class SellerRoutes {
   static const signIn = '/sign-in';
 
   static const dashboard = '/dashboard';
+  static const storeRegistration = '/stores/register';
   static const operations = '/operations';
   static const orders = '/orders';
   static const customers = '/customers';
@@ -65,6 +67,9 @@ GoRouter createSellerRouter({
       final isSignIn =
           location == SellerRoutes.signIn;
 
+      final isStoreRegistration =
+          location == SellerRoutes.storeRegistration;
+
       if (bootstrapController.status ==
           SellerBootstrapStatus.restoring) {
         return isBootstrap
@@ -101,7 +106,8 @@ GoRouter createSellerRouter({
       if (!storeSelectionController.hasSelection &&
           location != SellerRoutes.dashboard &&
           location != SellerRoutes.customers &&
-          location != SellerRoutes.settings) {
+          location != SellerRoutes.settings &&
+          !isStoreRegistration) {
         return SellerRoutes.dashboard;
       }
 
@@ -162,6 +168,15 @@ GoRouter createSellerRouter({
 
           return SellerSettingsScreen(
             themeController: controller,
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.storeRegistration,
+        builder: (context, state) {
+          return SellerStoreRegistrationScreen(
+            repository: storeRepository,
+            selectionController: storeSelectionController,
           );
         },
       ),
