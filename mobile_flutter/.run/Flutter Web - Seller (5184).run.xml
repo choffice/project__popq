@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flutter Web - Seller (5184)" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://192.168.55.217:8082" />
-    <option name="filePath" value="$PROJECT_DIR$/apps/seller_app/lib/main.dart" />
-    <method v="2" />
-  </configuration>
-</component>
