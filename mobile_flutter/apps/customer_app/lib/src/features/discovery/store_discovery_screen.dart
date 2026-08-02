@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
+import '../favorites/customer_store_interest_controller.dart';
 import '../permissions/customer_permission_gateway.dart';
+import '../profile/customer_engagement_repository.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
 
@@ -11,11 +16,20 @@ class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
     required this.repository,
     required this.permissionGateway,
+    this.engagementRepository,
+    this.sessionController,
     super.key,
   });
 
   final StoreDiscoveryRepository repository;
   final CustomerPermissionGateway permissionGateway;
+
+  /// 다음 단계에서 라우터가 전달합니다.
+  ///
+  /// 두 의존성이 모두 전달되면 탐색 화면의 하트가
+  /// 실제 관심 매장 API와 연결됩니다.
+  final CustomerEngagementRepository? engagementRepository;
+  final SessionController? sessionController;
 
   @override
   State<StoreDiscoveryScreen> createState() =>
@@ -52,7 +66,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   final FocusNode _searchFocusNode = FocusNode();
 
-  final Set<int> _favoriteStoreIds = {};
+  final Set<int> _localFavoriteStoreIds = <int>{};
+
+  CustomerStoreInterestController? _interestController;
 
   CustomerStore? _selectedStore;
 
@@ -69,7 +85,64 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       permissionGateway: widget.permissionGateway,
     )..addListener(_onControllerChanged);
 
+    _createInterestController();
     _controller.search();
+  }
+
+  @override
+  void didUpdateWidget(StoreDiscoveryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final interestDependenciesChanged =
+        !identical(
+          oldWidget.engagementRepository,
+          widget.engagementRepository,
+        ) ||
+        !identical(
+          oldWidget.sessionController,
+          widget.sessionController,
+        );
+
+    if (!interestDependenciesChanged) {
+      return;
+    }
+
+    _disposeInterestController();
+    _createInterestController();
+  }
+
+  void _createInterestController() {
+    final engagementRepository = widget.engagementRepository;
+    final sessionController = widget.sessionController;
+
+    if (engagementRepository == null ||
+        sessionController == null) {
+      return;
+    }
+
+    final controller = CustomerStoreInterestController(
+      repository: engagementRepository,
+      sessionController: sessionController,
+    )..addListener(_onInterestControllerChanged);
+
+    _interestController = controller;
+    unawaited(controller.load());
+  }
+
+  void _disposeInterestController() {
+    _interestController
+      ?..removeListener(_onInterestControllerChanged)
+      ..dispose();
+
+    _interestController = null;
+  }
+
+  void _onInterestControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {});
   }
 
   @override
@@ -77,6 +150,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _controller
       ..removeListener(_onControllerChanged)
       ..dispose();
+
+    _disposeInterestController();
 
     _queryController.dispose();
     _searchFocusNode.dispose();
@@ -184,7 +259,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             bottom: 12,
             child: _SelectedStoreCard(
               store: _selectedStore!,
-              favorite: _favoriteStoreIds.contains(
+              favorite: _isFavorite(
+                _selectedStore!.storeId,
+              ),
+              favoriteUpdating: _isFavoriteUpdating(
                 _selectedStore!.storeId,
               ),
               onFavoritePressed: _toggleFavorite,
@@ -389,18 +467,88 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
   }
 
-  void _toggleFavorite() {
-    final storeId = _selectedStore?.storeId;
+  bool _isFavorite(int storeId) {
+    final controller = _interestController;
 
-    if (storeId == null) {
+    if (controller != null) {
+      return controller.isInterested(storeId);
+    }
+
+    return _localFavoriteStoreIds.contains(storeId);
+  }
+
+  bool _isFavoriteUpdating(int storeId) {
+    return _interestController?.isUpdating(storeId) ?? false;
+  }
+
+  Future<void> _toggleFavorite() async {
+    final store = _selectedStore;
+
+    if (store == null) {
       return;
     }
 
-    setState(() {
-      if (!_favoriteStoreIds.add(storeId)) {
-        _favoriteStoreIds.remove(storeId);
-      }
-    });
+    final controller = _interestController;
+
+    // 라우터가 새 의존성을 전달하기 전까지는
+    // 기존 화면의 로컬 하트 동작을 유지합니다.
+    if (controller == null) {
+      setState(() {
+        if (!_localFavoriteStoreIds.add(store.storeId)) {
+          _localFavoriteStoreIds.remove(store.storeId);
+        }
+      });
+      return;
+    }
+
+    final result = await controller.toggle(store.storeId);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result == CustomerStoreInterestToggleResult.added) {
+      _showFavoriteMessage(
+        '${store.name}을(를) 찜에 추가했어요.',
+      );
+      return;
+    }
+
+    if (result == CustomerStoreInterestToggleResult.removed) {
+      _showFavoriteMessage(
+        '${store.name}을(를) 찜에서 삭제했어요.',
+      );
+      return;
+    }
+
+    if (result ==
+        CustomerStoreInterestToggleResult.signInRequired) {
+      context.push(
+        Uri(
+          path: CustomerRoutes.signIn,
+          queryParameters: const {
+            'from': CustomerRoutes.discover,
+          },
+        ).toString(),
+      );
+      return;
+    }
+
+    _showFavoriteMessage(
+      '찜 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    );
+  }
+
+  void _showFavoriteMessage(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+        ),
+      );
   }
 
   void _openStoreDetail() {
@@ -953,6 +1101,7 @@ class _SelectedStoreCard extends StatelessWidget {
   const _SelectedStoreCard({
     required this.store,
     required this.favorite,
+    required this.favoriteUpdating,
     required this.onFavoritePressed,
     required this.onDetailsPressed,
     required this.onClose,
@@ -964,6 +1113,7 @@ class _SelectedStoreCard extends StatelessWidget {
 
   final CustomerStore store;
   final bool favorite;
+  final bool favoriteUpdating;
   final VoidCallback onFavoritePressed;
   final VoidCallback onDetailsPressed;
   final VoidCallback onClose;
@@ -998,16 +1148,25 @@ class _SelectedStoreCard extends StatelessWidget {
                   tooltip: favorite
                       ? '관심 업체 해제'
                       : '관심 업체 추가',
-                  onPressed: onFavoritePressed,
+                  onPressed:
+                      favoriteUpdating ? null : onFavoritePressed,
                   visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    favorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                    color: favorite
-                        ? Colors.redAccent
-                        : null,
-                  ),
+                  icon: favoriteUpdating
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                          ),
+                        )
+                      : Icon(
+                          favorite
+                              ? Icons.favorite_rounded
+                              : Icons.favorite_border_rounded,
+                          color: favorite
+                              ? Colors.redAccent
+                              : null,
+                        ),
                 ),
                 IconButton(
                   tooltip: '선택 닫기',

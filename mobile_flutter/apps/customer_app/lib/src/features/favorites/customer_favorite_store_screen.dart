@@ -22,6 +22,9 @@ class CustomerFavoriteStoreScreen extends StatefulWidget {
 
 class _CustomerFavoriteStoreScreenState
     extends State<CustomerFavoriteStoreScreen> {
+  static const Duration _snackBarDuration =
+  Duration(seconds: 3);
+
   List<InterestedStore> _stores = const [];
 
   final Set<int> _removingStoreIds = <int>{};
@@ -86,7 +89,8 @@ class _CustomerFavoriteStoreScreenState
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics:
+        const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           PopqSpacing.md,
           PopqSpacing.sm,
@@ -102,13 +106,10 @@ class _CustomerFavoriteStoreScreenState
               height: PopqSpacing.md,
             ),
           ],
-
           const _FavoriteHeader(),
-
           const SizedBox(
             height: PopqSpacing.lg,
           ),
-
           if (_loadError != null) ...[
             _FavoriteLoadNotice(
               onRetry: _load,
@@ -117,7 +118,6 @@ class _CustomerFavoriteStoreScreenState
               height: PopqSpacing.md,
             ),
           ],
-
           if (_stores.isEmpty)
             _FavoriteEmptyView(
               onDiscoverPressed: () {
@@ -146,7 +146,8 @@ class _CustomerFavoriteStoreScreenState
                 ),
                 child: _FavoriteStoreCard(
                   store: store,
-                  isRemoving: _removingStoreIds.contains(
+                  isRemoving:
+                  _removingStoreIds.contains(
                     store.storeId,
                   ),
                   onTap: () {
@@ -208,6 +209,11 @@ class _CustomerFavoriteStoreScreenState
             content: Text(
               '${store.name}을(를) 찜에서 삭제했어요.',
             ),
+            duration: _snackBarDuration,
+
+            // action이 있어도 3초 뒤 자동으로 사라지게 합니다.
+            persist: false,
+
             action: SnackBarAction(
               label: '되돌리기',
               onPressed: () {
@@ -223,14 +229,19 @@ class _CustomerFavoriteStoreScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            '찜을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      final messenger =
+      ScaffoldMessenger.of(context);
+
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              '찜을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
+            ),
+            duration: _snackBarDuration,
           ),
-        ),
-      );
+        );
     } finally {
       if (mounted) {
         setState(() {
@@ -254,8 +265,7 @@ class _CustomerFavoriteStoreScreenState
         return;
       }
 
-      final alreadyExists =
-      _stores.any(
+      final alreadyExists = _stores.any(
             (item) =>
         item.storeId == store.storeId,
       );
@@ -272,19 +282,38 @@ class _CustomerFavoriteStoreScreenState
           ],
         );
       });
+
+      final messenger =
+      ScaffoldMessenger.of(context);
+
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '${store.name}을(를) 다시 찜했어요.',
+            ),
+            duration: _snackBarDuration,
+          ),
+        );
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(
-        const SnackBar(
-          content: Text(
-            '찜을 다시 등록하지 못했어요.',
+      final messenger =
+      ScaffoldMessenger.of(context);
+
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              '찜을 다시 등록하지 못했어요.',
+            ),
+            duration: _snackBarDuration,
           ),
-        ),
-      );
+        );
     }
   }
 }
@@ -626,13 +655,15 @@ class _FavoriteStoreCard
                             store.name,
                             maxLines: 1,
                             overflow:
-                            TextOverflow.ellipsis,
+                            TextOverflow
+                                .ellipsis,
                             style: theme
                                 .textTheme
                                 .titleMedium
                                 ?.copyWith(
                               fontWeight:
-                              FontWeight.w900,
+                              FontWeight
+                                  .w900,
                             ),
                           ),
                         ),
@@ -690,7 +721,8 @@ class _FavoriteStoreCard
                                 '주소 정보 없음',
                             maxLines: 1,
                             overflow:
-                            TextOverflow.ellipsis,
+                            TextOverflow
+                                .ellipsis,
                             style: theme
                                 .textTheme
                                 .bodySmall,
@@ -709,7 +741,9 @@ class _FavoriteStoreCard
                   width: 48,
                   height: 48,
                   child: Padding(
-                    padding: EdgeInsets.all(13),
+                    padding: EdgeInsets.all(
+                      13,
+                    ),
                     child:
                     CircularProgressIndicator(
                       strokeWidth: 2.5,

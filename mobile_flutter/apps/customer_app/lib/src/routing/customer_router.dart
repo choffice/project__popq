@@ -131,16 +131,16 @@ GoRouter createCustomerRouter({
               location.startsWith(
                 '${CustomerRoutes.orders}/',
               ) ||
-              location == CustomerRoutes.favorites ||
-              location == CustomerRoutes.profile ||
+              location ==
+                  CustomerRoutes.favorites ||
+              location ==
+                  CustomerRoutes.profile ||
               location ==
                   CustomerRoutes.notifications;
 
       /*
-       * 장바구니에서는 로그인 여부를 직접 확인합니다.
-       *
-       * 여기에서는 주문, 찜, 마이페이지, 알림처럼
-       * 로그인 정보가 필요한 화면의 접근을 보호합니다.
+       * 주문, 찜, 마이페이지와 알림처럼
+       * 고객 로그인 정보가 필요한 화면을 보호합니다.
        */
       if (requiresSession &&
           !sessionController.isSignedIn) {
@@ -153,8 +153,8 @@ GoRouter createCustomerRouter({
       }
 
       /*
-       * 로그인 성공 후 사용자가 원래 접근하려던
-       * 화면으로 다시 이동합니다.
+       * 로그인에 성공하면 사용자가 원래 접근하려던
+       * 화면으로 돌아갑니다.
        */
       if (isSignIn &&
           sessionController.isSignedIn) {
@@ -192,13 +192,15 @@ GoRouter createCustomerRouter({
             body: PopqErrorView(
               message:
               '보안 저장소에서 로그인 정보를 불러오지 못했습니다.',
-              onRetry: sessionController.restore,
+              onRetry:
+              sessionController.restore,
             ),
           );
         },
       ),
       GoRoute(
-        path: CustomerRoutes.onboardingError,
+        path:
+        CustomerRoutes.onboardingError,
         builder: (context, state) {
           return Scaffold(
             body: PopqErrorView(
@@ -214,7 +216,8 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.onboarding,
         builder: (context, state) {
           return OnboardingScreen(
-            controller: onboardingController,
+            controller:
+            onboardingController,
             permissionGateway:
             permissionGateway,
           );
@@ -234,7 +237,8 @@ GoRouter createCustomerRouter({
             },
             onDevelopmentSignIn:
             onDevelopmentSignIn,
-            returnLocation: returnLocation,
+            returnLocation:
+            returnLocation,
           );
         },
       ),
@@ -243,25 +247,31 @@ GoRouter createCustomerRouter({
         '${CustomerRoutes.stores}/:storeId/products/:productId',
         builder: (context, state) {
           final storeId = int.tryParse(
-            state.pathParameters['storeId'] ?? '',
+            state.pathParameters['storeId'] ??
+                '',
           );
 
           final productId = int.tryParse(
-            state.pathParameters['productId'] ?? '',
+            state.pathParameters[
+            'productId'] ??
+                '',
           );
 
           if (storeId == null ||
               productId == null) {
             return const PopqErrorView(
-              message: '상품 번호가 올바르지 않습니다.',
+              message:
+              '상품 번호가 올바르지 않습니다.',
             );
           }
 
           return ProductDetailScreen(
             storeId: storeId,
             productId: productId,
-            repository: catalogRepository,
-            cartController: cartController,
+            repository:
+            catalogRepository,
+            cartController:
+            cartController,
           );
         },
       ),
@@ -270,19 +280,23 @@ GoRouter createCustomerRouter({
         '${CustomerRoutes.stores}/:storeId/products',
         builder: (context, state) {
           final storeId = int.tryParse(
-            state.pathParameters['storeId'] ?? '',
+            state.pathParameters['storeId'] ??
+                '',
           );
 
           if (storeId == null) {
             return const PopqErrorView(
-              message: '스토어 번호가 올바르지 않습니다.',
+              message:
+              '스토어 번호가 올바르지 않습니다.',
             );
           }
 
           return ProductListScreen(
             storeId: storeId,
-            repository: catalogRepository,
-            cartController: cartController,
+            repository:
+            catalogRepository,
+            cartController:
+            cartController,
           );
         },
       ),
@@ -291,12 +305,14 @@ GoRouter createCustomerRouter({
         '${CustomerRoutes.stores}/:storeId',
         builder: (context, state) {
           final storeId = int.tryParse(
-            state.pathParameters['storeId'] ?? '',
+            state.pathParameters['storeId'] ??
+                '',
           );
 
           if (storeId == null) {
             return const PopqErrorView(
-              message: '스토어 번호가 올바르지 않습니다.',
+              message:
+              '스토어 번호가 올바르지 않습니다.',
             );
           }
 
@@ -315,7 +331,8 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.cart,
         builder: (context, state) {
           return CartScreen(
-            controller: cartController,
+            controller:
+            cartController,
             sessionController:
             sessionController,
             onDevelopmentSignIn:
@@ -327,14 +344,18 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.checkout,
         builder: (context, state) {
           return CheckoutScreen(
-            cartController: cartController,
-            orderRepository: orderRepository,
-            tossClientKey: tossClientKey,
+            cartController:
+            cartController,
+            orderRepository:
+            orderRepository,
+            tossClientKey:
+            tossClientKey,
           );
         },
       ),
       GoRoute(
-        path: CustomerRoutes.notifications,
+        path:
+        CustomerRoutes.notifications,
         builder: (context, state) {
           return NotificationListScreen(
             repository:
@@ -351,7 +372,8 @@ GoRouter createCustomerRouter({
             state.pathParameters[
             'orderPublicId'] ??
                 '',
-            repository: engagementRepository,
+            repository:
+            engagementRepository,
           );
         },
       ),
@@ -364,12 +386,17 @@ GoRouter createCustomerRouter({
             state.pathParameters[
             'orderPublicId'] ??
                 '',
-            repository: orderRepository,
+            repository:
+            orderRepository,
           );
         },
       ),
       ShellRoute(
-        builder: (context, state, child) {
+        builder: (
+            context,
+            state,
+            child,
+            ) {
           return CustomerRootScreen(
             location: state.uri.path,
             notificationRepository:
@@ -386,42 +413,49 @@ GoRouter createCustomerRouter({
               return CustomerHomeScreen(
                 storeDiscoveryRepository:
                 storeDiscoveryRepository,
-                orderRepository: orderRepository,
+                orderRepository:
+                orderRepository,
                 sessionController:
                 sessionController,
               );
             },
           ),
           GoRoute(
-            path: CustomerRoutes.discover,
+            path:
+            CustomerRoutes.discover,
             builder: (context, state) {
               return StoreDiscoveryScreen(
                 repository:
                 storeDiscoveryRepository,
                 permissionGateway:
                 permissionGateway,
+
+                /*
+                 * 탐색 화면 하트를 실제 DB 찜 기능과
+                 * 연결하기 위해 전달합니다.
+                 */
+                engagementRepository:
+                engagementRepository,
+                sessionController:
+                sessionController,
               );
             },
           ),
 
           /*
-           * 기존 QR 연결은 그대로 보존합니다.
+           * 기존 QR 화면과 라우트는 수정하지 않습니다.
            */
           GoRoute(
-            path: CustomerRoutes.qrScanner,
+            path:
+            CustomerRoutes.qrScanner,
             builder: (context, state) {
               return const CustomerQrScannerScreen();
             },
           ),
 
-          /*
-           * 새로 만든 고객 찜 화면입니다.
-           *
-           * 기존 CustomerEngagementRepository를 재사용하므로
-           * 별도의 API나 Repository를 만들지 않습니다.
-           */
           GoRoute(
-            path: CustomerRoutes.favorites,
+            path:
+            CustomerRoutes.favorites,
             builder: (context, state) {
               return CustomerFavoriteStoreScreen(
                 repository:
@@ -431,16 +465,15 @@ GoRouter createCustomerRouter({
           ),
 
           /*
-           * 주문 목록 경로는 삭제하지 않습니다.
-           *
-           * 다음 단계에서 하단 주문 탭을 찜 탭으로 바꿔도
-           * 홈과 마이페이지에서 이 경로를 계속 사용할 수 있습니다.
+           * 하단 탭에서는 빠졌지만 주문 목록 경로는
+           * 홈과 마이페이지에서 계속 사용합니다.
            */
           GoRoute(
             path: CustomerRoutes.orders,
             builder: (context, state) {
               return OrderListScreen(
-                repository: orderRepository,
+                repository:
+                orderRepository,
               );
             },
           ),
