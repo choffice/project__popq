@@ -8,7 +8,9 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
+import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
+
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({

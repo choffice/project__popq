@@ -5,6 +5,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
+import 'customer_home_content.dart';
 
 enum CustomerHomeStatus {
   initial,
@@ -12,84 +13,7 @@ enum CustomerHomeStatus {
   data,
 }
 
-/// 홈의 임시 이미지 표현 종류입니다.
-///
-/// 아직 앱에 이미지 에셋과 매장 대표 이미지 API가 없기 때문에
-/// 홈 화면에서 아이콘과 그라데이션을 선택하는 용도로 사용합니다.
-/// 실제 이미지 API가 연결되면 삭제하거나 교체할 수 있습니다.
-enum CustomerHomeVisualKind {
-  taco,
-  dessert,
-  koreanFood,
-  steak,
-  membership,
-}
-
-/// 기간 한정 팝업·부스의 임시 표시 데이터입니다.
-///
-/// 백엔드 Store에 운영 기간 필드가 추가되거나
-/// 홈 전용 API가 만들어지면 이 모델 대신 API 응답을 사용합니다.
-class CustomerHomePopupItem {
-  const CustomerHomePopupItem({
-    required this.title,
-    required this.locationLabel,
-    required this.periodLabel,
-    required this.badgeLabel,
-    required this.visualKind,
-    this.storeId,
-  });
-
-  final String title;
-  final String locationLabel;
-  final String periodLabel;
-  final String badgeLabel;
-  final CustomerHomeVisualKind visualKind;
-
-  /// 실제 Store와 연결된 경우에만 사용합니다.
-  ///
-  /// 현재 임시 데이터에는 존재하지 않는 Store ID를 넣지 않기 위해
-  /// null로 유지합니다.
-  final int? storeId;
-}
-
-/// 추천 매장의 임시 표시 데이터입니다.
-///
-/// 실제 Store API 결과가 충분하지 않을 때만 사용하며,
-/// 임의의 Store ID는 넣지 않습니다.
-class CustomerHomeRecommendedItem {
-  const CustomerHomeRecommendedItem({
-    required this.name,
-    required this.categoryLabel,
-    required this.rating,
-    required this.visualKind,
-    this.storeId,
-  });
-
-  final String name;
-  final String categoryLabel;
-  final double rating;
-  final CustomerHomeVisualKind visualKind;
-  final int? storeId;
-}
-
-/// 회원 혜택 또는 서비스 안내 배너 데이터입니다.
-class CustomerHomeBenefitBanner {
-  const CustomerHomeBenefitBanner({
-    required this.eyebrow,
-    required this.title,
-    required this.description,
-    required this.actionLabel,
-    required this.visualKind,
-  });
-
-  final String eyebrow;
-  final String title;
-  final String description;
-  final String actionLabel;
-  final CustomerHomeVisualKind visualKind;
-}
-
-/// 홈 화면에서 사용하는 데이터 묶음입니다.
+/// 홈 화면에서 사용하는 전체 데이터 묶음입니다.
 class CustomerHomeSnapshot {
   const CustomerHomeSnapshot({
     required this.eventStores,
@@ -103,80 +27,35 @@ class CustomerHomeSnapshot {
     this.featuredStore,
   });
 
-  /// 완료·취소되지 않은 최신 주문입니다.
+  /// 완료·취소되지 않은 가장 최근 주문입니다.
   ///
-  /// null이면 홈에서 진행 중 주문 영역 전체를 숨깁니다.
+  /// null이면 홈의 진행 중 주문 카드 영역을 표시하지 않습니다.
   final CustomerOrder? activeOrder;
 
   /// 실제 Store API에서 가져온 홈 홍보 매장입니다.
   final CustomerStore? featuredStore;
 
-  /// API에서 조회된 EVENT_COMMERCE 매장입니다.
-  ///
-  /// 현재 API에는 운영 기간이 없으므로 실제 화면에서는
-  /// 임시 팝업 데이터와 함께 사용할 수 있습니다.
+  /// 실제 Store API에서 가져온 EVENT_COMMERCE 매장입니다.
   final List<CustomerStore> eventStores;
 
-  /// featuredStore를 제외한 실제 LOCAL_STORE 추천 목록입니다.
+  /// 홈 홍보 매장을 제외한 실제 LOCAL_STORE 추천 목록입니다.
   final List<CustomerStore> recommendedStores;
 
+  /// 아직 API가 없는 기간 한정 팝업·부스 임시 콘텐츠입니다.
   final List<CustomerHomePopupItem> temporaryPopups;
-  final List<CustomerHomeRecommendedItem> temporaryRecommendations;
+
+  /// 실제 추천 매장이 부족할 때 사용하는 임시 콘텐츠입니다.
+  final List<CustomerHomeRecommendedItem>
+  temporaryRecommendations;
+
+  /// 회원 혜택 또는 서비스 안내 배너입니다.
   final List<CustomerHomeBenefitBanner> benefitBanners;
 
-  /// Store API가 실패해 임시 콘텐츠만 표시 중인지 나타냅니다.
+  /// Store API 조회 실패 여부입니다.
   final bool storeLoadFailed;
 
-  /// 로그인 상태에서 주문 API 조회가 실패했는지 나타냅니다.
+  /// 주문 API 조회 실패 여부입니다.
   final bool orderLoadFailed;
-}
-
-/// 홈 전용 임시 콘텐츠입니다.
-///
-/// 홈 UI 코드와 분리되어 있으므로 이후 API가 추가되면
-/// 이 클래스만 삭제하고 Snapshot 생성 부분을 교체할 수 있습니다.
-abstract final class CustomerHomeTemporaryContent {
-  static const popupItems = <CustomerHomePopupItem>[
-    CustomerHomePopupItem(
-      title: '부산 야시장 타코 부스',
-      locationLabel: '부산 야시장 A구역',
-      periodLabel: '8월 10일까지',
-      badgeLabel: '기간 한정',
-      visualKind: CustomerHomeVisualKind.taco,
-    ),
-    CustomerHomePopupItem(
-      title: '서면 푸드마켓 디저트 부스',
-      locationLabel: '서면 푸드마켓',
-      periodLabel: '8월 12일까지',
-      badgeLabel: '이번 달',
-      visualKind: CustomerHomeVisualKind.dessert,
-    ),
-  ];
-
-  static const recommendedItems = <CustomerHomeRecommendedItem>[
-    CustomerHomeRecommendedItem(
-      name: '서면 분식당',
-      categoryLabel: '분식 · 한식',
-      rating: 4.6,
-      visualKind: CustomerHomeVisualKind.koreanFood,
-    ),
-    CustomerHomeRecommendedItem(
-      name: '그릴하우스',
-      categoryLabel: '양식 · 스테이크',
-      rating: 4.7,
-      visualKind: CustomerHomeVisualKind.steak,
-    ),
-  ];
-
-  static const benefitBanners = <CustomerHomeBenefitBanner>[
-    CustomerHomeBenefitBanner(
-      eyebrow: 'POPQ MEMBER',
-      title: '주문과 관심 매장을\n한곳에서 관리하세요.',
-      description: '주문 내역, 관심 스토어와 리뷰를 마이페이지에서 확인할 수 있어요.',
-      actionLabel: '회원 혜택 보기',
-      visualKind: CustomerHomeVisualKind.membership,
-    ),
-  ];
 }
 
 class CustomerHomeController extends ChangeNotifier {
@@ -185,9 +64,16 @@ class CustomerHomeController extends ChangeNotifier {
       this._orderRepository,
       this._sessionController,
       ) : _lastSignedIn = _sessionController.isSignedIn {
-    _sessionController.addListener(_handleSessionChanged);
+    _sessionController.addListener(
+      _handleSessionChanged,
+    );
   }
 
+  /// 홈 화면이 열려 있는 동안 주문 상태를 다시 확인하는 주기입니다.
+  static const Duration _orderRefreshInterval =
+  Duration(seconds: 15);
+
+  /// 홈에서 진행 중 주문으로 취급하는 상태입니다.
   static const Set<String> _activeOrderStatuses = {
     'PLACED',
     'ACCEPTED',
@@ -195,17 +81,29 @@ class CustomerHomeController extends ChangeNotifier {
     'READY',
   };
 
-  final StoreDiscoveryRepository _storeDiscoveryRepository;
+  final StoreDiscoveryRepository
+  _storeDiscoveryRepository;
+
   final CustomerOrderRepository _orderRepository;
+
   final SessionController _sessionController;
 
-  CustomerHomeStatus status = CustomerHomeStatus.initial;
+  CustomerHomeStatus status =
+      CustomerHomeStatus.initial;
+
   CustomerHomeSnapshot? snapshot;
 
+  List<CustomerStore> _stores = const [];
+
+  Timer? _orderRefreshTimer;
+
   bool _lastSignedIn;
+  bool _isRefreshingOrders = false;
   bool _disposed = false;
+
   int _requestVersion = 0;
 
+  /// 홈의 매장 정보와 주문 정보를 함께 조회합니다.
   Future<void> load() async {
     final requestVersion = ++_requestVersion;
     final signedIn = _sessionController.isSignedIn;
@@ -214,6 +112,7 @@ class CustomerHomeController extends ChangeNotifier {
     _notifySafely();
 
     final storeFuture = _loadStores();
+
     final orderFuture = _loadOrders(
       signedIn: signedIn,
     );
@@ -221,14 +120,48 @@ class CustomerHomeController extends ChangeNotifier {
     final storeResult = await storeFuture;
     final orderResult = await orderFuture;
 
-    if (_disposed || requestVersion != _requestVersion) {
+    if (_disposed ||
+        requestVersion != _requestVersion) {
       return;
     }
 
     final stores = storeResult.value;
     final orders = orderResult.value;
 
-    final activeOrder = _findActiveOrder(orders);
+    _stores = List.unmodifiable(stores);
+
+    snapshot = _createSnapshot(
+      stores: stores,
+      orders: orders,
+      storeLoadFailed:
+      storeResult.error != null,
+      orderLoadFailed:
+      orderResult.error != null,
+    );
+
+    status = CustomerHomeStatus.data;
+
+    _syncOrderRefreshTimer(
+      signedIn: signedIn,
+    );
+
+    _notifySafely();
+  }
+
+  /// 사용자가 홈 화면을 아래로 당겼을 때 전체 데이터를 다시 조회합니다.
+  Future<void> refresh() {
+    return load();
+  }
+
+  CustomerHomeSnapshot _createSnapshot({
+    required List<CustomerStore> stores,
+    required List<CustomerOrder> orders,
+    required bool storeLoadFailed,
+    required bool orderLoadFailed,
+  }) {
+    final activeOrder =
+    _findActiveOrder(orders);
+
     final featuredStore = _findFeaturedStore(
       stores: stores,
       orders: orders,
@@ -237,7 +170,9 @@ class CustomerHomeController extends ChangeNotifier {
 
     final eventStores = stores
         .where(
-          (store) => store.storeType == 'EVENT_COMMERCE',
+          (store) =>
+      store.storeType ==
+          'EVENT_COMMERCE',
     )
         .toList(
       growable: false,
@@ -246,50 +181,56 @@ class CustomerHomeController extends ChangeNotifier {
     final recommendedStores = stores
         .where(
           (store) =>
-      store.storeType == 'LOCAL_STORE' &&
-          store.storeId != featuredStore?.storeId,
+      store.storeType ==
+          'LOCAL_STORE' &&
+          store.storeId !=
+              featuredStore?.storeId,
     )
         .take(3)
         .toList(
       growable: false,
     );
 
-    snapshot = CustomerHomeSnapshot(
+    return CustomerHomeSnapshot(
       activeOrder: activeOrder,
       featuredStore: featuredStore,
-      eventStores: List.unmodifiable(eventStores),
+      eventStores: List.unmodifiable(
+        eventStores,
+      ),
       recommendedStores: List.unmodifiable(
         recommendedStores,
       ),
+
+      // 임시 콘텐츠는 customer_home_content.dart에서 가져옵니다.
       temporaryPopups:
-      CustomerHomeTemporaryContent.popupItems,
+      CustomerHomeTemporaryContent
+          .popupItems,
       temporaryRecommendations:
-      CustomerHomeTemporaryContent.recommendedItems,
+      CustomerHomeTemporaryContent
+          .recommendedItems,
       benefitBanners:
-      CustomerHomeTemporaryContent.benefitBanners,
-      storeLoadFailed: storeResult.error != null,
-      orderLoadFailed: orderResult.error != null,
+      CustomerHomeTemporaryContent
+          .benefitBanners,
+
+      storeLoadFailed: storeLoadFailed,
+      orderLoadFailed: orderLoadFailed,
     );
-
-    status = CustomerHomeStatus.data;
-    _notifySafely();
-  }
-
-  Future<void> refresh() {
-    return load();
   }
 
   Future<_HomeLoadResult<List<CustomerStore>>>
   _loadStores() async {
     try {
       final stores =
-      await _storeDiscoveryRepository.search();
+      await _storeDiscoveryRepository
+          .search();
 
-      return _HomeLoadResult<List<CustomerStore>>(
+      return _HomeLoadResult<
+          List<CustomerStore>>(
         value: List.unmodifiable(stores),
       );
     } catch (error) {
-      return _HomeLoadResult<List<CustomerStore>>(
+      return _HomeLoadResult<
+          List<CustomerStore>>(
         value: const [],
         error: error,
       );
@@ -301,22 +242,126 @@ class CustomerHomeController extends ChangeNotifier {
     required bool signedIn,
   }) async {
     if (!signedIn) {
-      return const _HomeLoadResult<List<CustomerOrder>>(
+      return const _HomeLoadResult<
+          List<CustomerOrder>>(
         value: [],
       );
     }
 
     try {
-      final orders = await _orderRepository.findAll();
+      final orders =
+      await _orderRepository.findAll();
 
-      return _HomeLoadResult<List<CustomerOrder>>(
+      return _HomeLoadResult<
+          List<CustomerOrder>>(
         value: List.unmodifiable(orders),
       );
     } catch (error) {
-      return _HomeLoadResult<List<CustomerOrder>>(
+      return _HomeLoadResult<
+          List<CustomerOrder>>(
         value: const [],
         error: error,
       );
+    }
+  }
+
+  void _syncOrderRefreshTimer({
+    required bool signedIn,
+  }) {
+    if (!signedIn) {
+      _cancelOrderRefreshTimer();
+      return;
+    }
+
+    if (_orderRefreshTimer != null) {
+      return;
+    }
+
+    _orderRefreshTimer = Timer.periodic(
+      _orderRefreshInterval,
+          (_) {
+        unawaited(
+          _refreshOrdersSilently(),
+        );
+      },
+    );
+  }
+
+  void _cancelOrderRefreshTimer() {
+    _orderRefreshTimer?.cancel();
+    _orderRefreshTimer = null;
+  }
+
+  /// 홈 전체 로딩 표시 없이 주문 상태만 다시 조회합니다.
+  Future<void> _refreshOrdersSilently() async {
+    if (_disposed ||
+        !_sessionController.isSignedIn ||
+        _isRefreshingOrders ||
+        status == CustomerHomeStatus.loading) {
+      return;
+    }
+
+    _isRefreshingOrders = true;
+
+    try {
+      final orders =
+      await _orderRepository.findAll();
+
+      if (_disposed) {
+        return;
+      }
+
+      final currentSnapshot = snapshot;
+
+      if (currentSnapshot == null) {
+        return;
+      }
+
+      snapshot = _createSnapshot(
+        stores: _stores,
+        orders: orders,
+        storeLoadFailed:
+        currentSnapshot.storeLoadFailed,
+        orderLoadFailed: false,
+      );
+
+      _notifySafely();
+    } catch (_) {
+      if (_disposed) {
+        return;
+      }
+
+      final currentSnapshot = snapshot;
+
+      if (currentSnapshot == null) {
+        return;
+      }
+
+      // 주문 갱신이 실패해도 기존 홈 데이터는 유지합니다.
+      snapshot = CustomerHomeSnapshot(
+        activeOrder:
+        currentSnapshot.activeOrder,
+        featuredStore:
+        currentSnapshot.featuredStore,
+        eventStores:
+        currentSnapshot.eventStores,
+        recommendedStores:
+        currentSnapshot.recommendedStores,
+        temporaryPopups:
+        currentSnapshot.temporaryPopups,
+        temporaryRecommendations:
+        currentSnapshot
+            .temporaryRecommendations,
+        benefitBanners:
+        currentSnapshot.benefitBanners,
+        storeLoadFailed:
+        currentSnapshot.storeLoadFailed,
+        orderLoadFailed: true,
+      );
+
+      _notifySafely();
+    } finally {
+      _isRefreshingOrders = false;
     }
   }
 
@@ -324,7 +369,9 @@ class CustomerHomeController extends ChangeNotifier {
       List<CustomerOrder> orders,
       ) {
     for (final order in orders) {
-      if (_activeOrderStatuses.contains(order.status)) {
+      if (_activeOrderStatuses.contains(
+        order.status,
+      )) {
         return order;
       }
     }
@@ -341,9 +388,10 @@ class CustomerHomeController extends ChangeNotifier {
       return null;
     }
 
-    // 진행 중 주문 매장을 가장 먼저 홍보 매장으로 사용합니다.
+    // 진행 중 주문이 있으면 해당 주문의 매장을 우선 표시합니다.
     if (activeOrder != null) {
-      final activeOrderStore = _findStoreById(
+      final activeOrderStore =
+      _findStoreById(
         stores,
         activeOrder.storeId,
       );
@@ -353,9 +401,10 @@ class CustomerHomeController extends ChangeNotifier {
       }
     }
 
-    // 진행 중 주문이 없으면 최근 주문에 실제로 사용한 매장을 찾습니다.
+    // 진행 중 주문이 없으면 최근 주문에 사용한 매장을 찾습니다.
     for (final order in orders) {
-      final orderedStore = _findStoreById(
+      final orderedStore =
+      _findStoreById(
         stores,
         order.storeId,
       );
@@ -365,14 +414,15 @@ class CustomerHomeController extends ChangeNotifier {
       }
     }
 
-    // 주문 기록이 없거나 로그아웃 상태라면
-    // 공개 Store API의 LOCAL_STORE를 사용합니다.
+    // 주문 기록이 없으면 공개된 LOCAL_STORE를 우선 사용합니다.
     for (final store in stores) {
-      if (store.storeType == 'LOCAL_STORE') {
+      if (store.storeType ==
+          'LOCAL_STORE') {
         return store;
       }
     }
 
+    // LOCAL_STORE도 없다면 공개 매장 중 첫 번째 매장을 사용합니다.
     return stores.first;
   }
 
@@ -390,13 +440,19 @@ class CustomerHomeController extends ChangeNotifier {
   }
 
   void _handleSessionChanged() {
-    final signedIn = _sessionController.isSignedIn;
+    final signedIn =
+        _sessionController.isSignedIn;
 
     if (_lastSignedIn == signedIn) {
       return;
     }
 
     _lastSignedIn = signedIn;
+
+    if (!signedIn) {
+      _cancelOrderRefreshTimer();
+    }
+
     unawaited(load());
   }
 
@@ -410,6 +466,8 @@ class CustomerHomeController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _requestVersion++;
+
+    _cancelOrderRefreshTimer();
 
     _sessionController.removeListener(
       _handleSessionChanged,
