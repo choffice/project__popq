@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -50,6 +51,9 @@ class PopqCustomerApp extends StatefulWidget {
 }
 
 class _PopqCustomerAppState extends State<PopqCustomerApp> {
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+  GlobalKey<ScaffoldMessengerState>();
+
   late final SessionController _sessionController;
   late final OnboardingController _onboardingController;
   late final SessionStore _sessionStore;
@@ -58,6 +62,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
   late final GoRouter _router;
+  late final _CustomerBackButtonDispatcher _backButtonDispatcher;
 
   @override
   void initState() {
@@ -96,23 +101,33 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
     final storeDiscoveryRepository =
         widget.storeDiscoveryRepository ??
-            ApiStoreDiscoveryRepository(_apiClient);
+            ApiStoreDiscoveryRepository(
+              _apiClient,
+            );
 
     final catalogRepository =
         widget.catalogRepository ??
-            ApiCatalogRepository(_apiClient);
+            ApiCatalogRepository(
+              _apiClient,
+            );
 
     final orderRepository =
         widget.orderRepository ??
-            ApiCustomerOrderRepository(_apiClient);
+            ApiCustomerOrderRepository(
+              _apiClient,
+            );
 
     final engagementRepository =
         widget.engagementRepository ??
-            ApiCustomerEngagementRepository(_apiClient);
+            ApiCustomerEngagementRepository(
+              _apiClient,
+            );
 
     final notificationRepository =
         widget.notificationRepository ??
-            ApiCustomerNotificationRepository(_apiClient);
+            ApiCustomerNotificationRepository(
+              _apiClient,
+            );
 
     _cartController =
         widget.cartController ??
@@ -124,23 +139,35 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       _onboardingController,
       storeDiscoveryRepository:
       storeDiscoveryRepository,
-      catalogRepository: catalogRepository,
-      orderRepository: orderRepository,
+      catalogRepository:
+      catalogRepository,
+      orderRepository:
+      orderRepository,
       engagementRepository:
       engagementRepository,
       notificationRepository:
       notificationRepository,
-      cartController: _cartController,
-      permissionGateway: permissionGateway,
+      cartController:
+      _cartController,
+      permissionGateway:
+      permissionGateway,
       tossClientKey:
       widget.environment.tossClientKey,
-      themeController: _themeController,
+      themeController:
+      _themeController,
       onDevelopmentSignIn:
       widget.environment.flavor ==
           AppFlavor.development
           ? _developmentSignIn
           : null,
     );
+
+    _backButtonDispatcher =
+        _CustomerBackButtonDispatcher(
+          router: _router,
+          scaffoldMessengerKey:
+          _scaffoldMessengerKey,
+        );
 
     unawaited(
       Future.wait([
@@ -153,13 +180,17 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
   Future<void> _developmentSignIn() async {
     final response =
-    await _apiClient.post<Map<String, Object?>>(
+    await _apiClient.post<
+        Map<String, Object?>
+    >(
       '/api/v1/dev/auth/login',
       body: {
         'email':
         'customer-app-dev@popq.local',
-        'name': 'POPQ 개발 고객',
-        'role': 'CUSTOMER',
+        'name':
+        'POPQ 개발 고객',
+        'role':
+        'CUSTOMER',
       },
       decode: (value) {
         return Map<String, Object?>.from(
@@ -169,17 +200,21 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     );
 
     final expiresIn =
-    (response['expiresIn'] as num).toInt();
+    (response['expiresIn'] as num)
+        .toInt();
 
     await _sessionController.save(
       AuthSession(
         accessToken:
-        response['accessToken'] as String,
+        response['accessToken']
+        as String,
         refreshToken: '',
         expiresAt: DateTime.now()
             .toUtc()
             .add(
-          Duration(seconds: expiresIn),
+          Duration(
+            seconds: expiresIn,
+          ),
         ),
       ),
     );
@@ -209,13 +244,170 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           title: 'POPQ',
           debugShowCheckedModeBanner:
           !widget.environment.isProduction,
+          scaffoldMessengerKey:
+          _scaffoldMessengerKey,
           theme: PopqTheme.light(),
           darkTheme: PopqTheme.dark(),
           themeMode:
           _themeController.themeMode,
-          routerConfig: _router,
+
+          /*
+           * routerConfig를 그대로 넘기지 않고
+           * Router 구성 요소를 각각 전달합니다.
+           *
+           * 이렇게 해야 최상위 Android 뒤로가기를 처리할
+           * BackButtonDispatcher를 직접 지정할 수 있습니다.
+           */
+          routeInformationProvider:
+          _router
+              .routeInformationProvider,
+          routeInformationParser:
+          _router
+              .routeInformationParser,
+          routerDelegate:
+          _router.routerDelegate,
+          backButtonDispatcher:
+          _backButtonDispatcher,
         );
       },
     );
+  }
+}
+
+class _CustomerBackButtonDispatcher
+    extends RootBackButtonDispatcher {
+  _CustomerBackButtonDispatcher({
+    required GoRouter router,
+    required GlobalKey<ScaffoldMessengerState>
+    scaffoldMessengerKey,
+  }) : _router = router,
+        _scaffoldMessengerKey =
+            scaffoldMessengerKey;
+
+  static const Duration _exitConfirmDuration =
+  Duration(seconds: 2);
+
+  static const Set<String> _rootTabLocations = {
+    CustomerRoutes.home,
+    CustomerRoutes.discover,
+    CustomerRoutes.qrScanner,
+    CustomerRoutes.orders,
+    CustomerRoutes.profile,
+  };
+
+  final GoRouter _router;
+
+  final GlobalKey<ScaffoldMessengerState>
+  _scaffoldMessengerKey;
+
+  DateTime? _lastBackPressedAt;
+
+  @override
+  Future<bool> invokeCallback(
+      Future<bool> defaultValue,
+      ) async {
+    /*
+     * 주문 상세, 매장 상세, 장바구니, 결제 등의 화면에서는
+     * 기존 Navigator와 PopScope가 먼저 뒤로가기를 처리합니다.
+     */
+    final handledByRouter =
+    await super.invokeCallback(
+      defaultValue,
+    );
+
+    if (handledByRouter) {
+      _lastBackPressedAt = null;
+      return true;
+    }
+
+    final location = _normalizeLocation(
+      _router
+          .routeInformationProvider
+          .value
+          .uri
+          .path,
+    );
+
+    /*
+     * 하단 탭 루트가 아닌 화면에서 기존 라우터가
+     * 처리하지 못했다면 Android 기본 동작을 허용합니다.
+     */
+    if (!_rootTabLocations.contains(
+      location,
+    )) {
+      _lastBackPressedAt = null;
+      return false;
+    }
+
+    /*
+     * 홈이 아닌 하단 탭에서는 앱을 종료하지 않고
+     * 홈으로 이동합니다.
+     */
+    if (location != CustomerRoutes.home) {
+      _lastBackPressedAt = null;
+
+      _router.go(
+        CustomerRoutes.home,
+      );
+
+      return true;
+    }
+
+    final now = DateTime.now();
+
+    final previousPressedAt =
+        _lastBackPressedAt;
+
+    final shouldExit =
+        previousPressedAt != null &&
+            now.difference(previousPressedAt) <=
+                _exitConfirmDuration;
+
+    /*
+     * 홈에서 2초 이내에 두 번째로 누른 경우에만 종료합니다.
+     */
+    if (shouldExit) {
+      _lastBackPressedAt = null;
+
+      await SystemNavigator.pop();
+
+      return true;
+    }
+
+    /*
+     * 홈에서 첫 번째로 누른 경우입니다.
+     */
+    _lastBackPressedAt = now;
+
+    final messenger =
+        _scaffoldMessengerKey.currentState;
+
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            '한 번 더 누르면 앱이 종료됩니다.',
+          ),
+          duration:
+          _exitConfirmDuration,
+        ),
+      );
+
+    return true;
+  }
+
+  String _normalizeLocation(
+      String location,
+      ) {
+    if (location.length > 1 &&
+        location.endsWith('/')) {
+      return location.substring(
+        0,
+        location.length - 1,
+      );
+    }
+
+    return location;
   }
 }

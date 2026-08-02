@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -29,165 +31,244 @@ class CustomerRootScreen extends StatefulWidget {
 
 class _CustomerRootScreenState
     extends State<CustomerRootScreen> {
-  // 실제 경로 순서
+  // 실제 라우트 순서
+  //
   // 0 홈
   // 1 탐색
-  // 2 주문
+  // 2 찜
   // 3 마이
   // 4 QR
-  static const _locations = [
+  static const List<String> _locations = [
     CustomerRoutes.home,
     CustomerRoutes.discover,
-    CustomerRoutes.orders,
+    CustomerRoutes.favorites,
     CustomerRoutes.profile,
     CustomerRoutes.qrScanner,
   ];
 
-  static const _titles = [
+  static const List<String> _titles = [
     'POPQ',
     '스토어 찾기',
-    '주문 내역',
+    '찜한 매장',
     '마이 POPQ',
     'QR 스캔',
   ];
 
-  // 하단 UI 순서
-  // 홈(경로 0)
-  // 탐색(경로 1)
-  // QR(경로 4)
-  // 주문(경로 2)
-  // 마이(경로 3)
-  static const _uiToRouteIndex = [0, 1, 4, 2, 3];
+  // 하단 내비게이션 UI 순서
+  //
+  // 홈   -> 실제 라우트 0
+  // 탐색 -> 실제 라우트 1
+  // QR   -> 실제 라우트 4
+  // 찜   -> 실제 라우트 2
+  // 마이 -> 실제 라우트 3
+  static const List<int> _uiToRouteIndex = [
+    0,
+    1,
+    4,
+    2,
+    3,
+  ];
+
+  static const Duration _exitConfirmDuration =
+  Duration(seconds: 2);
 
   DateTime? _lastBackPressedAt;
 
   @override
+  void initState() {
+    super.initState();
+
+    unawaited(
+      SystemNavigator.setFrameworkHandlesBack(true),
+    );
+  }
+
+  @override
+  void didUpdateWidget(
+      CustomerRootScreen oldWidget,
+      ) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.location != widget.location) {
+      _lastBackPressedAt = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(
+      SystemNavigator.setFrameworkHandlesBack(false),
+    );
+
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final routeIndex =
-    _routeIndexForLocation(widget.location);
+    final routeIndex = _routeIndexForLocation(
+      widget.location,
+    );
 
-    // 실제 경로 인덱스를 하단 UI 인덱스로 변환
-    final selectedIndex =
-    _uiToRouteIndex.indexOf(routeIndex);
+    final selectedIndex = _uiToRouteIndex.indexOf(
+      routeIndex,
+    );
 
-    return PopScope<void>(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) {
-          return;
-        }
-
-        _handleSystemBack();
-      },
-      child: PopqAppScaffold(
-        title: _titles[routeIndex],
-        actions: [
-          NotificationAction(
-            repository:
-            widget.notificationRepository,
-            sessionController:
-            widget.sessionController,
-          ),
-        ],
-        selectedIndex: selectedIndex,
-        onDestinationSelected: (uiIndex) {
-          final nextRouteIndex =
-          _uiToRouteIndex[uiIndex];
-
-          final nextLocation =
-          _locations[nextRouteIndex];
-
-          if (nextLocation == widget.location) {
+    return BackButtonListener(
+      onBackButtonPressed: _handleRootBackButtonPressed,
+      child: PopScope<Object?>(
+        canPop: false,
+        onPopInvokedWithResult: (
+            didPop,
+            result,
+            ) {
+          if (didPop) {
             return;
           }
 
-          context.go(nextLocation);
+          _handleSystemBack();
         },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon:
-            Icon(Icons.home_rounded),
-            label: '홈',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.search_rounded),
-            selectedIcon:
-            Icon(Icons.manage_search_rounded),
-            label: '탐색',
-          ),
-          NavigationDestination(
-            icon: Icon(
-              Icons.qr_code_scanner_rounded,
+        child: PopqAppScaffold(
+          title: _titles[routeIndex],
+          actions: [
+            NotificationAction(
+              repository:
+              widget.notificationRepository,
+              sessionController:
+              widget.sessionController,
             ),
-            selectedIcon: Icon(
-              Icons.qr_code_scanner_rounded,
+          ],
+          selectedIndex: selectedIndex,
+          onDestinationSelected: (uiIndex) {
+            final nextRouteIndex =
+            _uiToRouteIndex[uiIndex];
+
+            final nextLocation =
+            _locations[nextRouteIndex];
+
+            if (nextLocation == widget.location) {
+              return;
+            }
+
+            _lastBackPressedAt = null;
+
+            context.go(nextLocation);
+          },
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(
+                Icons.home_outlined,
+              ),
+              selectedIcon: Icon(
+                Icons.home_rounded,
+              ),
+              label: '홈',
             ),
-            label: 'QR',
-          ),
-          NavigationDestination(
-            icon: Icon(
-              Icons.receipt_long_outlined,
+            NavigationDestination(
+              icon: Icon(
+                Icons.search_rounded,
+              ),
+              selectedIcon: Icon(
+                Icons.manage_search_rounded,
+              ),
+              label: '탐색',
             ),
-            selectedIcon: Icon(
-              Icons.receipt_long_rounded,
+            NavigationDestination(
+              icon: Icon(
+                Icons.qr_code_scanner_rounded,
+              ),
+              selectedIcon: Icon(
+                Icons.qr_code_scanner_rounded,
+              ),
+              label: 'QR',
             ),
-            label: '주문',
-          ),
-          NavigationDestination(
-            icon: Icon(
-              Icons.person_outline_rounded,
+            NavigationDestination(
+              icon: Icon(
+                Icons.favorite_border_rounded,
+              ),
+              selectedIcon: Icon(
+                Icons.favorite_rounded,
+              ),
+              label: '찜',
             ),
-            selectedIcon:
-            Icon(Icons.person_rounded),
-            label: '마이',
-          ),
-        ],
-        body: widget.child,
+            NavigationDestination(
+              icon: Icon(
+                Icons.person_outline_rounded,
+              ),
+              selectedIcon: Icon(
+                Icons.person_rounded,
+              ),
+              label: '마이',
+            ),
+          ],
+          body: widget.child,
+        ),
       ),
     );
   }
 
+  Future<bool> _handleRootBackButtonPressed() {
+    _handleSystemBack();
+
+    return Future<bool>.value(true);
+  }
+
   void _handleSystemBack() {
-    // 홈이 아닌 하단 메뉴 화면에서는
-    // 앱을 종료하지 않고 홈으로 돌아갑니다.
+    if (!mounted) {
+      return;
+    }
+
+    // 홈이 아닌 하단 탭에서는 앱을 종료하지 않고 홈으로 이동합니다.
     if (widget.location != CustomerRoutes.home) {
       _lastBackPressedAt = null;
-      context.go(CustomerRoutes.home);
+
+      context.go(
+        CustomerRoutes.home,
+      );
+
       return;
     }
 
     final now = DateTime.now();
+    final previousPressedAt = _lastBackPressedAt;
 
     final shouldExit =
-        _lastBackPressedAt != null &&
-            now.difference(_lastBackPressedAt!) <=
-                const Duration(seconds: 2);
+        previousPressedAt != null &&
+            now.difference(previousPressedAt) <=
+                _exitConfirmDuration;
 
-    // 홈에서 2초 안에 뒤로가기를 다시 누르면 종료합니다.
+    // 홈에서 2초 안에 두 번째로 누른 경우에만 종료합니다.
     if (shouldExit) {
-      SystemNavigator.pop();
+      _lastBackPressedAt = null;
+
+      unawaited(
+        SystemNavigator.pop(),
+      );
+
       return;
     }
 
+    // 홈에서 첫 번째 뒤로가기입니다.
     _lastBackPressedAt = now;
 
-    ScaffoldMessenger.of(context)
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
           content: Text(
             '한 번 더 누르면 앱이 종료됩니다.',
           ),
-          duration: Duration(seconds: 2),
+          duration: _exitConfirmDuration,
         ),
       );
   }
 
-  int _routeIndexForLocation(String value) {
+  int _routeIndexForLocation(
+      String value,
+      ) {
     final index = _locations.indexWhere(
-          (candidate) =>
-          value.startsWith(candidate),
+          (candidate) => value.startsWith(candidate),
     );
 
     return index < 0 ? 0 : index;

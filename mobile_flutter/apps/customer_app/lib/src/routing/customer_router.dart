@@ -13,6 +13,7 @@ import '../features/catalog/product_list_screen.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
+import '../features/favorites/customer_favorite_store_screen.dart';
 import '../features/home/customer_home_screen.dart';
 import '../features/notifications/customer_notification_repository.dart';
 import '../features/notifications/notification_list_screen.dart';
@@ -38,6 +39,7 @@ abstract final class CustomerRoutes {
   static const home = '/home';
   static const discover = '/discover';
   static const qrScanner = '/qr-scanner';
+  static const favorites = '/favorites';
   static const stores = '/stores';
   static const cart = '/cart';
   static const checkout = '/checkout';
@@ -85,7 +87,8 @@ GoRouter createCustomerRouter({
           location == CustomerRoutes.signIn;
 
       final isRestoring =
-          sessionController.status == SessionStatus.restoring ||
+          sessionController.status ==
+              SessionStatus.restoring ||
               onboardingController.status ==
                   OnboardingStatus.restoring;
 
@@ -128,15 +131,16 @@ GoRouter createCustomerRouter({
               location.startsWith(
                 '${CustomerRoutes.orders}/',
               ) ||
+              location == CustomerRoutes.favorites ||
               location == CustomerRoutes.profile ||
-              location == CustomerRoutes.notifications;
+              location ==
+                  CustomerRoutes.notifications;
 
       /*
        * 장바구니에서는 로그인 여부를 직접 확인합니다.
        *
-       * 여기의 로그인 리다이렉트는 주문 목록,
-       * 알림, 마이페이지 등의 보호 화면에
-       * 직접 접근했을 때 사용됩니다.
+       * 여기에서는 주문, 찜, 마이페이지, 알림처럼
+       * 로그인 정보가 필요한 화면의 접근을 보호합니다.
        */
       if (requiresSession &&
           !sessionController.isSignedIn) {
@@ -149,11 +153,8 @@ GoRouter createCustomerRouter({
       }
 
       /*
-       * 라우터를 통해 로그인 화면에 들어온 경우,
-       * 로그인 성공 후 원래 접근하려던 화면으로 이동합니다.
-       *
-       * 장바구니 결제 로그인은 별도의 전체 화면 모달을
-       * 사용하므로 이 처리의 영향을 받지 않습니다.
+       * 로그인 성공 후 사용자가 원래 접근하려던
+       * 화면으로 다시 이동합니다.
        */
       if (isSignIn &&
           sessionController.isSignedIn) {
@@ -167,7 +168,9 @@ GoRouter createCustomerRouter({
       return PopqErrorView(
         message: '요청한 화면을 찾을 수 없습니다.',
         onRetry: () {
-          context.go(CustomerRoutes.home);
+          context.go(
+            CustomerRoutes.home,
+          );
         },
       );
     },
@@ -212,7 +215,8 @@ GoRouter createCustomerRouter({
         builder: (context, state) {
           return OnboardingScreen(
             controller: onboardingController,
-            permissionGateway: permissionGateway,
+            permissionGateway:
+            permissionGateway,
           );
         },
       ),
@@ -224,7 +228,9 @@ GoRouter createCustomerRouter({
 
           return SignInScreen(
             onBackHome: () {
-              context.go(CustomerRoutes.home);
+              context.go(
+                CustomerRoutes.home,
+              );
             },
             onDevelopmentSignIn:
             onDevelopmentSignIn,
@@ -331,7 +337,8 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.notifications,
         builder: (context, state) {
           return NotificationListScreen(
-            repository: notificationRepository,
+            repository:
+            notificationRepository,
           );
         },
       ),
@@ -376,7 +383,13 @@ GoRouter createCustomerRouter({
           GoRoute(
             path: CustomerRoutes.home,
             builder: (context, state) {
-              return const CustomerHomeScreen();
+              return CustomerHomeScreen(
+                storeDiscoveryRepository:
+                storeDiscoveryRepository,
+                orderRepository: orderRepository,
+                sessionController:
+                sessionController,
+              );
             },
           ),
           GoRoute(
@@ -392,10 +405,7 @@ GoRouter createCustomerRouter({
           ),
 
           /*
-           * 기존 QR 화면 연결 복구
-           *
-           * QR 스캐너 화면 내부 코드는 수정하지 않고
-           * 라우터 경로만 연결합니다.
+           * 기존 QR 연결은 그대로 보존합니다.
            */
           GoRoute(
             path: CustomerRoutes.qrScanner,
@@ -404,6 +414,28 @@ GoRouter createCustomerRouter({
             },
           ),
 
+          /*
+           * 새로 만든 고객 찜 화면입니다.
+           *
+           * 기존 CustomerEngagementRepository를 재사용하므로
+           * 별도의 API나 Repository를 만들지 않습니다.
+           */
+          GoRoute(
+            path: CustomerRoutes.favorites,
+            builder: (context, state) {
+              return CustomerFavoriteStoreScreen(
+                repository:
+                engagementRepository,
+              );
+            },
+          ),
+
+          /*
+           * 주문 목록 경로는 삭제하지 않습니다.
+           *
+           * 다음 단계에서 하단 주문 탭을 찜 탭으로 바꿔도
+           * 홈과 마이페이지에서 이 경로를 계속 사용할 수 있습니다.
+           */
           GoRoute(
             path: CustomerRoutes.orders,
             builder: (context, state) {
