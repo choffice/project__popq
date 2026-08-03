@@ -71,6 +71,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   late final StoreDiscoveryController _controller;
 
+  late final KakaoStoreMapController _mapController;
+
   final TextEditingController _queryController = TextEditingController();
 
   final FocusNode _searchFocusNode = FocusNode();
@@ -106,6 +108,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   @override
   void initState() {
     super.initState();
+
+    _mapController =
+        KakaoStoreMapController();
 
     _controller = StoreDiscoveryController(
       repository: widget.repository,
@@ -283,18 +288,24 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     setState(() {
-      final selectedStoreId = _selectedStore?.storeId;
+      final selectedStoreId =
+          _selectedStore?.storeId;
 
       if (selectedStoreId == null) {
         return;
       }
 
-      final selectedStoreStillExists = _filteredStores.any(
-        (store) => store.storeId == selectedStoreId,
-      );
-
-      if (!selectedStoreStillExists) {
-        _clearSelectedStoreState();
+      /*
+   * 새 검색 결과에도 선택 업체가 포함되어 있다면
+   * 최신 업체 정보로 카드 객체만 갱신합니다.
+   *
+   * 검색 결과에서 벗어났더라도 기존 카드는 유지합니다.
+   */
+      for (final store in _controller.stores) {
+        if (store.storeId == selectedStoreId) {
+          _selectedStore = store;
+          break;
+        }
       }
     });
   }
@@ -376,6 +387,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       fit: StackFit.expand,
       children: [
         KakaoStoreMap(
+          controller: _mapController,
           stores: stores,
           favoriteStoreIds: _favoriteStoreIds,
           currentLocation: _controller.location,
@@ -411,6 +423,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
               walkingRouteLoading: _walkingRouteLoading,
               walkingRouteError: _walkingRouteError,
               onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
+              onStoreLocationPressed:
+              _focusSelectedStoreOnMap,
               onFavoritePressed: _toggleFavorite,
               onDetailsPressed: _openStoreDetail,
               onClose: () {
@@ -666,12 +680,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _lastSearchWasMapMove = true;
 
     /*
-   * 지도를 다른 지역으로 옮기면 기존에 선택했던
-   * 업체 카드는 닫습니다.
-   */
-    if (_selectedStore != null || _showSuggestions) {
+ * 지도를 이동해도 선택 업체 카드는 유지합니다.
+ *
+ * 검색 추천 목록만 닫고,
+ * 사용자가 카드의 닫기 버튼을 누르거나
+ * 다른 업체를 선택하기 전까지 현재 카드를 유지합니다.
+ */
+    if (_showSuggestions) {
       setState(() {
-        _clearSelectedStoreState();
         _showSuggestions = false;
       });
     }
@@ -712,6 +728,46 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
 
     unawaited(_loadWalkingRoute(store));
+  }
+
+  Future<void> _focusSelectedStoreOnMap() async {
+    final store = _selectedStore;
+
+    final latitude = store?.latitude;
+    final longitude = store?.longitude;
+
+    if (store == null ||
+        latitude == null ||
+        longitude == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              '업체 위치 정보가 없습니다.',
+            ),
+          ),
+        );
+
+      return;
+    }
+
+    /*
+   * 이전에 예약된 지도 이동 검색이 있다면 취소합니다.
+   *
+   * 버튼으로 업체 위치에 이동한 뒤 발생하는
+   * 새 viewport 이벤트만 처리하도록 합니다.
+   */
+    _mapSearchDebounce?.cancel();
+
+    _searchFocusNode.unfocus();
+
+    await _mapController.focusStoreLocation(
+      CustomerLocation(
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    );
   }
 
   Future<void> _loadWalkingRoute(CustomerStore store) async {
@@ -798,7 +854,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
    */
     _walkingRouteRequestSerial++;
 
-    _clearSelectedStoreState();
+    _selectedStore = null;
     _walkingRoute = null;
     _walkingRouteLoading = false;
     _walkingRouteError = null;
@@ -1205,6 +1261,7 @@ class _SelectedStoreCard extends StatelessWidget {
     required this.walkingRouteLoading,
     required this.walkingRouteError,
     required this.onWalkingRouteRetry,
+    required this.onStoreLocationPressed,
     required this.onFavoritePressed,
     required this.onDetailsPressed,
     required this.onClose,
@@ -1221,6 +1278,7 @@ class _SelectedStoreCard extends StatelessWidget {
   final bool walkingRouteLoading;
   final Object? walkingRouteError;
   final VoidCallback onWalkingRouteRetry;
+  final VoidCallback onStoreLocationPressed;
   final VoidCallback onFavoritePressed;
   final VoidCallback onDetailsPressed;
   final VoidCallback onClose;
@@ -1396,6 +1454,25 @@ class _SelectedStoreCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 4),
+              IconButton(
+                tooltip: '선택 업체 위치로 이동',
+                onPressed:
+                store.latitude != null &&
+                    store.longitude != null
+                    ? onStoreLocationPressed
+                    : null,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 34,
+                ),
+                icon: const Icon(
+                  Icons.gps_fixed_rounded,
+                  size: 19,
+                  color: _greenColor,
+                ),
+              ),
               IconButton(
                 tooltip: favorite ? '관심 업체 해제' : '관심 업체 추가',
                 onPressed: favoriteUpdating ? null : onFavoritePressed,

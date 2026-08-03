@@ -17,6 +17,24 @@ class KakaoMapViewport {
   final double radiusKm;
 }
 
+class KakaoStoreMapController {
+  Future<void> Function(
+      CustomerLocation location,
+      )? _focusStoreLocation;
+
+  Future<void> focusStoreLocation(
+      CustomerLocation location,
+      ) async {
+    final callback = _focusStoreLocation;
+
+    if (callback == null) {
+      return;
+    }
+
+    await callback(location);
+  }
+}
+
 class KakaoStoreMap extends StatefulWidget {
   const KakaoStoreMap({
     required this.stores,
@@ -24,6 +42,7 @@ class KakaoStoreMap extends StatefulWidget {
     required this.currentLocation,
     required this.selectedStoreId,
     required this.onStoreSelected,
+    this.controller,
     this.searchCenter,
     this.onViewportIdle,
     super.key,
@@ -33,6 +52,8 @@ class KakaoStoreMap extends StatefulWidget {
    * 현재 검색 결과에 포함된 POPQ 매장입니다.
    */
   final List<CustomerStore> stores;
+
+  final KakaoStoreMapController? controller;
 
   /*
  * 현재 사용자가 찜한 업체 ID입니다.
@@ -92,11 +113,16 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
   bool _pendingSync = false;
   bool _pendingMoveToSearchCenter = false;
 
+  CustomerLocation? _pendingFocusLocation;
+
   String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
+
+    widget.controller?._focusStoreLocation =
+        _focusStoreLocation;
 
     _webViewController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -111,7 +137,7 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
       )
       ..addJavaScriptChannel(
         'MapReady',
-        onMessageReceived: (_) {
+        onMessageReceived: (_) async {
           if (!mounted) {
             return;
           }
@@ -129,6 +155,17 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
             _pendingMoveToSearchCenter = false;
 
             _syncMapData(moveToSearchCenter: moveToSearchCenter);
+          }
+
+          final pendingFocusLocation =
+              _pendingFocusLocation;
+
+          _pendingFocusLocation = null;
+
+          if (pendingFocusLocation != null) {
+            await _focusStoreLocation(
+              pendingFocusLocation,
+            );
           }
         },
       )
@@ -181,8 +218,27 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
   }
 
   @override
+  void dispose() {
+    widget.controller?._focusStoreLocation =
+    null;
+
+    super.dispose();
+  }
+
+  @override
   void didUpdateWidget(covariant KakaoStoreMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (!identical(
+      oldWidget.controller,
+      widget.controller,
+    )) {
+      oldWidget.controller?._focusStoreLocation =
+      null;
+
+      widget.controller?._focusStoreLocation =
+          _focusStoreLocation;
+    }
 
     final storesChanged =
         _storeSignature(oldWidget.stores) != _storeSignature(widget.stores);
@@ -313,6 +369,28 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
       _buildMapHtml(),
       baseUrl: 'http://localhost/',
     );
+  }
+
+  Future<void> _focusStoreLocation(
+      CustomerLocation location,
+      ) async {
+    if (!_mapReady) {
+      _pendingFocusLocation = location;
+      return;
+    }
+
+    try {
+      await _webViewController.runJavaScript(
+        'window.focusStoreLocation('
+            '${location.latitude},'
+            '${location.longitude}'
+            ');',
+      );
+    } catch (caught) {
+      debugPrint(
+        '[KakaoMap] 매장 위치 이동 실패: $caught',
+      );
+    }
   }
 
   /*
@@ -727,6 +805,27 @@ if (store.favorite === true) {
           );
         }
       };
+
+window.focusStoreLocation =
+  function(latitude, longitude) {
+    if (map === null) {
+      return;
+    }
+
+    /*
+     * 매장 위치 버튼으로 이동한 경우에는
+     * 이동 완료 후 현재 지도 영역을 Flutter에 전달해
+     * 해당 매장 주변 업체도 다시 조회합니다.
+     */
+    userChangedViewport = true;
+
+    map.setCenter(
+      new kakao.maps.LatLng(
+        latitude,
+        longitude
+      )
+    );
+  };
 
     function toRadians(value) {
       return value * Math.PI / 180;
