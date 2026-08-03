@@ -54,6 +54,7 @@ public enum ErrorCode {
     REFUND_NOT_ALLOWED(HttpStatus.CONFLICT, "현재 주문 또는 결제 상태에서는 환불할 수 없습니다."),
     INVALID_REFUND_AMOUNT(HttpStatus.BAD_REQUEST, "환불 금액이 올바르지 않습니다."),
     REFUND_FAILED(HttpStatus.CONFLICT, "환불 처리에 실패했습니다."),
+    WALKING_ROUTE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "도보 경로를 불러오지 못했습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final HttpStatus status;

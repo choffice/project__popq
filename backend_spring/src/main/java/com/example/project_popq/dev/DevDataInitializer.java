@@ -52,7 +52,7 @@ public class DevDataInitializer implements CommandLineRunner {
 
   /*
    * 카카오맵과 탐색 탭 테스트 전용 판매자입니다.
-   * 지도용 매장 14개는 이 판매자에게 연결합니다.
+   * 지도용 매장 19개는 이 판매자에게 연결합니다.
    */
   private static final String MAP_SELLER_EMAIL =
       "map-seed@popq.local";
@@ -234,6 +234,58 @@ public class DevDataInitializer implements CommandLineRunner {
               "부산광역시 금정구 남산동 범어사역 인근",
               "35.2732000",
               "129.0923000"
+          ),
+
+          /*
+           * 부산진구 서면역 주변
+           *
+           * 기본 지도 중심에서 여러 종류의 매장과
+           * 마커를 한 화면에 확인하기 위한 가상 데이터입니다.
+           */
+          new StoreSeed(
+              StoreType.LOCAL_STORE,
+              "POPQ 서면 로스터리 카페",
+              "서면역 주변의 로컬 카페와 "
+                  + "음료 주문 흐름을 확인하기 위한 매장입니다.",
+              "부산광역시 부산진구 부전동 서면역 7번 출구 인근",
+              "35.1581800",
+              "129.0586200"
+          ),
+          new StoreSeed(
+              StoreType.LOCAL_STORE,
+              "POPQ 전포 디저트 베이커리",
+              "전포 카페거리의 베이커리와 디저트 메뉴를 "
+                  + "확인하기 위한 개발용 매장입니다.",
+              "부산광역시 부산진구 전포동 전포 카페거리 인근",
+              "35.1567600",
+              "129.0625500"
+          ),
+          new StoreSeed(
+              StoreType.LOCAL_STORE,
+              "POPQ 부전 생활마켓",
+              "부전동 생활권의 로컬 상품과 "
+                  + "소품 주문을 확인하기 위한 개발용 매장입니다.",
+              "부산광역시 부산진구 부전동 부전시장 인근",
+              "35.1602500",
+              "129.0580500"
+          ),
+          new StoreSeed(
+              StoreType.EVENT_COMMERCE,
+              "POPQ 서면 푸드 나이트",
+              "서면역 주변의 야간 푸드 행사와 "
+                  + "현장 주문을 표현한 개발용 이벤트 매장입니다.",
+              "부산광역시 부산진구 부전동 서면 젊음의거리 인근",
+              "35.1559000",
+              "129.0598500"
+          ),
+          new StoreSeed(
+              StoreType.EVENT_COMMERCE,
+              "POPQ 전포 크리에이터 플리마켓",
+              "전포 지역의 창작자 굿즈와 "
+                  + "기간 한정 상품을 확인하기 위한 행사 매장입니다.",
+              "부산광역시 부산진구 전포동 전포역 인근",
+              "35.1589000",
+              "129.0630000"
           )
       );
 
@@ -311,7 +363,7 @@ public class DevDataInitializer implements CommandLineRunner {
 
     /*
      * 지도 테스트 전용 판매자에게
-     * 부산 지역 매장 14개를 생성하거나 갱신합니다.
+     * 부산 지역 매장 19개를 생성하거나 갱신합니다.
      */
     SeedSummary mapSeedSummary =
         ensureMapStores(mapSeller);
@@ -386,7 +438,7 @@ public class DevDataInitializer implements CommandLineRunner {
   }
 
   /*
-   * 지도 전용 판매자의 부산 매장 14개를
+   * 지도 전용 판매자의 부산 매장 19개를
    * 이름 기준으로 생성하거나 갱신합니다.
    */
   private SeedSummary ensureMapStores(

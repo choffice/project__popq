@@ -47,16 +47,25 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   static const _greenColor = Color(0xFF17643E);
 
   static const _filters = [
-    _StoreFilter(label: '전체', icon: Icons.apps_rounded, storeType: null),
     _StoreFilter(
-      label: '로컬마켓',
-      icon: Icons.storefront_rounded,
-      storeType: 'LOCAL_STORE',
+      type: _StoreFilterType.all,
+      label: '전체',
+      icon: Icons.apps_rounded,
     ),
     _StoreFilter(
+      type: _StoreFilterType.localStore,
+      label: '로컬마켓',
+      icon: Icons.storefront_rounded,
+    ),
+    _StoreFilter(
+      type: _StoreFilterType.eventCommerce,
       label: '행사·이벤트',
       icon: Icons.celebration_rounded,
-      storeType: 'EVENT_COMMERCE',
+    ),
+    _StoreFilter(
+      type: _StoreFilterType.favorites,
+      label: '마이픽',
+      icon: Icons.favorite_rounded,
     ),
   ];
 
@@ -72,7 +81,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   CustomerStore? _selectedStore;
 
-  String? _selectedStoreType;
+  _StoreFilterType _selectedFilter = _StoreFilterType.all;
 
   bool _showSuggestions = false;
 
@@ -83,6 +92,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   Timer? _mapSearchDebounce;
 
   Object? _lastShownRefreshError;
+
+  bool _lastSearchWasMapMove = false;
 
   @override
   void initState() {
@@ -150,7 +161,45 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
-    setState(() {});
+    final interestController =
+        _interestController;
+
+    setState(() {
+      /*
+     * 로그아웃되면 마이픽 필터를 유지하지 않고
+     * 전체 필터로 되돌립니다.
+     */
+      if (_selectedFilter ==
+          _StoreFilterType.favorites &&
+          interestController != null &&
+          !interestController.isSignedIn) {
+        _selectedFilter =
+            _StoreFilterType.all;
+
+        _selectedStore = null;
+        return;
+      }
+
+      /*
+     * 마이픽 화면에서 선택한 업체의 하트를 해제하면
+     * 해당 업체는 필터 결과에서 빠지므로
+     * 하단 선택 카드도 함께 닫습니다.
+     */
+      if (_selectedFilter !=
+          _StoreFilterType.favorites) {
+        return;
+      }
+
+      final selectedStoreId =
+          _selectedStore?.storeId;
+
+      if (selectedStoreId != null &&
+          !_favoriteStoreIds.contains(
+            selectedStoreId,
+          )) {
+        _selectedStore = null;
+      }
+    });
   }
 
   @override
@@ -170,6 +219,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   Future<void> _initializeDiscovery() async {
+    _lastSearchWasMapMove = false;
     /*
    * 부산 기본 위치를 기준으로 업체 API를 호출합니다.
    *
@@ -263,13 +313,62 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   List<CustomerStore> get _filteredStores {
-    if (_selectedStoreType == null) {
-      return _controller.stores;
+    final stores = _controller.stores;
+
+    return switch (_selectedFilter) {
+      _StoreFilterType.all =>
+      stores,
+
+      _StoreFilterType.localStore =>
+          stores
+              .where(
+                (store) =>
+            store.storeType ==
+                'LOCAL_STORE',
+          )
+              .toList(),
+
+      _StoreFilterType.eventCommerce =>
+          stores
+              .where(
+                (store) =>
+            store.storeType ==
+                'EVENT_COMMERCE',
+          )
+              .toList(),
+
+    /*
+     * 서버에서 받은 현재 지도 영역의 업체 중
+     * 사용자가 찜한 업체만 표시합니다.
+     */
+      _StoreFilterType.favorites =>
+          stores
+              .where(
+                (store) =>
+                _favoriteStoreIds.contains(
+                  store.storeId,
+                ),
+          )
+              .toList(),
+    };
+  }
+
+  /*
+ * 카카오맵 마커에 표시할 현재 찜 업체 ID입니다.
+ *
+ * 실제 API Controller가 있으면 서버 상태를 사용하고,
+ * 없으면 임시 로컬 즐겨찾기 상태를 사용합니다.
+ */
+  Set<int> get _favoriteStoreIds {
+    final controller = _interestController;
+
+    if (controller != null) {
+      return controller.interestedStoreIds;
     }
 
-    return _controller.stores
-        .where((store) => store.storeType == _selectedStoreType)
-        .toList();
+    return Set<int>.unmodifiable(
+      _localFavoriteStoreIds,
+    );
   }
 
   List<CustomerStore> get _searchSuggestions {
@@ -311,9 +410,11 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       children: [
         KakaoStoreMap(
           stores: stores,
+          favoriteStoreIds: _favoriteStoreIds,
           currentLocation: _controller.location,
           searchCenter: _controller.searchCenter,
-          selectedStoreId: _selectedStore?.storeId,
+          selectedStoreId:
+          _selectedStore?.storeId,
           onStoreSelected: _selectStore,
           onViewportIdle: _onMapViewportIdle,
         ),
@@ -409,7 +510,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         else
           _StoreFilterBar(
             filters: _filters,
-            selectedStoreType: _selectedStoreType,
+            selectedFilter: _selectedFilter,
             onSelected: _selectFilter,
           ),
 
@@ -453,6 +554,23 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return const SizedBox.shrink();
     }
 
+    /*
+   * 사용자가 지도를 이동해서 조회한 결과가 비어 있을 때는
+   * 중앙의 결과 없음 카드를 표시하지 않습니다.
+   */
+    if (_lastSearchWasMapMove) {
+      final viewportHasNoResult =
+          _controller.status ==
+              DiscoveryStatus.empty ||
+              (_controller.status ==
+                  DiscoveryStatus.data &&
+                  filteredStores.isEmpty);
+
+      if (viewportHasNoResult) {
+        return const SizedBox.shrink();
+      }
+    }
+
     return switch (_controller.status) {
       DiscoveryStatus.loading => const Center(
         child: _MapStatusCard(
@@ -461,11 +579,12 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           loading: true,
         ),
       ),
+
       DiscoveryStatus.failure => Center(
         child: _MapStatusCard(
           icon: Icons.cloud_off_rounded,
           message:
-              '인터넷 또는 서버에 연결할 수 없습니다.\n'
+          '인터넷 또는 서버에 연결할 수 없습니다.\n'
               '연결 상태를 확인한 뒤 다시 시도해 주세요.',
           buttonLabel: '다시 시도',
           onPressed: () {
@@ -473,36 +592,78 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           },
         ),
       ),
+
       DiscoveryStatus.empty => const Center(
         child: _MapStatusCard(
           icon: Icons.storefront_outlined,
           message: '검색 조건에 맞는 업체가 없습니다.',
         ),
       ),
-      DiscoveryStatus.data when filteredStores.isEmpty => const Center(
-        child: _MapStatusCard(
-          icon: Icons.filter_alt_off_rounded,
-          message: '선택한 분류의 업체가 없습니다.',
-        ),
-      ),
-      DiscoveryStatus.data => const SizedBox.shrink(),
+
+      DiscoveryStatus.data
+      when filteredStores.isEmpty =>
+          Center(
+            child: _MapStatusCard(
+              icon: _selectedFilter ==
+                  _StoreFilterType.favorites
+                  ? Icons.favorite_border_rounded
+                  : Icons.filter_alt_off_rounded,
+              message: _selectedFilter ==
+                  _StoreFilterType.favorites
+                  ? '이 지도 영역에 찜한 업체가 없습니다.'
+                  : '선택한 분류의 업체가 없습니다.',
+            ),
+          ),
+
+      DiscoveryStatus.data =>
+      const SizedBox.shrink(),
     };
   }
 
-  void _selectFilter(String? storeType) {
+  void _selectFilter(
+      _StoreFilterType filter,
+      ) {
+    _searchFocusNode.unfocus();
+
+    /*
+   * 실제 즐겨찾기 Controller가 있는데 로그인하지 않은 경우,
+   * 마이픽을 빈 화면으로 보여주지 않고 로그인 화면으로 이동합니다.
+   *
+   * Controller가 없는 메모리 테스트 환경에서는
+   * 로컬 즐겨찾기 Set을 그대로 사용합니다.
+   */
+    final interestController =
+        _interestController;
+
+    if (filter ==
+        _StoreFilterType.favorites &&
+        interestController != null &&
+        !interestController.isSignedIn) {
+      context.push(
+        Uri(
+          path: CustomerRoutes.signIn,
+          queryParameters: const {
+            'from': CustomerRoutes.discover,
+          },
+        ).toString(),
+      );
+
+      return;
+    }
+
     setState(() {
-      _selectedStoreType = storeType;
+      _lastSearchWasMapMove = false;
+      _selectedFilter = filter;
       _selectedStore = null;
       _showSuggestions = false;
     });
-
-    _searchFocusNode.unfocus();
   }
 
   Future<void> _submitSearch(String value) async {
     _searchFocusNode.unfocus();
 
     setState(() {
+      _lastSearchWasMapMove = false;
       _showSuggestions = false;
       _selectedStore = null;
     });
@@ -516,9 +677,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final stores = _filteredStores;
 
     if (stores.length == 1) {
-      setState(() {
-        _selectedStore = stores.first;
-      });
+      _selectStore(stores.first);
     }
   }
 
@@ -527,6 +686,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _searchFocusNode.unfocus();
 
     setState(() {
+      _lastSearchWasMapMove = false;
       _showSuggestions = false;
       _selectedStore = null;
     });
@@ -537,14 +697,11 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _selectSearchSuggestion(CustomerStore store) {
     _queryController
       ..text = store.name
-      ..selection = TextSelection.collapsed(offset: store.name.length);
+      ..selection = TextSelection.collapsed(
+        offset: store.name.length,
+      );
 
-    _searchFocusNode.unfocus();
-
-    setState(() {
-      _showSuggestions = false;
-      _selectedStore = store;
-    });
+    _selectStore(store);
   }
 
   void _onMapViewportIdle(
@@ -557,6 +714,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
    * 중간 위치마다 API를 호출하지 않기 위한 처리입니다.
    */
     _mapSearchDebounce?.cancel();
+
+    _lastSearchWasMapMove = true;
 
     /*
    * 지도를 다른 지역으로 옮기면 기존에 선택했던
@@ -708,6 +867,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     _mapSearchDebounce?.cancel();
 
+    _lastSearchWasMapMove = false;
+
     setState(() {
       _requestingInitialLocation = true;
     });
@@ -746,6 +907,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   Future<void> _useCurrentLocation() async {
     _mapSearchDebounce?.cancel();
+    _lastSearchWasMapMove = false;
 
     final decision =
     await _controller.useCurrentLocation(
@@ -798,81 +960,119 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 }
 
-class _StoreFilter {
-  const _StoreFilter({
-    required this.label,
-    required this.icon,
-    required this.storeType,
-  });
-
-  final String label;
-  final IconData icon;
-  final String? storeType;
+enum _StoreFilterType {
+  all,
+  localStore,
+  eventCommerce,
+  favorites,
 }
 
-class _StoreFilterBar extends StatelessWidget {
+class _StoreFilter {
+  const _StoreFilter({
+    required this.type,
+    required this.label,
+    required this.icon,
+  });
+
+  final _StoreFilterType type;
+  final String label;
+  final IconData icon;
+}
+
+class _StoreFilterBar
+    extends StatelessWidget {
   const _StoreFilterBar({
     required this.filters,
-    required this.selectedStoreType,
+    required this.selectedFilter,
     required this.onSelected,
   });
 
-  static const _accentColor = Color(0xFFB7FF00);
-  static const _darkColor = Color(0xFF08110E);
+  static const _accentColor =
+  Color(0xFFB7FF00);
+
+  static const _darkColor =
+  Color(0xFF08110E);
 
   final List<_StoreFilter> filters;
-  final String? selectedStoreType;
-  final ValueChanged<String?> onSelected;
+
+  final _StoreFilterType selectedFilter;
+
+  final ValueChanged<_StoreFilterType>
+  onSelected;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Theme.of(context).colorScheme.surface.withOpacity(0.96),
-      borderRadius: BorderRadius.circular(16),
+      color: Theme.of(context)
+          .colorScheme
+          .surface
+          .withOpacity(0.96),
+      borderRadius:
+      BorderRadius.circular(16),
       elevation: 2,
       child: Padding(
         padding: const EdgeInsets.all(4),
         child: Row(
           children: filters.map((filter) {
-            final selected = filter.storeType == selectedStoreType;
+            final selected =
+                filter.type ==
+                    selectedFilter;
 
             return Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
+                padding:
+                const EdgeInsets.symmetric(
+                  horizontal: 2,
+                ),
                 child: InkWell(
                   onTap: () {
-                    onSelected(filter.storeType);
+                    onSelected(filter.type);
                   },
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                  BorderRadius.circular(12),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 6,
+                    duration: const Duration(
+                      milliseconds: 180,
+                    ),
+                    padding:
+                    const EdgeInsets.symmetric(
+                      horizontal: 3,
+                      vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: selected ? _accentColor : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
+                      color: selected
+                          ? _accentColor
+                          : Colors.transparent,
+                      borderRadius:
+                      BorderRadius.circular(
+                        12,
+                      ),
                     ),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
                       children: [
                         Icon(
                           filter.icon,
-                          size: 17,
+                          size: 15,
                           color: selected
                               ? _darkColor
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                              : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         Flexible(
                           child: Text(
                             filter.label,
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                            overflow:
+                            TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: selected ? _darkColor : null,
-                              fontSize: 11,
+                              color: selected
+                                  ? _darkColor
+                                  : null,
+                              fontSize: 10,
                               fontWeight: selected
                                   ? FontWeight.w800
                                   : FontWeight.w600,

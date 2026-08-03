@@ -45,6 +45,69 @@ class CustomerStore {
   final int? distanceMeters;
 }
 
+class StoreWalkingRoute {
+  const StoreWalkingRoute({
+    required this.distanceMeters,
+    required this.durationSeconds,
+    this.landingUrl,
+  });
+
+  final int distanceMeters;
+  final int durationSeconds;
+  final String? landingUrl;
+
+  int get durationMinutes {
+    if (durationSeconds <= 0) {
+      return 0;
+    }
+
+    return (durationSeconds / 60).ceil();
+  }
+
+  factory StoreWalkingRoute.fromJson(
+      Map<String, dynamic> json,
+      ) {
+    return StoreWalkingRoute(
+      distanceMeters: _readInt(
+        json['distanceMeters'],
+      ),
+      durationSeconds: _readInt(
+        json['durationSeconds'],
+      ),
+      landingUrl: _readNullableString(
+        json['landingUrl'],
+      ),
+    );
+  }
+
+  static int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(
+      value?.toString() ?? '',
+    ) ??
+        0;
+  }
+
+  static String? _readNullableString(
+      dynamic value,
+      ) {
+    final text = value?.toString().trim();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return text;
+  }
+}
+
 abstract interface class StoreDiscoveryRepository {
   Future<List<CustomerStore>> search({
     String? query,
@@ -54,6 +117,11 @@ abstract interface class StoreDiscoveryRepository {
   });
 
   Future<CustomerStore> findDetail(int storeId);
+
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  });
 }
 
 class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {

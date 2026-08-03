@@ -5,13 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules/backend_spring.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/.metadata" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/.metadata" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/.run/Flutter Android Emulator - Customer.run.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/.run/Flutter Android Emulator - Seller.run.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/PublicStoreController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/PublicStoreController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/resources/application.yml" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/resources/application.yml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/env.intellij" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features.zip" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/kakao_store_map.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/kakao_store_map.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,6 +68,7 @@
     <option name="RECENT_TEMPLATES">
       <list>
         <option value="Dart File" />
+        <option value="Class" />
       </list>
     </option>
   </component>
@@ -119,7 +125,7 @@
     "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "ochang__main",
+    "git-widget-placeholder": "ochang",
     "ignore.virus.scanning.warn.message": "true",
     "io.flutter.reload.alreadyRun": "true",
     "kotlin-language-version-configured": "true",
@@ -145,7 +151,7 @@
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
     </key>
   </component>
-  <component name="RunManager" selected="Flutter.main.dart">
+  <component name="RunManager" selected="Spring Boot.ProjectPopqApplication">
     <configuration name="ProjectPopqApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <envs>
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
@@ -230,8 +236,21 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
+    <configuration default="true" type="JetRunConfigurationType">
+      <module name="com.example.backend_spring" />
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
+      <module name="com.example.backend_spring" />
+      <option name="filePath" />
+      <method v="2" />
+    </configuration>
     <configuration name="ProjectPopqApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <envs>
+        <env name="POPQ_KAKAO_REST_API_KEY" value="9a02351c3b6c63a80a59a4bb2ef71c6a" />
+        <env name="POPQ_SEED_ENABLED" value="true" />
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
       </envs>
       <option name="envFilePaths">

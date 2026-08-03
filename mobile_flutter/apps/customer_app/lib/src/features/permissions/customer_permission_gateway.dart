@@ -144,8 +144,8 @@ class MemoryCustomerPermissionGateway
     this.notificationDecision =
         PermissionDecision.granted,
     this.location = const CustomerLocation(
-      latitude: 35.1796,
-      longitude: 129.0756,
+      latitude: 35.157778,
+      longitude: 129.059167,
     ),
   });
 

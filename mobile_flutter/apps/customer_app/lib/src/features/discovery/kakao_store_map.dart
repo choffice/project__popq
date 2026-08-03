@@ -20,6 +20,7 @@ class KakaoMapViewport {
 class KakaoStoreMap extends StatefulWidget {
   const KakaoStoreMap({
     required this.stores,
+    required this.favoriteStoreIds,
     required this.currentLocation,
     required this.selectedStoreId,
     required this.onStoreSelected,
@@ -32,6 +33,14 @@ class KakaoStoreMap extends StatefulWidget {
    * 현재 검색 결과에 포함된 POPQ 매장입니다.
    */
   final List<CustomerStore> stores;
+
+  /*
+ * 현재 사용자가 찜한 업체 ID입니다.
+ *
+ * 이 값이 변경되면 HTML 전체를 다시 로드하지 않고
+ * 지도 마커만 갱신합니다.
+ */
+  final Set<int> favoriteStoreIds;
 
   /*
    * 실제 GPS 위치입니다.
@@ -69,11 +78,11 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
   static const _kakaoMapKey = String.fromEnvironment('KAKAO_MAP_JS_KEY');
 
   /*
-   * 지도와 검색 결과가 모두 없을 때 사용할
-   * 부산 기본 중심 좌표입니다.
-   */
-  static const double _busanLatitude = 35.1796;
-  static const double _busanLongitude = 129.0756;
+ * 검색 중심, 현재 위치, 업체 좌표가 모두 없을 때 사용하는
+ * 최종 지도 중심입니다.
+ */
+  static const double _busanLatitude = 35.157778;
+  static const double _busanLongitude = 129.059167;
 
   late final WebViewController _webViewController;
 
@@ -148,15 +157,14 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
           onWebResourceError: (error) {
             debugPrint(
               '[KakaoWebResourceError] '
-                  'main=${error.isForMainFrame} '
-                  'code=${error.errorCode} '
-                  'type=${error.errorType} '
-                  'url=${error.url} '
-                  'description=${error.description}',
+              'main=${error.isForMainFrame} '
+              'code=${error.errorCode} '
+              'type=${error.errorType} '
+              'url=${error.url} '
+              'description=${error.description}',
             );
 
-            if (!mounted ||
-                error.isForMainFrame != true) {
+            if (!mounted || error.isForMainFrame != true) {
               return;
             }
 
@@ -179,6 +187,10 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
     final storesChanged =
         _storeSignature(oldWidget.stores) != _storeSignature(widget.stores);
 
+    final favoritesChanged =
+        _favoriteSignature(oldWidget.favoriteStoreIds) !=
+        _favoriteSignature(widget.favoriteStoreIds);
+
     final currentLocationChanged = _locationChanged(
       oldWidget.currentLocation,
       widget.currentLocation,
@@ -193,6 +205,7 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
         oldWidget.selectedStoreId != widget.selectedStoreId;
 
     if (!storesChanged &&
+        !favoritesChanged &&
         !currentLocationChanged &&
         !searchCenterChanged &&
         !selectionChanged) {
@@ -350,6 +363,7 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
             'storeType': store.storeType,
             'latitude': store.latitude,
             'longitude': store.longitude,
+            'favorite': widget.favoriteStoreIds.contains(store.storeId),
           },
         )
         .toList();
@@ -427,26 +441,61 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
     }
 
     .store-label {
-      max-width: 160px;
-      padding: 8px 12px;
-      border: 0;
-      border-radius: 999px;
-      background: #08110e;
-      color: white;
-      font-size: 12px;
-      font-weight: 800;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      box-shadow:
-        0 3px 9px rgba(0, 0, 0, 0.28);
-    }
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #08110e;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow:
+    0 3px 9px rgba(0, 0, 0, 0.28);
+}
 
-    .store-label.selected {
-      background: #b7ff00;
-      color: #08110e;
-      transform: scale(1.06);
-    }
+.store-label.selected {
+  background: #b7ff00;
+  color: #08110e;
+  transform: scale(1.06);
+}
+
+.store-type-icon {
+  flex: 0 0 auto;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.store-name {
+  min-width: 0;
+  max-width: 128px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.favorite-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid white;
+  border-radius: 50%;
+  background: white;
+  color: #ff4057;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
 
     .current-location {
       width: 18px;
@@ -550,7 +599,48 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
             ? 'store-label selected'
             : 'store-label';
 
-        button.textContent = store.name;
+        const typeIcon =
+  document.createElement('span');
+
+typeIcon.className =
+  'store-type-icon';
+
+typeIcon.textContent =
+  store.storeType === 'EVENT_COMMERCE'
+    ? '🎇'
+    : '🏪';
+
+const storeName =
+  document.createElement('span');
+
+storeName.className =
+  'store-name';
+
+storeName.textContent =
+  store.name;
+
+button.appendChild(
+  typeIcon
+);
+
+button.appendChild(
+  storeName
+);
+
+if (store.favorite === true) {
+  const favoriteBadge =
+    document.createElement('span');
+
+  favoriteBadge.className =
+    'favorite-badge';
+
+  favoriteBadge.textContent =
+    '♥';
+
+  button.appendChild(
+    favoriteBadge
+  );
+}
 
         button.addEventListener(
           'click',
@@ -1034,6 +1124,12 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
           )
           .toList(),
     );
+  }
+
+  String _favoriteSignature(Set<int> favoriteStoreIds) {
+    final sortedIds = favoriteStoreIds.toList()..sort();
+
+    return sortedIds.join(',');
   }
 
   @override
