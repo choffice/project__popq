@@ -7,6 +7,7 @@ class SignInScreen extends StatefulWidget {
     required this.onBackHome,
     this.onGoogleSignIn,
     this.onDevelopmentSignIn,
+    this.onKakaoSignIn,
     this.returnResultOnSuccess = false,
     this.returnLocation,
     super.key,
@@ -14,6 +15,7 @@ class SignInScreen extends StatefulWidget {
 
   final VoidCallback onBackHome;
   final Future<void> Function()? onGoogleSignIn;
+  final Future<void> Function()? onKakaoSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   /*
@@ -72,17 +74,29 @@ class _SignInScreenState extends State<SignInScreen> {
             const SizedBox(height: PopqSpacing.xl),
             _ProviderButton(
               label: 'Google로 계속하기',
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF1F1F1F),
+              borderColor: const Color(0xFFDADCE0),
               onPressed: widget.onGoogleSignIn == null || _busy
                   ? null
                   : _handleGoogleSignIn,
             ),
             const SizedBox(height: PopqSpacing.sm),
-            const _ProviderButton(
+            _ProviderButton(
               label: 'Kakao로 계속하기',
+              backgroundColor: const Color(0xFFFEE500),
+              foregroundColor: const Color(0xFF191919),
+              borderColor: const Color(0xFFFEE500),
+              onPressed: widget.onKakaoSignIn == null || _busy
+                  ? null
+                  : _handleKakaoSignIn,
             ),
             const SizedBox(height: PopqSpacing.sm),
             const _ProviderButton(
               label: 'Naver로 계속하기',
+              backgroundColor: Color(0xFF03C75A),
+              foregroundColor: Colors.white,
+              borderColor: Color(0xFF03C75A),
             ),
             if (widget.onDevelopmentSignIn != null) ...[
               const SizedBox(height: PopqSpacing.lg),
@@ -91,11 +105,7 @@ class _SignInScreenState extends State<SignInScreen> {
               FilledButton.icon(
                 onPressed: _busy ? null : _developmentSignIn,
                 icon: const Icon(Icons.science_outlined),
-                label: Text(
-                  _busy
-                      ? '개발 로그인 중...'
-                      : '개발용 고객으로 로그인',
-                ),
+                label: Text(_busy ? '개발 로그인 중...' : '개발용 고객으로 로그인'),
               ),
               const SizedBox(height: PopqSpacing.sm),
               const Text(
@@ -108,9 +118,7 @@ class _SignInScreenState extends State<SignInScreen> {
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: PopqPalette.coral,
-                ),
+                style: const TextStyle(color: PopqPalette.coral),
               ),
             ],
             const SizedBox(height: PopqSpacing.lg),
@@ -176,9 +184,7 @@ class _SignInScreenState extends State<SignInScreen> {
        * 마이페이지 등의 보호 경로에서 라우터를 통해
        * 로그인 화면으로 들어온 경우에는 기존 방식으로 이동합니다.
        */
-      context.go(
-        _safeReturnLocation(widget.returnLocation),
-      );
+      context.go(_safeReturnLocation(widget.returnLocation));
     } catch (error, stackTrace) {
       debugPrint('개발 로그인 오류: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -211,9 +217,34 @@ class _SignInScreenState extends State<SignInScreen> {
     }
   }
 
+  Future<void> _handleKakaoSignIn() async {
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onKakaoSignIn!();
+    } catch (e) {
+      debugPrint('카카오 로그인 오류: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _busy = false;
+        _errorMessage = '카카오 로그인에 실패했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
   String _safeReturnLocation(String? locationValue) {
-    if (locationValue == null ||
-        locationValue.trim().isEmpty) {
+    if (locationValue == null || locationValue.trim().isEmpty) {
       return '/home';
     }
 
@@ -234,16 +265,32 @@ class _SignInScreenState extends State<SignInScreen> {
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({required this.label, this.onPressed});
+  const _ProviderButton({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.borderColor,
+    this.onPressed,
+  });
 
   final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final Color borderColor;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(52),
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        disabledBackgroundColor: backgroundColor.withValues(alpha: 0.55),
+        disabledForegroundColor: foregroundColor.withValues(alpha: 0.55),
+        side: BorderSide(color: borderColor),
+      ),
       child: Text(label),
     );
   }
