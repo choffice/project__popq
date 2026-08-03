@@ -110,6 +110,7 @@ void main() {
       find.byKey(const Key('sign-up-password-confirm')),
       'password1',
     );
+    await tester.tap(find.byKey(const Key('sign-up-agree')));
     await tester.tap(find.byKey(const Key('sign-up-submit')));
     await tester.pumpAndSettle();
 
