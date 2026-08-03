@@ -5,10 +5,12 @@ import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.product.domain.Tag;
 import com.example.project_popq.product.domain.TagType;
 import com.example.project_popq.product.repository.TagRepository;
+import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreMember;
 import com.example.project_popq.store.domain.StoreMemberStatus;
 import com.example.project_popq.store.domain.StoreRole;
+import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreTable;
 import com.example.project_popq.store.domain.StoreTag;
 import com.example.project_popq.store.domain.StoreType;
@@ -48,319 +50,383 @@ public class StoreApplicationService {
 
     @Transactional
     public StoreSummaryResponse create(
-            User currentUser,
-            CreateStoreRequest request
+        User currentUser,
+        CreateStoreRequest request
     ) {
         if (currentUser.getRole() != PlatformRole.SELLER
-                && currentUser.getRole() != PlatformRole.ADMIN) {
-            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+            && currentUser.getRole() != PlatformRole.ADMIN) {
+            throw new BusinessException(
+                ErrorCode.ACCESS_DENIED
+            );
         }
 
         validateLocation(
-                request.latitude(),
-                request.longitude()
+            request.latitude(),
+            request.longitude()
         );
 
         validateOperatingHours(
-                request.openTime(),
-                request.closeTime()
+            request.openTime(),
+            request.closeTime()
         );
 
         Store store = Store.create(
-                request.storeType(),
-                request.name().trim(),
-                normalizeOptionalText(request.description())
+            request.storeType(),
+            request.name().trim(),
+            normalizeOptionalText(
+                request.description()
+            )
         );
 
         store.updateDiscoveryProfile(
-                normalizeOptionalText(request.address()),
-                request.latitude(),
-                request.longitude()
+            normalizeOptionalText(
+                request.address()
+            ),
+            request.latitude(),
+            request.longitude()
         );
 
         store.updateBusinessProfile(
-                normalizeOptionalText(
-                        request.representativeCategory()
-                ),
-                normalizeOptionalText(
-                        request.detailAddress()
-                ),
-                normalizeOptionalText(
-                        request.imageUrl()
-                ),
-                normalizeOptionalText(
-                        request.phone()
-                )
+            normalizeOptionalText(
+                request.representativeCategory()
+            ),
+            normalizeOptionalText(
+                request.detailAddress()
+            ),
+            normalizeOptionalText(
+                request.imageUrl()
+            ),
+            normalizeOptionalText(
+                request.phone()
+            )
         );
 
         store.updateOperatingPolicy(
-                request.openTime(),
-                request.closeTime(),
-                normalizeClosedDays(
-                        request.closedDays()
-                ),
-                defaultTrue(
-                        request.takeoutAvailable()
-                ),
-                defaultTrue(
-                        request.dineInAvailable()
-                ),
-                defaultTrue(
-                        request.orderAcceptingEnabled()
-                )
+            request.openTime(),
+            request.closeTime(),
+            normalizeClosedDays(
+                request.closedDays()
+            ),
+            defaultTrue(
+                request.takeoutAvailable()
+            ),
+            defaultTrue(
+                request.dineInAvailable()
+            ),
+            defaultTrue(
+                request.orderAcceptingEnabled()
+            )
         );
 
         storeRepository.save(store);
-        saveTags(store, request.tags());
+
+        saveTags(
+            store,
+            request.tags()
+        );
 
         StoreMember owner = StoreMember.create(
-                store,
-                currentUser,
-                StoreRole.OWNER
+            store,
+            currentUser,
+            StoreRole.OWNER
         );
 
         storeMemberRepository.save(owner);
 
         return StoreSummaryResponse.of(
-                store,
-                owner.getRole()
+            store,
+            owner.getRole()
         );
     }
 
     @Transactional(readOnly = true)
     public List<StoreSummaryResponse> findMyStores(
-            User currentUser
+        User currentUser
     ) {
         return storeMemberRepository
-                .findAllByUserIdAndStatusOrderByIdAsc(
-                        currentUser.getId(),
-                        StoreMemberStatus.ACTIVE
+            .findAllByUserIdAndStatusOrderByIdAsc(
+                currentUser.getId(),
+                StoreMemberStatus.ACTIVE
+            )
+            .stream()
+            .filter(member ->
+                member.getStore().isActive()
+            )
+            .map(member ->
+                StoreSummaryResponse.of(
+                    member.getStore(),
+                    member.getRole()
                 )
-                .stream()
-                .map(member -> StoreSummaryResponse.of(
-                        member.getStore(),
-                        member.getRole()
-                ))
-                .toList();
+            )
+            .toList();
     }
 
     @Transactional(readOnly = true)
     public SellerStoreDetailResponse findOne(
-            User currentUser,
-            Long storeId
+        User currentUser,
+        Long storeId
     ) {
         StoreMember member =
-                storeAuthorizationService.requireAnyRole(
-                        currentUser.getId(),
-                        storeId,
-                        StoreRole.OWNER,
-                        StoreRole.MANAGER,
-                        StoreRole.STAFF
-                );
+            storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER,
+                StoreRole.STAFF
+            );
 
         return detail(member);
     }
 
     @Transactional
     public SellerStoreDetailResponse update(
-            User currentUser,
-            Long storeId,
-            UpdateStoreRequest request
+        User currentUser,
+        Long storeId,
+        UpdateStoreRequest request
     ) {
         StoreMember member =
-                storeAuthorizationService.requireAnyRole(
-                        currentUser.getId(),
-                        storeId,
-                        StoreRole.OWNER,
-                        StoreRole.MANAGER
-                );
+            storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER
+            );
 
         validateLocation(
-                request.latitude(),
-                request.longitude()
+            request.latitude(),
+            request.longitude()
         );
 
         Store store = member.getStore();
 
         LocalTime openTime =
-                request.openTime() == null
-                        ? store.getOpenTime()
-                        : request.openTime();
+            request.openTime() == null
+                ? store.getOpenTime()
+                : request.openTime();
 
         LocalTime closeTime =
-                request.closeTime() == null
-                        ? store.getCloseTime()
-                        : request.closeTime();
+            request.closeTime() == null
+                ? store.getCloseTime()
+                : request.closeTime();
 
         validateOperatingHours(
-                openTime,
-                closeTime
+            openTime,
+            closeTime
         );
 
         store.updateSellerProfile(
-                request.name().trim(),
-                normalizeOptionalText(
-                        request.description()
-                ),
-                normalizeOptionalText(
-                        request.address()
-                ),
-                request.latitude(),
-                request.longitude()
+            request.name().trim(),
+            normalizeOptionalText(
+                request.description()
+            ),
+            normalizeOptionalText(
+                request.address()
+            ),
+            request.latitude(),
+            request.longitude()
         );
 
         store.updateBusinessProfile(
-                resolveOptionalText(
-                        store.getRepresentativeCategory(),
-                        request.representativeCategory()
-                ),
-                resolveOptionalText(
-                        store.getDetailAddress(),
-                        request.detailAddress()
-                ),
-                resolveOptionalText(
-                        store.getImageUrl(),
-                        request.imageUrl()
-                ),
-                resolveOptionalText(
-                        store.getPhone(),
-                        request.phone()
-                )
+            resolveOptionalText(
+                store.getRepresentativeCategory(),
+                request.representativeCategory()
+            ),
+            resolveOptionalText(
+                store.getDetailAddress(),
+                request.detailAddress()
+            ),
+            resolveOptionalText(
+                store.getImageUrl(),
+                request.imageUrl()
+            ),
+            resolveOptionalText(
+                store.getPhone(),
+                request.phone()
+            )
         );
 
         store.updateOperatingPolicy(
-                openTime,
-                closeTime,
-                request.closedDays() == null
-                        ? store.getClosedDays()
-                        : normalizeClosedDays(
-                        request.closedDays()
-                ),
-                request.takeoutAvailable() == null
-                        ? store.isTakeoutAvailable()
-                        : request.takeoutAvailable(),
-                request.dineInAvailable() == null
-                        ? store.isDineInAvailable()
-                        : request.dineInAvailable(),
-                request.orderAcceptingEnabled() == null
-                        ? store.isOrderAcceptingEnabled()
-                        : request.orderAcceptingEnabled()
+            openTime,
+            closeTime,
+            request.closedDays() == null
+                ? store.getClosedDays()
+                : normalizeClosedDays(
+                request.closedDays()
+            ),
+            request.takeoutAvailable() == null
+                ? store.isTakeoutAvailable()
+                : request.takeoutAvailable(),
+            request.dineInAvailable() == null
+                ? store.isDineInAvailable()
+                : request.dineInAvailable(),
+            request.orderAcceptingEnabled() == null
+                ? store.isOrderAcceptingEnabled()
+                : request.orderAcceptingEnabled()
         );
 
-        storeTagRepository.deleteAllByStoreId(storeId);
+        storeTagRepository.deleteAllByStoreId(
+            storeId
+        );
+
         storeTagRepository.flush();
 
         saveTags(
-                store,
-                request.tags()
+            store,
+            request.tags()
         );
 
         return detail(member);
     }
 
     @Transactional
-    public StoreSummaryResponse changeBusinessStatus(
-            User currentUser,
-            Long storeId,
-            ChangeBusinessStatusRequest request
+    public void delete(
+        User currentUser,
+        Long storeId
     ) {
         StoreMember member =
-                storeAuthorizationService.requireAnyRole(
-                        currentUser.getId(),
-                        storeId,
-                        StoreRole.OWNER,
-                        StoreRole.MANAGER
-                );
+            storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER
+            );
+
+        Store store = member.getStore();
+
+        if (!store.isActive()) {
+            throw new BusinessException(
+                ErrorCode.STORE_NOT_FOUND
+            );
+        }
+
+        store.changeBusinessStatus(
+            BusinessStatus.CLOSED
+        );
+
+        store.updateOperatingPolicy(
+            store.getOpenTime(),
+            store.getCloseTime(),
+            store.getClosedDays(),
+            store.isTakeoutAvailable(),
+            store.isDineInAvailable(),
+            false
+        );
+
+        store.changeStatus(
+            StoreStatus.CLOSED
+        );
+    }
+
+    @Transactional
+    public StoreSummaryResponse changeBusinessStatus(
+        User currentUser,
+        Long storeId,
+        ChangeBusinessStatusRequest request
+    ) {
+        StoreMember member =
+            storeAuthorizationService.requireAnyRole(
+                currentUser.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER
+            );
 
         Store store = member.getStore();
 
         store.changeBusinessStatus(
-                request.businessStatus()
+            request.businessStatus()
         );
 
         return StoreSummaryResponse.of(
-                store,
-                member.getRole()
+            store,
+            member.getRole()
         );
     }
 
     @Transactional
     public StoreTableResponse createTable(
-            User currentUser,
-            Long storeId,
-            CreateStoreTableRequest request
+        User currentUser,
+        Long storeId,
+        CreateStoreTableRequest request
     ) {
         storeAuthorizationService.requireAnyRole(
-                currentUser.getId(),
-                storeId,
-                StoreRole.OWNER,
-                StoreRole.MANAGER
+            currentUser.getId(),
+            storeId,
+            StoreRole.OWNER,
+            StoreRole.MANAGER
         );
 
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() ->
-                        new BusinessException(
-                                ErrorCode.STORE_NOT_FOUND
-                        )
-                );
+        Store store = storeRepository
+            .findById(storeId)
+            .orElseThrow(() ->
+                new BusinessException(
+                    ErrorCode.STORE_NOT_FOUND
+                )
+            );
 
         if (store.getStoreType()
-                != StoreType.LOCAL_STORE) {
+            != StoreType.LOCAL_STORE) {
             throw new BusinessException(
-                    ErrorCode.STORE_TABLE_NOT_ALLOWED
+                ErrorCode.STORE_TABLE_NOT_ALLOWED
             );
         }
 
         String tableCode = request.tableCode()
-                .trim()
-                .toUpperCase();
+            .trim()
+            .toUpperCase();
 
         if (storeTableRepository
-                .existsByStoreIdAndTableCodeIgnoreCase(
-                        storeId,
-                        tableCode
-                )) {
+            .existsByStoreIdAndTableCodeIgnoreCase(
+                storeId,
+                tableCode
+            )) {
             throw new BusinessException(
-                    ErrorCode.DUPLICATE_STORE_TABLE
+                ErrorCode.DUPLICATE_STORE_TABLE
             );
         }
 
         StoreTable table =
-                storeTableRepository.save(
-                        StoreTable.create(
-                                store,
-                                tableCode,
-                                request.name().trim()
-                        )
-                );
+            storeTableRepository.save(
+                StoreTable.create(
+                    store,
+                    tableCode,
+                    request.name().trim()
+                )
+            );
 
-        return StoreTableResponse.from(table);
+        return StoreTableResponse.from(
+            table
+        );
     }
 
     @Transactional(readOnly = true)
     public List<StoreTableResponse> findTables(
-            User currentUser,
-            Long storeId
+        User currentUser,
+        Long storeId
     ) {
         storeAuthorizationService.requireAnyRole(
-                currentUser.getId(),
-                storeId,
-                StoreRole.OWNER,
-                StoreRole.MANAGER,
-                StoreRole.STAFF
+            currentUser.getId(),
+            storeId,
+            StoreRole.OWNER,
+            StoreRole.MANAGER,
+            StoreRole.STAFF
         );
 
         return storeTableRepository
-                .findAllByStoreIdOrderByIdAsc(storeId)
-                .stream()
-                .map(StoreTableResponse::from)
-                .toList();
+            .findAllByStoreIdOrderByIdAsc(
+                storeId
+            )
+            .stream()
+            .map(
+                StoreTableResponse::from
+            )
+            .toList();
     }
 
     private String normalizeOptionalText(
-            String value
+        String value
     ) {
-        if (value == null || value.isBlank()) {
+        if (value == null
+            || value.isBlank()) {
             return null;
         }
 
@@ -368,117 +434,131 @@ public class StoreApplicationService {
     }
 
     private String resolveOptionalText(
-            String currentValue,
-            String requestedValue
+        String currentValue,
+        String requestedValue
     ) {
         if (requestedValue == null) {
             return currentValue;
         }
 
-        return normalizeOptionalText(requestedValue);
+        return normalizeOptionalText(
+            requestedValue
+        );
     }
 
     private void validateLocation(
-            BigDecimal latitude,
-            BigDecimal longitude
+        BigDecimal latitude,
+        BigDecimal longitude
     ) {
         if ((latitude == null)
-                != (longitude == null)) {
+            != (longitude == null)) {
             throw new BusinessException(
-                    ErrorCode.INVALID_REQUEST
+                ErrorCode.INVALID_REQUEST
             );
         }
     }
 
     private void validateOperatingHours(
-            LocalTime openTime,
-            LocalTime closeTime
+        LocalTime openTime,
+        LocalTime closeTime
     ) {
         if ((openTime == null)
-                != (closeTime == null)) {
+            != (closeTime == null)) {
             throw new BusinessException(
-                    ErrorCode.INVALID_REQUEST
+                ErrorCode.INVALID_REQUEST
             );
         }
     }
 
     private boolean defaultTrue(
-            Boolean value
+        Boolean value
     ) {
-        return value == null || value;
+        return value == null
+            || value;
     }
 
     private String normalizeClosedDays(
-            List<DayOfWeek> closedDays
+        List<DayOfWeek> closedDays
     ) {
         if (closedDays == null
-                || closedDays.isEmpty()) {
+            || closedDays.isEmpty()) {
             return null;
         }
 
         return closedDays.stream()
-                .distinct()
-                .map(DayOfWeek::name)
-                .collect(Collectors.joining(","));
+            .distinct()
+            .map(
+                DayOfWeek::name
+            )
+            .collect(
+                Collectors.joining(",")
+            );
     }
 
     private void saveTags(
-            Store store,
-            List<String> requestedTags
+        Store store,
+        List<String> requestedTags
     ) {
         if (requestedTags == null
-                || requestedTags.isEmpty()) {
+            || requestedTags.isEmpty()) {
             return;
         }
 
         requestedTags.stream()
-                .map(String::trim)
-                .filter(value -> !value.isBlank())
-                .map(String::toLowerCase)
-                .distinct()
-                .map(name -> tagRepository
-                        .findByNameIgnoreCaseAndTagType(
+            .map(
+                String::trim
+            )
+            .filter(value ->
+                !value.isBlank()
+            )
+            .map(
+                String::toLowerCase
+            )
+            .distinct()
+            .map(name ->
+                tagRepository
+                    .findByNameIgnoreCaseAndTagType(
+                        name,
+                        TagType.STORE
+                    )
+                    .orElseGet(() ->
+                        tagRepository.save(
+                            Tag.create(
                                 name,
                                 TagType.STORE
+                            )
                         )
-                        .orElseGet(() ->
-                                tagRepository.save(
-                                        Tag.create(
-                                                name,
-                                                TagType.STORE
-                                        )
-                                )
-                        )
+                    )
+            )
+            .map(tag ->
+                StoreTag.create(
+                    store,
+                    tag
                 )
-                .map(tag ->
-                        StoreTag.create(
-                                store,
-                                tag
-                        )
-                )
-                .forEach(
-                        storeTagRepository::save
-                );
+            )
+            .forEach(
+                storeTagRepository::save
+            );
     }
 
     private SellerStoreDetailResponse detail(
-            StoreMember member
+        StoreMember member
     ) {
         List<String> tags =
-                storeTagRepository
-                        .findAllByStoreId(
-                                member.getStore().getId()
-                        )
-                        .stream()
-                        .map(storeTag ->
-                                storeTag.getTag().getName()
-                        )
-                        .toList();
+            storeTagRepository
+                .findAllByStoreId(
+                    member.getStore().getId()
+                )
+                .stream()
+                .map(storeTag ->
+                    storeTag.getTag().getName()
+                )
+                .toList();
 
         return SellerStoreDetailResponse.of(
-                member.getStore(),
-                member.getRole(),
-                tags
+            member.getStore(),
+            member.getRole(),
+            tags
         );
     }
 }
