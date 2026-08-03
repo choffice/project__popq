@@ -25,8 +25,8 @@ class StoreDiscoveryController extends ChangeNotifier {
    */
   static final CustomerLocation busanDefaultCenter =
   CustomerLocation(
-    latitude: 35.1796,
-    longitude: 129.0756,
+    latitude: 35.157778,
+    longitude: 129.059167,
   );
 
   static const double defaultRadiusKm = 10;
