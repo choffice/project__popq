@@ -6,8 +6,9 @@ class SignInScreen extends StatefulWidget {
   const SignInScreen({
     required this.onBackHome,
     this.onGoogleSignIn,
-    this.onDevelopmentSignIn,
     this.onKakaoSignIn,
+    this.onNaverSignIn,
+    this.onDevelopmentSignIn,
     this.returnResultOnSuccess = false,
     this.returnLocation,
     super.key,
@@ -16,6 +17,7 @@ class SignInScreen extends StatefulWidget {
   final VoidCallback onBackHome;
   final Future<void> Function()? onGoogleSignIn;
   final Future<void> Function()? onKakaoSignIn;
+  final Future<void> Function()? onNaverSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   /*
@@ -92,11 +94,13 @@ class _SignInScreenState extends State<SignInScreen> {
                   : _handleKakaoSignIn,
             ),
             const SizedBox(height: PopqSpacing.sm),
-            const _ProviderButton(
+            _ProviderButton(
               label: 'Naver로 계속하기',
               backgroundColor: Color(0xFF03C75A),
               foregroundColor: Colors.white,
               borderColor: Color(0xFF03C75A),
+              onPressed: widget.onNaverSignIn == null || _busy
+              ? null : _handleNaverSignIn,
             ),
             if (widget.onDevelopmentSignIn != null) ...[
               const SizedBox(height: PopqSpacing.lg),
@@ -233,6 +237,30 @@ class _SignInScreenState extends State<SignInScreen> {
       setState(() {
         _busy = false;
         _errorMessage = '카카오 로그인에 실패했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleNaverSignIn() async {
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      await widget.onNaverSignIn!();
+    } catch (e) {
+      debugPrint('네이버 로그인 오류: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = '네이버 로그인에 실패했습니다.';
       });
     } finally {
       if (mounted) {

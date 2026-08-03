@@ -5,26 +5,16 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
-    <application
-        android:label="popq_customer_app"
-        android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false">
+    <application android:label="popq_customer_app" android:name="${applicationName}" android:icon="@mipmap/ic_launcher" android:allowBackup="false">
+        <!-- 네이버 로그인 설정 -->
+        <meta-data android:name="com.naver.sdk.clientId" android:value="GxL8Qnbr3tbzqhIvXYir"/>
+        <meta-data android:name="com.naver.sdk.clientSecret" android:value="@string/client_secret"/>
+        <meta-data android:name="com.naver.sdk.clientName" android:value="POPQ"/>
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize"
-            android:enableOnBackInvokedCallback="false">
 
-            <meta-data
-                android:name="io.flutter.embedding.android.NormalTheme"
-                android:resource="@style/NormalTheme"/>
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:taskAffinity="" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize" android:enableOnBackInvokedCallback="false">
+
+            <meta-data android:name="io.flutter.embedding.android.NormalTheme" android:resource="@style/NormalTheme"/>
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -33,27 +23,19 @@
         </activity>
 
         <!-- 카카오 로그인 완료 후 앱으로 돌아오는 콜백 -->
-        <activity
-            android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity"
-            android:exported="true">
+        <activity android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity" android:exported="true">
             <intent-filter android:label="flutter_web_auth">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
 
-                <data
-                    android:scheme="kakaoc4ae67811eeef68ede602afc04a8efbd"
-                    android:host="oauth"/>
+                <data android:scheme="kakaoc4ae67811eeef68ede602afc04a8efbd" android:host="oauth"/>
             </intent-filter>
         </activity>
 
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2"/>
+        <meta-data android:name="flutterEmbedding" android:value="2"/>
 
-        <meta-data
-            android:name="flutterEmbedding"
-            android:value="2"/>
+        <meta-data android:name="flutterEmbedding" android:value="2"/>
     </application>
 
     <queries>

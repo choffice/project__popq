@@ -7,6 +7,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/auth/kakao_auth_service.dart';
+import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
@@ -66,6 +67,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final GoogleAuthService _googleAuthService;
   late final _CustomerBackButtonDispatcher _backButtonDispatcher;
   late final KakaoAuthService _kakaoAuthService;
+  late final NaverAuthService _naverAuthService;
 
 
   @override
@@ -102,6 +104,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
     );
     _kakaoAuthService = KakaoAuthService();
+    _naverAuthService = NaverAuthService();
+
     final permissionGateway =
         widget.permissionGateway ??
             DeviceCustomerPermissionGateway();
@@ -169,6 +173,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           : null,
       onGoogleSignIn: _googleSignIn,
       onKakaoSignIn: _kakaoSignIn,
+      onNaverSignIn: _naverSignIn,
     );
 
     _backButtonDispatcher =
@@ -245,6 +250,19 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     );
 
     // TODO(backend): 카카오 Access Token을 Spring 로그인 API로 전송하고,
+    // 응답으로 받은 POPQ accessToken/refreshToken을 AuthSession에 저장합니다.
+  }
+
+  Future<void> _naverSignIn() async {
+    final accessToken =
+    await _naverAuthService.signInAndGetAccessToken();
+
+    debugPrint(
+      '네이버 로그인 성공: Access Token 수신 '
+          '(${accessToken.length}자)',
+    );
+
+    // TODO(backend): 네이버 Access Token을 Spring 로그인 API로 전송하고,
     // 응답으로 받은 POPQ accessToken/refreshToken을 AuthSession에 저장합니다.
   }
 
