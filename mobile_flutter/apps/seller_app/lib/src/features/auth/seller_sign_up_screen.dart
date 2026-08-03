@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../routing/seller_router.dart';
 
 class SellerSignUpScreen extends StatefulWidget {
   const SellerSignUpScreen({required this.onSignUp, super.key});
@@ -9,7 +12,7 @@ class SellerSignUpScreen extends StatefulWidget {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   })
   onSignUp;
 
@@ -28,6 +31,7 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
   String? _errorMessage;
 
   static final _passwordPattern = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$');
+  static final _phonePattern = RegExp(r'^01[0-9]-?\d{3,4}-?\d{4}$');
 
   @override
   void dispose() {
@@ -88,7 +92,19 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                     key: const Key('sign-up-phone'),
                     controller: _phone,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: '전화번호 (선택)'),
+                    decoration: const InputDecoration(
+                      labelText: '전화번호',
+                      hintText: '010-1234-5678',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '전화번호를 입력해 주세요.';
+                      }
+                      if (!_phonePattern.hasMatch(value.trim())) {
+                        return '올바른 전화번호 형식이 아닙니다.';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: PopqSpacing.sm),
                   TextFormField(
@@ -159,8 +175,14 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
         email: _email.text.trim(),
         password: _password.text,
         name: _name.text.trim(),
-        phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+        phone: _phone.text.trim(),
       );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해 주세요.')),
+      );
+      context.go(SellerRoutes.signIn);
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       setState(() {

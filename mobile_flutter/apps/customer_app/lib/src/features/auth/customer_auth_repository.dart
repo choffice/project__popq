@@ -5,12 +5,28 @@ abstract interface class CustomerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   });
 
   Future<AuthSession> logIn({
     required String email,
     required String password,
+  });
+
+  Future<String> findId({
+    required String name,
+    required String phone,
+  });
+
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  });
+
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
   });
 }
 
@@ -24,13 +40,13 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) {
     return _submit('/api/v1/auth/signup', {
       'email': email,
       'password': password,
       'name': name,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      'phone': phone,
       'role': 'CUSTOMER',
     });
   }
@@ -44,6 +60,44 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
       'email': email,
       'password': password,
     });
+  }
+
+  @override
+  Future<String> findId({
+    required String name,
+    required String phone,
+  }) async {
+    final response = await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/find-id',
+      body: {'name': name, 'phone': phone},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+    return response['maskedEmail'] as String;
+  }
+
+  @override
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  }) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/password-reset/verify',
+      body: {'email': email, 'phone': phone},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
+  }) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/password-reset/confirm',
+      body: {'email': email, 'phone': phone, 'newPassword': newPassword},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
   }
 
   Future<AuthSession> _submit(
@@ -71,7 +125,7 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) async {
     return _session();
   }
@@ -83,6 +137,27 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
   }) async {
     return _session();
   }
+
+  @override
+  Future<String> findId({
+    required String name,
+    required String phone,
+  }) async {
+    return 'cu***@popq.test';
+  }
+
+  @override
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  }) async {}
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
+  }) async {}
 
   AuthSession _session() {
     return AuthSession(

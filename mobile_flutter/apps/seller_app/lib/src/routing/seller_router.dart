@@ -5,6 +5,8 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../features/announcements/seller_announcement_repository.dart';
 import '../features/auth/seller_bootstrap_controller.dart';
+import '../features/auth/seller_find_id_screen.dart';
+import '../features/auth/seller_find_password_screen.dart';
 import '../features/auth/seller_sign_in_screen.dart';
 import '../features/auth/seller_sign_up_screen.dart';
 import '../features/customers/seller_customer_screen.dart';
@@ -27,6 +29,8 @@ abstract final class SellerRoutes {
   static const bootstrapError = '/bootstrap-error';
   static const signIn = '/sign-in';
   static const signUp = '/sign-up';
+  static const findId = '/find-id';
+  static const findPassword = '/find-password';
   static const dashboard = '/dashboard';
   static const storeRegistration = '/stores/register';
   static const operations = '/operations';
@@ -51,9 +55,14 @@ GoRouter createSellerRouter({
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   })
   onSignUp,
+  required Future<String> Function(String name, String phone) onFindId,
+  required Future<void> Function(String email, String phone)
+  onVerifyForPasswordReset,
+  required Future<void> Function(String email, String phone, String newPassword)
+  onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -78,6 +87,15 @@ GoRouter createSellerRouter({
 
       final isSignUp =
           location == SellerRoutes.signUp;
+
+      final isFindId =
+          location == SellerRoutes.findId;
+
+      final isFindPassword =
+          location == SellerRoutes.findPassword;
+
+      final isPreLoginAuthScreen =
+          isSignIn || isSignUp || isFindId || isFindPassword;
 
       final isStoreRegistration =
           location == SellerRoutes.storeRegistration;
@@ -105,12 +123,12 @@ GoRouter createSellerRouter({
       }
 
       if (!sessionController.isSignedIn) {
-        return (isSignIn || isSignUp)
+        return isPreLoginAuthScreen
             ? null
             : SellerRoutes.signIn;
       }
 
-      if (isSignIn || isSignUp) {
+      if (isPreLoginAuthScreen) {
         return state.uri.queryParameters['from'] ??
             SellerRoutes.dashboard;
       }
@@ -169,6 +187,21 @@ GoRouter createSellerRouter({
         path: SellerRoutes.signUp,
         builder: (context, state) {
           return SellerSignUpScreen(onSignUp: onSignUp);
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.findId,
+        builder: (context, state) {
+          return SellerFindIdScreen(onFindId: onFindId);
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.findPassword,
+        builder: (context, state) {
+          return SellerFindPasswordScreen(
+            onVerify: onVerifyForPasswordReset,
+            onResetPassword: onResetPassword,
+          );
         },
       ),
       GoRoute(

@@ -14,12 +14,28 @@ abstract interface class SellerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   });
 
   Future<SellerAuthResult> logIn({
     required String email,
     required String password,
+  });
+
+  Future<String> findId({
+    required String name,
+    required String phone,
+  });
+
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  });
+
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
   });
 }
 
@@ -40,7 +56,7 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) async {
     return _result();
   }
@@ -52,6 +68,27 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
   }) async {
     return _result();
   }
+
+  @override
+  Future<String> findId({
+    required String name,
+    required String phone,
+  }) async {
+    return 'se***@popq.test';
+  }
+
+  @override
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  }) async {}
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
+  }) async {}
 
   SellerAuthResult _result() {
     return SellerAuthResult(
@@ -75,13 +112,13 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) {
     return _submit('/api/v1/auth/signup', {
       'email': email,
       'password': password,
       'name': name,
-      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      'phone': phone,
       'role': 'SELLER',
     });
   }
@@ -95,6 +132,44 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
       'email': email,
       'password': password,
     });
+  }
+
+  @override
+  Future<String> findId({
+    required String name,
+    required String phone,
+  }) async {
+    final response = await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/find-id',
+      body: {'name': name, 'phone': phone},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+    return response['maskedEmail'] as String;
+  }
+
+  @override
+  Future<void> verifyForPasswordReset({
+    required String email,
+    required String phone,
+  }) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/password-reset/verify',
+      body: {'email': email, 'phone': phone},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<void> resetPassword({
+    required String email,
+    required String phone,
+    required String newPassword,
+  }) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/password-reset/confirm',
+      body: {'email': email, 'phone': phone, 'newPassword': newPassword},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
   }
 
   Future<SellerAuthResult> _submit(

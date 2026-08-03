@@ -74,4 +74,8 @@ public class User extends BaseTimeEntity {
     public void changeStatus(UserStatus status) {
         this.status = status;
     }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
 }

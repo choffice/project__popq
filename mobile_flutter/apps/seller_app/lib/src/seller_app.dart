@@ -210,6 +210,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       onSignOut: _bootstrapController.signOut,
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onFindId: _findId,
+      onVerifyForPasswordReset: _verifyForPasswordReset,
+      onResetPassword: _resetPassword,
       themeController: _themeController,
       onDevelopmentSignIn:
       widget.environment.flavor ==
@@ -244,15 +247,30 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) async {
-    final result = await _authRepository.signUp(
+    await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
     );
-    await _completeSignIn(result.session);
+  }
+
+  Future<String> _findId(String name, String phone) {
+    return _authRepository.findId(name: name, phone: phone);
+  }
+
+  Future<void> _verifyForPasswordReset(String email, String phone) {
+    return _authRepository.verifyForPasswordReset(email: email, phone: phone);
+  }
+
+  Future<void> _resetPassword(String email, String phone, String newPassword) {
+    return _authRepository.resetPassword(
+      email: email,
+      phone: phone,
+      newPassword: newPassword,
+    );
   }
 
   Future<void> _completeSignIn(AuthSession session) async {
@@ -273,10 +291,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     >(
       '/api/v1/dev/auth/login',
       body: {
-        'email':
-        'seller@popq.local',
-        'name':
-        'POPQ 테스트 판매자',
+        'email': 'map-seed@popq.local',
+        'name': 'POPQ 지도 테스트 판매자',
         'role': 'SELLER',
       },
       decode: (value) {
