@@ -33,19 +33,26 @@ class SellerStore {
       description: json['description'] as String?,
       address: json['address'] as String?,
       detailAddress: json['detailAddress'] as String?,
-      representativeCategory: json['representativeCategory'] as String?,
+      representativeCategory:
+      json['representativeCategory'] as String?,
       imageUrl: json['imageUrl'] as String?,
       phone: json['phone'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       openTime: json['openTime'] as String?,
       closeTime: json['closeTime'] as String?,
-      closedDays: _readStringList(json['closedDays']),
-      takeoutAvailable: json['takeoutAvailable'] as bool? ?? true,
-      dineInAvailable: json['dineInAvailable'] as bool? ?? true,
+      closedDays: _readStringList(
+        json['closedDays'],
+      ),
+      takeoutAvailable:
+      json['takeoutAvailable'] as bool? ?? true,
+      dineInAvailable:
+      json['dineInAvailable'] as bool? ?? true,
       orderAcceptingEnabled:
       json['orderAcceptingEnabled'] as bool? ?? true,
-      tags: _readStringList(json['tags']),
+      tags: _readStringList(
+        json['tags'],
+      ),
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
       myRole: json['myRole'] as String,
@@ -99,9 +106,11 @@ class SellerStore {
       name: name ?? this.name,
       description: description ?? this.description,
       address: address ?? this.address,
-      detailAddress: detailAddress ?? this.detailAddress,
+      detailAddress:
+      detailAddress ?? this.detailAddress,
       representativeCategory:
-      representativeCategory ?? this.representativeCategory,
+      representativeCategory ??
+          this.representativeCategory,
       imageUrl: imageUrl ?? this.imageUrl,
       phone: phone ?? this.phone,
       latitude: latitude ?? this.latitude,
@@ -109,13 +118,17 @@ class SellerStore {
       openTime: openTime ?? this.openTime,
       closeTime: closeTime ?? this.closeTime,
       closedDays: closedDays ?? this.closedDays,
-      takeoutAvailable: takeoutAvailable ?? this.takeoutAvailable,
-      dineInAvailable: dineInAvailable ?? this.dineInAvailable,
+      takeoutAvailable:
+      takeoutAvailable ?? this.takeoutAvailable,
+      dineInAvailable:
+      dineInAvailable ?? this.dineInAvailable,
       orderAcceptingEnabled:
-      orderAcceptingEnabled ?? this.orderAcceptingEnabled,
+      orderAcceptingEnabled ??
+          this.orderAcceptingEnabled,
       tags: tags ?? this.tags,
       status: status,
-      businessStatus: businessStatus ?? this.businessStatus,
+      businessStatus:
+      businessStatus ?? this.businessStatus,
       myRole: myRole,
     );
   }
@@ -124,7 +137,9 @@ class SellerStore {
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
 
-  Future<SellerStore> findOne(int storeId);
+  Future<SellerStore> findOne(
+      int storeId,
+      );
 
   Future<SellerStore> createDevelopmentStore();
 
@@ -172,10 +187,17 @@ abstract interface class SellerStoreRepository {
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
       });
+
+  Future<void> delete(
+      int storeId,
+      );
 }
 
-class ApiSellerStoreRepository implements SellerStoreRepository {
-  ApiSellerStoreRepository(this._apiClient);
+class ApiSellerStoreRepository
+    implements SellerStoreRepository {
+  ApiSellerStoreRepository(
+      this._apiClient,
+      );
 
   final PopqApiClient _apiClient;
 
@@ -183,23 +205,34 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
   Future<List<SellerStore>> findAll() {
     return _apiClient.get(
       '/api/v1/seller/stores',
-      decode: (value) => (value as List<Object?>)
-          .map(
-            (item) => SellerStore.fromJson(
-          Map<String, Object?>.from(item as Map),
-        ),
-      )
-          .toList(),
+      decode: (Object? value) {
+        return (value as List<Object?>)
+            .map(
+              (Object? item) =>
+              SellerStore.fromJson(
+                Map<String, Object?>.from(
+                  item as Map,
+                ),
+              ),
+        )
+            .toList();
+      },
     );
   }
 
   @override
-  Future<SellerStore> findOne(int storeId) {
+  Future<SellerStore> findOne(
+      int storeId,
+      ) {
     return _apiClient.get(
       '/api/v1/seller/stores/$storeId',
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (Object? value) {
+        return SellerStore.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
   }
 
@@ -240,7 +273,8 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'description': description,
         'address': address,
         'detailAddress': detailAddress,
-        'representativeCategory': representativeCategory,
+        'representativeCategory':
+        representativeCategory,
         'imageUrl': imageUrl,
         'phone': phone,
         'latitude': latitude,
@@ -250,12 +284,17 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
-        'orderAcceptingEnabled': orderAcceptingEnabled,
+        'orderAcceptingEnabled':
+        orderAcceptingEnabled,
         'tags': tags,
       },
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (Object? value) {
+        return SellerStore.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
   }
 
@@ -265,13 +304,18 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
       String status,
       ) {
     return _apiClient.patch(
-      '/api/v1/seller/stores/$storeId/business-status',
+      '/api/v1/seller/stores/'
+          '$storeId/business-status',
       body: {
         'businessStatus': status,
       },
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (Object? value) {
+        return SellerStore.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
   }
 
@@ -302,7 +346,8 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'description': description,
         'address': address,
         'detailAddress': detailAddress,
-        'representativeCategory': representativeCategory,
+        'representativeCategory':
+        representativeCategory,
         'imageUrl': imageUrl,
         'phone': phone,
         'latitude': latitude,
@@ -312,17 +357,42 @@ class ApiSellerStoreRepository implements SellerStoreRepository {
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
-        'orderAcceptingEnabled': orderAcceptingEnabled,
+        'orderAcceptingEnabled':
+        orderAcceptingEnabled,
         'tags': tags,
       },
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (Object? value) {
+        return SellerStore.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
+  }
+
+  @override
+  Future<void> delete(
+      int storeId,
+      ) async {
+    final bool deleted =
+    await _apiClient.delete<bool>(
+      '/api/v1/seller/stores/$storeId',
+      decode: (Object? value) {
+        return value as bool;
+      },
+    );
+
+    if (!deleted) {
+      throw StateError(
+        'store deletion failed',
+      );
+    }
   }
 }
 
-class MemorySellerStoreRepository implements SellerStoreRepository {
+class MemorySellerStoreRepository
+    implements SellerStoreRepository {
   MemorySellerStoreRepository({
     List<SellerStore>? stores,
   }) : _stores =
@@ -346,13 +416,19 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
 
   @override
   Future<List<SellerStore>> findAll() async {
-    return List.unmodifiable(_stores);
+    return List<SellerStore>.unmodifiable(
+      _stores,
+    );
   }
 
   @override
-  Future<SellerStore> findOne(int storeId) async {
+  Future<SellerStore> findOne(
+      int storeId,
+      ) async {
     return _stores.firstWhere(
-          (store) => store.storeId == storeId,
+          (SellerStore store) {
+        return store.storeId == storeId;
+      },
     );
   }
 
@@ -385,31 +461,52 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
   }) async {
-    final store = SellerStore(
-      storeId: _stores.length + 1,
+    final int nextStoreId = _stores.isEmpty
+        ? 1
+        : _stores
+        .map(
+          (SellerStore store) =>
+      store.storeId,
+    )
+        .reduce(
+          (int left, int right) =>
+      left > right ? left : right,
+    ) +
+        1;
+
+    final SellerStore store = SellerStore(
+      storeId: nextStoreId,
       storeType: storeType,
       name: name,
       description: description,
       address: address,
       detailAddress: detailAddress,
-      representativeCategory: representativeCategory,
+      representativeCategory:
+      representativeCategory,
       imageUrl: imageUrl,
       phone: phone,
       latitude: latitude,
       longitude: longitude,
       openTime: openTime,
       closeTime: closeTime,
-      closedDays: List.unmodifiable(closedDays),
+      closedDays:
+      List<String>.unmodifiable(
+        closedDays,
+      ),
       takeoutAvailable: takeoutAvailable,
       dineInAvailable: dineInAvailable,
-      orderAcceptingEnabled: orderAcceptingEnabled,
-      tags: List.unmodifiable(tags),
+      orderAcceptingEnabled:
+      orderAcceptingEnabled,
+      tags: List<String>.unmodifiable(
+        tags,
+      ),
       status: 'ACTIVE',
       businessStatus: 'PRE_OPEN',
       myRole: 'OWNER',
     );
 
     _stores.add(store);
+
     return store;
   }
 
@@ -418,25 +515,34 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
       int storeId,
       String status,
       ) async {
-    final index = _stores.indexWhere(
-          (store) => store.storeId == storeId,
+    final int index = _stores.indexWhere(
+          (SellerStore store) {
+        return store.storeId == storeId;
+      },
     );
 
     if (index < 0) {
-      throw StateError('store not found');
+      throw StateError(
+        'store not found',
+      );
     }
 
-    final store = _stores[index];
+    final SellerStore store = _stores[index];
 
-    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
-      throw StateError('store manager role is required');
+    if (store.myRole != 'OWNER' &&
+        store.myRole != 'MANAGER') {
+      throw StateError(
+        'store manager role is required',
+      );
     }
 
-    final updated = store.copyWith(
+    final SellerStore updated =
+    store.copyWith(
       businessStatus: status,
     );
 
     _stores[index] = updated;
+
     return updated;
   }
 
@@ -460,59 +566,112 @@ class MemorySellerStoreRepository implements SellerStoreRepository {
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
       }) async {
-    final index = _stores.indexWhere(
-          (store) => store.storeId == storeId,
+    final int index = _stores.indexWhere(
+          (SellerStore store) {
+        return store.storeId == storeId;
+      },
     );
 
     if (index < 0) {
-      throw StateError('store not found');
+      throw StateError(
+        'store not found',
+      );
     }
 
-    final store = _stores[index];
+    final SellerStore store = _stores[index];
 
-    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
-      throw StateError('store manager role is required');
+    if (store.myRole != 'OWNER' &&
+        store.myRole != 'MANAGER') {
+      throw StateError(
+        'store manager role is required',
+      );
     }
 
-    final updated = SellerStore(
+    final SellerStore updated = SellerStore(
       storeId: store.storeId,
       storeType: store.storeType,
       name: name,
       description: description,
       address: address,
-      detailAddress: detailAddress ?? store.detailAddress,
+      detailAddress:
+      detailAddress ?? store.detailAddress,
       representativeCategory:
-      representativeCategory ?? store.representativeCategory,
-      imageUrl: imageUrl ?? store.imageUrl,
+      representativeCategory ??
+          store.representativeCategory,
+      imageUrl:
+      imageUrl ?? store.imageUrl,
       phone: phone ?? store.phone,
       latitude: latitude,
       longitude: longitude,
-      openTime: openTime ?? store.openTime,
-      closeTime: closeTime ?? store.closeTime,
-      closedDays: List.unmodifiable(
+      openTime:
+      openTime ?? store.openTime,
+      closeTime:
+      closeTime ?? store.closeTime,
+      closedDays:
+      List<String>.unmodifiable(
         closedDays ?? store.closedDays,
       ),
       takeoutAvailable:
-      takeoutAvailable ?? store.takeoutAvailable,
+      takeoutAvailable ??
+          store.takeoutAvailable,
       dineInAvailable:
-      dineInAvailable ?? store.dineInAvailable,
+      dineInAvailable ??
+          store.dineInAvailable,
       orderAcceptingEnabled:
-      orderAcceptingEnabled ?? store.orderAcceptingEnabled,
-      tags: List.unmodifiable(tags),
+      orderAcceptingEnabled ??
+          store.orderAcceptingEnabled,
+      tags: List<String>.unmodifiable(
+        tags,
+      ),
       status: store.status,
-      businessStatus: store.businessStatus,
+      businessStatus:
+      store.businessStatus,
       myRole: store.myRole,
     );
 
     _stores[index] = updated;
+
     return updated;
+  }
+
+  @override
+  Future<void> delete(
+      int storeId,
+      ) async {
+    final int index = _stores.indexWhere(
+          (SellerStore store) {
+        return store.storeId == storeId;
+      },
+    );
+
+    if (index < 0) {
+      throw StateError(
+        'store not found',
+      );
+    }
+
+    final SellerStore store = _stores[index];
+
+    if (store.myRole != 'OWNER') {
+      throw StateError(
+        'store owner role is required',
+      );
+    }
+
+    _stores.removeAt(index);
   }
 }
 
-List<String> _readStringList(Object? value) {
+List<String> _readStringList(
+    Object? value,
+    ) {
   if (value is! List) {
-    return const [];
+    return const <String>[];
   }
 
-  return value.whereType<String>().toList(growable: false);
+  return value
+      .whereType<String>()
+      .toList(
+    growable: false,
+  );
 }
