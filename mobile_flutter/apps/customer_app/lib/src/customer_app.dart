@@ -62,6 +62,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
   late final GoRouter _router;
+  late final GoogleAuthService _googleAuthService;
   late final _CustomerBackButtonDispatcher _backButtonDispatcher;
 
   @override
@@ -93,6 +94,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         return (await _sessionStore.read())
             ?.accessToken;
       },
+    );
+    _googleAuthService = GoogleAuthService(
+      webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
     );
 
     final permissionGateway =
@@ -160,6 +164,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           AppFlavor.development
           ? _developmentSignIn
           : null,
+      onGoogleSignIn: _googleSignIn,
     );
 
     _backButtonDispatcher =
@@ -218,6 +223,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         ),
       ),
     );
+  }
+  Future<void> _googleSignIn() async {
+    final idToken = await _googleAuthService.signInAndGetIdToken();
+    debugPrint('Google idToken: $idToken');
+    // TODO(backend): Spring Security 엔드포인트 확정되면
+    // idToken을 body에 담아 POST 요청 → 응답의 accessToken/refreshToken을
+    // _sessionController.save(AuthSession(...))에 저장하는 코드로 교체
   }
 
   @override

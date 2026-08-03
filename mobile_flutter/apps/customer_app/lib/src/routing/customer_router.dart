@@ -61,6 +61,7 @@ GoRouter createCustomerRouter({
   required String tossClientKey,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
+  Future<void> Function()? onGoogleSignIn,
 }) {
   return GoRouter(
     initialLocation: CustomerRoutes.home,
@@ -230,6 +231,9 @@ GoRouter createCustomerRouter({
           state.uri.queryParameters['from'];
 
           return SignInScreen(
+            onBackHome: () => context.go(CustomerRoutes.home),
+            onDevelopmentSignIn: onDevelopmentSignIn,
+            onGoogleSignIn: onGoogleSignIn,
             onBackHome: () {
               context.go(
                 CustomerRoutes.home,
