@@ -7,6 +7,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/announcements/seller_announcement_repository.dart';
+import 'features/auth/seller_auth_repository.dart';
 import 'features/auth/seller_bootstrap_controller.dart';
 import 'features/auth/seller_identity_repository.dart';
 import 'features/home/seller_analytics_repository.dart';
@@ -29,6 +30,7 @@ class PopqSellerApp extends StatefulWidget {
     this.productRepository,
     this.analyticsRepository,
     this.themeController,
+    this.authRepository,
     super.key,
   });
 
@@ -42,6 +44,7 @@ class PopqSellerApp extends StatefulWidget {
   final SellerProductRepository? productRepository;
   final SellerAnalyticsRepository? analyticsRepository;
   final PopqThemeController? themeController;
+  final SellerAuthRepository? authRepository;
 
   @override
   State<PopqSellerApp> createState() =>
@@ -68,6 +71,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
   late final SellerAnalyticsRepository
   _analyticsRepository;
+
+  late final SellerAuthRepository _authRepository;
 
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
@@ -147,6 +152,10 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         widget.identityRepository ??
             ApiSellerIdentityRepository(_apiClient);
 
+    _authRepository =
+        widget.authRepository ??
+            ApiSellerAuthRepository(_apiClient);
+
     _bootstrapController =
         SellerBootstrapController(
           sessionController: _sessionController,
@@ -168,6 +177,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       analyticsRepository:
       _analyticsRepository,
       onSignOut: _bootstrapController.signOut,
+      onSignIn: _signIn,
+      onSignUp: _signUp,
       themeController: _themeController,
       onDevelopmentSignIn:
       widget.environment.flavor ==
@@ -182,6 +193,40 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         _themeController.restore(),
       ]),
     );
+  }
+
+  Future<void> _signIn(String email, String password) async {
+    final result = await _authRepository.logIn(
+      email: email,
+      password: password,
+    );
+    await _completeSignIn(result.session);
+  }
+
+  Future<void> _signUp({
+    required String email,
+    required String password,
+    required String name,
+    String? phone,
+  }) async {
+    final result = await _authRepository.signUp(
+      email: email,
+      password: password,
+      name: name,
+      phone: phone,
+    );
+    await _completeSignIn(result.session);
+  }
+
+  Future<void> _completeSignIn(AuthSession session) async {
+    await _storeSelectionController.clear();
+    await _sessionController.save(session);
+    _bootstrapController.acknowledgeSellerSignIn();
+
+    final stores = await _storeRepository.findAll();
+    if (stores.length == 1) {
+      await _storeSelectionController.select(stores.single.storeId);
+    }
   }
 
   Future<void> _developmentSignIn() async {

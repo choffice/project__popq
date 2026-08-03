@@ -12,6 +12,7 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
     USER_INACTIVE(HttpStatus.FORBIDDEN, "비활성화된 사용자입니다."),
     DUPLICATE_USER(HttpStatus.CONFLICT, "이미 등록된 사용자입니다."),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
     INVALID_DEV_ROLE(HttpStatus.BAD_REQUEST, "개발 로그인에서 허용되지 않는 역할입니다."),
     SELLER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "판매자 프로필을 찾을 수 없습니다."),
     STORE_NOT_FOUND(HttpStatus.NOT_FOUND, "스토어를 찾을 수 없습니다."),

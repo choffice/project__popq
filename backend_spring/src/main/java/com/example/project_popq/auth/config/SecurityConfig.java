@@ -19,6 +19,8 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -49,6 +51,7 @@ public class SecurityConfig {
                 "/v3/api-docs/**"
             ).permitAll()
             .requestMatchers("/api/v1/dev/auth/**").permitAll()
+            .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/stores/**").permitAll()
             .requestMatchers("/api/v1/qr/**").permitAll()
             .requestMatchers("/ws", "/ws/**").permitAll()
@@ -94,6 +97,11 @@ public class SecurityConfig {
         new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", configuration);
     return source;
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
   }
 
   @Bean
