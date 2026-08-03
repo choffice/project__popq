@@ -230,10 +230,8 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     >(
       '/api/v1/dev/auth/login',
       body: {
-        'email':
-        'seller@popq.local',
-        'name':
-        'POPQ 테스트 판매자',
+        'email': 'map-seed@popq.local',
+        'name': 'POPQ 지도 테스트 판매자',
         'role': 'SELLER',
       },
       decode: (value) {
