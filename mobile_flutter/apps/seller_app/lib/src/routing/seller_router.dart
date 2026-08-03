@@ -6,6 +6,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../features/announcements/seller_announcement_repository.dart';
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
+import '../features/auth/seller_sign_up_screen.dart';
 import '../features/customers/seller_customer_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
 import '../features/operations/seller_operation_screen.dart';
@@ -25,7 +26,7 @@ abstract final class SellerRoutes {
   static const bootstrap = '/bootstrap';
   static const bootstrapError = '/bootstrap-error';
   static const signIn = '/sign-in';
-
+  static const signUp = '/sign-up';
   static const dashboard = '/dashboard';
   static const storeRegistration = '/stores/register';
   static const operations = '/operations';
@@ -45,6 +46,14 @@ GoRouter createSellerRouter({
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
   required Future<void> Function() onSignOut,
+  required Future<void> Function(String email, String password) onSignIn,
+  required Future<void> Function({
+    required String email,
+    required String password,
+    required String name,
+    String? phone,
+  })
+  onSignUp,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -66,6 +75,9 @@ GoRouter createSellerRouter({
 
       final isSignIn =
           location == SellerRoutes.signIn;
+
+      final isSignUp =
+          location == SellerRoutes.signUp;
 
       final isStoreRegistration =
           location == SellerRoutes.storeRegistration;
@@ -93,12 +105,12 @@ GoRouter createSellerRouter({
       }
 
       if (!sessionController.isSignedIn) {
-        return isSignIn
+        return (isSignIn || isSignUp)
             ? null
             : SellerRoutes.signIn;
       }
 
-      if (isSignIn) {
+      if (isSignIn || isSignUp) {
         return state.uri.queryParameters['from'] ??
             SellerRoutes.dashboard;
       }
@@ -148,8 +160,15 @@ GoRouter createSellerRouter({
         builder: (context, state) {
           return SellerSignInScreen(
             roleMismatch: bootstrapController.roleMismatch,
+            onSignIn: onSignIn,
             onDevelopmentSignIn: onDevelopmentSignIn,
           );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.signUp,
+        builder: (context, state) {
+          return SellerSignUpScreen(onSignUp: onSignUp);
         },
       ),
       GoRoute(

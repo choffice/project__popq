@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../routing/seller_router.dart';
 
 class SellerSignInScreen extends StatefulWidget {
   const SellerSignInScreen({
     required this.roleMismatch,
+    required this.onSignIn,
     this.onDevelopmentSignIn,
     super.key,
   });
 
   final bool roleMismatch;
+  final Future<void> Function(String email, String password) onSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   @override
@@ -16,8 +22,18 @@ class SellerSignInScreen extends StatefulWidget {
 }
 
 class _SellerSignInScreenState extends State<SellerSignInScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   var _busy = false;
   String? _errorMessage;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,6 +83,61 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
               ),
             ],
             const SizedBox(height: PopqSpacing.xl),
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    key: const Key('sign-in-email'),
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: '이메일'),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '이메일을 입력해 주세요.';
+                      }
+                      if (!value.contains('@')) {
+                        return '올바른 이메일 형식이 아닙니다.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  TextFormField(
+                    key: const Key('sign-in-password'),
+                    controller: _password,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: '비밀번호'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '비밀번호를 입력해 주세요.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: PopqSpacing.md),
+                  FilledButton(
+                    key: const Key('sign-in-submit'),
+                    onPressed: _busy ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: Text(_busy ? '로그인 중...' : '로그인'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            TextButton(
+              key: const Key('go-to-sign-up'),
+              onPressed: _busy
+                  ? null
+                  : () => context.push(SellerRoutes.signUp),
+              child: const Text('아직 계정이 없으신가요? 판매자 회원가입'),
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            const Divider(),
+            const SizedBox(height: PopqSpacing.md),
             const _ProviderButton(label: '판매자 Google 계정으로 계속하기'),
             const SizedBox(height: PopqSpacing.sm),
             const _ProviderButton(label: '판매자 Kakao 계정으로 계속하기'),
@@ -95,13 +166,36 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
             ],
             const SizedBox(height: PopqSpacing.lg),
             const Text(
-              '운영 로그인은 Firebase/OAuth 공급자 설정 후 연결합니다.',
+              '소셜 로그인은 공급자 설정 완료 후 연결됩니다.',
               textAlign: TextAlign.center,
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      await widget.onSignIn(_email.text.trim(), _password.text);
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = failure.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = '로그인에 실패했습니다. 다시 시도해 주세요.';
+      });
+    }
   }
 
   Future<void> _developmentSignIn() async {
