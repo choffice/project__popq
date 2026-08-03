@@ -68,7 +68,7 @@ void main() {
     expect(find.text('사업장 대시보드'), findsOneWidget);
   });
 
-  testWidgets('seller signs up and lands on the empty dashboard', (
+  testWidgets('seller signs up and returns to sign-in without auto-login', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -99,6 +99,10 @@ void main() {
       '신규 판매자',
     );
     await tester.enterText(
+      find.byKey(const Key('sign-up-phone')),
+      '010-1234-5678',
+    );
+    await tester.enterText(
       find.byKey(const Key('sign-up-password')),
       'password1',
     );
@@ -109,8 +113,87 @@ void main() {
     await tester.tap(find.byKey(const Key('sign-up-submit')));
     await tester.pumpAndSettle();
 
-    expect(find.text('등록된 사업장이 없어요.'), findsOneWidget);
+    expect(find.text('회원가입이 완료되었습니다. 로그인해 주세요.'), findsOneWidget);
+    expect(find.byKey(const Key('sign-in-submit')), findsOneWidget);
   });
+
+  testWidgets('seller finds their id with name and phone', (tester) async {
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(),
+        storeRepository: MemorySellerStoreRepository(stores: const []),
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+        authRepository: MemorySellerAuthRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('go-to-find-id')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('find-id-name')), '홍길동');
+    await tester.enterText(
+      find.byKey(const Key('find-id-phone')),
+      '010-1234-5678',
+    );
+    await tester.tap(find.byKey(const Key('find-id-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('se***@popq.test'), findsOneWidget);
+  });
+
+  testWidgets(
+    'seller resets password via find-password flow',
+    (tester) async {
+      await tester.pumpWidget(
+        PopqSellerApp(
+          environment: const AppEnvironment.local(),
+          sessionStore: MemorySessionStore(),
+          storeSelectionStore: MemorySellerStoreSelectionStore(),
+          storeRepository: MemorySellerStoreRepository(stores: const []),
+          identityRepository: const MemorySellerIdentityRepository(),
+          orderRepository: MemorySellerOrderRepository(),
+          productRepository: MemorySellerProductRepository(),
+          analyticsRepository: MemorySellerAnalyticsRepository(),
+          authRepository: MemorySellerAuthRepository(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('go-to-find-password')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('find-password-email')),
+        'seller@popq.test',
+      );
+      await tester.enterText(
+        find.byKey(const Key('find-password-phone')),
+        '010-1234-5678',
+      );
+      await tester.tap(find.byKey(const Key('find-password-verify')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('find-password-new')),
+        'newpassword1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('find-password-new-confirm')),
+        'newpassword1',
+      );
+      await tester.tap(find.byKey(const Key('find-password-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('비밀번호가 변경되었습니다. 로그인해 주세요.'), findsOneWidget);
+      expect(find.byKey(const Key('sign-in-submit')), findsOneWidget);
+    },
+  );
 
   testWidgets('restored seller session opens the selected store workspace', (
     tester,
