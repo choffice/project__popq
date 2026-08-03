@@ -4,6 +4,8 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../customer_root_screen.dart';
+import '../features/auth/customer_find_id_screen.dart';
+import '../features/auth/customer_find_password_screen.dart';
 import '../features/auth/customer_sign_up_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/cart/cart_controller.dart';
@@ -37,6 +39,8 @@ abstract final class CustomerRoutes {
   static const onboarding = '/onboarding';
   static const signIn = '/sign-in';
   static const signUp = '/sign-up';
+  static const findId = '/find-id';
+  static const findPassword = '/find-password';
 
   static const home = '/home';
   static const discover = '/discover';
@@ -66,9 +70,14 @@ GoRouter createCustomerRouter({
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   })
   onSignUp,
+  required Future<String> Function(String name, String phone) onFindId,
+  required Future<void> Function(String email, String phone)
+  onVerifyForPasswordReset,
+  required Future<void> Function(String email, String phone, String newPassword)
+  onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
   Future<void> Function()? onGoogleSignIn,
@@ -100,6 +109,12 @@ GoRouter createCustomerRouter({
 
       final isSignUp =
           location == CustomerRoutes.signUp;
+
+      final isFindId =
+          location == CustomerRoutes.findId;
+
+      final isFindPassword =
+          location == CustomerRoutes.findPassword;
 
       final isRestoring =
           sessionController.status ==
@@ -171,7 +186,7 @@ GoRouter createCustomerRouter({
        * 로그인에 성공하면 사용자가 원래 접근하려던
        * 화면으로 돌아갑니다.
        */
-      if ((isSignIn || isSignUp) &&
+      if ((isSignIn || isSignUp || isFindId || isFindPassword) &&
           sessionController.isSignedIn) {
         return state.uri.queryParameters['from'] ??
             CustomerRoutes.home;
@@ -264,6 +279,21 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.signUp,
         builder: (context, state) {
           return CustomerSignUpScreen(onSignUp: onSignUp);
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.findId,
+        builder: (context, state) {
+          return CustomerFindIdScreen(onFindId: onFindId);
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.findPassword,
+        builder: (context, state) {
+          return CustomerFindPasswordScreen(
+            onVerify: onVerifyForPasswordReset,
+            onResetPassword: onResetPassword,
+          );
         },
       ),
       GoRoute(

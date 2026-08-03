@@ -128,6 +128,26 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
               ),
             ),
             const SizedBox(height: PopqSpacing.sm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                TextButton(
+                  key: const Key('go-to-find-id'),
+                  onPressed: _busy
+                      ? null
+                      : () => context.push(SellerRoutes.findId),
+                  child: const Text('아이디 찾기'),
+                ),
+                const Text('|'),
+                TextButton(
+                  key: const Key('go-to-find-password'),
+                  onPressed: _busy
+                      ? null
+                      : () => context.push(SellerRoutes.findPassword),
+                  child: const Text('비밀번호 찾기'),
+                ),
+              ],
+            ),
             TextButton(
               key: const Key('go-to-sign-up'),
               onPressed: _busy

@@ -10,6 +10,7 @@ import 'features/announcements/seller_announcement_repository.dart';
 import 'features/auth/seller_auth_repository.dart';
 import 'features/auth/seller_bootstrap_controller.dart';
 import 'features/auth/seller_identity_repository.dart';
+import 'features/customers/seller_customer_repository.dart';
 import 'features/home/seller_analytics_repository.dart';
 import 'features/orders/seller_order_repository.dart';
 import 'features/products/seller_product_repository.dart';
@@ -30,6 +31,7 @@ class PopqSellerApp extends StatefulWidget {
     this.orderRepository,
     this.productRepository,
     this.analyticsRepository,
+    this.customerRepository,
     this.themeController,
     this.authRepository,
     super.key,
@@ -44,6 +46,7 @@ class PopqSellerApp extends StatefulWidget {
   final SellerOrderRepository? orderRepository;
   final SellerProductRepository? productRepository;
   final SellerAnalyticsRepository? analyticsRepository;
+  final SellerCustomerRepository? customerRepository;
   final PopqThemeController? themeController;
   final SellerAuthRepository? authRepository;
 
@@ -60,24 +63,21 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final SessionStore _sessionStore;
   late final SessionController _sessionController;
 
-  late final SellerStoreSelectionController
-  _storeSelectionController;
+  late final SellerStoreSelectionController _storeSelectionController;
 
-  late final SellerBootstrapController
-  _bootstrapController;
+  late final SellerBootstrapController _bootstrapController;
 
   late final SellerStoreRepository _storeRepository;
 
-  late final SellerAnnouncementRepository
-  _announcementRepository;
+  late final SellerAnnouncementRepository _announcementRepository;
 
   late final SellerOrderRepository _orderRepository;
 
-  late final SellerProductRepository
-  _productRepository;
+  late final SellerProductRepository _productRepository;
 
-  late final SellerAnalyticsRepository
-  _analyticsRepository;
+  late final SellerAnalyticsRepository _analyticsRepository;
+
+  late final SellerCustomerRepository _customerRepository;
 
   late final SellerAuthRepository _authRepository;
 
@@ -87,8 +87,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final PopqApiClient _apiClient;
   late final GoRouter _router;
 
-  late final _SellerBackButtonDispatcher
-  _backButtonDispatcher;
+  late final _SellerBackButtonDispatcher _backButtonDispatcher;
 
   @override
   void initState() {
@@ -96,45 +95,39 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
     final useMemoryStorage =
         kIsWeb &&
-            widget.environment.flavor ==
-                AppFlavor.development;
+            widget.environment.flavor == AppFlavor.development;
 
     _sessionStore =
         widget.sessionStore ??
             (useMemoryStorage
                 ? MemorySessionStore()
                 : SecureSessionStore(
-              storageKey:
-              'popq.seller.auth.session.v1',
+              storageKey: 'popq.seller.auth.session.v1',
             ));
 
     _sessionController = SessionController(
       sessionStore: _sessionStore,
     );
 
-    _storeSelectionController =
-        SellerStoreSelectionController(
-          widget.storeSelectionStore ??
-              (useMemoryStorage
-                  ? MemorySellerStoreSelectionStore()
-                  : SharedPreferencesSellerStoreSelectionStore()),
-        );
+    _storeSelectionController = SellerStoreSelectionController(
+      widget.storeSelectionStore ??
+          (useMemoryStorage
+              ? MemorySellerStoreSelectionStore()
+              : SharedPreferencesSellerStoreSelectionStore()),
+    );
 
-    _ownsThemeController =
-        widget.themeController == null;
+    _ownsThemeController = widget.themeController == null;
 
     _themeController =
         widget.themeController ??
             PopqThemeController(
-              storageKey:
-              'popq.seller.theme.preference.v1',
+              storageKey: 'popq.seller.theme.preference.v1',
             );
 
     _apiClient = PopqApiClient(
       baseUrl: widget.environment.apiBaseUrl,
       accessTokenReader: () async {
-        final session =
-        await _sessionStore.read();
+        final session = await _sessionStore.read();
 
         return session?.accessToken;
       },
@@ -170,6 +163,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
               _apiClient,
             );
 
+    _customerRepository =
+        widget.customerRepository ??
+            ApiSellerCustomerRepository(
+              _apiClient,
+            );
+
     final identityRepository =
         widget.identityRepository ??
             ApiSellerIdentityRepository(
@@ -178,51 +177,43 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
     _authRepository =
         widget.authRepository ??
-            ApiSellerAuthRepository(_apiClient);
+            ApiSellerAuthRepository(
+              _apiClient,
+            );
 
-    _bootstrapController =
-        SellerBootstrapController(
-          sessionController:
-          _sessionController,
-          storeSelectionController:
-          _storeSelectionController,
-          identityRepository:
-          identityRepository,
-        );
+    _bootstrapController = SellerBootstrapController(
+      sessionController: _sessionController,
+      storeSelectionController: _storeSelectionController,
+      identityRepository: identityRepository,
+    );
 
     _router = createSellerRouter(
-      sessionController:
-      _sessionController,
-      bootstrapController:
-      _bootstrapController,
-      storeSelectionController:
-      _storeSelectionController,
-      storeRepository:
-      _storeRepository,
-      announcementRepository:
-      _announcementRepository,
-      orderRepository:
-      _orderRepository,
-      productRepository:
-      _productRepository,
-      analyticsRepository:
-      _analyticsRepository,
+      sessionController: _sessionController,
+      bootstrapController: _bootstrapController,
+      storeSelectionController: _storeSelectionController,
+      storeRepository: _storeRepository,
+      announcementRepository: _announcementRepository,
+      orderRepository: _orderRepository,
+      productRepository: _productRepository,
+      analyticsRepository: _analyticsRepository,
+      customerRepository: _customerRepository,
       onSignOut: _bootstrapController.signOut,
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onFindId: _findId,
+      onVerifyForPasswordReset: _verifyForPasswordReset,
+      onResetPassword: _resetPassword,
       themeController: _themeController,
       onDevelopmentSignIn:
-      widget.environment.flavor ==
-          AppFlavor.development
+      widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
     );
 
-    _backButtonDispatcher =
-        _SellerBackButtonDispatcher(
-          _router,
-          _scaffoldMessengerKey,
-        );
+    _backButtonDispatcher = _SellerBackButtonDispatcher(
+      _router,
+      _scaffoldMessengerKey,
+    );
 
     unawaited(
       Future.wait([
@@ -232,51 +223,78 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     );
   }
 
-  Future<void> _signIn(String email, String password) async {
+  Future<void> _signIn(
+      String email,
+      String password,
+      ) async {
     final result = await _authRepository.logIn(
       email: email,
       password: password,
     );
-    await _completeSignIn(result.session);
+
+    await _completeSignIn(
+      result.session,
+    );
   }
 
   Future<void> _signUp({
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) async {
-    final result = await _authRepository.signUp(
+    await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
     );
-    await _completeSignIn(result.session);
   }
 
-  Future<void> _completeSignIn(AuthSession session) async {
+  Future<String> _findId(String name, String phone) {
+    return _authRepository.findId(name: name, phone: phone);
+  }
+
+  Future<void> _verifyForPasswordReset(String email, String phone) {
+    return _authRepository.verifyForPasswordReset(email: email, phone: phone);
+  }
+
+  Future<void> _resetPassword(String email, String phone, String newPassword) {
+    return _authRepository.resetPassword(
+      email: email,
+      phone: phone,
+      newPassword: newPassword,
+    );
+  }
+
+  Future<void> _completeSignIn(
+      AuthSession session,
+      ) async {
     await _storeSelectionController.clear();
-    await _sessionController.save(session);
+
+    await _sessionController.save(
+      session,
+    );
+
     _bootstrapController.acknowledgeSellerSignIn();
 
     final stores = await _storeRepository.findAll();
+
     if (stores.length == 1) {
-      await _storeSelectionController.select(stores.single.storeId);
+      await _storeSelectionController.select(
+        stores.single.storeId,
+      );
     }
   }
 
   Future<void> _developmentSignIn() async {
-    final response =
-    await _apiClient.post<
+    final response = await _apiClient.post<
         Map<String, Object?>
     >(
       '/api/v1/dev/auth/login',
       body: {
-        'email':
-        'seller@popq.local',
-        'name':
-        'POPQ 테스트 판매자',
+        'email': 'map-seed@popq.local',
+        'name': 'POPQ 지도 테스트 판매자',
         'role': 'SELLER',
       },
       decode: (value) {
@@ -286,8 +304,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       },
     );
 
-    final user =
-    Map<String, Object?>.from(
+    final user = Map<String, Object?>.from(
       response['user'] as Map,
     );
 
@@ -297,21 +314,15 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       );
     }
 
-    final expiresIn =
-    (response['expiresIn'] as num)
-        .toInt();
+    final expiresIn = (response['expiresIn'] as num).toInt();
 
     await _storeSelectionController.clear();
 
     await _sessionController.save(
       AuthSession(
-        accessToken:
-        response['accessToken']
-        as String,
+        accessToken: response['accessToken'] as String,
         refreshToken: '',
-        expiresAt: DateTime.now()
-            .toUtc()
-            .add(
+        expiresAt: DateTime.now().toUtc().add(
           Duration(
             seconds: expiresIn,
           ),
@@ -319,16 +330,13 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       ),
     );
 
-    _bootstrapController
-        .acknowledgeSellerSignIn();
+    _bootstrapController.acknowledgeSellerSignIn();
 
-    final stores =
-    await _storeRepository.findAll();
+    final stores = await _storeRepository.findAll();
 
     if (stores.isEmpty) {
       final created =
-      await _storeRepository
-          .createDevelopmentStore();
+      await _storeRepository.createDevelopmentStore();
 
       await _storeSelectionController.select(
         created.storeId,
@@ -364,22 +372,16 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           title: 'POPQ Seller',
           debugShowCheckedModeBanner:
           !widget.environment.isProduction,
-          scaffoldMessengerKey:
-          _scaffoldMessengerKey,
+          scaffoldMessengerKey: _scaffoldMessengerKey,
           theme: SellerTheme.light(),
           darkTheme: SellerTheme.dark(),
-          themeMode:
-          _themeController.themeMode,
+          themeMode: _themeController.themeMode,
           routeInformationProvider:
-          _router
-              .routeInformationProvider,
+          _router.routeInformationProvider,
           routeInformationParser:
-          _router
-              .routeInformationParser,
-          routerDelegate:
-          _router.routerDelegate,
-          backButtonDispatcher:
-          _backButtonDispatcher,
+          _router.routeInformationParser,
+          routerDelegate: _router.routerDelegate,
+          backButtonDispatcher: _backButtonDispatcher,
         );
       },
     );
@@ -415,8 +417,7 @@ class _SellerBackButtonDispatcher
   Future<bool> invokeCallback(
       Future<bool> defaultValue,
       ) async {
-    final handledByRouter =
-    await super.invokeCallback(
+    final handledByRouter = await super.invokeCallback(
       defaultValue,
     );
 
@@ -427,11 +428,7 @@ class _SellerBackButtonDispatcher
     }
 
     final location = _normalizeLocation(
-      _router
-          .routeInformationProvider
-          .value
-          .uri
-          .path,
+      _router.routeInformationProvider.value.uri.path,
     );
 
     if (!_rootTabLocations.contains(location)) {
@@ -452,8 +449,7 @@ class _SellerBackButtonDispatcher
 
     final now = DateTime.now();
 
-    final previousPressedAt =
-        _lastBackPressedAt;
+    final previousPressedAt = _lastBackPressedAt;
 
     final shouldExit =
         previousPressedAt != null &&
@@ -470,8 +466,7 @@ class _SellerBackButtonDispatcher
 
     _lastBackPressedAt = now;
 
-    final messenger =
-        _scaffoldMessengerKey.currentState;
+    final messenger = _scaffoldMessengerKey.currentState;
 
     messenger
       ?..hideCurrentSnackBar()
@@ -480,8 +475,7 @@ class _SellerBackButtonDispatcher
           content: Text(
             '한 번 더 누르면 앱이 종료됩니다.',
           ),
-          duration:
-          _exitConfirmDuration,
+          duration: _exitConfirmDuration,
         ),
       );
 
