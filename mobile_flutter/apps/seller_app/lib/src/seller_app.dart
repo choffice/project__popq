@@ -207,12 +207,10 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       _productRepository,
       analyticsRepository:
       _analyticsRepository,
-      onSignOut:
-      _bootstrapController.signOut,
+      onSignOut: _bootstrapController.signOut,
       onSignIn: _signIn,
       onSignUp: _signUp,
-      themeController:
-      _themeController,
+      themeController: _themeController,
       onDevelopmentSignIn:
       widget.environment.flavor ==
           AppFlavor.development
