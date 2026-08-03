@@ -70,9 +70,6 @@ class _SignInScreenState extends State<SignInScreen> {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: PopqSpacing.xl),
-            const _ProviderButton(
-              label: 'Google로 계속하기',
-            ),
             _ProviderButton(
               label: 'Google로 계속하기',
               onPressed: widget.onGoogleSignIn == null || _busy
@@ -237,9 +234,6 @@ class _SignInScreenState extends State<SignInScreen> {
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({
-    required this.label,
-  });
   const _ProviderButton({required this.label, this.onPressed});
 
   final String label;
@@ -248,10 +242,6 @@ class _ProviderButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: null,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-      ),
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       child: Text(label),

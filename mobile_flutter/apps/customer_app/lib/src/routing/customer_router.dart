@@ -231,8 +231,6 @@ GoRouter createCustomerRouter({
           state.uri.queryParameters['from'];
 
           return SignInScreen(
-            onBackHome: () => context.go(CustomerRoutes.home),
-            onDevelopmentSignIn: onDevelopmentSignIn,
             onGoogleSignIn: onGoogleSignIn,
             onBackHome: () {
               context.go(
