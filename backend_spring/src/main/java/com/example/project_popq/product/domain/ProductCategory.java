@@ -21,11 +21,11 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(
-        name = "product_categories",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_product_categories_store_name",
-                columnNames = {"store_id", "name"}
-        )
+    name = "product_categories",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_product_categories_store_name",
+        columnNames = {"store_id", "name"}
+    )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ProductCategory extends BaseTimeEntity {
@@ -49,19 +49,42 @@ public class ProductCategory extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 30)
     private CatalogStatus status;
 
-    private ProductCategory(Store store, String name, int displayOrder) {
+    private ProductCategory(
+        Store store,
+        String name,
+        int displayOrder
+    ) {
         this.store = store;
         this.name = name;
         this.displayOrder = displayOrder;
         this.status = CatalogStatus.ACTIVE;
     }
 
-    public static ProductCategory create(Store store, String name, int displayOrder) {
-        return new ProductCategory(store, name, displayOrder);
+    public static ProductCategory create(
+        Store store,
+        String name,
+        int displayOrder
+    ) {
+        return new ProductCategory(
+            store,
+            name,
+            displayOrder
+        );
     }
 
-    public void update(String name, int displayOrder) {
+    public void update(
+        String name,
+        int displayOrder
+    ) {
         this.name = name;
         this.displayOrder = displayOrder;
+    }
+
+    public void delete() {
+        this.status = CatalogStatus.DELETED;
+    }
+
+    public boolean isDeleted() {
+        return this.status == CatalogStatus.DELETED;
     }
 }
