@@ -166,6 +166,23 @@ class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
           CustomerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
+
+  @override
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  }) {
+    return _apiClient.get(
+      '/api/v1/public/stores/$storeId/walking-route',
+      query: {
+        'startLatitude': startLocation.latitude,
+        'startLongitude': startLocation.longitude,
+      },
+      decode: (value) => StoreWalkingRoute.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
 }
 
 class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
@@ -228,6 +245,23 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
   @override
   Future<CustomerStore> findDetail(int storeId) async {
     return _stores.firstWhere((store) => store.storeId == storeId);
+  }
+
+  @override
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  }) async {
+    final store = _stores.firstWhere(
+          (store) => store.storeId == storeId,
+    );
+
+    final distanceMeters = store.distanceMeters ?? 500;
+
+    return StoreWalkingRoute(
+      distanceMeters: distanceMeters,
+      durationSeconds: (distanceMeters / 75).ceil() * 60,
+    );
   }
 
   @override
