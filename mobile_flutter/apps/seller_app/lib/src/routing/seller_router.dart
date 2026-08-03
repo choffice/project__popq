@@ -7,6 +7,8 @@ import '../features/announcements/seller_announcement_repository.dart';
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_sign_in_screen.dart';
 import '../features/auth/seller_sign_up_screen.dart';
+import '../features/customers/seller_customer_chat_screen.dart';
+import '../features/customers/seller_customer_repository.dart';
 import '../features/customers/seller_customer_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
 import '../features/operations/seller_operation_screen.dart';
@@ -27,6 +29,7 @@ abstract final class SellerRoutes {
   static const bootstrapError = '/bootstrap-error';
   static const signIn = '/sign-in';
   static const signUp = '/sign-up';
+
   static const dashboard = '/dashboard';
   static const storeRegistration = '/stores/register';
   static const operations = '/operations';
@@ -45,15 +48,18 @@ GoRouter createSellerRouter({
   required SellerOrderRepository orderRepository,
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
+  required SellerCustomerRepository customerRepository,
   required Future<void> Function() onSignOut,
-  required Future<void> Function(String email, String password) onSignIn,
+  required Future<void> Function(
+      String email,
+      String password,
+      ) onSignIn,
   required Future<void> Function({
-    required String email,
-    required String password,
-    required String name,
-    String? phone,
-  })
-  onSignUp,
+  required String email,
+  required String password,
+  required String name,
+  String? phone,
+  }) onSignUp,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
 }) {
@@ -159,16 +165,20 @@ GoRouter createSellerRouter({
         path: SellerRoutes.signIn,
         builder: (context, state) {
           return SellerSignInScreen(
-            roleMismatch: bootstrapController.roleMismatch,
+            roleMismatch:
+            bootstrapController.roleMismatch,
             onSignIn: onSignIn,
-            onDevelopmentSignIn: onDevelopmentSignIn,
+            onDevelopmentSignIn:
+            onDevelopmentSignIn,
           );
         },
       ),
       GoRoute(
         path: SellerRoutes.signUp,
         builder: (context, state) {
-          return SellerSignUpScreen(onSignUp: onSignUp);
+          return SellerSignUpScreen(
+            onSignUp: onSignUp,
+          );
         },
       ),
       GoRoute(
@@ -180,7 +190,9 @@ GoRouter createSellerRouter({
             return PopqErrorView(
               message: '화면 설정을 준비하지 못했어요.',
               onRetry: () {
-                context.go(SellerRoutes.dashboard);
+                context.go(
+                  SellerRoutes.dashboard,
+                );
               },
             );
           }
@@ -206,9 +218,26 @@ GoRouter createSellerRouter({
         builder: (context, state) {
           return SellerOrderDetailScreen(
             orderPublicId:
-            state.pathParameters['orderPublicId']!,
+            state.pathParameters[
+            'orderPublicId'
+            ]!,
             repository: orderRepository,
             storeRepository: storeRepository,
+            selectionController:
+            storeSelectionController,
+          );
+        },
+      ),
+      GoRoute(
+        path:
+        '${SellerRoutes.customers}/:orderPublicId',
+        builder: (context, state) {
+          return SellerCustomerChatScreen(
+            orderPublicId:
+            state.pathParameters[
+            'orderPublicId'
+            ]!,
+            repository: customerRepository,
             selectionController:
             storeSelectionController,
           );
@@ -237,7 +266,8 @@ GoRouter createSellerRouter({
             path: SellerRoutes.operations,
             builder: (context, state) {
               return SellerOperationScreen(
-                storeRepository: storeRepository,
+                storeRepository:
+                storeRepository,
                 announcementRepository:
                 announcementRepository,
                 productRepository:
@@ -260,14 +290,20 @@ GoRouter createSellerRouter({
           GoRoute(
             path: SellerRoutes.customers,
             builder: (context, state) {
-              return const SellerCustomerScreen();
+              return SellerCustomerScreen(
+                repository:
+                customerRepository,
+                selectionController:
+                storeSelectionController,
+              );
             },
           ),
           GoRoute(
             path: SellerRoutes.sales,
             builder: (context, state) {
               return SellerSalesScreen(
-                storeRepository: storeRepository,
+                storeRepository:
+                storeRepository,
                 analyticsRepository:
                 analyticsRepository,
                 selectionController:
