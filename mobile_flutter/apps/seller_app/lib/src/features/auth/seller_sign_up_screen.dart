@@ -28,6 +28,7 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   var _busy = false;
+  var _agreed = false;
   String? _errorMessage;
 
   static final _passwordPattern = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$');
@@ -138,7 +139,20 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: PopqSpacing.md),
+                  const SizedBox(height: PopqSpacing.sm),
+                  Row(
+                    children: [
+                      Checkbox(
+                        key: const Key('sign-up-agree'),
+                        value: _agreed,
+                        onChanged: (value) {
+                          setState(() => _agreed = value ?? false);
+                        },
+                      ),
+                      const Text('데이터 잘 쓸게요'),
+                    ],
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
                   FilledButton(
                     key: const Key('sign-up-submit'),
                     onPressed: _busy ? null : _submit,
@@ -166,6 +180,10 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_agreed) {
+      setState(() => _errorMessage = '데이터 이용에 동의해 주세요.');
+      return;
+    }
     setState(() {
       _busy = true;
       _errorMessage = null;
