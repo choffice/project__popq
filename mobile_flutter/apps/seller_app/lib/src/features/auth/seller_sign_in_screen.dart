@@ -122,7 +122,7 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                     ),
-                    child: Text(_busy ? '로그인 중...' : '이메일로 로그인'),
+                    child: Text(_busy ? '로그인 중...' : '로그인'),
                   ),
                 ],
               ),

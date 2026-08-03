@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/auth/customer_auth_repository.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
@@ -30,6 +31,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.cartController,
     this.permissionGateway,
     this.themeController,
+    this.authRepository,
     super.key,
   });
 
@@ -44,6 +46,7 @@ class PopqCustomerApp extends StatefulWidget {
   final CartController? cartController;
   final CustomerPermissionGateway? permissionGateway;
   final PopqThemeController? themeController;
+  final CustomerAuthRepository? authRepository;
 
   @override
   State<PopqCustomerApp> createState() =>
@@ -63,6 +66,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final bool _ownsThemeController;
   late final GoRouter _router;
   late final GoogleAuthService _googleAuthService;
+  late final CustomerAuthRepository _authRepository;
   late final _CustomerBackButtonDispatcher _backButtonDispatcher;
 
   @override
@@ -98,6 +102,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     _googleAuthService = GoogleAuthService(
       webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
     );
+
+    _authRepository =
+        widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
 
     final permissionGateway =
         widget.permissionGateway ??
@@ -165,6 +172,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           ? _developmentSignIn
           : null,
       onGoogleSignIn: _googleSignIn,
+      onSignIn: _signIn,
+      onSignUp: _signUp,
     );
 
     _backButtonDispatcher =
@@ -224,6 +233,29 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       ),
     );
   }
+  Future<void> _signIn(String email, String password) async {
+    final session = await _authRepository.logIn(
+      email: email,
+      password: password,
+    );
+    await _sessionController.save(session);
+  }
+
+  Future<void> _signUp({
+    required String email,
+    required String password,
+    required String name,
+    String? phone,
+  }) async {
+    final session = await _authRepository.signUp(
+      email: email,
+      password: password,
+      name: name,
+      phone: phone,
+    );
+    await _sessionController.save(session);
+  }
+
   Future<void> _googleSignIn() async {
     final idToken = await _googleAuthService.signInAndGetIdToken();
     debugPrint('Google idToken: $idToken');

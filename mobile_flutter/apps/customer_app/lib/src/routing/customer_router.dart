@@ -4,6 +4,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../customer_root_screen.dart';
+import '../features/auth/customer_sign_up_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_screen.dart';
@@ -35,6 +36,7 @@ abstract final class CustomerRoutes {
   static const onboardingError = '/onboarding-error';
   static const onboarding = '/onboarding';
   static const signIn = '/sign-in';
+  static const signUp = '/sign-up';
 
   static const home = '/home';
   static const discover = '/discover';
@@ -59,6 +61,14 @@ GoRouter createCustomerRouter({
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   required String tossClientKey,
+  required Future<void> Function(String email, String password) onSignIn,
+  required Future<void> Function({
+    required String email,
+    required String password,
+    required String name,
+    String? phone,
+  })
+  onSignUp,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
   Future<void> Function()? onGoogleSignIn,
@@ -86,6 +96,9 @@ GoRouter createCustomerRouter({
 
       final isSignIn =
           location == CustomerRoutes.signIn;
+
+      final isSignUp =
+          location == CustomerRoutes.signUp;
 
       final isRestoring =
           sessionController.status ==
@@ -157,7 +170,7 @@ GoRouter createCustomerRouter({
        * 로그인에 성공하면 사용자가 원래 접근하려던
        * 화면으로 돌아갑니다.
        */
-      if (isSignIn &&
+      if ((isSignIn || isSignUp) &&
           sessionController.isSignedIn) {
         return state.uri.queryParameters['from'] ??
             CustomerRoutes.home;
@@ -231,6 +244,7 @@ GoRouter createCustomerRouter({
           state.uri.queryParameters['from'];
 
           return SignInScreen(
+            onSignIn: onSignIn,
             onGoogleSignIn: onGoogleSignIn,
             onBackHome: () {
               context.go(
@@ -242,6 +256,12 @@ GoRouter createCustomerRouter({
             returnLocation:
             returnLocation,
           );
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.signUp,
+        builder: (context, state) {
+          return CustomerSignUpScreen(onSignUp: onSignUp);
         },
       ),
       GoRoute(
@@ -337,6 +357,7 @@ GoRouter createCustomerRouter({
             cartController,
             sessionController:
             sessionController,
+            onSignIn: onSignIn,
             onDevelopmentSignIn:
             onDevelopmentSignIn,
           );
