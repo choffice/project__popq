@@ -5,19 +5,11 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/kakao_store_map.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_SDK.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_SDK.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Flutter_Plugins.xml" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/settings.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/.metadata" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/.metadata" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/onboarding/onboarding_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/onboarding/onboarding_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/pubspec.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -50,6 +42,12 @@
               <path>
                 <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
                 <item name="backend_spring" type="f1a62948:ProjectNode" />
+                <item name="Tasks" type="e4a08cd1:TasksNode" />
+                <item name="build" type="c8890929:TasksNode$1" />
+              </path>
+              <path>
+                <item name="" type="6a2764b6:ExternalProjectsStructure$RootNode" />
+                <item name="backend_spring" type="f1a62948:ProjectNode" />
                 <item name="Run Configurations" type="7b0102dc:RunConfigurationsNode" />
               </path>
             </expand>
@@ -67,6 +65,11 @@
     </option>
   </component>
   <component name="Git.Settings">
+    <option name="RECENT_BRANCH_BY_REPOSITORY">
+      <map>
+        <entry key="$PROJECT_DIR$" value="ochang_main" />
+      </map>
+    </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
   <component name="GitHubPullRequestSearchHistory">{
@@ -78,7 +81,7 @@
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/choffice/project__popq.git&quot;,
-    &quot;accountId&quot;: &quot;d8161e0e-be11-4916-b4c4-2f1c79653a97&quot;
+    &quot;accountId&quot;: &quot;79dd1983-e26c-4af8-b560-8e974d0d7691&quot;
   }
 }</component>
   <component name="KubernetesApiPersistence">{}</component>
@@ -94,43 +97,43 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Flutter.main.dart.executor": "Run",
-    "Gradle.Build backend_spring.executor": "Run",
-    "Gradle.backend_spring [build].executor": "Run",
-    "Gradle.backend_spring [clean].executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RequestMappingsPanelOrder0": "0",
-    "RequestMappingsPanelOrder1": "1",
-    "RequestMappingsPanelWidth0": "75",
-    "RequestMappingsPanelWidth1": "75",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "Spring Boot.ProjectPopqApplication.executor": "Run",
-    "android.gradle.sync.needed": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "ochang",
-    "ignore.virus.scanning.warn.message": "true",
-    "io.flutter.reload.alreadyRun": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/akdtp/Desktop/AcademyProject/project__popq/project__popq/mobile_flutter/apps/customer_app/lib/src/features/discovery",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Project",
-    "project.structure.proportion": "0.15088758",
-    "project.structure.side.proportion": "0.3109756",
-    "settings.editor.selected.configurable": "dart.settings",
-    "show.migrate.to.gradle.popup": "false",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Flutter.main.dart.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Build backend_spring.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.backend_spring [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.backend_spring [clean].executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;Spring Boot.ProjectPopqApplication.executor&quot;: &quot;Run&quot;,
+    &quot;android.gradle.sync.needed&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;ochang&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;io.flutter.reload.alreadyRun&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/akdtp/Desktop/AcademyProject/project__popq/project__popq/mobile_flutter/apps/customer_app/lib/src/features/discovery&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15088758&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.3109756&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;dart.settings&quot;,
+    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
@@ -203,7 +206,7 @@
         <option value="$PROJECT_DIR$/.env.intellij" />
       </option>
       <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
-      <module name="backend_spring.main" />
+      <module name="com.example.backend_spring.main" />
       <option name="SPRING_BOOT_MAIN_CLASS" value="com.example.project_popq.ProjectPopqApplication" />
       <method v="2">
         <option name="Make" enabled="true" />
@@ -220,9 +223,9 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Flutter.main.dart" />
-        <item itemvalue="Gradle.backend_spring [clean]" />
         <item itemvalue="Gradle.backend_spring [build]" />
+        <item itemvalue="Gradle.backend_spring [clean]" />
+        <item itemvalue="Flutter.main.dart" />
       </list>
     </recent_temporary>
   </component>
@@ -244,6 +247,9 @@
       <workItem from="1785664828132" duration="724000" />
       <workItem from="1785665595517" duration="122000" />
       <workItem from="1785665730993" duration="6852000" />
+      <workItem from="1785719438060" duration="240000" />
+      <workItem from="1785719691191" duration="88000" />
+      <workItem from="1785719790457" duration="38000" />
     </task>
     <servers />
   </component>
