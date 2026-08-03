@@ -153,6 +153,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
             CartController();
 
     _router = createCustomerRouter(
+      onSignIn: _signIn,
+      onSignUp: _signUp,
+      onFindId: _findId,
+      onVerifyForPasswordReset: _verifyForPasswordReset,
+      onResetPassword: _resetPassword,
       sessionController: _sessionController,
       onboardingController:
       _onboardingController,
