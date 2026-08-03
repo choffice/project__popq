@@ -41,15 +41,30 @@ public class User extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 30)
     private UserStatus status;
 
-    private User(String email, String name, PlatformRole role) {
+    @Column(name = "password_hash", length = 255)
+    private String passwordHash;
+
+    private User(String email, String name, String phone, PlatformRole role, String passwordHash) {
         this.email = email;
         this.name = name;
+        this.phone = phone;
         this.role = role;
         this.status = UserStatus.ACTIVE;
+        this.passwordHash = passwordHash;
     }
 
     public static User create(String email, String name, PlatformRole role) {
-        return new User(email, name, role);
+        return new User(email, name, null, role, null);
+    }
+
+    public static User createWithPassword(
+            String email,
+            String name,
+            String phone,
+            PlatformRole role,
+            String passwordHash
+    ) {
+        return new User(email, name, phone, role, passwordHash);
     }
 
     public boolean isActive() {
