@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../routing/customer_router.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({
     required this.onBackHome,
+    required this.onSignIn,
+    this.onGoogleSignIn,
     this.onDevelopmentSignIn,
     this.returnResultOnSuccess = false,
     this.returnLocation,
@@ -12,6 +17,8 @@ class SignInScreen extends StatefulWidget {
   });
 
   final VoidCallback onBackHome;
+  final Future<void> Function(String email, String password) onSignIn;
+  final Future<void> Function()? onGoogleSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   /*
@@ -31,8 +38,18 @@ class SignInScreen extends StatefulWidget {
 }
 
 class _SignInScreenState extends State<SignInScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   var _busy = false;
   String? _errorMessage;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -68,8 +85,66 @@ class _SignInScreenState extends State<SignInScreen> {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: PopqSpacing.xl),
-            const _ProviderButton(
+            Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    key: const Key('sign-in-email'),
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(labelText: '이메일'),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '이메일을 입력해 주세요.';
+                      }
+                      if (!value.contains('@')) {
+                        return '올바른 이메일 형식이 아닙니다.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  TextFormField(
+                    key: const Key('sign-in-password'),
+                    controller: _password,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: '비밀번호'),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '비밀번호를 입력해 주세요.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: PopqSpacing.md),
+                  FilledButton(
+                    key: const Key('sign-in-submit'),
+                    onPressed: _busy ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                    child: Text(_busy ? '로그인 중...' : '로그인'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            TextButton(
+              key: const Key('go-to-sign-up'),
+              onPressed: _busy
+                  ? null
+                  : () => context.push(CustomerRoutes.signUp),
+              child: const Text('아직 계정이 없으신가요? 회원가입'),
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            const Divider(),
+            const SizedBox(height: PopqSpacing.md),
+            _ProviderButton(
               label: 'Google로 계속하기',
+              onPressed: widget.onGoogleSignIn == null || _busy
+                  ? null
+                  : _handleGoogleSignIn,
             ),
             const SizedBox(height: PopqSpacing.sm),
             const _ProviderButton(
@@ -151,29 +226,7 @@ class _SignInScreenState extends State<SignInScreen> {
         return;
       }
 
-      /*
-       * 장바구니에서 전체 화면 모달로 로그인한 경우:
-       * 로그인 화면 자체를 제거하면서 성공 결과를 반환합니다.
-       *
-       * Navigator.pop을 사용하므로 로그인 화면이
-       * GoRouter의 뒤로가기 기록에 남지 않습니다.
-       */
-      if (widget.returnResultOnSuccess) {
-        final navigator = Navigator.of(context);
-
-        if (navigator.canPop()) {
-          navigator.pop(true);
-          return;
-        }
-      }
-
-      /*
-       * 마이페이지 등의 보호 경로에서 라우터를 통해
-       * 로그인 화면으로 들어온 경우에는 기존 방식으로 이동합니다.
-       */
-      context.go(
-        _safeReturnLocation(widget.returnLocation),
-      );
+      _handleSignInSuccess();
     } catch (error, stackTrace) {
       debugPrint('개발 로그인 오류: $error');
       debugPrintStack(stackTrace: stackTrace);
@@ -185,6 +238,70 @@ class _SignInScreenState extends State<SignInScreen> {
       setState(() {
         _busy = false;
         _errorMessage = '로그인 실패: $error';
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onSignIn(_email.text.trim(), _password.text);
+
+      if (!mounted) return;
+
+      _handleSignInSuccess();
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = failure.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = '로그인에 실패했습니다. 다시 시도해 주세요.';
+      });
+    }
+  }
+
+  /*
+   * 개발 로그인·이메일 로그인 성공 시 동일하게 처리합니다.
+   * 장바구니 모달로 열린 경우 결과를 반환하며 닫고,
+   * 그 외에는 원래 접근하려던 경로로 이동합니다.
+   */
+  void _handleSignInSuccess() {
+    if (widget.returnResultOnSuccess) {
+      final navigator = Navigator.of(context);
+
+      if (navigator.canPop()) {
+        navigator.pop(true);
+        return;
+      }
+    }
+
+    context.go(_safeReturnLocation(widget.returnLocation));
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+    try {
+      await widget.onGoogleSignIn!();
+    } catch (e) {
+      debugPrint('Google 로그인 에러: $e');
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _errorMessage = 'Google 로그인에 실패했습니다.';
       });
     }
   }
@@ -212,19 +329,16 @@ class _SignInScreenState extends State<SignInScreen> {
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({
-    required this.label,
-  });
+  const _ProviderButton({required this.label, this.onPressed});
 
   final String label;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: null,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-      ),
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       child: Text(label),
     );
   }

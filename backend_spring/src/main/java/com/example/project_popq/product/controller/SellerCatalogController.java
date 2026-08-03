@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -40,140 +41,175 @@ public class SellerCatalogController {
 
     @GetMapping("/categories")
     public ApiResponse<List<CategoryResponse>> findCategories(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
     ) {
         return ApiResponse.success(
-                catalogService.findCategories(
-                        currentUserService.getRequired(jwt),
-                        storeId
-                )
+            catalogService.findCategories(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
         );
     }
 
     @PostMapping("/categories")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody CreateCategoryRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody CreateCategoryRequest request
     ) {
         CategoryResponse created = catalogService.createCategory(
-                currentUserService.getRequired(jwt),
-                storeId,
-                request
+            currentUserService.getRequired(jwt),
+            storeId,
+            request
         );
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 
     @PatchMapping("/categories/{categoryId}")
     public ApiResponse<CategoryResponse> updateCategory(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @PathVariable Long categoryId,
-            @Valid @RequestBody UpdateCategoryRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long categoryId,
+        @Valid @RequestBody UpdateCategoryRequest request
     ) {
         return ApiResponse.success(
-                catalogService.updateCategory(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        categoryId,
-                        request
-                )
+            catalogService.updateCategory(
+                currentUserService.getRequired(jwt),
+                storeId,
+                categoryId,
+                request
+            )
         );
+    }
+
+    @DeleteMapping("/categories/{categoryId}")
+    public ApiResponse<Boolean> deleteCategory(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long categoryId
+    ) {
+        catalogService.deleteCategory(
+            currentUserService.getRequired(jwt),
+            storeId,
+            categoryId
+        );
+
+        return ApiResponse.success(true);
     }
 
     @GetMapping("/products")
     public ApiResponse<List<ProductSummaryResponse>> findProducts(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
     ) {
         return ApiResponse.success(
-                catalogService.findSellerProducts(
-                        currentUserService.getRequired(jwt),
-                        storeId
-                )
+            catalogService.findSellerProducts(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
         );
     }
 
     @PostMapping("/products")
     public ResponseEntity<ApiResponse<ProductDetailResponse>> createProduct(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody CreateProductRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody CreateProductRequest request
     ) {
-        ProductDetailResponse created = catalogService.createProduct(
+        ProductDetailResponse created =
+            catalogService.createProduct(
                 currentUserService.getRequired(jwt),
                 storeId,
                 request
-        );
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 
     @GetMapping("/products/{productId}")
     public ApiResponse<ProductDetailResponse> findProduct(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @PathVariable Long productId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long productId
     ) {
         return ApiResponse.success(
-                catalogService.findSellerProduct(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        productId
-                )
+            catalogService.findSellerProduct(
+                currentUserService.getRequired(jwt),
+                storeId,
+                productId
+            )
         );
     }
 
     @PatchMapping("/products/{productId}")
     public ApiResponse<ProductDetailResponse> updateProduct(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @PathVariable Long productId,
-            @Valid @RequestBody UpdateProductRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long productId,
+        @Valid @RequestBody UpdateProductRequest request
     ) {
         return ApiResponse.success(
-                catalogService.updateProduct(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        productId,
-                        request
-                )
+            catalogService.updateProduct(
+                currentUserService.getRequired(jwt),
+                storeId,
+                productId,
+                request
+            )
         );
+    }
+
+    @DeleteMapping("/products/{productId}")
+    public ApiResponse<Boolean> deleteProduct(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long productId
+    ) {
+        catalogService.deleteProduct(
+            currentUserService.getRequired(jwt),
+            storeId,
+            productId
+        );
+
+        return ApiResponse.success(true);
     }
 
     @PutMapping("/products/{productId}/options")
     public ApiResponse<ProductDetailResponse> replaceOptions(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @PathVariable Long productId,
-            @Valid @RequestBody ReplaceProductOptionsRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long productId,
+        @Valid @RequestBody ReplaceProductOptionsRequest request
     ) {
         return ApiResponse.success(
-                catalogService.replaceOptions(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        productId,
-                        request
-                )
+            catalogService.replaceOptions(
+                currentUserService.getRequired(jwt),
+                storeId,
+                productId,
+                request
+            )
         );
     }
 
     @PatchMapping("/products/{productId}/availability")
     public ApiResponse<ProductDetailResponse> updateAvailability(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @PathVariable Long productId,
-            @RequestBody UpdateAvailabilityRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @PathVariable Long productId,
+        @RequestBody UpdateAvailabilityRequest request
     ) {
         return ApiResponse.success(
-                catalogService.updateAvailability(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        productId,
-                        request
-                )
+            catalogService.updateAvailability(
+                currentUserService.getRequired(jwt),
+                storeId,
+                productId,
+                request
+            )
         );
     }
 }

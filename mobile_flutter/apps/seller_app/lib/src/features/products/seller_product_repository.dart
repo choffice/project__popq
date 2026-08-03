@@ -9,12 +9,17 @@ class SellerCategory {
     this.status = 'ACTIVE',
   });
 
-  factory SellerCategory.fromJson(int storeId, Map<String, Object?> json) {
+  factory SellerCategory.fromJson(
+      int storeId,
+      Map<String, Object?> json,
+      ) {
     return SellerCategory(
       storeId: storeId,
-      categoryId: (json['categoryId'] as num).toInt(),
+      categoryId:
+      (json['categoryId'] as num).toInt(),
       name: json['name'] as String,
-      displayOrder: (json['displayOrder'] as num).toInt(),
+      displayOrder:
+      (json['displayOrder'] as num).toInt(),
       status: json['status'] as String,
     );
   }
@@ -33,11 +38,15 @@ class SellerProductOption {
     required this.displayOrder,
   });
 
-  factory SellerProductOption.fromJson(Map<String, Object?> json) {
+  factory SellerProductOption.fromJson(
+      Map<String, Object?> json,
+      ) {
     return SellerProductOption(
       name: json['name'] as String,
-      additionalPrice: (json['additionalPrice'] as num).toInt(),
-      displayOrder: (json['displayOrder'] as num).toInt(),
+      additionalPrice:
+      (json['additionalPrice'] as num).toInt(),
+      displayOrder:
+      (json['displayOrder'] as num).toInt(),
     );
   }
 
@@ -45,11 +54,13 @@ class SellerProductOption {
   final int additionalPrice;
   final int displayOrder;
 
-  Map<String, Object?> toJson() => {
-    'name': name,
-    'additionalPrice': additionalPrice,
-    'displayOrder': displayOrder,
-  };
+  Map<String, Object?> toJson() {
+    return {
+      'name': name,
+      'additionalPrice': additionalPrice,
+      'displayOrder': displayOrder,
+    };
+  }
 }
 
 class SellerProductOptionGroup {
@@ -62,19 +73,27 @@ class SellerProductOptionGroup {
     required this.options,
   });
 
-  factory SellerProductOptionGroup.fromJson(Map<String, Object?> json) {
+  factory SellerProductOptionGroup.fromJson(
+      Map<String, Object?> json,
+      ) {
     return SellerProductOptionGroup(
       name: json['name'] as String,
-      minSelect: (json['minSelect'] as num).toInt(),
-      maxSelect: (json['maxSelect'] as num).toInt(),
+      minSelect:
+      (json['minSelect'] as num).toInt(),
+      maxSelect:
+      (json['maxSelect'] as num).toInt(),
       required: json['required'] as bool,
-      displayOrder: (json['displayOrder'] as num).toInt(),
+      displayOrder:
+      (json['displayOrder'] as num).toInt(),
       options: (json['options'] as List<Object?>)
           .map(
-            (item) => SellerProductOption.fromJson(
-              Map<String, Object?>.from(item as Map),
+            (Object? item) =>
+            SellerProductOption.fromJson(
+              Map<String, Object?>.from(
+                item as Map,
+              ),
             ),
-          )
+      )
           .toList(),
     );
   }
@@ -86,14 +105,21 @@ class SellerProductOptionGroup {
   final int displayOrder;
   final List<SellerProductOption> options;
 
-  Map<String, Object?> toJson() => {
-    'name': name,
-    'minSelect': minSelect,
-    'maxSelect': maxSelect,
-    'required': required,
-    'displayOrder': displayOrder,
-    'options': options.map((item) => item.toJson()).toList(),
-  };
+  Map<String, Object?> toJson() {
+    return {
+      'name': name,
+      'minSelect': minSelect,
+      'maxSelect': maxSelect,
+      'required': required,
+      'displayOrder': displayOrder,
+      'options': options
+          .map(
+            (SellerProductOption item) =>
+            item.toJson(),
+      )
+          .toList(),
+    };
+  }
 }
 
 class SellerProductDetail {
@@ -103,7 +129,8 @@ class SellerProductDetail {
   });
 
   final SellerProduct product;
-  final List<SellerProductOptionGroup> optionGroups;
+  final List<SellerProductOptionGroup>
+  optionGroups;
 }
 
 class SellerProduct {
@@ -126,24 +153,39 @@ class SellerProduct {
     this.salesEndAt,
   });
 
-  factory SellerProduct.fromJson(int storeId, Map<String, Object?> json) {
+  factory SellerProduct.fromJson(
+      int storeId,
+      Map<String, Object?> json,
+      ) {
     return SellerProduct(
-      productId: (json['productId'] as num).toInt(),
+      productId:
+      (json['productId'] as num).toInt(),
       storeId: storeId,
-      categoryId: (json['categoryId'] as num).toInt(),
-      categoryName: json['categoryName'] as String,
+      categoryId:
+      (json['categoryId'] as num).toInt(),
+      categoryName:
+      json['categoryName'] as String,
       name: json['name'] as String,
-      description: json['description'] as String?,
+      description:
+      json['description'] as String?,
       imageUrl: json['imageUrl'] as String?,
-      basePrice: (json['basePrice'] as num).toInt(),
+      basePrice:
+      (json['basePrice'] as num).toInt(),
       status: json['status'] as String,
       soldOut: json['soldOut'] as bool,
-      availableForQr: json['availableForQr'] as bool,
-      availableForCustomerApp: json['availableForCustomerApp'] as bool,
-      salesStartAt: json['salesStartAt'] as String?,
-      salesEndAt: json['salesEndAt'] as String?,
-      qrWebEnabled: json['qrWebEnabled'] as bool,
-      customerAppEnabled: json['customerAppEnabled'] as bool,
+      availableForQr:
+      json['availableForQr'] as bool,
+      availableForCustomerApp:
+      json['availableForCustomerApp']
+      as bool,
+      salesStartAt:
+      json['salesStartAt'] as String?,
+      salesEndAt:
+      json['salesEndAt'] as String?,
+      qrWebEnabled:
+      json['qrWebEnabled'] as bool,
+      customerAppEnabled:
+      json['customerAppEnabled'] as bool,
     );
   }
 
@@ -180,161 +222,246 @@ class SellerProduct {
     return SellerProduct(
       productId: productId,
       storeId: storeId,
-      categoryId: categoryId ?? this.categoryId,
-      categoryName: categoryName ?? this.categoryName,
+      categoryId:
+      categoryId ?? this.categoryId,
+      categoryName:
+      categoryName ?? this.categoryName,
       name: name ?? this.name,
-      description: description ?? this.description,
+      description:
+      description ?? this.description,
       imageUrl: imageUrl ?? this.imageUrl,
       basePrice: basePrice ?? this.basePrice,
       status: status,
       soldOut: soldOut ?? this.soldOut,
-      availableForQr: availableForQr ?? this.availableForQr,
+      availableForQr:
+      availableForQr ?? this.availableForQr,
       availableForCustomerApp:
-          availableForCustomerApp ?? this.availableForCustomerApp,
+      availableForCustomerApp ??
+          this.availableForCustomerApp,
       salesStartAt: salesStartAt,
       salesEndAt: salesEndAt,
-      qrWebEnabled: qrWebEnabled ?? this.qrWebEnabled,
-      customerAppEnabled: customerAppEnabled ?? this.customerAppEnabled,
+      qrWebEnabled:
+      qrWebEnabled ?? this.qrWebEnabled,
+      customerAppEnabled:
+      customerAppEnabled ??
+          this.customerAppEnabled,
     );
   }
 }
 
-abstract interface class SellerProductRepository {
-  Future<List<SellerCategory>> findCategories(int storeId);
+abstract interface class
+SellerProductRepository {
+  Future<List<SellerCategory>> findCategories(
+      int storeId,
+      );
 
   Future<SellerCategory> createCategory(
-    int storeId, {
-    required String name,
-    required int displayOrder,
-  });
+      int storeId, {
+        required String name,
+        required int displayOrder,
+      });
 
   Future<SellerCategory> updateCategory(
-    int storeId,
-    int categoryId, {
-    required String name,
-    required int displayOrder,
-  });
+      int storeId,
+      int categoryId, {
+        required String name,
+        required int displayOrder,
+      });
 
-  Future<List<SellerProduct>> findAll(int storeId);
+  Future<void> deleteCategory(
+      int storeId,
+      int categoryId,
+      );
+
+  Future<List<SellerProduct>> findAll(
+      int storeId,
+      );
 
   Future<SellerProduct> create(
-    int storeId, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  });
+      int storeId, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      });
 
   Future<SellerProduct> update(
-    int storeId,
-    SellerProduct product, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  });
+      int storeId,
+      SellerProduct product, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      });
 
-  Future<SellerProductDetail> findOne(int storeId, SellerProduct product);
+  Future<void> deleteProduct(
+      int storeId,
+      SellerProduct product,
+      );
+
+  Future<SellerProductDetail> findOne(
+      int storeId,
+      SellerProduct product,
+      );
 
   Future<SellerProductDetail> replaceOptions(
-    int storeId,
-    SellerProduct product,
-    List<SellerProductOptionGroup> groups,
-  );
+      int storeId,
+      SellerProduct product,
+      List<SellerProductOptionGroup> groups,
+      );
 
   Future<SellerProduct> updateAvailability(
-    int storeId,
-    SellerProduct product, {
-    bool? soldOut,
-    bool? qrWebEnabled,
-    bool? customerAppEnabled,
-  });
+      int storeId,
+      SellerProduct product, {
+        bool? soldOut,
+        bool? qrWebEnabled,
+        bool? customerAppEnabled,
+      });
 }
 
-class ApiSellerProductRepository implements SellerProductRepository {
-  ApiSellerProductRepository(this._apiClient);
+class ApiSellerProductRepository
+    implements SellerProductRepository {
+  ApiSellerProductRepository(
+      this._apiClient,
+      );
 
   final PopqApiClient _apiClient;
 
-  String _basePath(int storeId) => '/api/v1/seller/stores/$storeId/products';
+  String _basePath(int storeId) {
+    return '/api/v1/seller/stores/'
+        '$storeId/products';
+  }
 
-  String _categoryPath(int storeId) =>
-      '/api/v1/seller/stores/$storeId/categories';
+  String _categoryPath(int storeId) {
+    return '/api/v1/seller/stores/'
+        '$storeId/categories';
+  }
 
   @override
-  Future<List<SellerCategory>> findCategories(int storeId) {
+  Future<List<SellerCategory>>
+  findCategories(
+      int storeId,
+      ) {
     return _apiClient.get(
       _categoryPath(storeId),
-      decode: (value) => (value as List<Object?>)
-          .map(
-            (item) => SellerCategory.fromJson(
-              storeId,
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
-          .toList(),
+      decode: (Object? value) {
+        return (value as List<Object?>)
+            .map(
+              (Object? item) =>
+              SellerCategory.fromJson(
+                storeId,
+                Map<String, Object?>.from(
+                  item as Map,
+                ),
+              ),
+        )
+            .toList();
+      },
     );
   }
 
   @override
   Future<SellerCategory> createCategory(
-    int storeId, {
-    required String name,
-    required int displayOrder,
-  }) {
+      int storeId, {
+        required String name,
+        required int displayOrder,
+      }) {
     return _apiClient.post(
       _categoryPath(storeId),
-      body: {'name': name, 'displayOrder': displayOrder},
-      decode: (value) => SellerCategory.fromJson(
-        storeId,
-        Map<String, Object?>.from(value as Map),
-      ),
+      body: {
+        'name': name,
+        'displayOrder': displayOrder,
+      },
+      decode: (Object? value) {
+        return SellerCategory.fromJson(
+          storeId,
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
   }
 
   @override
   Future<SellerCategory> updateCategory(
-    int storeId,
-    int categoryId, {
-    required String name,
-    required int displayOrder,
-  }) {
+      int storeId,
+      int categoryId, {
+        required String name,
+        required int displayOrder,
+      }) {
     return _apiClient.patch(
-      '${_categoryPath(storeId)}/$categoryId',
-      body: {'name': name, 'displayOrder': displayOrder},
-      decode: (value) => SellerCategory.fromJson(
-        storeId,
-        Map<String, Object?>.from(value as Map),
-      ),
+      '${_categoryPath(storeId)}/'
+          '$categoryId',
+      body: {
+        'name': name,
+        'displayOrder': displayOrder,
+      },
+      decode: (Object? value) {
+        return SellerCategory.fromJson(
+          storeId,
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
     );
   }
 
   @override
-  Future<List<SellerProduct>> findAll(int storeId) {
+  Future<void> deleteCategory(
+      int storeId,
+      int categoryId,
+      ) async {
+    final bool deleted =
+    await _apiClient.delete(
+      '${_categoryPath(storeId)}/'
+          '$categoryId',
+      decode: (Object? value) {
+        return value as bool;
+      },
+    );
+
+    if (!deleted) {
+      throw StateError(
+        'category delete failed',
+      );
+    }
+  }
+
+  @override
+  Future<List<SellerProduct>> findAll(
+      int storeId,
+      ) {
     return _apiClient.get(
       _basePath(storeId),
-      decode: (value) => (value as List<Object?>)
-          .map(
-            (item) => SellerProduct.fromJson(
-              storeId,
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
-          .toList(),
+      decode: (Object? value) {
+        return (value as List<Object?>)
+            .map(
+              (Object? item) =>
+              SellerProduct.fromJson(
+                storeId,
+                Map<String, Object?>.from(
+                  item as Map,
+                ),
+              ),
+        )
+            .toList();
+      },
     );
   }
 
   @override
   Future<SellerProduct> create(
-    int storeId, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  }) {
+      int storeId, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      }) {
     return _apiClient.post(
       _basePath(storeId),
       body: {
@@ -344,25 +471,33 @@ class ApiSellerProductRepository implements SellerProductRepository {
         'imageUrl': imageUrl,
         'basePrice': basePrice,
       },
-      decode: (value) => _decodeDetailProduct(storeId, value),
+      decode: (Object? value) {
+        return _decodeDetailProduct(
+          storeId,
+          value,
+        );
+      },
     );
   }
 
   @override
   Future<SellerProduct> update(
-    int storeId,
-    SellerProduct product, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  }) {
-    if (product.storeId != storeId) {
-      throw StateError('product does not belong to selected store');
-    }
+      int storeId,
+      SellerProduct product, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      }) {
+    _validateProductStore(
+      storeId,
+      product,
+    );
+
     return _apiClient.patch(
-      '${_basePath(storeId)}/${product.productId}',
+      '${_basePath(storeId)}/'
+          '${product.productId}',
       body: {
         'categoryId': categoryId,
         'name': name,
@@ -370,119 +505,266 @@ class ApiSellerProductRepository implements SellerProductRepository {
         'imageUrl': imageUrl,
         'basePrice': basePrice,
       },
-      decode: (value) => _decodeDetailProduct(storeId, value),
+      decode: (Object? value) {
+        return _decodeDetailProduct(
+          storeId,
+          value,
+        );
+      },
     );
   }
 
-  SellerProduct _decodeDetailProduct(int storeId, Object? value) {
-    final detail = Map<String, Object?>.from(value as Map);
+  @override
+  Future<void> deleteProduct(
+      int storeId,
+      SellerProduct product,
+      ) async {
+    _validateProductStore(
+      storeId,
+      product,
+    );
+
+    final bool deleted =
+    await _apiClient.delete(
+      '${_basePath(storeId)}/'
+          '${product.productId}',
+      decode: (Object? value) {
+        return value as bool;
+      },
+    );
+
+    if (!deleted) {
+      throw StateError(
+        'product delete failed',
+      );
+    }
+  }
+
+  SellerProduct _decodeDetailProduct(
+      int storeId,
+      Object? value,
+      ) {
+    final Map<String, Object?> detail =
+    Map<String, Object?>.from(
+      value as Map,
+    );
+
     return SellerProduct.fromJson(
       storeId,
-      Map<String, Object?>.from(detail['product'] as Map),
+      Map<String, Object?>.from(
+        detail['product'] as Map,
+      ),
     );
   }
 
-  SellerProductDetail _decodeDetail(int storeId, Object? value) {
-    final detail = Map<String, Object?>.from(value as Map);
+  SellerProductDetail _decodeDetail(
+      int storeId,
+      Object? value,
+      ) {
+    final Map<String, Object?> detail =
+    Map<String, Object?>.from(
+      value as Map,
+    );
+
     return SellerProductDetail(
       product: SellerProduct.fromJson(
         storeId,
-        Map<String, Object?>.from(detail['product'] as Map),
+        Map<String, Object?>.from(
+          detail['product'] as Map,
+        ),
       ),
-      optionGroups: (detail['optionGroups'] as List<Object?>)
+      optionGroups:
+      (detail['optionGroups']
+      as List<Object?>)
           .map(
-            (item) => SellerProductOptionGroup.fromJson(
-              Map<String, Object?>.from(item as Map),
+            (Object? item) =>
+            SellerProductOptionGroup
+                .fromJson(
+              Map<String, Object?>.from(
+                item as Map,
+              ),
             ),
-          )
+      )
           .toList(),
     );
   }
 
   @override
   Future<SellerProductDetail> findOne(
-    int storeId,
-    SellerProduct product,
-  ) {
-    if (product.storeId != storeId) {
-      throw StateError('product does not belong to selected store');
-    }
+      int storeId,
+      SellerProduct product,
+      ) {
+    _validateProductStore(
+      storeId,
+      product,
+    );
+
     return _apiClient.get(
-      '${_basePath(storeId)}/${product.productId}',
-      decode: (value) => _decodeDetail(storeId, value),
-    );
-  }
-
-  @override
-  Future<SellerProductDetail> replaceOptions(
-    int storeId,
-    SellerProduct product,
-    List<SellerProductOptionGroup> groups,
-  ) {
-    if (product.storeId != storeId) {
-      throw StateError('product does not belong to selected store');
-    }
-    return _apiClient.put(
-      '${_basePath(storeId)}/${product.productId}/options',
-      body: {'groups': groups.map((item) => item.toJson()).toList()},
-      decode: (value) => _decodeDetail(storeId, value),
-    );
-  }
-
-  @override
-  Future<SellerProduct> updateAvailability(
-    int storeId,
-    SellerProduct product, {
-    bool? soldOut,
-    bool? qrWebEnabled,
-    bool? customerAppEnabled,
-  }) {
-    if (product.storeId != storeId) {
-      throw StateError('product does not belong to selected store');
-    }
-    return _apiClient.patch(
-      '${_basePath(storeId)}/${product.productId}/availability',
-      body: {
-        'soldOut': soldOut ?? product.soldOut,
-        'salesStartAt': product.salesStartAt,
-        'salesEndAt': product.salesEndAt,
-        'qrWebEnabled': qrWebEnabled ?? product.qrWebEnabled,
-        'customerAppEnabled': customerAppEnabled ?? product.customerAppEnabled,
-      },
-      decode: (value) {
-        final detail = Map<String, Object?>.from(value as Map);
-        return SellerProduct.fromJson(
+      '${_basePath(storeId)}/'
+          '${product.productId}',
+      decode: (Object? value) {
+        return _decodeDetail(
           storeId,
-          Map<String, Object?>.from(detail['product'] as Map),
+          value,
         );
       },
     );
   }
+
+  @override
+  Future<SellerProductDetail>
+  replaceOptions(
+      int storeId,
+      SellerProduct product,
+      List<SellerProductOptionGroup> groups,
+      ) {
+    _validateProductStore(
+      storeId,
+      product,
+    );
+
+    return _apiClient.put(
+      '${_basePath(storeId)}/'
+          '${product.productId}/options',
+      body: {
+        'groups': groups
+            .map(
+              (
+              SellerProductOptionGroup item,
+              ) =>
+              item.toJson(),
+        )
+            .toList(),
+      },
+      decode: (Object? value) {
+        return _decodeDetail(
+          storeId,
+          value,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<SellerProduct>
+  updateAvailability(
+      int storeId,
+      SellerProduct product, {
+        bool? soldOut,
+        bool? qrWebEnabled,
+        bool? customerAppEnabled,
+      }) {
+    _validateProductStore(
+      storeId,
+      product,
+    );
+
+    return _apiClient.patch(
+      '${_basePath(storeId)}/'
+          '${product.productId}/availability',
+      body: {
+        'soldOut':
+        soldOut ?? product.soldOut,
+        'salesStartAt':
+        product.salesStartAt,
+        'salesEndAt': product.salesEndAt,
+        'qrWebEnabled':
+        qrWebEnabled ??
+            product.qrWebEnabled,
+        'customerAppEnabled':
+        customerAppEnabled ??
+            product.customerAppEnabled,
+      },
+      decode: (Object? value) {
+        final Map<String, Object?> detail =
+        Map<String, Object?>.from(
+          value as Map,
+        );
+
+        return SellerProduct.fromJson(
+          storeId,
+          Map<String, Object?>.from(
+            detail['product'] as Map,
+          ),
+        );
+      },
+    );
+  }
+
+  void _validateProductStore(
+      int storeId,
+      SellerProduct product,
+      ) {
+    if (product.storeId != storeId) {
+      throw StateError(
+        'product does not belong to '
+            'selected store',
+      );
+    }
+  }
 }
 
-class MemorySellerProductRepository implements SellerProductRepository {
+class MemorySellerProductRepository
+    implements SellerProductRepository {
   MemorySellerProductRepository({
-    List<SellerProduct> products = const [],
-    List<SellerCategory> categories = const [],
-    Map<int, List<SellerProductOptionGroup>> optionGroups = const {},
-  }) : _products = List.of(products),
-       _categories = List.of(categories),
-       _optionGroups = optionGroups.map(
-         (key, value) => MapEntry(key, List.of(value)),
-       ) {
-    for (final product in products) {
-      if (_categories.every(
-        (item) =>
-            item.storeId != product.storeId ||
-            item.categoryId != product.categoryId,
-      )) {
+    List<SellerProduct> products =
+    const <SellerProduct>[],
+    List<SellerCategory> categories =
+    const <SellerCategory>[],
+    Map<int, List<SellerProductOptionGroup>>
+    optionGroups =
+    const <
+        int,
+        List<
+            SellerProductOptionGroup>>{},
+  })  : _products =
+  List<SellerProduct>.of(
+    products,
+  ),
+        _categories =
+        List<SellerCategory>.of(
+          categories,
+        ),
+        _optionGroups = optionGroups.map(
+              (
+              int key,
+              List<SellerProductOptionGroup>
+              value,
+              ) {
+            return MapEntry(
+              key,
+              List<SellerProductOptionGroup>
+                  .of(value),
+            );
+          },
+        ) {
+    for (final SellerProduct product
+    in products) {
+      final bool categoryExists =
+      _categories.any(
+            (SellerCategory item) {
+          return item.storeId ==
+              product.storeId &&
+              item.categoryId ==
+                  product.categoryId;
+        },
+      );
+
+      if (!categoryExists) {
         _categories.add(
           SellerCategory(
             storeId: product.storeId,
-            categoryId: product.categoryId,
+            categoryId:
+            product.categoryId,
             name: product.categoryName,
             displayOrder: _categories
-                .where((item) => item.storeId == product.storeId)
+                .where(
+                  (
+                  SellerCategory item,
+                  ) =>
+              item.storeId ==
+                  product.storeId,
+            )
                 .length,
           ),
         );
@@ -492,91 +774,212 @@ class MemorySellerProductRepository implements SellerProductRepository {
 
   final List<SellerProduct> _products;
   final List<SellerCategory> _categories;
-  final Map<int, List<SellerProductOptionGroup>> _optionGroups;
+  final Map<
+      int,
+      List<SellerProductOptionGroup>>
+  _optionGroups;
 
   @override
-  Future<List<SellerCategory>> findCategories(int storeId) async {
-    final result = <SellerCategory>[
-      ..._categories.where((item) => item.storeId == storeId),
+  Future<List<SellerCategory>>
+  findCategories(
+      int storeId,
+      ) async {
+    final List<SellerCategory> result =
+    <SellerCategory>[
+      ..._categories.where(
+            (SellerCategory item) =>
+        item.storeId == storeId,
+      ),
     ];
-    result.sort((left, right) => left.displayOrder.compareTo(right.displayOrder));
-    return List.unmodifiable(result);
+
+    result.sort(
+          (
+          SellerCategory left,
+          SellerCategory right,
+          ) {
+        return left.displayOrder.compareTo(
+          right.displayOrder,
+        );
+      },
+    );
+
+    return List<SellerCategory>.unmodifiable(
+      result,
+    );
   }
 
   @override
   Future<SellerCategory> createCategory(
-    int storeId, {
-    required String name,
-    required int displayOrder,
-  }) async {
-    final nextId = _categories.fold<int>(
+      int storeId, {
+        required String name,
+        required int displayOrder,
+      }) async {
+    final int nextId =
+        _categories.fold<int>(
           0,
-          (value, item) => item.categoryId > value ? item.categoryId : value,
+              (
+              int value,
+              SellerCategory item,
+              ) {
+            return item.categoryId >
+                value
+                ? item.categoryId
+                : value;
+          },
         ) +
-        1;
-    final created = SellerCategory(
+            1;
+
+    final SellerCategory created =
+    SellerCategory(
       storeId: storeId,
       categoryId: nextId,
       name: name,
       displayOrder: displayOrder,
     );
+
     _categories.add(created);
+
     return created;
   }
 
   @override
   Future<SellerCategory> updateCategory(
-    int storeId,
-    int categoryId, {
-    required String name,
-    required int displayOrder,
-  }) async {
-    final index = _categories.indexWhere(
-      (item) => item.storeId == storeId && item.categoryId == categoryId,
+      int storeId,
+      int categoryId, {
+        required String name,
+        required int displayOrder,
+      }) async {
+    final int index =
+    _categories.indexWhere(
+          (SellerCategory item) {
+        return item.storeId == storeId &&
+            item.categoryId == categoryId;
+      },
     );
-    if (index < 0) throw StateError('category not found in selected store');
-    final updated = SellerCategory(
+
+    if (index < 0) {
+      throw StateError(
+        'category not found in '
+            'selected store',
+      );
+    }
+
+    final SellerCategory updated =
+    SellerCategory(
       storeId: storeId,
       categoryId: categoryId,
       name: name,
       displayOrder: displayOrder,
       status: _categories[index].status,
     );
+
     _categories[index] = updated;
-    for (var i = 0; i < _products.length; i++) {
-      final product = _products[i];
-      if (product.storeId == storeId && product.categoryId == categoryId) {
-        _products[i] = product.copyWith(categoryName: name);
+
+    for (int i = 0;
+    i < _products.length;
+    i++) {
+      final SellerProduct product =
+      _products[i];
+
+      if (product.storeId == storeId &&
+          product.categoryId ==
+              categoryId) {
+        _products[i] = product.copyWith(
+          categoryName: name,
+        );
       }
     }
+
     return updated;
   }
 
   @override
-  Future<List<SellerProduct>> findAll(int storeId) async {
-    return List.unmodifiable(
-      _products.where((product) => product.storeId == storeId),
+  Future<void> deleteCategory(
+      int storeId,
+      int categoryId,
+      ) async {
+    final bool hasProducts =
+    _products.any(
+          (SellerProduct product) {
+        return product.storeId == storeId &&
+            product.categoryId ==
+                categoryId;
+      },
+    );
+
+    if (hasProducts) {
+      throw StateError(
+        'category still has products',
+      );
+    }
+
+    final int index =
+    _categories.indexWhere(
+          (SellerCategory category) {
+        return category.storeId ==
+            storeId &&
+            category.categoryId ==
+                categoryId;
+      },
+    );
+
+    if (index < 0) {
+      throw StateError(
+        'category not found in '
+            'selected store',
+      );
+    }
+
+    _categories.removeAt(index);
+  }
+
+  @override
+  Future<List<SellerProduct>> findAll(
+      int storeId,
+      ) async {
+    return List<SellerProduct>.unmodifiable(
+      _products.where(
+            (SellerProduct product) =>
+        product.storeId == storeId,
+      ),
     );
   }
 
   @override
   Future<SellerProduct> create(
-    int storeId, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  }) async {
-    final category = (await findCategories(storeId)).firstWhere(
-      (item) => item.categoryId == categoryId,
+      int storeId, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      }) async {
+    final SellerCategory category =
+    (await findCategories(storeId))
+        .firstWhere(
+          (SellerCategory item) {
+        return item.categoryId ==
+            categoryId;
+      },
     );
-    final nextId = _products.fold<int>(
+
+    final int nextId =
+        _products.fold<int>(
           0,
-          (value, item) => item.productId > value ? item.productId : value,
+              (
+              int value,
+              SellerProduct item,
+              ) {
+            return item.productId >
+                value
+                ? item.productId
+                : value;
+          },
         ) +
-        1;
-    final created = SellerProduct(
+            1;
+
+    final SellerProduct created =
+    SellerProduct(
       productId: nextId,
       storeId: storeId,
       categoryId: categoryId,
@@ -592,30 +995,49 @@ class MemorySellerProductRepository implements SellerProductRepository {
       qrWebEnabled: true,
       customerAppEnabled: true,
     );
+
     _products.add(created);
+
     return created;
   }
 
   @override
   Future<SellerProduct> update(
-    int storeId,
-    SellerProduct product, {
-    required int categoryId,
-    required String name,
-    String? description,
-    String? imageUrl,
-    required int basePrice,
-  }) async {
-    final index = _products.indexWhere(
-      (item) => item.storeId == storeId && item.productId == product.productId,
+      int storeId,
+      SellerProduct product, {
+        required int categoryId,
+        required String name,
+        String? description,
+        String? imageUrl,
+        required int basePrice,
+      }) async {
+    final int index =
+    _products.indexWhere(
+          (SellerProduct item) {
+        return item.storeId == storeId &&
+            item.productId ==
+                product.productId;
+      },
     );
-    if (index < 0 || product.storeId != storeId) {
-      throw StateError('product not found in selected store');
+
+    if (index < 0 ||
+        product.storeId != storeId) {
+      throw StateError(
+        'product not found in selected store',
+      );
     }
-    final category = (await findCategories(storeId)).firstWhere(
-      (item) => item.categoryId == categoryId,
+
+    final SellerCategory category =
+    (await findCategories(storeId))
+        .firstWhere(
+          (SellerCategory item) {
+        return item.categoryId ==
+            categoryId;
+      },
     );
-    final updated = SellerProduct(
+
+    final SellerProduct updated =
+    SellerProduct(
       productId: product.productId,
       storeId: storeId,
       categoryId: categoryId,
@@ -626,78 +1048,163 @@ class MemorySellerProductRepository implements SellerProductRepository {
       basePrice: basePrice,
       status: product.status,
       soldOut: product.soldOut,
-      availableForQr: product.availableForQr,
-      availableForCustomerApp: product.availableForCustomerApp,
-      salesStartAt: product.salesStartAt,
+      availableForQr:
+      product.availableForQr,
+      availableForCustomerApp:
+      product.availableForCustomerApp,
+      salesStartAt:
+      product.salesStartAt,
       salesEndAt: product.salesEndAt,
-      qrWebEnabled: product.qrWebEnabled,
-      customerAppEnabled: product.customerAppEnabled,
+      qrWebEnabled:
+      product.qrWebEnabled,
+      customerAppEnabled:
+      product.customerAppEnabled,
     );
+
     _products[index] = updated;
+
     return updated;
   }
 
   @override
-  Future<SellerProductDetail> findOne(
-    int storeId,
-    SellerProduct product,
-  ) async {
-    final stored = _products.where(
-      (item) => item.storeId == storeId && item.productId == product.productId,
+  Future<void> deleteProduct(
+      int storeId,
+      SellerProduct product,
+      ) async {
+    final int index =
+    _products.indexWhere(
+          (SellerProduct candidate) {
+        return candidate.storeId ==
+            storeId &&
+            candidate.productId ==
+                product.productId;
+      },
     );
-    if (stored.isEmpty || product.storeId != storeId) {
-      throw StateError('product not found in selected store');
+
+    if (index < 0 ||
+        product.storeId != storeId) {
+      throw StateError(
+        'product not found in selected store',
+      );
     }
+
+    _products.removeAt(index);
+    _optionGroups.remove(
+      product.productId,
+    );
+  }
+
+  @override
+  Future<SellerProductDetail> findOne(
+      int storeId,
+      SellerProduct product,
+      ) async {
+    final Iterable<SellerProduct> stored =
+    _products.where(
+          (SellerProduct item) {
+        return item.storeId == storeId &&
+            item.productId ==
+                product.productId;
+      },
+    );
+
+    if (stored.isEmpty ||
+        product.storeId != storeId) {
+      throw StateError(
+        'product not found in selected store',
+      );
+    }
+
     return SellerProductDetail(
       product: stored.single,
-      optionGroups: List.unmodifiable(
-        _optionGroups[product.productId] ?? const [],
+      optionGroups: List<
+          SellerProductOptionGroup>.unmodifiable(
+        _optionGroups[product.productId] ??
+            const <
+                SellerProductOptionGroup>[],
       ),
     );
   }
 
   @override
-  Future<SellerProductDetail> replaceOptions(
-    int storeId,
-    SellerProduct product,
-    List<SellerProductOptionGroup> groups,
-  ) async {
-    final detail = await findOne(storeId, product);
-    _optionGroups[product.productId] = List.of(groups);
+  Future<SellerProductDetail>
+  replaceOptions(
+      int storeId,
+      SellerProduct product,
+      List<SellerProductOptionGroup> groups,
+      ) async {
+    final SellerProductDetail detail =
+    await findOne(
+      storeId,
+      product,
+    );
+
+    _optionGroups[product.productId] =
+    List<SellerProductOptionGroup>.of(
+      groups,
+    );
+
     return SellerProductDetail(
       product: detail.product,
-      optionGroups: List.unmodifiable(groups),
+      optionGroups: List<
+          SellerProductOptionGroup>.unmodifiable(
+        groups,
+      ),
     );
   }
 
   @override
-  Future<SellerProduct> updateAvailability(
-    int storeId,
-    SellerProduct product, {
-    bool? soldOut,
-    bool? qrWebEnabled,
-    bool? customerAppEnabled,
-  }) async {
-    final index = _products.indexWhere(
-      (candidate) =>
-          candidate.storeId == storeId &&
-          candidate.productId == product.productId,
+  Future<SellerProduct>
+  updateAvailability(
+      int storeId,
+      SellerProduct product, {
+        bool? soldOut,
+        bool? qrWebEnabled,
+        bool? customerAppEnabled,
+      }) async {
+    final int index =
+    _products.indexWhere(
+          (SellerProduct candidate) {
+        return candidate.storeId ==
+            storeId &&
+            candidate.productId ==
+                product.productId;
+      },
     );
-    if (index < 0 || product.storeId != storeId) {
-      throw StateError('product not found in selected store');
+
+    if (index < 0 ||
+        product.storeId != storeId) {
+      throw StateError(
+        'product not found in selected store',
+      );
     }
-    final nextSoldOut = soldOut ?? product.soldOut;
-    final nextQrEnabled = qrWebEnabled ?? product.qrWebEnabled;
-    final nextCustomerEnabled =
-        customerAppEnabled ?? product.customerAppEnabled;
-    final updated = product.copyWith(
+
+    final bool nextSoldOut =
+        soldOut ?? product.soldOut;
+
+    final bool nextQrEnabled =
+        qrWebEnabled ??
+            product.qrWebEnabled;
+
+    final bool nextCustomerEnabled =
+        customerAppEnabled ??
+            product.customerAppEnabled;
+
+    final SellerProduct updated =
+    product.copyWith(
       soldOut: nextSoldOut,
       qrWebEnabled: nextQrEnabled,
-      customerAppEnabled: nextCustomerEnabled,
-      availableForQr: !nextSoldOut && nextQrEnabled,
-      availableForCustomerApp: !nextSoldOut && nextCustomerEnabled,
+      customerAppEnabled:
+      nextCustomerEnabled,
+      availableForQr:
+      !nextSoldOut && nextQrEnabled,
+      availableForCustomerApp:
+      !nextSoldOut &&
+          nextCustomerEnabled,
     );
+
     _products[index] = updated;
+
     return updated;
   }
 }

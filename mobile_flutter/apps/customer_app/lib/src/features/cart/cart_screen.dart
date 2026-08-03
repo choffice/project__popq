@@ -11,12 +11,14 @@ class CartScreen extends StatefulWidget {
   const CartScreen({
     required this.controller,
     required this.sessionController,
+    required this.onSignIn,
     this.onDevelopmentSignIn,
     super.key,
   });
 
   final CartController controller;
   final SessionController sessionController;
+  final Future<void> Function(String email, String password) onSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
   @override
@@ -220,6 +222,7 @@ class _CartScreenState extends State<CartScreen> {
             fullscreenDialog: true,
             builder: (signInContext) {
               return SignInScreen(
+                onSignIn: widget.onSignIn,
                 onBackHome: () {
                   final navigator = Navigator.of(
                     signInContext,
