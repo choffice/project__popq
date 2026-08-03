@@ -171,11 +171,13 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
                     );
                   },
                   itemBuilder: (context, index) {
+                    final conversation = items[index];
+
                     return _ConversationCard(
-                      conversation: items[index],
-                      onTap: () {
-                        _openConversation(
-                          items[index],
+                      conversation: conversation,
+                      onTap: () async {
+                        await _openConversation(
+                          conversation,
                         );
                       },
                     );
@@ -244,16 +246,22 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
     await nextFuture;
   }
 
-  void _openConversation(
+  Future<void> _openConversation(
       SellerConversationSummary conversation,
-      ) {
+      ) async {
     final encodedOrderPublicId = Uri.encodeComponent(
       conversation.orderPublicId,
     );
 
-    context.push(
+    await context.push(
       '${SellerRoutes.customers}/$encodedOrderPublicId',
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _reload();
   }
 }
 
@@ -264,7 +272,7 @@ class _ConversationCard extends StatelessWidget {
   });
 
   final SellerConversationSummary conversation;
-  final VoidCallback onTap;
+  final Future<void> Function() onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -279,7 +287,9 @@ class _ConversationCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: hasUnreadMessage ? 2 : 1,
       child: InkWell(
-        onTap: onTap,
+        onTap: () async {
+          await onTap();
+        },
         child: Padding(
           padding: const EdgeInsets.all(
             PopqSpacing.md,
