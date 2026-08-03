@@ -32,6 +32,25 @@
             </intent-filter>
         </activity>
 
+        <!-- 카카오 로그인 완료 후 앱으로 돌아오는 콜백 -->
+        <activity
+            android:name="com.kakao.sdk.flutter.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+
+                <data
+                    android:scheme="kakaoc4ae67811eeef68ede602afc04a8efbd"
+                    android:host="oauth"/>
+            </intent-filter>
+        </activity>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2"/>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
