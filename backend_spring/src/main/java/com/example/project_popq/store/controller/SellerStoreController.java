@@ -18,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,96 +38,115 @@ public class SellerStoreController {
 
     @GetMapping
     public ApiResponse<List<StoreSummaryResponse>> findMyStores(
-            @AuthenticationPrincipal Jwt jwt
+        @AuthenticationPrincipal Jwt jwt
     ) {
         return ApiResponse.success(
-                storeApplicationService.findMyStores(
-                        currentUserService.getRequired(jwt)
-                )
+            storeApplicationService.findMyStores(
+                currentUserService.getRequired(jwt)
+            )
         );
     }
 
     @GetMapping("/{storeId}")
     public ApiResponse<SellerStoreDetailResponse> findOne(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
     ) {
         return ApiResponse.success(
-                storeApplicationService.findOne(
-                        currentUserService.getRequired(jwt),
-                        storeId
-                )
+            storeApplicationService.findOne(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
         );
     }
 
     @PostMapping
     public ResponseEntity<ApiResponse<StoreSummaryResponse>> create(
-            @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateStoreRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody CreateStoreRequest request
     ) {
-        StoreSummaryResponse created = storeApplicationService.create(
+        StoreSummaryResponse created =
+            storeApplicationService.create(
                 currentUserService.getRequired(jwt),
                 request
-        );
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 
     @PatchMapping("/{storeId}")
     public ApiResponse<SellerStoreDetailResponse> update(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody UpdateStoreRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody UpdateStoreRequest request
     ) {
         return ApiResponse.success(
-                storeApplicationService.update(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        request
-                )
+            storeApplicationService.update(
+                currentUserService.getRequired(jwt),
+                storeId,
+                request
+            )
         );
+    }
+
+    @DeleteMapping("/{storeId}")
+    public ApiResponse<Boolean> delete(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
+    ) {
+        storeApplicationService.delete(
+            currentUserService.getRequired(jwt),
+            storeId
+        );
+
+        return ApiResponse.success(true);
     }
 
     @PatchMapping("/{storeId}/business-status")
     public ApiResponse<StoreSummaryResponse> changeBusinessStatus(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody ChangeBusinessStatusRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody ChangeBusinessStatusRequest request
     ) {
         return ApiResponse.success(
-                storeApplicationService.changeBusinessStatus(
-                        currentUserService.getRequired(jwt),
-                        storeId,
-                        request
-                )
+            storeApplicationService.changeBusinessStatus(
+                currentUserService.getRequired(jwt),
+                storeId,
+                request
+            )
         );
     }
 
     @GetMapping("/{storeId}/tables")
     public ApiResponse<List<StoreTableResponse>> findTables(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
     ) {
         return ApiResponse.success(
-                storeApplicationService.findTables(
-                        currentUserService.getRequired(jwt),
-                        storeId
-                )
+            storeApplicationService.findTables(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
         );
     }
 
     @PostMapping("/{storeId}/tables")
     public ResponseEntity<ApiResponse<StoreTableResponse>> createTable(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody CreateStoreTableRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody CreateStoreTableRequest request
     ) {
-        StoreTableResponse created = storeApplicationService.createTable(
+        StoreTableResponse created =
+            storeApplicationService.createTable(
                 currentUserService.getRequired(jwt),
                 storeId,
                 request
-        );
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 }

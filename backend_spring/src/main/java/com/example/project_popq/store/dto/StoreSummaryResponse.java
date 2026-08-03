@@ -6,25 +6,76 @@ import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreType;
 
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalTime;
+import java.util.Arrays;
+import java.util.List;
+
 public record StoreSummaryResponse(
         Long storeId,
         StoreType storeType,
         String name,
         String description,
+        String address,
+        String detailAddress,
+        String representativeCategory,
+        String imageUrl,
+        String phone,
+        BigDecimal latitude,
+        BigDecimal longitude,
+        LocalTime openTime,
+        LocalTime closeTime,
+        List<DayOfWeek> closedDays,
+        boolean takeoutAvailable,
+        boolean dineInAvailable,
+        boolean orderAcceptingEnabled,
         StoreStatus status,
         BusinessStatus businessStatus,
         StoreRole myRole
 ) {
-    public static StoreSummaryResponse of(Store store, StoreRole myRole) {
+
+    public static StoreSummaryResponse of(
+            Store store,
+            StoreRole myRole
+    ) {
         return new StoreSummaryResponse(
                 store.getId(),
                 store.getStoreType(),
                 store.getName(),
                 store.getDescription(),
+                store.getAddress(),
+                store.getDetailAddress(),
+                store.getRepresentativeCategory(),
+                store.getImageUrl(),
+                store.getPhone(),
+                store.getLatitude(),
+                store.getLongitude(),
+                store.getOpenTime(),
+                store.getCloseTime(),
+                parseClosedDays(store.getClosedDays()),
+                store.isTakeoutAvailable(),
+                store.isDineInAvailable(),
+                store.isOrderAcceptingEnabled(),
                 store.getStatus(),
                 store.getBusinessStatus(),
                 myRole
         );
     }
-}
 
+    private static List<DayOfWeek> parseClosedDays(
+            String closedDays
+    ) {
+        if (closedDays == null || closedDays.isBlank()) {
+            return List.of();
+        }
+
+        return Arrays.stream(closedDays.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(String::toUpperCase)
+                .map(DayOfWeek::valueOf)
+                .distinct()
+                .toList();
+    }
+}
