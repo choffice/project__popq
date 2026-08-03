@@ -5,36 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/AndroidProjectSystem.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.main.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/com.example.backend_spring.main.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/modules/com.example.backend_spring.test.iml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2026-08-03__10_08__Changes_.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2026-08-03__10_08__Changes_1.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2026-08-03_오전_10_08_[Changes]/shelved.patch" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Checkout_at_2026-08-03_오전_10_08_[Changes]1/shelved.patch" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/android/app/src/main/kotlin/com/example/mobile_flutter/MainActivity.kt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/devtools_options.yaml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features.zip" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery.zip" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/kakao_store_map.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_SDK.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_SDK.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules/backend_spring.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/settings.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/settings.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/dev/DevDataInitializer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/.metadata" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/.metadata" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_controller.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/onboarding/onboarding_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/onboarding/onboarding_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/permissions/customer_permission_gateway.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/.run/Flutter Android Emulator - Customer.run.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/.run/Flutter Android Emulator - Seller.run.xml" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -126,6 +103,7 @@
   "keyToString": {
     "Flutter.main.dart.executor": "Run",
     "Gradle.Build backend_spring.executor": "Run",
+    "Gradle.backend_spring [:com.example.project_popq.ProjectPopqApplication.main()].executor": "Run",
     "Gradle.backend_spring [build].executor": "Run",
     "Gradle.backend_spring [clean].executor": "Run",
     "ModuleVcsDetector.initialDetectionPerformed": "true",
@@ -141,7 +119,7 @@
     "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "Merging ochang__main",
+    "git-widget-placeholder": "ochang__main",
     "ignore.virus.scanning.warn.message": "true",
     "io.flutter.reload.alreadyRun": "true",
     "kotlin-language-version-configured": "true",
@@ -154,7 +132,7 @@
     "project.structure.last.edited": "Modules",
     "project.structure.proportion": "0.15088758",
     "project.structure.side.proportion": "0.3109756",
-    "settings.editor.selected.configurable": "dart.settings",
+    "settings.editor.selected.configurable": "flutter.settings",
     "show.migrate.to.gradle.popup": "false",
     "vue.rearranger.settings.migration": "true"
   }
@@ -168,7 +146,36 @@
     </key>
   </component>
   <component name="RunManager" selected="Flutter.main.dart">
-    <configuration name="main.dart" type="FlutterRunConfigurationType" factoryName="Flutter" temporary="true" nameIsGenerated="true">
+    <configuration name="ProjectPopqApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <envs>
+        <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+      </envs>
+      <option name="envFilePaths">
+        <option value="$PROJECT_DIR$/.env.intellij" />
+      </option>
+      <option name="MAIN_CLASS_NAME" value="com.example.project_popq.ProjectPopqApplication" />
+      <module name="com.example.backend_spring.main" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.example.project_popq.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Flutter Android Emulator - Customer" type="FlutterRunConfigurationType" factoryName="Flutter">
+      <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14:8082" />
+      <option name="filePath" value="$PROJECT_DIR$/apps/customer_app/lib/main.dart" />
+      <method v="2" />
+    </configuration>
+    <configuration name="Flutter Android Emulator - Seller" type="FlutterRunConfigurationType" factoryName="Flutter">
+      <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14:8082" />
+      <option name="filePath" value="$PROJECT_DIR$/apps/seller_app/lib/main.dart" />
+      <method v="2" />
+    </configuration>
+    <configuration name="main.dart" type="FlutterRunConfigurationType" factoryName="Flutter">
       <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_API_BASE_URL=http://127.0.0.1:8082" />
       <option name="filePath" value="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/main.dart" />
       <method v="2" />
@@ -238,9 +245,9 @@
       </method>
     </configuration>
     <list>
+      <item itemvalue="Application.ProjectPopqApplication" />
       <item itemvalue="Flutter.Flutter Android Emulator - Customer" />
       <item itemvalue="Flutter.Flutter Android Emulator - Seller" />
-      <item itemvalue="Flutter.Flutter Web - Customer (5183)" />
       <item itemvalue="Flutter.main.dart" />
       <item itemvalue="Gradle.backend_spring [build]" />
       <item itemvalue="Gradle.backend_spring [clean]" />
@@ -248,9 +255,9 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Gradle.backend_spring [build]" />
         <item itemvalue="Gradle.backend_spring [clean]" />
-        <item itemvalue="Flutter.main.dart" />
+        <item itemvalue="Application.ProjectPopqApplication" />
+        <item itemvalue="Gradle.backend_spring [build]" />
       </list>
     </recent_temporary>
   </component>
@@ -275,6 +282,11 @@
       <workItem from="1785719438060" duration="240000" />
       <workItem from="1785719691191" duration="88000" />
       <workItem from="1785719790457" duration="171000" />
+      <workItem from="1785720514628" duration="587000" />
+      <workItem from="1785721119827" duration="298000" />
+      <workItem from="1785721438607" duration="118000" />
+      <workItem from="1785721575904" duration="45000" />
+      <workItem from="1785721633737" duration="1352000" />
     </task>
     <servers />
   </component>
