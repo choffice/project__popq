@@ -2,6 +2,7 @@ package com.example.project_popq.inquiry.controller;
 
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
+import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
 import com.example.project_popq.inquiry.dto.SendOrderMessageRequest;
 import com.example.project_popq.inquiry.service.OrderMessageService;
@@ -28,6 +29,18 @@ public class CustomerOrderMessageController {
 
   private final CurrentUserService currentUserService;
   private final OrderMessageService orderMessageService;
+
+  @GetMapping("/messages/unread-counts")
+  public ApiResponse<List<CustomerOrderUnreadMessageResponse>>
+  findUnreadMessageCounts(
+      @AuthenticationPrincipal Jwt jwt
+  ) {
+    return ApiResponse.success(
+        orderMessageService.findCustomerUnreadMessageCounts(
+            currentUserService.getRequired(jwt)
+        )
+    );
+  }
 
   @GetMapping("/{orderPublicId}/messages")
   public ApiResponse<List<OrderMessageResponse>> findMessages(

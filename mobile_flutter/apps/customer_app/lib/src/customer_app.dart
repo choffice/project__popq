@@ -12,6 +12,7 @@ import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
+import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
 import 'features/onboarding/onboarding_controller.dart';
 import 'features/onboarding/onboarding_store.dart';
@@ -28,6 +29,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.storeDiscoveryRepository,
     this.catalogRepository,
     this.orderRepository,
+    this.orderMessageRepository,
     this.engagementRepository,
     this.notificationRepository,
     this.cartController,
@@ -43,6 +45,7 @@ class PopqCustomerApp extends StatefulWidget {
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
   final CustomerOrderRepository? orderRepository;
+  final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
   final CustomerNotificationRepository? notificationRepository;
   final CartController? cartController;
@@ -72,7 +75,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final _CustomerBackButtonDispatcher _backButtonDispatcher;
   late final KakaoAuthService _kakaoAuthService;
   late final NaverAuthService _naverAuthService;
-
 
   @override
   void initState() {
@@ -104,12 +106,17 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
             ?.accessToken;
       },
     );
+
     _googleAuthService = GoogleAuthService(
-      webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+      webClientId:
+      '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
     );
 
     _authRepository =
-        widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
+        widget.authRepository ??
+            ApiCustomerAuthRepository(
+              _apiClient,
+            );
 
     _kakaoAuthService = KakaoAuthService();
     _naverAuthService = NaverAuthService();
@@ -136,6 +143,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
               _apiClient,
             );
 
+    final orderMessageRepository =
+        widget.orderMessageRepository ??
+            ApiCustomerOrderMessageRepository(
+              _apiClient,
+            );
+
     final engagementRepository =
         widget.engagementRepository ??
             ApiCustomerEngagementRepository(
@@ -156,9 +169,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       onSignIn: _signIn,
       onSignUp: _signUp,
       onFindId: _findId,
-      onVerifyForPasswordReset: _verifyForPasswordReset,
-      onResetPassword: _resetPassword,
-      sessionController: _sessionController,
+      onVerifyForPasswordReset:
+      _verifyForPasswordReset,
+      onResetPassword:
+      _resetPassword,
+      sessionController:
+      _sessionController,
       onboardingController:
       _onboardingController,
       storeDiscoveryRepository:
@@ -167,6 +183,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       catalogRepository,
       orderRepository:
       orderRepository,
+      orderMessageRepository:
+      orderMessageRepository,
       engagementRepository:
       engagementRepository,
       notificationRepository:
@@ -184,9 +202,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           AppFlavor.development
           ? _developmentSignIn
           : null,
-      onGoogleSignIn: _googleSignIn,
-      onKakaoSignIn: _kakaoSignIn,
-      onNaverSignIn: _naverSignIn,
+      onGoogleSignIn:
+      _googleSignIn,
+      onKakaoSignIn:
+      _kakaoSignIn,
+      onNaverSignIn:
+      _naverSignIn,
     );
 
     _backButtonDispatcher =
@@ -208,8 +229,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   Future<void> _developmentSignIn() async {
     final response =
     await _apiClient.post<
-        Map<String, Object?>
-    >(
+        Map<String, Object?>>(
       '/api/v1/dev/auth/login',
       body: {
         'email':
@@ -246,12 +266,20 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       ),
     );
   }
-  Future<void> _signIn(String email, String password) async {
-    final session = await _authRepository.logIn(
+
+  Future<void> _signIn(
+      String email,
+      String password,
+      ) async {
+    final session =
+    await _authRepository.logIn(
       email: email,
       password: password,
     );
-    await _sessionController.save(session);
+
+    await _sessionController.save(
+      session,
+    );
   }
 
   Future<void> _signUp({
@@ -268,15 +296,32 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     );
   }
 
-  Future<String> _findId(String name, String phone) {
-    return _authRepository.findId(name: name, phone: phone);
+  Future<String> _findId(
+      String name,
+      String phone,
+      ) {
+    return _authRepository.findId(
+      name: name,
+      phone: phone,
+    );
   }
 
-  Future<void> _verifyForPasswordReset(String email, String phone) {
-    return _authRepository.verifyForPasswordReset(email: email, phone: phone);
+  Future<void> _verifyForPasswordReset(
+      String email,
+      String phone,
+      ) {
+    return _authRepository
+        .verifyForPasswordReset(
+      email: email,
+      phone: phone,
+    );
   }
 
-  Future<void> _resetPassword(String email, String phone, String newPassword) {
+  Future<void> _resetPassword(
+      String email,
+      String phone,
+      String newPassword,
+      ) {
     return _authRepository.resetPassword(
       email: email,
       phone: phone,
@@ -285,15 +330,23 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   }
 
   Future<void> _googleSignIn() async {
-    final idToken = await _googleAuthService.signInAndGetIdToken();
-    debugPrint('Google idToken: $idToken');
+    final idToken =
+    await _googleAuthService
+        .signInAndGetIdToken();
+
+    debugPrint(
+      'Google idToken: $idToken',
+    );
+
     // TODO(backend): Spring Security 엔드포인트 확정되면
     // idToken을 body에 담아 POST 요청 → 응답의 accessToken/refreshToken을
     // _sessionController.save(AuthSession(...))에 저장하는 코드로 교체
   }
+
   Future<void> _kakaoSignIn() async {
     final accessToken =
-    await _kakaoAuthService.signInAndGetAccessToken();
+    await _kakaoAuthService
+        .signInAndGetAccessToken();
 
     debugPrint(
       '카카오 로그인 성공: Access Token 수신 '
@@ -306,7 +359,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
   Future<void> _naverSignIn() async {
     final accessToken =
-    await _naverAuthService.signInAndGetAccessToken();
+    await _naverAuthService
+        .signInAndGetAccessToken();
 
     debugPrint(
       '네이버 로그인 성공: Access Token 수신 '
@@ -343,8 +397,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           !widget.environment.isProduction,
           scaffoldMessengerKey:
           _scaffoldMessengerKey,
-          theme: PopqTheme.light(),
-          darkTheme: PopqTheme.dark(),
+          theme:
+          PopqTheme.light(),
+          darkTheme:
+          PopqTheme.dark(),
           themeMode:
           _themeController.themeMode,
 
@@ -377,14 +433,16 @@ class _CustomerBackButtonDispatcher
     required GoRouter router,
     required GlobalKey<ScaffoldMessengerState>
     scaffoldMessengerKey,
-  }) : _router = router,
+  })  : _router = router,
         _scaffoldMessengerKey =
             scaffoldMessengerKey;
 
-  static const Duration _exitConfirmDuration =
+  static const Duration
+  _exitConfirmDuration =
   Duration(seconds: 2);
 
-  static const Set<String> _rootTabLocations = {
+  static const Set<String>
+  _rootTabLocations = {
     CustomerRoutes.home,
     CustomerRoutes.discover,
     CustomerRoutes.qrScanner,
@@ -417,7 +475,8 @@ class _CustomerBackButtonDispatcher
       return true;
     }
 
-    final location = _normalizeLocation(
+    final location =
+    _normalizeLocation(
       _router
           .routeInformationProvider
           .value
@@ -440,7 +499,8 @@ class _CustomerBackButtonDispatcher
      * 홈이 아닌 하단 탭에서는 앱을 종료하지 않고
      * 홈으로 이동합니다.
      */
-    if (location != CustomerRoutes.home) {
+    if (location !=
+        CustomerRoutes.home) {
       _lastBackPressedAt = null;
 
       _router.go(
@@ -457,7 +517,9 @@ class _CustomerBackButtonDispatcher
 
     final shouldExit =
         previousPressedAt != null &&
-            now.difference(previousPressedAt) <=
+            now.difference(
+              previousPressedAt,
+            ) <=
                 _exitConfirmDuration;
 
     /*
@@ -477,7 +539,8 @@ class _CustomerBackButtonDispatcher
     _lastBackPressedAt = now;
 
     final messenger =
-        _scaffoldMessengerKey.currentState;
+        _scaffoldMessengerKey
+            .currentState;
 
     messenger
       ?..hideCurrentSnackBar()
