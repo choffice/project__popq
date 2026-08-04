@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -22,19 +24,34 @@ class SellerCustomerScreen extends StatefulWidget {
   }
 }
 
-class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
+class _SellerCustomerScreenState
+    extends State<SellerCustomerScreen>
+    with WidgetsBindingObserver {
+  static const Duration _pollingInterval =
+  Duration(seconds: 3);
+
   int? _loadedStoreId;
+
   Future<List<SellerConversationSummary>>? _conversations;
+
+  Timer? _pollingTimer;
+
+  bool _pollRequestInProgress = false;
+
+  int _requestSerial = 0;
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     widget.selectionController.addListener(
       _handleStoreSelectionChanged,
     );
 
     _loadForCurrentStore();
+    _startPolling();
   }
 
   @override
@@ -53,19 +70,51 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
         _handleStoreSelectionChanged,
       );
 
+      _requestSerial++;
       _loadedStoreId = null;
+
       _loadForCurrentStore();
+      _restartPolling();
+
       return;
     }
 
     if (oldWidget.repository != widget.repository) {
+      _requestSerial++;
       _loadedStoreId = null;
+
       _loadForCurrentStore();
+      _restartPolling();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+
+      unawaited(
+        _pollConversations(),
+      );
+
+      return;
+    }
+
+    _stopPolling();
+  }
+
+  @override
   void dispose() {
+    _requestSerial++;
+
+    _stopPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
+
     widget.selectionController.removeListener(
       _handleStoreSelectionChanged,
     );
@@ -109,7 +158,8 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
           ),
         ),
         Expanded(
-          child: FutureBuilder<List<SellerConversationSummary>>(
+          child:
+          FutureBuilder<List<SellerConversationSummary>>(
             future: conversations,
             builder: (context, snapshot) {
               if (snapshot.connectionState !=
@@ -122,7 +172,8 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
 
               if (snapshot.hasError) {
                 return PopqErrorView(
-                  message: '고객 문의 목록을 불러오지 못했어요.',
+                  message:
+                  '고객 문의 목록을 불러오지 못했어요.',
                   onRetry: _reload,
                 );
               }
@@ -142,7 +193,8 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
                         hasScrollBody: false,
                         child: PopqEmptyView(
                           icon: Icons.forum_outlined,
-                          title: '도착한 고객 문의가 없어요.',
+                          title:
+                          '도착한 고객 문의가 없어요.',
                           description:
                           '고객이 주문 문의를 보내면 '
                               '이곳에서 확인하고 답변할 수 있어요.',
@@ -203,14 +255,19 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
       return;
     }
 
+    _requestSerial++;
+
     setState(() {
       _loadedStoreId = selectedStoreId;
+
       _conversations = selectedStoreId == null
           ? null
           : widget.repository.findConversations(
         selectedStoreId,
       );
     });
+
+    _restartPolling();
   }
 
   void _loadForCurrentStore() {
@@ -218,11 +275,90 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
         widget.selectionController.selectedStoreId;
 
     _loadedStoreId = selectedStoreId;
+
     _conversations = selectedStoreId == null
         ? null
         : widget.repository.findConversations(
       selectedStoreId,
     );
+  }
+
+  void _startPolling() {
+    if (_pollingTimer?.isActive ?? false) {
+      return;
+    }
+
+    _pollingTimer = Timer.periodic(
+      _pollingInterval,
+          (_) {
+        unawaited(
+          _pollConversations(),
+        );
+      },
+    );
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  void _restartPolling() {
+    _stopPolling();
+    _startPolling();
+  }
+
+  Future<void> _pollConversations() async {
+    if (!mounted || _pollRequestInProgress) {
+      return;
+    }
+
+    final selectedStoreId =
+        widget.selectionController.selectedStoreId;
+
+    if (selectedStoreId == null) {
+      return;
+    }
+
+    _pollRequestInProgress = true;
+
+    final requestSerial = ++_requestSerial;
+
+    try {
+      final conversations =
+      await widget.repository.findConversations(
+        selectedStoreId,
+      );
+
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.selectionController.selectedStoreId !=
+              selectedStoreId) {
+        return;
+      }
+
+      setState(() {
+        _loadedStoreId = selectedStoreId;
+        _conversations = Future.value(
+          conversations,
+        );
+      });
+    } catch (error, stackTrace) {
+      /*
+       * 자동 갱신 실패 시 기존 목록은 그대로 유지합니다.
+       * 일시적인 네트워크 오류 때문에 오류 화면으로
+       * 전환되지 않도록 합니다.
+       */
+      debugPrint(
+        '고객 문의 목록 자동 갱신 실패: $error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _pollRequestInProgress = false;
+    }
   }
 
   Future<void> _reload() async {
@@ -232,6 +368,8 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
     if (selectedStoreId == null) {
       return;
     }
+
+    final requestSerial = ++_requestSerial;
 
     final nextFuture =
     widget.repository.findConversations(
@@ -243,18 +381,26 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
       _conversations = nextFuture;
     });
 
-    await nextFuture;
+    try {
+      await nextFuture;
+    } finally {
+      if (requestSerial != _requestSerial) {
+        return;
+      }
+    }
   }
 
   Future<void> _openConversation(
       SellerConversationSummary conversation,
       ) async {
-    final encodedOrderPublicId = Uri.encodeComponent(
+    final encodedOrderPublicId =
+    Uri.encodeComponent(
       conversation.orderPublicId,
     );
 
     await context.push(
-      '${SellerRoutes.customers}/$encodedOrderPublicId',
+      '${SellerRoutes.customers}/'
+          '$encodedOrderPublicId',
     );
 
     if (!mounted) {
@@ -293,7 +439,8 @@ class _ConversationCard extends StatelessWidget {
             PopqSpacing.md,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment:
+            CrossAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 23,
@@ -362,7 +509,8 @@ class _ConversationCard extends StatelessWidget {
                     Text(
                       conversation.lastMessage,
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      overflow:
+                      TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium
                           ?.copyWith(
                         color: hasUnreadMessage
@@ -403,10 +551,13 @@ class _ConversationCard extends StatelessWidget {
                     height: PopqSpacing.sm,
                   ),
                   AnimatedContainer(
-                    duration:
-                    const Duration(milliseconds: 180),
-                    width: hasUnreadMessage ? 8 : 0,
-                    height: hasUnreadMessage ? 8 : 0,
+                    duration: const Duration(
+                      milliseconds: 180,
+                    ),
+                    width:
+                    hasUnreadMessage ? 8 : 0,
+                    height:
+                    hasUnreadMessage ? 8 : 0,
                     decoration: BoxDecoration(
                       color: colorScheme.error,
                       shape: BoxShape.circle,
@@ -421,7 +572,9 @@ class _ConversationCard extends StatelessWidget {
     );
   }
 
-  static String _firstCharacter(String value) {
+  static String _firstCharacter(
+      String value,
+      ) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
@@ -433,10 +586,14 @@ class _ConversationCard extends StatelessWidget {
     );
   }
 
-  static String _relativeTime(DateTime value) {
+  static String _relativeTime(
+      DateTime value,
+      ) {
     final localValue = value.toLocal();
     final now = DateTime.now();
-    final difference = now.difference(localValue);
+
+    final difference =
+    now.difference(localValue);
 
     if (difference.isNegative ||
         difference.inMinutes < 1) {
@@ -488,7 +645,9 @@ class _ConversationCard extends StatelessWidget {
         left.day == right.day;
   }
 
-  static String _twoDigits(int value) {
+  static String _twoDigits(
+      int value,
+      ) {
     return value.toString().padLeft(2, '0');
   }
 }

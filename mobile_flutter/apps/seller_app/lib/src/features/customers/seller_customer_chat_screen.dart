@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -23,37 +25,51 @@ class SellerCustomerChatScreen extends StatefulWidget {
 }
 
 class _SellerCustomerChatScreenState
-    extends State<SellerCustomerChatScreen> {
+    extends State<SellerCustomerChatScreen>
+    with WidgetsBindingObserver {
+  static const Duration _pollingInterval = Duration(seconds: 3);
+
   final TextEditingController _messageController =
   TextEditingController();
 
   final FocusNode _messageFocusNode = FocusNode();
+
   final ScrollController _scrollController =
   ScrollController();
 
   SellerConversationDetail? _conversation;
+
   Object? _error;
 
+  Timer? _pollingTimer;
+
+  int? _loadedStoreId;
+
+  int _requestSerial = 0;
+
   bool _loading = true;
+
   bool _sending = false;
 
-  int get _storeId {
-    final storeId =
-        widget.selectionController.selectedStoreId;
+  bool _pollRequestInProgress = false;
 
-    if (storeId == null) {
-      throw StateError(
-        'selected store is missing',
-      );
-    }
-
-    return storeId;
+  int? get _selectedStoreId {
+    return widget.selectionController.selectedStoreId;
   }
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    widget.selectionController.addListener(
+      _handleStoreSelectionChanged,
+    );
+
     _loadConversation();
+
+    _startPolling();
   }
 
   @override
@@ -62,19 +78,72 @@ class _SellerCustomerChatScreenState
       ) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.orderPublicId !=
-        widget.orderPublicId ||
-        oldWidget.repository != widget.repository ||
-        oldWidget.selectionController !=
-            widget.selectionController) {
+    var shouldReload = false;
+
+    if (oldWidget.selectionController !=
+        widget.selectionController) {
+      oldWidget.selectionController.removeListener(
+        _handleStoreSelectionChanged,
+      );
+
+      widget.selectionController.addListener(
+        _handleStoreSelectionChanged,
+      );
+
+      shouldReload = true;
+    }
+
+    if (oldWidget.orderPublicId != widget.orderPublicId ||
+        oldWidget.repository != widget.repository) {
+      shouldReload = true;
+    }
+
+    if (shouldReload) {
+      _requestSerial++;
+
+      _loadedStoreId = null;
+
       _loadConversation();
+
+      _restartPolling();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+
+      unawaited(
+        _pollConversation(),
+      );
+
+      return;
+    }
+
+    _stopPolling();
+  }
+
+  @override
   void dispose() {
+    _requestSerial++;
+
+    _stopPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
+
+    widget.selectionController.removeListener(
+      _handleStoreSelectionChanged,
+    );
+
     _messageController.dispose();
+
     _messageFocusNode.dispose();
+
     _scrollController.dispose();
 
     super.dispose();
@@ -166,7 +235,8 @@ class _SellerCustomerChatScreenState
                 final message =
                 conversation.messages[index];
 
-                final previousMessage = index == 0
+                final previousMessage =
+                index == 0
                     ? null
                     : conversation
                     .messages[index - 1];
@@ -176,7 +246,8 @@ class _SellerCustomerChatScreenState
                         !_isSameDay(
                           previousMessage.createdAt
                               .toLocal(),
-                          message.createdAt.toLocal(),
+                          message.createdAt
+                              .toLocal(),
                         );
 
                 return Column(
@@ -205,61 +276,127 @@ class _SellerCustomerChatScreenState
     );
   }
 
+  void _handleStoreSelectionChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final storeId = _selectedStoreId;
+
+    if (_loadedStoreId == storeId) {
+      return;
+    }
+
+    _requestSerial++;
+
+    _loadedStoreId = null;
+
+    _loadConversation();
+
+    _restartPolling();
+  }
+
   Future<void> _loadConversation() async {
+    final storeId = _selectedStoreId;
+
+    final requestSerial = ++_requestSerial;
+
     setState(() {
       _loading = true;
       _error = null;
     });
 
-    try {
-      final conversation =
-      await widget.repository.findConversation(
-        _storeId,
-        widget.orderPublicId,
-      );
-
-      if (!mounted) {
+    if (storeId == null) {
+      if (!mounted ||
+          requestSerial != _requestSerial) {
         return;
       }
 
       setState(() {
+        _conversation = null;
+
+        _error = StateError(
+          'selected store is missing',
+        );
+
+        _loading = false;
+      });
+
+      return;
+    }
+
+    try {
+      final conversation =
+      await widget.repository.findConversation(
+        storeId,
+        widget.orderPublicId,
+      );
+
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          _selectedStoreId != storeId) {
+        return;
+      }
+
+      setState(() {
+        _loadedStoreId = storeId;
+
         _conversation = conversation;
+
+        _error = null;
+
         _loading = false;
       });
 
       _scrollToLatestMessage();
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          requestSerial != _requestSerial) {
         return;
       }
 
       setState(() {
         _error = error;
+
         _loading = false;
       });
     }
   }
 
   Future<void> _refreshConversation() async {
+    final storeId = _selectedStoreId;
+
+    if (storeId == null) {
+      return;
+    }
+
+    final requestSerial = ++_requestSerial;
+
     try {
       final conversation =
       await widget.repository.findConversation(
-        _storeId,
+        storeId,
         widget.orderPublicId,
       );
 
-      if (!mounted) {
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          _selectedStoreId != storeId) {
         return;
       }
 
       setState(() {
+        _loadedStoreId = storeId;
+
         _conversation = conversation;
+
         _error = null;
       });
 
       _scrollToLatestMessage();
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          requestSerial != _requestSerial) {
         return;
       }
 
@@ -273,11 +410,116 @@ class _SellerCustomerChatScreenState
     }
   }
 
+  void _startPolling() {
+    if (_pollingTimer?.isActive ?? false) {
+      return;
+    }
+
+    _pollingTimer = Timer.periodic(
+      _pollingInterval,
+          (_) {
+        unawaited(
+          _pollConversation(),
+        );
+      },
+    );
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+
+    _pollingTimer = null;
+  }
+
+  void _restartPolling() {
+    _stopPolling();
+
+    _startPolling();
+  }
+
+  Future<void> _pollConversation() async {
+    if (!mounted ||
+        _loading ||
+        _sending ||
+        _pollRequestInProgress) {
+      return;
+    }
+
+    final storeId = _selectedStoreId;
+
+    if (storeId == null) {
+      return;
+    }
+
+    _pollRequestInProgress = true;
+
+    final requestSerial = ++_requestSerial;
+
+    try {
+      final conversation =
+      await widget.repository.findConversation(
+        storeId,
+        widget.orderPublicId,
+      );
+
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          _selectedStoreId != storeId) {
+        return;
+      }
+
+      final previousConversation =
+          _conversation;
+
+      final hasChanged =
+      _hasConversationChanged(
+        previousConversation,
+        conversation,
+      );
+
+      if (!hasChanged) {
+        return;
+      }
+
+      final hasNewMessage =
+          previousConversation == null ||
+              conversation.messages.length >
+                  previousConversation
+                      .messages.length;
+
+      setState(() {
+        _loadedStoreId = storeId;
+
+        _conversation = conversation;
+
+        _error = null;
+      });
+
+      if (hasNewMessage) {
+        _scrollToLatestMessage();
+      }
+    } catch (error, stackTrace) {
+      debugPrint(
+        '고객 문의 상세 자동 갱신 실패: $error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _pollRequestInProgress = false;
+    }
+  }
+
   Future<void> _sendMessage() async {
     final content =
     _messageController.text.trim();
 
-    if (content.isEmpty || _sending) {
+    final storeId = _selectedStoreId;
+
+    if (content.isEmpty ||
+        _sending ||
+        storeId == null) {
       return;
     }
 
@@ -299,7 +541,7 @@ class _SellerCustomerChatScreenState
 
     try {
       await widget.repository.sendMessage(
-        _storeId,
+        storeId,
         widget.orderPublicId,
         content: content,
       );
@@ -333,6 +575,49 @@ class _SellerCustomerChatScreenState
         });
       }
     }
+  }
+
+  bool _hasConversationChanged(
+      SellerConversationDetail? previous,
+      SellerConversationDetail next,
+      ) {
+    if (previous == null) {
+      return true;
+    }
+
+    if (previous.orderStatus != next.orderStatus ||
+        previous.totalAmount != next.totalAmount ||
+        previous.messages.length !=
+            next.messages.length) {
+      return true;
+    }
+
+    for (
+    var index = 0;
+    index < next.messages.length;
+    index++
+    ) {
+      final previousMessage =
+      previous.messages[index];
+
+      final nextMessage =
+      next.messages[index];
+
+      if (previousMessage.orderMessageId !=
+          nextMessage.orderMessageId ||
+          previousMessage.content !=
+              nextMessage.content ||
+          previousMessage.senderType !=
+              nextMessage.senderType ||
+          previousMessage.read !=
+              nextMessage.read ||
+          previousMessage.readAt !=
+              nextMessage.readAt) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void _scrollToLatestMessage() {
@@ -375,6 +660,7 @@ class _OrderSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colorScheme = theme.colorScheme;
 
     final itemSummary = conversation.orderItems
@@ -416,8 +702,7 @@ class _OrderSummaryCard extends StatelessWidget {
                       .textTheme
                       .titleSmall
                       ?.copyWith(
-                    color:
-                    colorScheme.primary,
+                    color: colorScheme.primary,
                     fontWeight:
                     FontWeight.w800,
                   ),
@@ -541,6 +826,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     final colorScheme = theme.colorScheme;
 
     final sentBySeller =
@@ -636,11 +922,15 @@ class _MessageBubble extends StatelessWidget {
                         ),
                         bottomLeft:
                         Radius.circular(
-                          sentBySeller ? 20 : 6,
+                          sentBySeller
+                              ? 20
+                              : 6,
                         ),
                         bottomRight:
                         Radius.circular(
-                          sentBySeller ? 6 : 20,
+                          sentBySeller
+                              ? 6
+                              : 20,
                         ),
                       ),
                     ),
@@ -686,7 +976,9 @@ class _MessageTime extends StatelessWidget {
   });
 
   final DateTime dateTime;
+
   final bool read;
+
   final bool showRead;
 
   @override
@@ -726,8 +1018,11 @@ class _MessageComposer extends StatelessWidget {
   });
 
   final TextEditingController controller;
+
   final FocusNode focusNode;
+
   final bool sending;
+
   final VoidCallback onSend;
 
   @override
@@ -826,6 +1121,7 @@ String _orderStatusLabel(String value) {
 
 String _won(int amount) {
   final digits = amount.toString();
+
   final buffer = StringBuffer();
 
   for (

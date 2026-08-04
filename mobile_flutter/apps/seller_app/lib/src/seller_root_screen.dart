@@ -32,7 +32,8 @@ class SellerRootScreen extends StatefulWidget {
   }
 }
 
-class _SellerRootScreenState extends State<SellerRootScreen> {
+class _SellerRootScreenState extends State<SellerRootScreen>
+    with WidgetsBindingObserver {
   static const List<String> _locations = [
     SellerRoutes.dashboard,
     SellerRoutes.operations,
@@ -53,14 +54,24 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
     seconds: 2,
   );
 
+  static const Duration _unreadPollingInterval = Duration(
+    seconds: 3,
+  );
+
   DateTime? _lastBackPressedAt;
 
   int _customerUnreadCount = 0;
   int _unreadRequestSerial = 0;
 
+  Timer? _unreadPollingTimer;
+
+  bool _unreadRequestInProgress = false;
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     widget.storeSelectionController?.addListener(
       _handleStoreSelectionChanged,
@@ -71,6 +82,7 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
     );
 
     _scheduleUnreadRefresh();
+    _startUnreadPolling();
   }
 
   @override
@@ -101,14 +113,43 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       _resetUnreadCount();
     }
 
-    // 채팅 상세 화면에서 목록으로 돌아왔을 때처럼
-    // 경로 문자열이 같아도 읽지 않은 메시지 수를 다시 조회한다.
+    /*
+     * 채팅 상세에서 목록으로 돌아왔을 때처럼
+     * 경로 문자열이 같더라도 읽지 않은 수를 다시 확인합니다.
+     */
     _scheduleUnreadRefresh();
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startUnreadPolling();
+
+      unawaited(
+        _refreshCustomerUnreadCount(),
+      );
+
+      return;
+    }
+
+    /*
+     * 앱이 백그라운드로 이동하면
+     * 불필요한 API 요청을 중지합니다.
+     */
+    _stopUnreadPolling();
   }
 
   @override
   void dispose() {
     _unreadRequestSerial++;
+
+    _stopUnreadPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
 
     widget.storeSelectionController?.removeListener(
       _handleStoreSelectionChanged,
@@ -327,7 +368,31 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
     });
   }
 
+  void _startUnreadPolling() {
+    if (_unreadPollingTimer?.isActive ?? false) {
+      return;
+    }
+
+    _unreadPollingTimer = Timer.periodic(
+      _unreadPollingInterval,
+          (_) {
+        unawaited(
+          _refreshCustomerUnreadCount(),
+        );
+      },
+    );
+  }
+
+  void _stopUnreadPolling() {
+    _unreadPollingTimer?.cancel();
+    _unreadPollingTimer = null;
+  }
+
   Future<void> _refreshCustomerUnreadCount() async {
+    if (_unreadRequestInProgress) {
+      return;
+    }
+
     final repository = widget.customerRepository;
     final storeId =
         widget.storeSelectionController?.selectedStoreId;
@@ -348,6 +413,8 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       return;
     }
 
+    _unreadRequestInProgress = true;
+
     try {
       final unreadCount =
       await repository.countUnreadMessages(
@@ -355,7 +422,9 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       );
 
       if (!mounted ||
-          requestSerial != _unreadRequestSerial) {
+          requestSerial != _unreadRequestSerial ||
+          widget.storeSelectionController?.selectedStoreId !=
+              storeId) {
         return;
       }
 
@@ -367,14 +436,20 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
         _customerUnreadCount = unreadCount;
       });
     } catch (error, stackTrace) {
+      /*
+       * 자동 조회가 한 번 실패해도 기존 배지는 유지합니다.
+       * 다음 폴링 주기에 다시 조회합니다.
+       */
       debugPrint(
-        '고객 문의 읽지 않은 메시지 수를 불러오지 못했습니다: '
-            '$error',
+        '고객 문의 읽지 않은 메시지 수를 '
+            '불러오지 못했습니다: $error',
       );
 
       debugPrintStack(
         stackTrace: stackTrace,
       );
+    } finally {
+      _unreadRequestInProgress = false;
     }
   }
 
