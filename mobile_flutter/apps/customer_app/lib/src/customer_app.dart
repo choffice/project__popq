@@ -179,6 +179,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       onKakaoSignIn: _kakaoSignIn,
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onFindId: _findId,
+      onVerifyForPasswordReset: _verifyForPasswordReset,
+      onResetPassword: _resetPassword,
     );
 
     _backButtonDispatcher =
@@ -250,15 +253,30 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   }) async {
-    final session = await _authRepository.signUp(
+    await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
     );
-    await _sessionController.save(session);
+  }
+
+  Future<String> _findId(String name, String phone) {
+    return _authRepository.findId(name: name, phone: phone);
+  }
+
+  Future<void> _verifyForPasswordReset(String email, String phone) {
+    return _authRepository.verifyForPasswordReset(email: email, phone: phone);
+  }
+
+  Future<void> _resetPassword(String email, String phone, String newPassword) {
+    return _authRepository.resetPassword(
+      email: email,
+      phone: phone,
+      newPassword: newPassword,
+    );
   }
 
   Future<void> _googleSignIn() async {

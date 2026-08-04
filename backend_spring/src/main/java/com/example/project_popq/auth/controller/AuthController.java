@@ -1,8 +1,13 @@
 package com.example.project_popq.auth.controller;
 
+import com.example.project_popq.auth.dto.AckResponse;
 import com.example.project_popq.auth.dto.AuthTokenResponse;
 import com.example.project_popq.auth.dto.AuthUserResponse;
+import com.example.project_popq.auth.dto.FindIdRequest;
+import com.example.project_popq.auth.dto.FindIdResponse;
 import com.example.project_popq.auth.dto.LoginRequest;
+import com.example.project_popq.auth.dto.PasswordResetConfirmRequest;
+import com.example.project_popq.auth.dto.PasswordResetVerifyRequest;
 import com.example.project_popq.auth.dto.SignupRequest;
 import com.example.project_popq.auth.service.AuthService;
 import com.example.project_popq.auth.service.CurrentUserService;
@@ -47,6 +52,27 @@ public class AuthController {
             @Valid @RequestBody LoginRequest request
     ) {
         return ApiResponse.success(authService.login(request));
+    }
+
+    @PostMapping("/find-id")
+    public ApiResponse<FindIdResponse> findId(
+            @Valid @RequestBody FindIdRequest request
+    ) {
+        return ApiResponse.success(authService.findId(request));
+    }
+
+    @PostMapping("/password-reset/verify")
+    public ApiResponse<AckResponse> verifyForPasswordReset(
+            @Valid @RequestBody PasswordResetVerifyRequest request
+    ) {
+        return ApiResponse.success(authService.verifyForPasswordReset(request));
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ApiResponse<AckResponse> confirmPasswordReset(
+            @Valid @RequestBody PasswordResetConfirmRequest request
+    ) {
+        return ApiResponse.success(authService.resetPassword(request));
     }
 }
 

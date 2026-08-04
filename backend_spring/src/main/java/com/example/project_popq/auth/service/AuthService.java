@@ -1,8 +1,13 @@
 package com.example.project_popq.auth.service;
 
+import com.example.project_popq.auth.dto.AckResponse;
 import com.example.project_popq.auth.dto.AuthTokenResponse;
 import com.example.project_popq.auth.dto.AuthUserResponse;
+import com.example.project_popq.auth.dto.FindIdRequest;
+import com.example.project_popq.auth.dto.FindIdResponse;
 import com.example.project_popq.auth.dto.LoginRequest;
+import com.example.project_popq.auth.dto.PasswordResetConfirmRequest;
+import com.example.project_popq.auth.dto.PasswordResetVerifyRequest;
 import com.example.project_popq.auth.dto.SignupRequest;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedAccessToken;
 import com.example.project_popq.common.error.BusinessException;
@@ -33,12 +38,15 @@ public class AuthService {
             throw new BusinessException(ErrorCode.DUPLICATE_USER);
         }
 
+        String normalizedPhone = normalizePhone(request.phone());
+        if (userRepository.existsByPhone(normalizedPhone)) {
+            throw new BusinessException(ErrorCode.DUPLICATE_PHONE);
+        }
+
         User user = User.createWithPassword(
                 normalizedEmail,
                 request.name().trim(),
-                request.phone() == null || request.phone().isBlank()
-                        ? null
-                        : request.phone().trim(),
+                normalizedPhone,
                 request.role(),
                 passwordEncoder.encode(request.password())
         );
@@ -64,6 +72,48 @@ public class AuthService {
         }
 
         return issueToken(user);
+    }
+
+    @Transactional(readOnly = true)
+    public FindIdResponse findId(FindIdRequest request) {
+        User user = userRepository.findByNameAndPhone(
+                        request.name().trim(),
+                        normalizePhone(request.phone())
+                )
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTITY_VERIFICATION_FAILED));
+
+        return new FindIdResponse(maskEmail(user.getEmail()));
+    }
+
+    @Transactional(readOnly = true)
+    public AckResponse verifyForPasswordReset(PasswordResetVerifyRequest request) {
+        findUserForPasswordReset(request.email(), request.phone());
+        return AckResponse.ok();
+    }
+
+    @Transactional
+    public AckResponse resetPassword(PasswordResetConfirmRequest request) {
+        User user = findUserForPasswordReset(request.email(), request.phone());
+        user.changePasswordHash(passwordEncoder.encode(request.newPassword()));
+        return AckResponse.ok();
+    }
+
+    private User findUserForPasswordReset(String email, String phone) {
+        String normalizedEmail = email.trim().toLowerCase();
+        return userRepository.findByEmailIgnoreCaseAndPhone(normalizedEmail, normalizePhone(phone))
+                .orElseThrow(() -> new BusinessException(ErrorCode.IDENTITY_VERIFICATION_FAILED));
+    }
+
+    private String normalizePhone(String phone) {
+        return phone.trim().replaceAll("-", "");
+    }
+
+    private String maskEmail(String email) {
+        int at = email.indexOf('@');
+        String local = email.substring(0, at);
+        String domain = email.substring(at);
+        String visible = local.substring(0, Math.min(2, local.length()));
+        return visible + "***" + domain;
     }
 
     private AuthTokenResponse issueToken(User user) {

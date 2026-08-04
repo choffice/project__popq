@@ -51,7 +51,14 @@ public class SecurityConfig {
                 "/v3/api-docs/**"
             ).permitAll()
             .requestMatchers("/api/v1/dev/auth/**").permitAll()
-            .requestMatchers(HttpMethod.POST, "/api/v1/auth/signup", "/api/v1/auth/login").permitAll()
+            .requestMatchers(
+                HttpMethod.POST,
+                "/api/v1/auth/signup",
+                "/api/v1/auth/login",
+                "/api/v1/auth/find-id",
+                "/api/v1/auth/password-reset/verify",
+                "/api/v1/auth/password-reset/confirm"
+            ).permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/stores/**").permitAll()
             .requestMatchers("/api/v1/qr/**").permitAll()
             .requestMatchers("/ws", "/ws/**").permitAll()

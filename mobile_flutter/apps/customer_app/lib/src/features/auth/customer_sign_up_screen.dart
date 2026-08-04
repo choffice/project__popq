@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../routing/customer_router.dart';
 
 class CustomerSignUpScreen extends StatefulWidget {
   const CustomerSignUpScreen({required this.onSignUp, super.key});
@@ -9,7 +12,7 @@ class CustomerSignUpScreen extends StatefulWidget {
     required String email,
     required String password,
     required String name,
-    String? phone,
+    required String phone,
   })
   onSignUp;
 
@@ -26,9 +29,11 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
   final _name = TextEditingController();
   final _phone = TextEditingController();
   var _busy = false;
+  var _agreed = false;
   String? _errorMessage;
 
   static final _passwordPattern = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$');
+  static final _phonePattern = RegExp(r'^01[0-9]-?\d{3,4}-?\d{4}$');
 
   @override
   void dispose() {
@@ -89,7 +94,19 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     key: const Key('sign-up-phone'),
                     controller: _phone,
                     keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: '전화번호 (선택)'),
+                    decoration: const InputDecoration(
+                      labelText: '전화번호',
+                      hintText: '010-1234-5678',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return '전화번호를 입력해 주세요.';
+                      }
+                      if (!_phonePattern.hasMatch(value.trim())) {
+                        return '올바른 전화번호 형식이 아닙니다.';
+                      }
+                      return null;
+                    },
                   ),
                   const SizedBox(height: PopqSpacing.sm),
                   TextFormField(
@@ -123,7 +140,20 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: PopqSpacing.md),
+                  const SizedBox(height: PopqSpacing.sm),
+                  Row(
+                    children: [
+                      Checkbox(
+                        key: const Key('sign-up-agree'),
+                        value: _agreed,
+                        onChanged: (value) {
+                          setState(() => _agreed = value ?? false);
+                        },
+                      ),
+                      const Text('데이터 잘 쓸게요'),
+                    ],
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
                   FilledButton(
                     key: const Key('sign-up-submit'),
                     onPressed: _busy ? null : _submit,
@@ -151,6 +181,10 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_agreed) {
+      setState(() => _errorMessage = '데이터 이용에 동의해 주세요.');
+      return;
+    }
     setState(() {
       _busy = true;
       _errorMessage = null;
@@ -160,8 +194,14 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
         email: _email.text.trim(),
         password: _password.text,
         name: _name.text.trim(),
-        phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+        phone: _phone.text.trim(),
       );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해 주세요.')),
+      );
+      context.go(CustomerRoutes.signIn);
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       setState(() {
