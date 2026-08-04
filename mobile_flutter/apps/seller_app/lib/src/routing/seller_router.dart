@@ -308,6 +308,7 @@ GoRouter createSellerRouter({
             customerRepository,
             storeSelectionController:
             storeSelectionController,
+            themeController: themeController,
             child: child,
           );
         },

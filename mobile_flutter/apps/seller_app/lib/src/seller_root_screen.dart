@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/common/theme_mode_toggle.dart';
 import 'features/customers/seller_customer_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'routing/seller_router.dart';
@@ -16,6 +18,7 @@ class SellerRootScreen extends StatefulWidget {
     required this.child,
     this.customerRepository,
     this.storeSelectionController,
+    this.themeController,
     super.key,
   });
 
@@ -25,6 +28,7 @@ class SellerRootScreen extends StatefulWidget {
 
   final SellerCustomerRepository? customerRepository;
   final SellerStoreSelectionController? storeSelectionController;
+  final PopqThemeController? themeController;
 
   @override
   State<SellerRootScreen> createState() {
@@ -198,6 +202,10 @@ class _SellerRootScreenState extends State<SellerRootScreen>
                 icon: const Icon(
                   Icons.swap_horiz_rounded,
                 ),
+              ),
+            if (widget.themeController != null)
+              ThemeModeToggle(
+                controller: widget.themeController!,
               ),
             IconButton(
               tooltip: '판매자 설정',
