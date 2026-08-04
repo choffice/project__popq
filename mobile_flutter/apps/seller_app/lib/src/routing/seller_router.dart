@@ -56,18 +56,30 @@ GoRouter createSellerRouter({
   required Future<void> Function(
       String email,
       String password,
-      ) onSignIn,
+      )
+  onSignIn,
   required Future<void> Function({
-    required String email,
-    required String password,
-    required String name,
-    required String phone,
+  required String email,
+  required String password,
+  required String name,
+  required String phone,
   })
   onSignUp,
-  required Future<String> Function(String name, String phone) onFindId,
-  required Future<void> Function(String email, String phone)
+  required Future<String> Function(
+      String name,
+      String phone,
+      )
+  onFindId,
+  required Future<void> Function(
+      String email,
+      String phone,
+      )
   onVerifyForPasswordReset,
-  required Future<void> Function(String email, String phone, String newPassword)
+  required Future<void> Function(
+      String email,
+      String phone,
+      String newPassword,
+      )
   onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
@@ -101,7 +113,10 @@ GoRouter createSellerRouter({
           location == SellerRoutes.findPassword;
 
       final isPreLoginAuthScreen =
-          isSignIn || isSignUp || isFindId || isFindPassword;
+          isSignIn ||
+              isSignUp ||
+              isFindId ||
+              isFindPassword;
 
       final isStoreRegistration =
           location == SellerRoutes.storeRegistration;
@@ -153,7 +168,9 @@ GoRouter createSellerRouter({
       return PopqErrorView(
         message: '요청한 판매자 화면을 찾을 수 없어요.',
         onRetry: () {
-          context.go(SellerRoutes.dashboard);
+          context.go(
+            SellerRoutes.dashboard,
+          );
         },
       );
     },
@@ -202,7 +219,9 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.findId,
         builder: (context, state) {
-          return SellerFindIdScreen(onFindId: onFindId);
+          return SellerFindIdScreen(
+            onFindId: onFindId,
+          );
         },
       ),
       GoRoute(
@@ -281,6 +300,10 @@ GoRouter createSellerRouter({
           return SellerRootScreen(
             location: state.uri.path,
             onSignOut: onSignOut,
+            customerRepository:
+            customerRepository,
+            storeSelectionController:
+            storeSelectionController,
             child: child,
           );
         },

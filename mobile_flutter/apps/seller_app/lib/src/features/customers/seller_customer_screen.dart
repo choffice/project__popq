@@ -175,8 +175,8 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
 
                     return _ConversationCard(
                       conversation: conversation,
-                      onTap: () async {
-                        await _openConversation(
+                      onTap: () {
+                        _openConversation(
                           conversation,
                         );
                       },
@@ -272,7 +272,7 @@ class _ConversationCard extends StatelessWidget {
   });
 
   final SellerConversationSummary conversation;
-  final Future<void> Function() onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -287,9 +287,7 @@ class _ConversationCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: hasUnreadMessage ? 2 : 1,
       child: InkWell(
-        onTap: () async {
-          await onTap();
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(
             PopqSpacing.md,
