@@ -12,6 +12,7 @@ class SellerSignInScreen extends StatefulWidget {
     this.onDevelopmentSignIn,
     this.onGoogleSignIn,
     this.onKakaoSignIn,
+    this.onNaverSignIn,
     super.key,
   });
 
@@ -20,6 +21,7 @@ class SellerSignInScreen extends StatefulWidget {
   final Future<void> Function()? onDevelopmentSignIn;
   final Future<void> Function()? onGoogleSignIn;
   final Future<void> Function()? onKakaoSignIn;
+  final Future<void> Function()? onNaverSignIn;
 
   @override
   State<SellerSignInScreen> createState() => _SellerSignInScreenState();
@@ -164,16 +166,32 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
             const SizedBox(height: PopqSpacing.md),
              _ProviderButton(
               label: '판매자 Google 계정으로 계속하기',
+               backgroundColor: Colors.white,
+               foregroundColor: const Color(0xFF1F1F1F),
+               borderColor: const Color(0xFFDADCE0),
               onPressed: widget.onGoogleSignIn == null || _busy
                   ? null
                   : _handleGoogleSignIn,),
             const SizedBox(height: PopqSpacing.sm),
              _ProviderButton(
                 label: '판매자 Kakao 계정으로 계속하기',
+                backgroundColor: const Color(0xFFFEE500),
+                foregroundColor: const Color(0xFF191919),
+                borderColor: const Color(0xFFFEE500),
             onPressed: widget.onKakaoSignIn == null || _busy
               ? null
               : _handleKakaoSignIn,
              ),
+            const SizedBox(height: PopqSpacing.sm),
+            _ProviderButton(
+              label: '판매자 Naver 계정으로 계속하기',
+              backgroundColor: const Color(0xFF03C75A),
+              foregroundColor: Colors.white,
+              borderColor: const Color(0xFF03C75A),
+              onPressed: widget.onNaverSignIn == null || _busy
+                  ? null
+                  : _handleNaverSignIn,
+            ),
             if (widget.onDevelopmentSignIn != null) ...[
               const SizedBox(height: PopqSpacing.lg),
               const Divider(),
@@ -262,6 +280,33 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
     }
   }
 
+  Future<void> _handleNaverSignIn() async {
+    if (_busy || widget.onNaverSignIn == null) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onNaverSignIn!();
+    } catch (error) {
+      debugPrint('판매자 Naver 로그인 오류: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Naver 로그인에 실패했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
@@ -307,17 +352,32 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
 class _ProviderButton extends StatelessWidget {
   const _ProviderButton({
     required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.borderColor,
     this.onPressed,
   });
 
   final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final Color borderColor;
   final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(52),
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        disabledBackgroundColor:
+        backgroundColor.withValues(alpha: 0.55),
+        disabledForegroundColor:
+        foregroundColor.withValues(alpha: 0.55),
+        side: BorderSide(color: borderColor),
+      ),
       child: Text(label),
     );
   }
