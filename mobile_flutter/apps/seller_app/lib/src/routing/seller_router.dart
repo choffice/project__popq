@@ -85,6 +85,7 @@ GoRouter createSellerRouter({
   Future<void> Function()? onDevelopmentSignIn,
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
+  Future<void> Function()? onNaverSignIn,
 }) {
   return GoRouter(
     initialLocation: SellerRoutes.dashboard,
@@ -209,6 +210,7 @@ GoRouter createSellerRouter({
             onDevelopmentSignIn,
             onGoogleSignIn: onGoogleSignIn,
             onKakaoSignIn : onKakaoSignIn,
+            onNaverSignIn : onNaverSignIn,
           );
         },
       ),
