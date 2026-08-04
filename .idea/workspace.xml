@@ -5,21 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/config/UploadWebConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerStoreImageController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/StoreImageUploadResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/StoreImageStorageService.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerLocationController.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoAddressSearchResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/KakaoLocationService.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/business_registration_ocr_service.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/auth/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/auth/config/SecurityConfig.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/GlobalExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/GlobalExceptionHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/packages/app_core/lib/src/network/popq_api_client.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/packages/app_core/lib/src/network/popq_api_client.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -156,7 +149,7 @@
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
     </key>
   </component>
-  <component name="RunManager" selected="Spring Boot.ProjectPopqApplication">
+  <component name="RunManager" selected="Flutter.seller_main.dart">
     <configuration name="ProjectPopqApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <envs>
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
@@ -187,14 +180,14 @@
       <method v="2" />
     </configuration>
     <configuration name="customer_main.dart" type="FlutterRunConfigurationType" factoryName="Flutter">
-      <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e" />
+      <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14/ --dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e define=POPQ_TOSS_CLIENT_KEY=test_ck_QbgMGZzorzqqZ7MqB5nNVl5E1em4 --dart-define=NAVER_CLIENT_ID=GxL8Qnbr3tbzqhIvXYir --dart-define=NAVER_CLIENT_SECRET=6Jtg3b6WVX" />
       <option name="filePath" value="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/main.dart" />
       <method v="2">
         <option name="ToolBeforeRunTask" enabled="true" actionId="Tool_External Tools_ADB reverse 8082" />
       </method>
     </configuration>
     <configuration name="seller_main.dart" type="FlutterRunConfigurationType" factoryName="Flutter" temporary="true">
-      <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14:8082" />
+      <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14:8082 --dart-define=NAVER_CLIENT_ID=GxL8Qnbr3tbzqhIvXYir --dart-define=NAVER_CLIENT_SECRET=6Jtg3b6WVX" />
       <option name="filePath" value="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/main.dart" />
       <method v="2" />
     </configuration>
@@ -310,7 +303,7 @@
       <workItem from="1785721575904" duration="45000" />
       <workItem from="1785721633737" duration="1352000" />
       <workItem from="1785747424594" duration="1576000" />
-      <workItem from="1785800659608" duration="11600000" />
+      <workItem from="1785800659608" duration="16751000" />
     </task>
     <servers />
   </component>

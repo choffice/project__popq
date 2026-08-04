@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
-
+import 'business_registration_ocr_service.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
 
@@ -27,6 +27,24 @@ class _ImportedStoreInformation {
   final String? name;
   final String? address;
   final String? phone;
+}
+
+class _SelectedStoreLocation {
+  const _SelectedStoreLocation({
+    required this.latitude,
+    required this.longitude,
+    required this.address,
+    required this.sourceLabel,
+  });
+
+  final double latitude;
+  final double longitude;
+
+  /// 이 좌표를 검색하거나 선택할 때 사용한 주소.
+  final String address;
+
+  /// 카카오 업체, 주소 검색, 지도 직접 선택 등.
+  final String sourceLabel;
 }
 
 class SellerStoreRegistrationScreen extends StatefulWidget {
@@ -102,6 +120,16 @@ class _SellerStoreRegistrationScreenState
   XFile? _selectedRepresentativeImage;
 
   bool _pickingRepresentativeImage = false;
+
+  final BusinessRegistrationOcrService
+  _businessRegistrationOcrService =
+  BusinessRegistrationOcrService();
+
+  bool _recognizingBusinessRegistration = false;
+
+  _SelectedStoreLocation? _selectedStoreLocation;
+
+  bool _searchingAddressLocation = false;
 
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
@@ -270,14 +298,25 @@ class _SellerStoreRegistrationScreenState
                 key: const Key(
                   'import-business-registration',
                 ),
-                onPressed: _submitting
+                onPressed:
+                _submitting ||
+                    _recognizingBusinessRegistration
                     ? null
                     : _openBusinessRegistrationImport,
-                icon: const Icon(
+                icon: _recognizingBusinessRegistration
+                    ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+                    : const Icon(
                   Icons.document_scanner_outlined,
                 ),
-                label: const Text(
-                  '사업자등록증으로 자동 입력',
+                label: Text(
+                  _recognizingBusinessRegistration
+                      ? '사업자등록증 인식 중...'
+                      : '사업자등록증으로 자동 입력',
                 ),
               ),
             ),
@@ -489,7 +528,13 @@ class _SellerStoreRegistrationScreenState
               },
             ),
             const SizedBox(
-              height: PopqSpacing.sm,
+              height: PopqSpacing.md,
+            ),
+
+            _buildStoreLocationSection(context),
+
+            const SizedBox(
+              height: PopqSpacing.md,
             ),
             TextFormField(
               controller: _phoneController,
@@ -773,6 +818,198 @@ class _SellerStoreRegistrationScreenState
             return null;
           },
         ),
+      ],
+    );
+  }
+
+  Widget _buildStoreLocationSection(
+      BuildContext context,
+      ) {
+    final _SelectedStoreLocation? location =
+        _selectedStoreLocation;
+
+    final ColorScheme colorScheme =
+        Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '지도 위치',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium,
+        ),
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+        Text(
+          '고객 탐색 지도에 표시할 정확한 사업장 위치를 선택해 주세요.',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall,
+        ),
+        const SizedBox(
+          height: PopqSpacing.md,
+        ),
+
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(
+            PopqSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            color: location == null
+                ? colorScheme.surfaceContainerHighest
+                : colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: location == null
+                  ? colorScheme.outlineVariant
+                  : colorScheme.primary,
+            ),
+          ),
+          child: location == null
+              ? const Row(
+            children: [
+              Icon(
+                Icons.location_off_outlined,
+              ),
+              SizedBox(
+                width: PopqSpacing.sm,
+              ),
+              Expanded(
+                child: Text(
+                  '아직 지도 위치가 확정되지 않았습니다.',
+                ),
+              ),
+            ],
+          )
+              : Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_on_rounded,
+                  ),
+                  const SizedBox(
+                    width: PopqSpacing.sm,
+                  ),
+                  Expanded(
+                    child: Text(
+                      '위치 선택 완료',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(
+                height: PopqSpacing.sm,
+              ),
+              Text(
+                location.address,
+              ),
+              const SizedBox(
+                height: PopqSpacing.xs,
+              ),
+              Text(
+                '위도 ${location.latitude.toStringAsFixed(6)} · '
+                    '경도 ${location.longitude.toStringAsFixed(6)}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall,
+              ),
+              const SizedBox(
+                height: PopqSpacing.xs,
+              ),
+              Text(
+                '선택 방식: ${location.sourceLabel}',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall,
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(
+          height: PopqSpacing.md,
+        ),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const Key(
+              'search-location-by-address',
+            ),
+            onPressed:
+            _submitting ||
+                _searchingAddressLocation
+                ? null
+                : _prepareAddressLocationSearch,
+            icon: _searchingAddressLocation
+                ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
+              Icons.manage_search_rounded,
+            ),
+            label: Text(
+              _searchingAddressLocation
+                  ? '주소 검색 중...'
+                  : '입력한 주소로 위치 찾기',
+            ),
+          ),
+        ),
+
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const Key(
+              'select-location-on-map',
+            ),
+            onPressed: _submitting
+                ? null
+                : _prepareMapLocationSelection,
+            icon: const Icon(
+              Icons.map_outlined,
+            ),
+            label: const Text(
+              '지도에서 직접 위치 선택',
+            ),
+          ),
+        ),
+
+        if (location != null) ...[
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _submitting
+                  ? null
+                  : _clearSelectedStoreLocation,
+              icon: const Icon(
+                Icons.refresh_rounded,
+              ),
+              label: const Text(
+                '위치 다시 선택',
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1099,20 +1336,385 @@ class _SellerStoreRegistrationScreenState
   }
 
   Future<void> _openBusinessRegistrationImport() async {
-    if (_submitting) {
+    if (_submitting ||
+        _recognizingBusinessRegistration) {
       return;
     }
 
-    // 다음 OCR 단계에서 실제 인식 결과로 교체한다.
-    const _ImportedStoreInformation sample =
-    _ImportedStoreInformation(
-      sourceLabel: '사업자등록증',
-      name: '포포컴퍼니',
-      address: '부산광역시 부산진구 중앙대로 123',
-      phone: '051-123-4567',
+    final ImageSource? source =
+    await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (
+          BuildContext bottomSheetContext,
+          ) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(
+              PopqSpacing.md,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_camera_outlined,
+                  ),
+                  title: const Text(
+                    '사업자등록증 촬영',
+                  ),
+                  subtitle: const Text(
+                    '카메라로 등록증을 촬영합니다.',
+                  ),
+                  onTap: () {
+                    Navigator.of(
+                      bottomSheetContext,
+                    ).pop(
+                      ImageSource.camera,
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_outlined,
+                  ),
+                  title: const Text(
+                    '갤러리에서 선택',
+                  ),
+                  subtitle: const Text(
+                    '저장된 등록증 사진을 선택합니다.',
+                  ),
+                  onTap: () {
+                    Navigator.of(
+                      bottomSheetContext,
+                    ).pop(
+                      ImageSource.gallery,
+                    );
+                  },
+                ),
+                const SizedBox(
+                  height: PopqSpacing.sm,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(
+                        bottomSheetContext,
+                      ).pop();
+                    },
+                    child: const Text('취소'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
 
-    await _applyImportedInformation(sample);
+    if (source == null || !mounted) {
+      return;
+    }
+
+    await _recognizeBusinessRegistration(
+      source,
+    );
+  }
+
+  Future<void> _recognizeBusinessRegistration(
+      ImageSource source,
+      ) async {
+    setState(() {
+      _recognizingBusinessRegistration = true;
+    });
+
+    try {
+      final XFile? selectedImage =
+      await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 2400,
+        maxHeight: 2400,
+        imageQuality: 95,
+        requestFullMetadata: false,
+      );
+
+      if (selectedImage == null) {
+        return;
+      }
+
+      final BusinessRegistrationOcrResult result =
+      await _businessRegistrationOcrService
+          .recognize(
+        imagePath: selectedImage.path,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      final bool applyToForm =
+      await _showBusinessRegistrationOcrResult(
+        result,
+      );
+
+      if (!mounted || !applyToForm) {
+        return;
+      }
+
+      final bool hasImportedFormValue =
+          result.businessName != null ||
+              result.businessAddress != null;
+
+      if (!hasImportedFormValue) {
+        _showMessage(
+          '사업자등록번호는 확인했지만 상호명과 주소를 자동으로 찾지 못했습니다. 직접 입력해 주세요.',
+        );
+        return;
+      }
+
+      await _applyImportedInformation(
+        _ImportedStoreInformation(
+          sourceLabel: '사업자등록증 OCR',
+          name: result.businessName,
+          address: result.businessAddress,
+          phone: null,
+        ),
+      );
+    } on BusinessRegistrationOcrException catch (
+    exception
+    ) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        exception.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '사업자등록증을 인식하는 중 오류가 발생했습니다.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recognizingBusinessRegistration = false;
+        });
+      }
+    }
+  }
+
+  Future<bool>
+  _showBusinessRegistrationOcrResult(
+      BusinessRegistrationOcrResult result,
+      ) async {
+    final bool hasImportableValue =
+        result.businessName != null ||
+            result.businessAddress != null;
+
+    final bool? applyToForm =
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return AlertDialog(
+          title: const Text(
+            '사업자등록증 인식 결과',
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
+                children: [
+                  _buildOcrResultItem(
+                    context: context,
+                    label: '사업자등록번호',
+                    value: result.businessNumber,
+                  ),
+                  const SizedBox(
+                    height: PopqSpacing.md,
+                  ),
+                  _buildOcrResultItem(
+                    context: context,
+                    label: '상호명',
+                    value: result.businessName,
+                  ),
+                  const SizedBox(
+                    height: PopqSpacing.md,
+                  ),
+                  _buildOcrResultItem(
+                    context: context,
+                    label: '대표자명',
+                    value:
+                    result.representativeName,
+                  ),
+                  const SizedBox(
+                    height: PopqSpacing.md,
+                  ),
+                  _buildOcrResultItem(
+                    context: context,
+                    label: '사업장 소재지',
+                    value:
+                    result.businessAddress,
+                  ),
+                  const SizedBox(
+                    height: PopqSpacing.lg,
+                  ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(
+                      PopqSpacing.sm,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                      borderRadius:
+                      BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '사업자등록번호와 대표자명은 확인용이며 '
+                          '현재 사업장 DB에는 저장하지 않습니다.',
+                    ),
+                  ),
+                  const SizedBox(
+                    height: PopqSpacing.lg,
+                  ),
+                  ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding:
+                    const EdgeInsets.only(
+                      bottom: PopqSpacing.sm,
+                    ),
+                    title: const Text(
+                      'OCR 전체 원문 보기',
+                    ),
+                    children: [
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .outlineVariant,
+                          ),
+                          borderRadius:
+                          BorderRadius.circular(8),
+                        ),
+                        child: Padding(
+                          padding:
+                          const EdgeInsets.all(
+                            PopqSpacing.sm,
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: SelectableText(
+                              result.rawText,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(false);
+              },
+              child: const Text(
+                '취소',
+              ),
+            ),
+            FilledButton(
+              onPressed: hasImportableValue
+                  ? () {
+                Navigator.of(
+                  dialogContext,
+                ).pop(true);
+              }
+                  : null,
+              child: const Text(
+                '입력폼에 반영',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return applyToForm ?? false;
+  }
+
+  Widget _buildOcrResultItem({
+    required BuildContext context,
+    required String label,
+    required String? value,
+  }) {
+    final String displayedValue =
+    value?.trim().isNotEmpty == true
+        ? value!.trim()
+        : '인식하지 못함';
+
+    final bool recognized =
+        value?.trim().isNotEmpty == true;
+
+    return Column(
+      crossAxisAlignment:
+      CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .labelLarge,
+        ),
+        const SizedBox(
+          height: PopqSpacing.xs,
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(
+            PopqSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: recognized
+                  ? Theme.of(context)
+                  .colorScheme
+                  .outlineVariant
+                  : Theme.of(context)
+                  .colorScheme
+                  .error,
+            ),
+            borderRadius:
+            BorderRadius.circular(8),
+          ),
+          child: SelectableText(
+            displayedValue,
+            style: TextStyle(
+              color: recognized
+                  ? null
+                  : Theme.of(context)
+                  .colorScheme
+                  .error,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _openKakaoPlaceImport() async {
@@ -1172,14 +1774,39 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
+    final _SelectedStoreLocation?
+    previousLocation =
+        _selectedStoreLocation;
+
+    final bool locationAddressChanged =
+        previousLocation != null &&
+            _normalizeComparisonText(
+              previousLocation.address,
+            ) !=
+                _normalizeComparisonText(
+                  resolvedAddress,
+                );
+
     setState(() {
-      _nameController.text = resolvedName;
-      _addressController.text = resolvedAddress;
-      _phoneController.text = resolvedPhone;
+      _nameController.text =
+          resolvedName;
+
+      _addressController.text =
+          resolvedAddress;
+
+      _phoneController.text =
+          resolvedPhone;
+
+      if (locationAddressChanged) {
+        _selectedStoreLocation = null;
+      }
     });
 
     _showMessage(
-      '${information.sourceLabel} 정보를 입력폼에 반영했습니다.',
+      locationAddressChanged
+          ? '${information.sourceLabel} 정보를 반영했습니다. '
+          '주소가 변경되어 지도 위치를 다시 선택해 주세요.'
+          : '${information.sourceLabel} 정보를 입력폼에 반영했습니다.',
     );
   }
 
@@ -1502,6 +2129,351 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
+  Future<void>
+  _prepareAddressLocationSearch() async {
+    if (_submitting ||
+        _searchingAddressLocation) {
+      return;
+    }
+
+    final String address =
+    _addressController.text.trim();
+
+    if (address.isEmpty) {
+      _showMessage(
+        '위치를 검색할 주소를 먼저 입력해 주세요.',
+      );
+      return;
+    }
+
+    setState(() {
+      _searchingAddressLocation = true;
+    });
+
+    try {
+      final List<SellerAddressSearchResult>
+      results =
+      await widget.repository
+          .searchAddresses(
+        address,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (results.isEmpty) {
+        _showMessage(
+          '입력한 주소의 검색 결과를 찾지 못했습니다. '
+              '상세 주소를 제외하고 도로명이나 지번 주소로 다시 검색해 주세요.',
+        );
+        return;
+      }
+
+      final SellerAddressSearchResult?
+      selectedResult =
+      await _showAddressSearchResultDialog(
+        results,
+      );
+
+      if (!mounted ||
+          selectedResult == null) {
+        return;
+      }
+
+      await _applySelectedStoreLocation(
+        sourceLabel: '카카오 주소 검색',
+        address:
+        selectedResult.addressName,
+        latitude:
+        selectedResult.latitude,
+        longitude:
+        selectedResult.longitude,
+      );
+    } on PopqFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        failure.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '주소를 검색하는 중 오류가 발생했습니다.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _searchingAddressLocation =
+          false;
+        });
+      }
+    }
+  }
+
+  Future<SellerAddressSearchResult?>
+  _showAddressSearchResultDialog(
+      List<SellerAddressSearchResult> results,
+      ) {
+    SellerAddressSearchResult
+    selectedResult = results.first;
+
+    return showDialog<
+        SellerAddressSearchResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return StatefulBuilder(
+          builder: (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              title: const Text(
+                '사업장 위치 선택',
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ConstrainedBox(
+                  constraints:
+                  const BoxConstraints(
+                    maxHeight: 460,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    separatorBuilder: (
+                        BuildContext context,
+                        int index,
+                        ) {
+                      return const Divider();
+                    },
+                    itemBuilder: (
+                        BuildContext context,
+                        int index,
+                        ) {
+                      final SellerAddressSearchResult
+                      result =
+                      results[index];
+
+                      return RadioListTile<
+                          SellerAddressSearchResult>(
+                        contentPadding:
+                        EdgeInsets.zero,
+                        value: result,
+                        groupValue:
+                        selectedResult,
+                        onChanged: (
+                            SellerAddressSearchResult?
+                            value,
+                            ) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            selectedResult = value;
+                          });
+                        },
+                        title: Text(
+                          result.addressName,
+                        ),
+                        subtitle: Text(
+                          _buildAddressSearchSubtitle(
+                            result,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop();
+                  },
+                  child: const Text(
+                    '취소',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop(
+                      selectedResult,
+                    );
+                  },
+                  child: const Text(
+                    '이 위치 선택',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _buildAddressSearchSubtitle(
+      SellerAddressSearchResult result,
+      ) {
+    final List<String> lines =
+    <String>[];
+
+    final String? roadAddress =
+        result.roadAddressName;
+
+    final String? jibunAddress =
+        result.jibunAddressName;
+
+    if (roadAddress != null &&
+        roadAddress.isNotEmpty &&
+        roadAddress !=
+            result.addressName) {
+      lines.add(
+        '도로명: $roadAddress',
+      );
+    }
+
+    if (jibunAddress != null &&
+        jibunAddress.isNotEmpty &&
+        jibunAddress !=
+            result.addressName) {
+      lines.add(
+        '지번: $jibunAddress',
+      );
+    }
+
+    if (result.zoneNo != null) {
+      lines.add(
+        '우편번호: ${result.zoneNo}',
+      );
+    }
+
+    lines.add(
+      '위도 ${result.latitude.toStringAsFixed(6)} · '
+          '경도 ${result.longitude.toStringAsFixed(6)}',
+    );
+
+    return lines.join('\n');
+  }
+
+  void _prepareMapLocationSelection() {
+    if (_submitting) {
+      return;
+    }
+
+    _showMessage(
+      '다음 단계에서 지도 위치 선택 화면을 연결합니다.',
+    );
+  }
+
+  void _clearSelectedStoreLocation() {
+    if (_submitting) {
+      return;
+    }
+
+    setState(() {
+      _selectedStoreLocation = null;
+    });
+
+    _showMessage(
+      '선택된 지도 위치를 초기화했습니다.',
+    );
+  }
+
+  Future<void> _applySelectedStoreLocation({
+    required String sourceLabel,
+    required String address,
+    required double latitude,
+    required double longitude,
+  }) async {
+    final String importedAddress =
+    address.trim();
+
+    final String previousAddress =
+    _addressController.text.trim();
+
+    if (importedAddress.isEmpty) {
+      _showMessage(
+        '선택한 위치에 주소 정보가 없습니다.',
+      );
+      return;
+    }
+
+    final String resolvedAddress =
+    await _resolveImportedText(
+      fieldLabel: '주소',
+      sourceLabel: sourceLabel,
+      currentValue:
+      _addressController.text,
+      importedValue: importedAddress,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    /*
+   * 사용자가 카카오 주소 대신 기존 주소나 직접 입력을
+   * 선택했다면, 해당 좌표가 실제로 그 주소와 일치하는지
+   * 보장할 수 없으므로 좌표를 저장하지 않는다.
+   */
+    final String normalizedResolved =
+    _normalizeComparisonText(
+      resolvedAddress,
+    );
+
+    final bool addressMatchesLocation =
+        normalizedResolved ==
+            _normalizeComparisonText(
+              importedAddress,
+            ) ||
+            normalizedResolved ==
+                _normalizeComparisonText(
+                  previousAddress,
+                );
+
+    setState(() {
+      _addressController.text =
+          resolvedAddress;
+
+      _selectedStoreLocation =
+      addressMatchesLocation
+          ? _SelectedStoreLocation(
+        latitude: latitude,
+        longitude: longitude,
+        address: importedAddress,
+        sourceLabel: sourceLabel,
+      )
+          : null;
+    });
+
+    if (!addressMatchesLocation) {
+      _showMessage(
+        '주소는 선택한 내용으로 반영했습니다. '
+            '지도 위치는 변경된 주소로 다시 확인해 주세요.',
+      );
+      return;
+    }
+
+    _showMessage(
+      '$sourceLabel 위치를 적용했습니다.',
+    );
+  }
+
   Future<void> _selectTime({
     required bool isOpenTime,
   }) async {
@@ -1672,8 +2644,14 @@ class _SellerStoreRegistrationScreenState
         representativeCategory:
         _representativeCategory,
         imageUrl: representativeImageUrl,
-        phone:
-        _phoneController.text.trim(),
+        phone: _phoneController.text.trim(),
+
+        latitude:
+        _selectedStoreLocation?.latitude,
+
+        longitude:
+        _selectedStoreLocation?.longitude,
+
         openTime: _toApiTime(
           _openTime!,
         ),

@@ -134,8 +134,78 @@ class SellerStore {
   }
 }
 
+class SellerAddressSearchResult {
+  const SellerAddressSearchResult({
+    required this.addressName,
+    required this.latitude,
+    required this.longitude,
+    this.roadAddressName,
+    this.jibunAddressName,
+    this.zoneNo,
+  });
+
+  factory SellerAddressSearchResult.fromJson(
+      Map<String, Object?> json,
+      ) {
+    final Object? latitudeValue =
+    json['latitude'];
+
+    final Object? longitudeValue =
+    json['longitude'];
+
+    if (latitudeValue is! num ||
+        longitudeValue is! num) {
+      throw const InvalidResponseFailure(
+        '주소 검색 결과의 좌표가 올바르지 않습니다.',
+      );
+    }
+
+    final String addressName =
+        json['addressName']?.toString().trim() ??
+            '';
+
+    if (addressName.isEmpty) {
+      throw const InvalidResponseFailure(
+        '주소 검색 결과에 주소가 없습니다.',
+      );
+    }
+
+    return SellerAddressSearchResult(
+      addressName: addressName,
+      roadAddressName:
+      _readNullableString(
+        json['roadAddressName'],
+      ),
+      jibunAddressName:
+      _readNullableString(
+        json['jibunAddressName'],
+      ),
+      zoneNo: _readNullableString(
+        json['zoneNo'],
+      ),
+      latitude:
+      latitudeValue.toDouble(),
+      longitude:
+      longitudeValue.toDouble(),
+    );
+  }
+
+  final String addressName;
+  final String? roadAddressName;
+  final String? jibunAddressName;
+  final String? zoneNo;
+
+  final double latitude;
+  final double longitude;
+}
+
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
+
+  Future<List<SellerAddressSearchResult>>
+  searchAddresses(
+      String query,
+      );
 
   Future<SellerStore> findOne(
       int storeId,
@@ -220,6 +290,48 @@ class ApiSellerStoreRepository
               ),
         )
             .toList();
+      },
+    );
+  }
+
+  @override
+  Future<List<SellerAddressSearchResult>>
+  searchAddresses(
+      String query,
+      ) {
+    return _apiClient.get<
+        List<SellerAddressSearchResult>>(
+      '/api/v1/seller/location/addresses',
+      query: <String, Object?>{
+        'query': query,
+      },
+      decode: (Object? value) {
+        if (value is! List) {
+          throw const InvalidResponseFailure(
+            '주소 검색 응답 형식이 올바르지 않습니다.',
+          );
+        }
+
+        return value
+            .map(
+              (Object? item) {
+            if (item is! Map) {
+              throw const InvalidResponseFailure(
+                '주소 검색 결과 형식이 올바르지 않습니다.',
+              );
+            }
+
+            return SellerAddressSearchResult
+                .fromJson(
+              Map<String, Object?>.from(
+                item,
+              ),
+            );
+          },
+        )
+            .toList(
+          growable: false,
+        );
       },
     );
   }
@@ -452,6 +564,32 @@ class MemorySellerStoreRepository
     return List<SellerStore>.unmodifiable(
       _stores,
     );
+  }
+
+  @override
+  Future<List<SellerAddressSearchResult>>
+  searchAddresses(
+      String query,
+      ) async {
+    final String normalizedQuery =
+    query.trim();
+
+    if (normalizedQuery.isEmpty) {
+      return const <
+          SellerAddressSearchResult>[];
+    }
+
+    return <SellerAddressSearchResult>[
+      SellerAddressSearchResult(
+        addressName: normalizedQuery,
+        roadAddressName: normalizedQuery,
+        jibunAddressName:
+        '부산 부산진구 부전동',
+        zoneNo: '47291',
+        latitude: 35.157746,
+        longitude: 129.059319,
+      ),
+    ];
   }
 
   @override
@@ -714,4 +852,19 @@ List<String> _readStringList(
       .toList(
     growable: false,
   );
+}
+
+String? _readNullableString(
+    Object? value,
+    ) {
+  if (value == null) {
+    return null;
+  }
+
+  final String text =
+  value.toString().trim();
+
+  return text.isEmpty
+      ? null
+      : text;
 }

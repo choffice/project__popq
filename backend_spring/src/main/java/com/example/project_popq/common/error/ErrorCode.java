@@ -58,6 +58,8 @@ public enum ErrorCode {
   INVALID_REFUND_AMOUNT(HttpStatus.BAD_REQUEST, "환불 금액이 올바르지 않습니다."),
   REFUND_FAILED(HttpStatus.CONFLICT, "환불 처리에 실패했습니다."),
   WALKING_ROUTE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "도보 경로를 불러오지 못했습니다."),
+  KAKAO_API_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE,"카카오 API 설정이 필요합니다."),
+  KAKAO_LOCATION_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "카카오 위치 정보를 불러오지 못했습니다."),
   INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "업로드할 이미지 파일이 올바르지 않습니다."),
   UPLOAD_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 파일 크기가 허용 범위를 초과했습니다."),
   FILE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 파일을 저장하지 못했습니다."),
