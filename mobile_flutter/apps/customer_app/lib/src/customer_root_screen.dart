@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/common/theme_mode_toggle.dart';
 import 'features/notifications/customer_notification_repository.dart';
 import 'features/notifications/notification_action.dart';
 import 'routing/customer_router.dart';
@@ -16,6 +17,7 @@ class CustomerRootScreen extends StatefulWidget {
     required this.child,
     required this.notificationRepository,
     required this.sessionController,
+    this.themeController,
     super.key,
   });
 
@@ -23,6 +25,7 @@ class CustomerRootScreen extends StatefulWidget {
   final Widget child;
   final CustomerNotificationRepository notificationRepository;
   final SessionController sessionController;
+  final PopqThemeController? themeController;
 
   @override
   State<CustomerRootScreen> createState() =>
@@ -130,6 +133,11 @@ class _CustomerRootScreenState
         child: PopqAppScaffold(
           title: _titles[routeIndex],
           actions: [
+            if (widget.themeController != null)
+              ThemeModeToggle(
+                controller:
+                widget.themeController!,
+              ),
             NotificationAction(
               repository:
               widget.notificationRepository,

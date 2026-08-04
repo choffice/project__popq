@@ -11,6 +11,8 @@ enum CustomerHomeVisualKind {
   koreanFood,
   steak,
   membership,
+  popupMarket,
+  cafe,
 }
 
 /// 기간 한정 팝업·부스의 임시 표시 데이터입니다.
@@ -24,6 +26,7 @@ class CustomerHomePopupItem {
     required this.periodLabel,
     required this.badgeLabel,
     required this.visualKind,
+    this.dDayLabel,
     this.storeId,
   });
 
@@ -32,6 +35,12 @@ class CustomerHomePopupItem {
   final String periodLabel;
   final String badgeLabel;
   final CustomerHomeVisualKind visualKind;
+
+  /// 진행 중인 이벤트 카드에 표시하는 D-day 배지입니다.
+  ///
+  /// 실제 Store와 연결된 이벤트에는 종료일 정보가 없어
+  /// null일 수 있습니다.
+  final String? dDayLabel;
 
   /// 실제 Store와 연결되는 항목에서만 사용합니다.
   ///
@@ -50,6 +59,7 @@ class CustomerHomeRecommendedItem {
     required this.categoryLabel,
     required this.rating,
     required this.visualKind,
+    this.visitLabel,
     this.storeId,
   });
 
@@ -58,8 +68,28 @@ class CustomerHomeRecommendedItem {
   final double rating;
   final CustomerHomeVisualKind visualKind;
 
+  /// 인기 랭킹 카드에 표시하는 방문 횟수 텍스트입니다.
+  final String? visitLabel;
+
   /// 실제 Store와 연결되는 경우에만 사용합니다.
   final int? storeId;
+}
+
+/// 이번 주 추천 이벤트 캐러셀에 사용하는 임시 표시 데이터입니다.
+class CustomerHomeFeatureBanner {
+  const CustomerHomeFeatureBanner({
+    required this.title,
+    required this.description,
+    required this.periodLabel,
+    required this.locationLabel,
+    required this.visualKind,
+  });
+
+  final String title;
+  final String description;
+  final String periodLabel;
+  final String locationLabel;
+  final CustomerHomeVisualKind visualKind;
 }
 
 /// 회원 혜택 또는 서비스 안내 배너 데이터입니다.
@@ -79,6 +109,15 @@ class CustomerHomeBenefitBanner {
   final CustomerHomeVisualKind visualKind;
 }
 
+/// 인기 랭킹·진행 중인 이벤트가 기준으로 삼는 권역입니다.
+///
+/// 위치 권한을 허용하면 현재 위치와 가장 가까운 권역을,
+/// 허용하지 않으면 기본값인 수도권을 사용합니다.
+enum CustomerHomeRegion {
+  metro,
+  busan,
+}
+
 /// 아직 백엔드 API가 없는 홈 전용 임시 콘텐츠입니다.
 ///
 /// 추후 홈 전용 API가 준비되면 이 클래스만 제거하고
@@ -87,12 +126,72 @@ class CustomerHomeBenefitBanner {
 /// 테스트 매장에는 사용하지 않으며,
 /// 테스트 매장은 기존 공개 Store API에서 가져옵니다.
 abstract final class CustomerHomeTemporaryContent {
-  static const popupItems = <CustomerHomePopupItem>[
+  static String regionLabel(
+      CustomerHomeRegion region,
+      ) {
+    return switch (region) {
+      CustomerHomeRegion.metro => '수도권',
+      CustomerHomeRegion.busan => '부산',
+    };
+  }
+
+  static List<CustomerHomePopupItem> popupItemsFor(
+      CustomerHomeRegion region,
+      ) {
+    return switch (region) {
+      CustomerHomeRegion.metro => _metroPopupItems,
+      CustomerHomeRegion.busan => _busanPopupItems,
+    };
+  }
+
+  static List<CustomerHomeRecommendedItem>
+  recommendedItemsFor(
+      CustomerHomeRegion region,
+      ) {
+    return switch (region) {
+      CustomerHomeRegion.metro =>
+      _metroRecommendedItems,
+      CustomerHomeRegion.busan =>
+      _busanRecommendedItems,
+    };
+  }
+
+  static const _metroPopupItems =
+  <CustomerHomePopupItem>[
+    CustomerHomePopupItem(
+      title: '판교 플리마켓 팝업존',
+      locationLabel: '판교역로 인근 야외 광장',
+      periodLabel: '8월 15일까지',
+      badgeLabel: '주말 한정',
+      dDayLabel: 'D-7',
+      visualKind: CustomerHomeVisualKind.popupMarket,
+    ),
+    CustomerHomePopupItem(
+      title: '위례 푸드트럭 존',
+      locationLabel: '위례 신도시 광장',
+      periodLabel: '8월 9일까지',
+      badgeLabel: '이번 주',
+      dDayLabel: 'D-2',
+      visualKind: CustomerHomeVisualKind.taco,
+    ),
+    CustomerHomePopupItem(
+      title: '성남 야시장 디저트 부스',
+      locationLabel: '성남 중앙공원',
+      periodLabel: '8월 12일까지',
+      badgeLabel: '이번 달',
+      dDayLabel: 'D-5',
+      visualKind: CustomerHomeVisualKind.dessert,
+    ),
+  ];
+
+  static const _busanPopupItems =
+  <CustomerHomePopupItem>[
     CustomerHomePopupItem(
       title: '부산 야시장 타코 부스',
       locationLabel: '부산 야시장 A구역',
       periodLabel: '8월 10일까지',
       badgeLabel: '기간 한정',
+      dDayLabel: 'D-2',
       visualKind: CustomerHomeVisualKind.taco,
     ),
     CustomerHomePopupItem(
@@ -100,23 +199,112 @@ abstract final class CustomerHomeTemporaryContent {
       locationLabel: '서면 푸드마켓',
       periodLabel: '8월 12일까지',
       badgeLabel: '이번 달',
+      dDayLabel: 'D-5',
       visualKind: CustomerHomeVisualKind.dessert,
+    ),
+    CustomerHomePopupItem(
+      title: '해운대 플리마켓 팝업존',
+      locationLabel: '해운대 해변로',
+      periodLabel: '8월 15일까지',
+      badgeLabel: '주말 한정',
+      dDayLabel: 'D-7',
+      visualKind: CustomerHomeVisualKind.popupMarket,
     ),
   ];
 
-  static const recommendedItems =
+  static const _metroRecommendedItems =
   <CustomerHomeRecommendedItem>[
     CustomerHomeRecommendedItem(
-      name: '서면 분식당',
-      categoryLabel: '분식 · 한식',
+      name: '보런치가든 판교점',
+      categoryLabel: '식당 · 브런치',
       rating: 4.6,
+      visitLabel: '128회 방문',
       visualKind: CustomerHomeVisualKind.koreanFood,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '산리오 팝업스토어',
+      categoryLabel: '팝업스토어',
+      rating: 4.8,
+      visitLabel: '97회 방문',
+      visualKind: CustomerHomeVisualKind.popupMarket,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '위례 플리마켓',
+      categoryLabel: '플리마켓',
+      rating: 4.3,
+      visitLabel: '86회 방문',
+      visualKind: CustomerHomeVisualKind.membership,
     ),
     CustomerHomeRecommendedItem(
       name: '그릴하우스',
       categoryLabel: '양식 · 스테이크',
       rating: 4.7,
+      visitLabel: '74회 방문',
       visualKind: CustomerHomeVisualKind.steak,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '카페 모먼트',
+      categoryLabel: '카페',
+      rating: 4.4,
+      visitLabel: '63회 방문',
+      visualKind: CustomerHomeVisualKind.cafe,
+    ),
+  ];
+
+  static const _busanRecommendedItems =
+  <CustomerHomeRecommendedItem>[
+    CustomerHomeRecommendedItem(
+      name: '서면 분식당',
+      categoryLabel: '분식 · 한식',
+      rating: 4.6,
+      visitLabel: '142회 방문',
+      visualKind: CustomerHomeVisualKind.koreanFood,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '남포동 플리마켓',
+      categoryLabel: '플리마켓',
+      rating: 4.5,
+      visitLabel: '89회 방문',
+      visualKind: CustomerHomeVisualKind.membership,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '부산진 타코존',
+      categoryLabel: '푸드트럭 · 타코',
+      rating: 4.4,
+      visitLabel: '77회 방문',
+      visualKind: CustomerHomeVisualKind.taco,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '그릴하우스',
+      categoryLabel: '양식 · 스테이크',
+      rating: 4.7,
+      visitLabel: '70회 방문',
+      visualKind: CustomerHomeVisualKind.steak,
+    ),
+    CustomerHomeRecommendedItem(
+      name: '해운대 카페 웨이브',
+      categoryLabel: '카페',
+      rating: 4.5,
+      visitLabel: '61회 방문',
+      visualKind: CustomerHomeVisualKind.cafe,
+    ),
+  ];
+
+  static const featureBanners =
+  <CustomerHomeFeatureBanner>[
+    CustomerHomeFeatureBanner(
+      title: '판교 푸드트럭 페스티벌',
+      description: '다양한 음식과 공연을 한곳에서 즐겨보세요!',
+      periodLabel: '8월 8일 - 8월 9일',
+      locationLabel: '성남 중앙공원',
+      visualKind: CustomerHomeVisualKind.taco,
+    ),
+    CustomerHomeFeatureBanner(
+      title: '분당 플리마켓 시즌 2',
+      description: '로컬 셀러들의 소품과 먹거리를 만나보세요.',
+      periodLabel: '8월 10일 - 8월 12일',
+      locationLabel: '분당 율동공원',
+      visualKind: CustomerHomeVisualKind.popupMarket,
     ),
   ];
 

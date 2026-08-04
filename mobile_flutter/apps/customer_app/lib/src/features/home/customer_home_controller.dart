@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
+import '../permissions/customer_permission_gateway.dart';
 import 'customer_home_content.dart';
 
 enum CustomerHomeStatus {
@@ -20,7 +22,10 @@ class CustomerHomeSnapshot {
     required this.recommendedStores,
     required this.temporaryPopups,
     required this.temporaryRecommendations,
+    required this.featureBanners,
     required this.benefitBanners,
+    required this.region,
+    required this.regionLabel,
     required this.storeLoadFailed,
     required this.orderLoadFailed,
     this.activeOrder,
@@ -48,8 +53,20 @@ class CustomerHomeSnapshot {
   final List<CustomerHomeRecommendedItem>
   temporaryRecommendations;
 
+  /// 이번 주 추천 이벤트 캐러셀에 사용하는 임시 콘텐츠입니다.
+  final List<CustomerHomeFeatureBanner> featureBanners;
+
   /// 회원 혜택 또는 서비스 안내 배너입니다.
   final List<CustomerHomeBenefitBanner> benefitBanners;
+
+  /// 인기 랭킹·진행 중인 이벤트가 기준으로 삼는 권역입니다.
+  ///
+  /// 위치 권한을 허용한 경우 현재 위치와 가장 가까운 권역,
+  /// 허용하지 않은 경우 기본값인 수도권입니다.
+  final CustomerHomeRegion region;
+
+  /// [region]을 화면에 보여줄 한글 이름입니다.
+  final String regionLabel;
 
   /// Store API 조회 실패 여부입니다.
   final bool storeLoadFailed;
@@ -63,6 +80,7 @@ class CustomerHomeController extends ChangeNotifier {
       this._storeDiscoveryRepository,
       this._orderRepository,
       this._sessionController,
+      this._permissionGateway,
       ) : _lastSignedIn = _sessionController.isSignedIn {
     _sessionController.addListener(
       _handleSessionChanged,
@@ -81,12 +99,29 @@ class CustomerHomeController extends ChangeNotifier {
     'READY',
   };
 
+  /// 권역을 나누는 기준 좌표입니다.
+  ///
+  /// 실제 시/도 경계 대신 대표 좌표와의 거리로 가장 가까운
+  /// 권역을 고르는 간단한 방식입니다.
+  static const _regionAnchors = <(
+  CustomerHomeRegion region,
+  double lat,
+  double lng,
+  )>[
+    (CustomerHomeRegion.metro, 37.4138, 127.1219),
+    (CustomerHomeRegion.busan, 35.1796, 129.0756),
+  ];
+
   final StoreDiscoveryRepository
   _storeDiscoveryRepository;
 
   final CustomerOrderRepository _orderRepository;
 
   final SessionController _sessionController;
+
+  final CustomerPermissionGateway _permissionGateway;
+
+  CustomerHomeRegion? _cachedRegion;
 
   CustomerHomeStatus status =
       CustomerHomeStatus.initial;
@@ -117,8 +152,11 @@ class CustomerHomeController extends ChangeNotifier {
       signedIn: signedIn,
     );
 
+    final regionFuture = _resolveRegion();
+
     final storeResult = await storeFuture;
     final orderResult = await orderFuture;
+    final region = await regionFuture;
 
     if (_disposed ||
         requestVersion != _requestVersion) {
@@ -133,6 +171,7 @@ class CustomerHomeController extends ChangeNotifier {
     snapshot = _createSnapshot(
       stores: stores,
       orders: orders,
+      region: region,
       storeLoadFailed:
       storeResult.error != null,
       orderLoadFailed:
@@ -156,6 +195,7 @@ class CustomerHomeController extends ChangeNotifier {
   CustomerHomeSnapshot _createSnapshot({
     required List<CustomerStore> stores,
     required List<CustomerOrder> orders,
+    required CustomerHomeRegion region,
     required bool storeLoadFailed,
     required bool orderLoadFailed,
   }) {
@@ -172,7 +212,8 @@ class CustomerHomeController extends ChangeNotifier {
         .where(
           (store) =>
       store.storeType ==
-          'EVENT_COMMERCE',
+          'EVENT_COMMERCE' &&
+          _matchesRegion(store, region),
     )
         .toList(
       growable: false,
@@ -184,9 +225,10 @@ class CustomerHomeController extends ChangeNotifier {
       store.storeType ==
           'LOCAL_STORE' &&
           store.storeId !=
-              featuredStore?.storeId,
+              featuredStore?.storeId &&
+          _matchesRegion(store, region),
     )
-        .take(3)
+        .take(5)
         .toList(
       growable: false,
     );
@@ -204,17 +246,122 @@ class CustomerHomeController extends ChangeNotifier {
       // 임시 콘텐츠는 customer_home_content.dart에서 가져옵니다.
       temporaryPopups:
       CustomerHomeTemporaryContent
-          .popupItems,
+          .popupItemsFor(region),
       temporaryRecommendations:
       CustomerHomeTemporaryContent
-          .recommendedItems,
+          .recommendedItemsFor(region),
+      featureBanners:
+      CustomerHomeTemporaryContent
+          .featureBanners,
       benefitBanners:
       CustomerHomeTemporaryContent
           .benefitBanners,
+      region: region,
+      regionLabel:
+      CustomerHomeTemporaryContent
+          .regionLabel(region),
 
       storeLoadFailed: storeLoadFailed,
       orderLoadFailed: orderLoadFailed,
     );
+  }
+
+  /// 위치 권한 상태에 따라 인기 랭킹·진행 중인 이벤트의 기준 권역을 정합니다.
+  ///
+  /// 위치 권한을 허용했다면 현재 위치와 가장 가까운 권역을,
+  /// 허용하지 않았거나 위치를 가져오지 못했다면 수도권을 기본값으로 씁니다.
+  /// 한 번 확인한 권역은 세션 동안 다시 위치 권한을 묻지 않도록 캐시합니다.
+  Future<CustomerHomeRegion> _resolveRegion() async {
+    final cachedRegion = _cachedRegion;
+
+    if (cachedRegion != null) {
+      return cachedRegion;
+    }
+
+    CustomerHomeRegion region =
+        CustomerHomeRegion.metro;
+
+    try {
+      final result =
+      await _permissionGateway
+          .requestLocation();
+
+      final location = result.location;
+
+      if (result.decision ==
+          PermissionDecision.granted &&
+          location != null) {
+        region = _nearestRegion(
+          location.latitude,
+          location.longitude,
+        );
+      }
+    } catch (_) {
+      // 위치 조회에 실패하면 기본값인 수도권을 유지합니다.
+    }
+
+    _cachedRegion = region;
+
+    return region;
+  }
+
+  CustomerHomeRegion _nearestRegion(
+      double latitude,
+      double longitude,
+      ) {
+    var nearest = _regionAnchors.first.$1;
+    var nearestDistance = double.infinity;
+
+    for (final anchor in _regionAnchors) {
+      final distance = _roughDistance(
+        latitude,
+        longitude,
+        anchor.$2,
+        anchor.$3,
+      );
+
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearest = anchor.$1;
+      }
+    }
+
+    return nearest;
+  }
+
+  /// 두 좌표 사이의 대략적인 거리입니다.
+  ///
+  /// 권역을 고르는 용도로만 쓰이므로 정밀한 하버사인 공식
+  /// 대신 단순한 평면 거리로 충분합니다.
+  double _roughDistance(
+      double lat1,
+      double lng1,
+      double lat2,
+      double lng2,
+      ) {
+    final dLat = lat1 - lat2;
+    final dLng = lng1 - lng2;
+
+    return math.sqrt(
+      dLat * dLat + dLng * dLng,
+    );
+  }
+
+  /// 실제 매장의 주소가 선택된 권역과 맞는지 확인합니다.
+  ///
+  /// 매장에 시/도 구분 필드가 없어 주소 문자열로 대략 판단합니다.
+  bool _matchesRegion(
+      CustomerStore store,
+      CustomerHomeRegion region,
+      ) {
+    final address = store.address ?? '';
+    final isBusanAddress = address.contains(
+      '부산',
+    );
+
+    return region == CustomerHomeRegion.busan
+        ? isBusanAddress
+        : !isBusanAddress;
   }
 
   Future<_HomeLoadResult<List<CustomerStore>>>
@@ -320,6 +467,7 @@ class CustomerHomeController extends ChangeNotifier {
       snapshot = _createSnapshot(
         stores: _stores,
         orders: orders,
+        region: currentSnapshot.region,
         storeLoadFailed:
         currentSnapshot.storeLoadFailed,
         orderLoadFailed: false,
@@ -352,8 +500,13 @@ class CustomerHomeController extends ChangeNotifier {
         temporaryRecommendations:
         currentSnapshot
             .temporaryRecommendations,
+        featureBanners:
+        currentSnapshot.featureBanners,
         benefitBanners:
         currentSnapshot.benefitBanners,
+        region: currentSnapshot.region,
+        regionLabel:
+        currentSnapshot.regionLabel,
         storeLoadFailed:
         currentSnapshot.storeLoadFailed,
         orderLoadFailed: true,
