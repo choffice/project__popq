@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="" />
+    <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -94,7 +98,9 @@
   </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
+    "Flutter.customer_main.dart.executor": "Run",
     "Flutter.main.dart.executor": "Run",
+    "Flutter.seller_main.dart.executor": "Run",
     "Gradle.Build backend_spring.executor": "Run",
     "Gradle.backend_spring [:com.example.project_popq.ProjectPopqApplication.main()].executor": "Run",
     "Gradle.backend_spring [build].executor": "Run",
@@ -138,7 +144,7 @@
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
     </key>
   </component>
-  <component name="RunManager" selected="Flutter.main.dart">
+  <component name="RunManager" selected="Flutter.seller_main.dart">
     <configuration name="ProjectPopqApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <envs>
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
@@ -168,12 +174,17 @@
       <option name="filePath" value="$PROJECT_DIR$/apps/seller_app/lib/main.dart" />
       <method v="2" />
     </configuration>
-    <configuration name="main.dart" type="FlutterRunConfigurationType" factoryName="Flutter">
-      <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_API_BASE_URL=http://127.0.0.1:8082" />
+    <configuration name="customer_main.dart" type="FlutterRunConfigurationType" factoryName="Flutter">
+      <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14/ --dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e define=POPQ_TOSS_CLIENT_KEY=test_ck_QbgMGZzorzqqZ7MqB5nNVl5E1em4 --dart-define=NAVER_CLIENT_ID=GxL8Qnbr3tbzqhIvXYir --dart-define=NAVER_CLIENT_SECRET=6Jtg3b6WVX" />
       <option name="filePath" value="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/main.dart" />
       <method v="2">
         <option name="ToolBeforeRunTask" enabled="true" actionId="Tool_External Tools_ADB reverse 8082" />
       </method>
+    </configuration>
+    <configuration name="seller_main.dart" type="FlutterRunConfigurationType" factoryName="Flutter" temporary="true">
+      <option name="additionalArgs" value="--dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.14:8082 --dart-define=NAVER_CLIENT_ID=GxL8Qnbr3tbzqhIvXYir --dart-define=NAVER_CLIENT_SECRET=6Jtg3b6WVX" />
+      <option name="filePath" value="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/main.dart" />
+      <method v="2" />
     </configuration>
     <configuration name="backend_spring [build]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
       <ExternalSystemSettings>
@@ -225,17 +236,6 @@
       <GradleCoverageDisabled>false</GradleCoverageDisabled>
       <method v="2" />
     </configuration>
-    <configuration default="true" type="JetRunConfigurationType">
-      <module name="com.example.backend_spring" />
-      <method v="2">
-        <option name="Make" enabled="true" />
-      </method>
-    </configuration>
-    <configuration default="true" type="KotlinStandaloneScriptRunConfigurationType">
-      <module name="com.example.backend_spring" />
-      <option name="filePath" />
-      <method v="2" />
-    </configuration>
     <configuration name="ProjectPopqApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
       <envs>
         <env name="POPQ_KAKAO_REST_API_KEY" value="9a02351c3b6c63a80a59a4bb2ef71c6a" />
@@ -256,13 +256,15 @@
       <item itemvalue="Application.ProjectPopqApplication" />
       <item itemvalue="Flutter.Flutter Android Emulator - Customer" />
       <item itemvalue="Flutter.Flutter Android Emulator - Seller" />
-      <item itemvalue="Flutter.main.dart" />
+      <item itemvalue="Flutter.customer_main.dart" />
+      <item itemvalue="Flutter.seller_main.dart" />
       <item itemvalue="Gradle.backend_spring [build]" />
       <item itemvalue="Gradle.backend_spring [clean]" />
       <item itemvalue="Spring Boot.ProjectPopqApplication" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Flutter.seller_main.dart" />
         <item itemvalue="Gradle.backend_spring [clean]" />
         <item itemvalue="Application.ProjectPopqApplication" />
         <item itemvalue="Gradle.backend_spring [build]" />
@@ -295,6 +297,8 @@
       <workItem from="1785721438607" duration="118000" />
       <workItem from="1785721575904" duration="45000" />
       <workItem from="1785721633737" duration="1352000" />
+      <workItem from="1785747424594" duration="1576000" />
+      <workItem from="1785800659608" duration="20731000" />
     </task>
     <servers />
   </component>
