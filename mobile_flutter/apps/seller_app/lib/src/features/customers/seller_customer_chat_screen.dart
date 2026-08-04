@@ -39,6 +39,10 @@ class _SellerCustomerChatScreenState
 
   SellerConversationDetail? _conversation;
 
+  final List<_OutgoingMessageDraft> _outgoingDrafts = [];
+
+  int _nextDraftId = 0;
+
   Object? _error;
 
   Timer? _pollingTimer;
@@ -100,6 +104,9 @@ class _SellerCustomerChatScreenState
 
     if (shouldReload) {
       _requestSerial++;
+
+      _outgoingDrafts.clear();
+      _sending = false;
 
       _loadedStoreId = null;
 
@@ -198,7 +205,8 @@ class _SellerCustomerChatScreenState
         Expanded(
           child: RefreshIndicator(
             onRefresh: _refreshConversation,
-            child: conversation.messages.isEmpty
+            child: conversation.messages.isEmpty &&
+                _outgoingDrafts.isEmpty
                 ? const CustomScrollView(
               physics:
               AlwaysScrollableScrollPhysics(),
@@ -226,39 +234,81 @@ class _SellerCustomerChatScreenState
                 PopqSpacing.md,
                 PopqSpacing.lg,
               ),
-              itemCount:
-              conversation.messages.length,
+              itemCount: conversation.messages.length +
+                  _outgoingDrafts.length,
               itemBuilder: (
                   context,
                   index,
                   ) {
-                final message =
-                conversation.messages[index];
+                if (index < conversation.messages.length) {
+                  final message =
+                  conversation.messages[index];
 
-                final previousMessage =
-                index == 0
+                  final previousMessage =
+                  index == 0
+                      ? null
+                      : conversation
+                      .messages[index - 1];
+
+                  final showDate =
+                      previousMessage == null ||
+                          !_isSameDay(
+                            previousMessage.createdAt
+                                .toLocal(),
+                            message.createdAt
+                                .toLocal(),
+                          );
+
+                  return Column(
+                    children: [
+                      if (showDate)
+                        _DateDivider(
+                          date: message.createdAt
+                              .toLocal(),
+                        ),
+                      _MessageBubble(
+                        message: message,
+                      ),
+                    ],
+                  );
+                }
+
+                final draftIndex =
+                    index - conversation.messages.length;
+
+                final draft =
+                _outgoingDrafts[draftIndex];
+
+                final previousDate = draftIndex > 0
+                    ? _outgoingDrafts[
+                draftIndex - 1
+                ].createdAt
+                    : conversation.messages.isEmpty
                     ? null
-                    : conversation
-                    .messages[index - 1];
+                    : conversation.messages.last.createdAt;
 
-                final showDate =
-                    previousMessage == null ||
-                        !_isSameDay(
-                          previousMessage.createdAt
-                              .toLocal(),
-                          message.createdAt
-                              .toLocal(),
-                        );
+                final currentDate =
+                draft.createdAt.toLocal();
+
+                final showDate = previousDate == null ||
+                    !_isSameDay(
+                      previousDate.toLocal(),
+                      currentDate,
+                    );
 
                 return Column(
                   children: [
                     if (showDate)
                       _DateDivider(
-                        date: message.createdAt
-                            .toLocal(),
+                        date: currentDate,
                       ),
-                    _MessageBubble(
-                      message: message,
+                    _OutgoingMessageBubble(
+                      draft: draft,
+                      onRetry: _sending
+                          ? null
+                          : () => _retryMessage(
+                        draft.localId,
+                      ),
                     ),
                   ],
                 );
@@ -288,6 +338,9 @@ class _SellerCustomerChatScreenState
     }
 
     _requestSerial++;
+
+    _outgoingDrafts.clear();
+    _sending = false;
 
     _loadedStoreId = null;
 
@@ -535,41 +588,158 @@ class _SellerCustomerChatScreenState
       return;
     }
 
+    final draft = _OutgoingMessageDraft(
+      localId: ++_nextDraftId,
+      content: content,
+      createdAt: DateTime.now(),
+      status: _OutgoingMessageStatus.sending,
+    );
+
     setState(() {
       _sending = true;
+      _outgoingDrafts.add(draft);
+      _messageController.clear();
     });
 
+    _scrollToLatestMessage();
+
+    await _deliverDraft(
+      localId: draft.localId,
+      storeId: storeId,
+    );
+  }
+
+  Future<void> _retryMessage(int localId) async {
+    final storeId = _selectedStoreId;
+
+    if (_sending || storeId == null) {
+      return;
+    }
+
+    final draftIndex = _outgoingDrafts.indexWhere(
+          (draft) => draft.localId == localId,
+    );
+
+    if (draftIndex < 0) {
+      return;
+    }
+
+    setState(() {
+      _sending = true;
+      _outgoingDrafts[draftIndex] =
+          _outgoingDrafts[draftIndex].copyWith(
+            status: _OutgoingMessageStatus.sending,
+          );
+    });
+
+    await _deliverDraft(
+      localId: localId,
+      storeId: storeId,
+    );
+  }
+
+  Future<void> _deliverDraft({
+    required int localId,
+    required int storeId,
+  }) async {
+    final draftIndex = _outgoingDrafts.indexWhere(
+          (draft) => draft.localId == localId,
+    );
+
+    if (draftIndex < 0) {
+      if (mounted) {
+        setState(() {
+          _sending = false;
+        });
+      }
+
+      return;
+    }
+
+    final draft = _outgoingDrafts[draftIndex];
+    final orderPublicId = widget.orderPublicId;
+
     try {
+      final sentMessage =
       await widget.repository.sendMessage(
         storeId,
-        widget.orderPublicId,
-        content: content,
+        orderPublicId,
+        content: draft.content,
       );
 
-      _messageController.clear();
-
-      await _refreshConversation();
-
-      if (!mounted) {
+      if (!mounted ||
+          _selectedStoreId != storeId ||
+          widget.orderPublicId != orderPublicId) {
         return;
       }
 
+      setState(() {
+        _outgoingDrafts.removeWhere(
+              (item) => item.localId == localId,
+        );
+
+        final conversation = _conversation;
+
+        if (conversation != null &&
+            !conversation.messages.any(
+                  (message) =>
+              message.orderMessageId ==
+                  sentMessage.orderMessageId,
+            )) {
+          _conversation = SellerConversationDetail(
+            orderPublicId: conversation.orderPublicId,
+            storeId: conversation.storeId,
+            storeName: conversation.storeName,
+            customerUserId: conversation.customerUserId,
+            customerName: conversation.customerName,
+            orderType: conversation.orderType,
+            orderStatus: conversation.orderStatus,
+            totalAmount: conversation.totalAmount,
+            orderedAt: conversation.orderedAt,
+            orderItems: conversation.orderItems,
+            messages: [
+              ...conversation.messages,
+              sentMessage,
+            ],
+          );
+        }
+      });
+
+      _scrollToLatestMessage();
       _messageFocusNode.requestFocus();
-    } catch (error) {
-      if (!mounted) {
+    } catch (_) {
+      if (!mounted ||
+          _selectedStoreId != storeId ||
+          widget.orderPublicId != orderPublicId) {
         return;
+      }
+
+      final failedIndex =
+      _outgoingDrafts.indexWhere(
+            (item) => item.localId == localId,
+      );
+
+      if (failedIndex >= 0) {
+        setState(() {
+          _outgoingDrafts[failedIndex] =
+              _outgoingDrafts[failedIndex].copyWith(
+                status: _OutgoingMessageStatus.failed,
+              );
+        });
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            '메시지를 보내지 못했어요. '
-                '다시 시도해 주세요.',
+            '메시지 전송에 실패했어요. '
+                '말풍선 아래 재전송을 눌러 주세요.',
           ),
         ),
       );
     } finally {
-      if (mounted) {
+      if (mounted &&
+          _selectedStoreId == storeId &&
+          widget.orderPublicId == orderPublicId) {
         setState(() {
           _sending = false;
         });
@@ -813,6 +983,174 @@ class _DateDivider extends StatelessWidget {
             child: Divider(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _OutgoingMessageStatus {
+  sending,
+  failed,
+}
+
+class _OutgoingMessageDraft {
+  const _OutgoingMessageDraft({
+    required this.localId,
+    required this.content,
+    required this.createdAt,
+    required this.status,
+  });
+
+  final int localId;
+  final String content;
+  final DateTime createdAt;
+  final _OutgoingMessageStatus status;
+
+  _OutgoingMessageDraft copyWith({
+    _OutgoingMessageStatus? status,
+  }) {
+    return _OutgoingMessageDraft(
+      localId: localId,
+      content: content,
+      createdAt: createdAt,
+      status: status ?? this.status,
+    );
+  }
+}
+
+class _OutgoingMessageBubble extends StatelessWidget {
+  const _OutgoingMessageBubble({
+    required this.draft,
+    required this.onRetry,
+  });
+
+  final _OutgoingMessageDraft draft;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final failed =
+        draft.status == _OutgoingMessageStatus.failed;
+
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: const EdgeInsets.only(
+          bottom: PopqSpacing.sm,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(
+                    right: PopqSpacing.xs,
+                  ),
+                  child: Text(
+                    '${_twoDigits(draft.createdAt.hour)}:'
+                        '${_twoDigits(draft.createdAt.minute)}',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(fontSize: 10),
+                  ),
+                ),
+                Flexible(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxWidth:
+                      MediaQuery.sizeOf(context).width * 0.72,
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PopqSpacing.md,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: failed
+                          ? colorScheme.errorContainer
+                          : colorScheme.primary,
+                      border: failed
+                          ? Border.all(
+                        color: colorScheme.error,
+                      )
+                          : null,
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(20),
+                        topRight: Radius.circular(20),
+                        bottomLeft: Radius.circular(20),
+                        bottomRight: Radius.circular(6),
+                      ),
+                    ),
+                    child: Text(
+                      draft.content,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: failed
+                            ? colorScheme.onErrorContainer
+                            : colorScheme.onPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: PopqSpacing.xs),
+            if (failed)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 16,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '전송 실패',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.error,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: PopqSpacing.xs),
+                  TextButton.icon(
+                    onPressed: onRetry,
+                    icon: const Icon(
+                      Icons.refresh_rounded,
+                      size: 17,
+                    ),
+                    label: const Text('재전송'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(0, 32),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: PopqSpacing.sm,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox.square(
+                    dimension: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 1.5,
+                    ),
+                  ),
+                  const SizedBox(width: PopqSpacing.xs),
+                  Text(
+                    '전송 중',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
     );
   }
