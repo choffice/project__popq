@@ -2036,8 +2036,6 @@ class _SellerStoreRegistrationScreenState
       },
     );
 
-    queryController.dispose();
-
     return query;
   }
 
@@ -2632,8 +2630,6 @@ class _SellerStoreRegistrationScreenState
         );
       },
     );
-
-    manualController.dispose();
 
     return result ?? currentValue;
   }
