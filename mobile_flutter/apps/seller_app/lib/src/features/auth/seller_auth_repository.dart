@@ -22,6 +22,11 @@ abstract interface class SellerAuthRepository {
     required String password,
   });
 
+  Future<SellerAuthResult> socialLogIn({
+    required String provider,
+    required String providerToken,
+  });
+
   Future<String> findId({
     required String name,
     required String phone,
@@ -65,6 +70,14 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
   Future<SellerAuthResult> logIn({
     required String email,
     required String password,
+  }) async {
+    return _result();
+  }
+
+  @override
+  Future<SellerAuthResult> socialLogIn({
+    required String provider,
+    required String providerToken,
   }) async {
     return _result();
   }
@@ -132,6 +145,21 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
       'email': email,
       'password': password,
     });
+  }
+
+  @override
+  Future<SellerAuthResult> socialLogIn({
+    required String provider,
+    required String providerToken,
+  }) {
+    return _submit(
+      '/api/v1/auth/social/login',
+      {
+        'provider': provider,
+        'providerToken': providerToken,
+        'role': 'SELLER',
+      },
+    );
   }
 
   @override

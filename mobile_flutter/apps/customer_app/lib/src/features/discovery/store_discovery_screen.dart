@@ -932,7 +932,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (result == CustomerStoreInterestToggleResult.removed) {
-      _showFavoriteMessage('${store.name}을(를) 찜에서 삭제했어요.');
+      _showFavoriteRemovedMessage(store);
       return;
     }
 
@@ -955,6 +955,98 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _showFavoriteRemovedMessage(
+      CustomerStore store,
+      ) {
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 3),
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            '${store.name}을(를) 찜에서 삭제했어요.',
+          ),
+          action: SnackBarAction(
+            label: '되돌리기',
+            onPressed: () {
+              unawaited(
+                _restoreFavorite(store),
+              );
+            },
+          ),
+        ),
+      );
+  }
+
+  Future<void> _restoreFavorite(
+      CustomerStore store,
+      ) async {
+    final controller = _interestController;
+
+    /*
+   * 실제 관심 매장 컨트롤러가 아직 연결되지 않은
+   * 로컬 테스트 상태도 같이 처리합니다.
+   */
+    if (controller == null) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _localFavoriteStoreIds.add(
+          store.storeId,
+        );
+      });
+
+      _showFavoriteMessage(
+        '${store.name}을(를) 다시 찜했어요.',
+      );
+
+      return;
+    }
+
+    /*
+   * SnackBar가 떠 있는 동안 다른 화면이나 동작에서
+   * 이미 다시 찜했다면 toggle을 호출하지 않습니다.
+   *
+   * 여기서 무조건 toggle하면 이미 추가된 찜이
+   * 다시 삭제될 수 있기 때문입니다.
+   */
+    if (controller.isInterested(store.storeId)) {
+      return;
+    }
+
+    final result =
+    await controller.toggle(store.storeId);
+
+    if (!mounted) {
+      return;
+    }
+
+    if (result ==
+        CustomerStoreInterestToggleResult.added) {
+      _showFavoriteMessage(
+        '${store.name}을(를) 다시 찜했어요.',
+      );
+      return;
+    }
+
+    if (result ==
+        CustomerStoreInterestToggleResult.signInRequired) {
+      _showFavoriteMessage(
+        '로그인이 만료되어 찜을 되돌리지 못했어요.',
+      );
+      return;
+    }
+
+    _showFavoriteMessage(
+      '찜 삭제를 되돌리지 못했어요. 다시 시도해 주세요.',
+    );
   }
 
   Future<void> _openStoreDetail() async {

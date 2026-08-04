@@ -115,6 +115,12 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen> {
                       const SizedBox(height: PopqSpacing.sm),
                   itemBuilder: (context, index) {
                     final order = snapshot.requireData[index];
+                    final itemSummary = formatPopqOrderItemSummary(
+                      order.items.map(
+                        (item) => '${item.productName} ${item.quantity}개',
+                      ),
+                    );
+
                     return Card(
                       child: ListTile(
                         contentPadding: const EdgeInsets.all(PopqSpacing.md),
@@ -129,10 +135,30 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen> {
                           sellerOrderStatusLabel(order.status),
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
-                        subtitle: Text(
-                          '${order.orderPublicId}\n'
-                          '${sellerOrderTypeLabel(order.orderType)} · '
-                          '${order.totalQuantity}개',
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: PopqSpacing.xs),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                formatPopqOrderNumber(order.orderPublicId),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                itemSummary,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${sellerOrderTypeLabel(order.orderType)} · '
+                                '총 ${order.totalQuantity}개',
+                              ),
+                            ],
+                          ),
                         ),
                         isThreeLine: true,
                         trailing: Text(

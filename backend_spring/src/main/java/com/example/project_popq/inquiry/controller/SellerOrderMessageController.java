@@ -2,6 +2,7 @@ package com.example.project_popq.inquiry.controller;
 
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
+import com.example.project_popq.inquiry.dto.OrderMessagePageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationDetailResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationSummaryResponse;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -70,6 +72,41 @@ public class SellerOrderMessageController {
             currentUserService.getRequired(jwt),
             storeId,
             orderPublicId
+        )
+    );
+  }
+
+  @GetMapping("/orders/{orderPublicId}/conversation")
+  public ApiResponse<SellerConversationDetailResponse>
+  findConversationMetadata(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable Long storeId,
+      @PathVariable String orderPublicId
+  ) {
+    return ApiResponse.success(
+        orderMessageService.findSellerConversationMetadata(
+            currentUserService.getRequired(jwt),
+            storeId,
+            orderPublicId
+        )
+    );
+  }
+
+  @GetMapping("/orders/{orderPublicId}/messages/page")
+  public ApiResponse<OrderMessagePageResponse> findMessagePage(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable Long storeId,
+      @PathVariable String orderPublicId,
+      @RequestParam(required = false) Long beforeMessageId,
+      @RequestParam(defaultValue = "30") Integer size
+  ) {
+    return ApiResponse.success(
+        orderMessageService.findSellerMessagePage(
+            currentUserService.getRequired(jwt),
+            storeId,
+            orderPublicId,
+            beforeMessageId,
+            size
         )
     );
   }

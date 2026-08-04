@@ -9,8 +9,10 @@ import com.example.project_popq.auth.dto.LoginRequest;
 import com.example.project_popq.auth.dto.PasswordResetConfirmRequest;
 import com.example.project_popq.auth.dto.PasswordResetVerifyRequest;
 import com.example.project_popq.auth.dto.SignupRequest;
+import com.example.project_popq.auth.dto.SocialLoginRequest;
 import com.example.project_popq.auth.service.AuthService;
 import com.example.project_popq.auth.service.CurrentUserService;
+import com.example.project_popq.auth.service.SocialAuthService;
 import com.example.project_popq.common.api.ApiResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +33,7 @@ public class AuthController {
 
     private final CurrentUserService currentUserService;
     private final AuthService authService;
+    private final SocialAuthService socialAuthService;
 
     @GetMapping("/me")
     public ApiResponse<AuthUserResponse> me(@AuthenticationPrincipal Jwt jwt) {
@@ -59,6 +62,14 @@ public class AuthController {
             @Valid @RequestBody FindIdRequest request
     ) {
         return ApiResponse.success(authService.findId(request));
+    }
+    @PostMapping("/social/login")
+    public ApiResponse<AuthTokenResponse> socialLogin(
+        @Valid @RequestBody SocialLoginRequest request
+    ) {
+        return ApiResponse.success(
+            socialAuthService.login(request)
+        );
     }
 
     @PostMapping("/password-reset/verify")

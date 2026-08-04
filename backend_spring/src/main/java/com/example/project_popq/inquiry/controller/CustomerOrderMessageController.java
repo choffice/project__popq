@@ -3,6 +3,7 @@ package com.example.project_popq.inquiry.controller;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
+import com.example.project_popq.inquiry.dto.OrderMessagePageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
 import com.example.project_popq.inquiry.dto.SendOrderMessageRequest;
 import com.example.project_popq.inquiry.service.OrderMessageService;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -51,6 +53,23 @@ public class CustomerOrderMessageController {
         orderMessageService.findCustomerMessages(
             currentUserService.getRequired(jwt),
             orderPublicId
+        )
+    );
+  }
+
+  @GetMapping("/{orderPublicId}/messages/page")
+  public ApiResponse<OrderMessagePageResponse> findMessagePage(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable String orderPublicId,
+      @RequestParam(required = false) Long beforeMessageId,
+      @RequestParam(defaultValue = "30") Integer size
+  ) {
+    return ApiResponse.success(
+        orderMessageService.findCustomerMessagePage(
+            currentUserService.getRequired(jwt),
+            orderPublicId,
+            beforeMessageId,
+            size
         )
     );
   }

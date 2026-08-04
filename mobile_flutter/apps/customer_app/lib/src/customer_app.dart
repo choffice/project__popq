@@ -457,7 +457,7 @@ class _CustomerBackButtonDispatcher
     CustomerRoutes.home,
     CustomerRoutes.discover,
     CustomerRoutes.qrScanner,
-    CustomerRoutes.orders,
+    CustomerRoutes.favorites,
     CustomerRoutes.profile,
   };
 

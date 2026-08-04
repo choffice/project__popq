@@ -55,12 +55,14 @@ public class SecurityConfig {
                 HttpMethod.POST,
                 "/api/v1/auth/signup",
                 "/api/v1/auth/login",
+                "/api/v1/auth/social/login",
                 "/api/v1/auth/find-id",
                 "/api/v1/auth/password-reset/verify",
                 "/api/v1/auth/password-reset/confirm"
             ).permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/stores/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/location/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
             .requestMatchers("/api/v1/qr/**").permitAll()
             .requestMatchers("/ws", "/ws/**").permitAll()
             .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

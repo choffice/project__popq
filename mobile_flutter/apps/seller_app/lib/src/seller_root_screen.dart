@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -43,7 +42,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     SellerRoutes.operations,
     SellerRoutes.orders,
     SellerRoutes.customers,
-    SellerRoutes.sales,
+    SellerRoutes.my,
   ];
 
   static const List<String> _titles = [
@@ -51,18 +50,12 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     '운영',
     '주문 관리',
     '고객',
-    '매출',
+    '마이',
   ];
-
-  static const Duration _exitConfirmDuration = Duration(
-    seconds: 2,
-  );
 
   static const Duration _unreadPollingInterval = Duration(
     seconds: 3,
   );
-
-  DateTime? _lastBackPressedAt;
 
   int _customerUnreadCount = 0;
   int _unreadRequestSerial = 0;
@@ -81,10 +74,6 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       _handleStoreSelectionChanged,
     );
 
-    unawaited(
-      SystemNavigator.setFrameworkHandlesBack(true),
-    );
-
     _scheduleUnreadRefresh();
     _startUnreadPolling();
   }
@@ -94,10 +83,6 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       covariant SellerRootScreen oldWidget,
       ) {
     super.didUpdateWidget(oldWidget);
-
-    if (oldWidget.location != widget.location) {
-      _lastBackPressedAt = null;
-    }
 
     if (oldWidget.storeSelectionController !=
         widget.storeSelectionController) {
@@ -159,10 +144,6 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       _handleStoreSelectionChanged,
     );
 
-    unawaited(
-      SystemNavigator.setFrameworkHandlesBack(false),
-    );
-
     super.dispose();
   }
 
@@ -172,188 +153,111 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       widget.location,
     );
 
-    return BackButtonListener(
-      onBackButtonPressed: _handleRootBackButtonPressed,
-      child: PopScope<Object?>(
-        canPop: false,
-        onPopInvokedWithResult: (
-            bool didPop,
-            Object? result,
-            ) {
-          if (didPop) {
-            return;
-          }
-
-          _handleSystemBack();
-        },
-        child: PopqAppScaffold(
-          title: _titles[selectedIndex],
-          actions: [
-            if (widget.location != SellerRoutes.dashboard)
-              IconButton(
-                tooltip: '사업장 전환',
-                onPressed: () {
-                  _lastBackPressedAt = null;
-
-                  context.go(
-                    SellerRoutes.dashboard,
-                  );
-                },
-                icon: const Icon(
-                  Icons.swap_horiz_rounded,
-                ),
-              ),
-            if (widget.themeController != null)
-              ThemeModeToggle(
-                controller: widget.themeController!,
-              ),
-            IconButton(
-              tooltip: '판매자 설정',
-              onPressed: () {
-                _lastBackPressedAt = null;
-
-                context.push(
-                  SellerRoutes.settings,
-                );
-              },
-              icon: const Icon(
-                Icons.settings_rounded,
-              ),
+    return PopqAppScaffold(
+      title: _titles[selectedIndex],
+      actions: [
+        if (widget.location != SellerRoutes.dashboard)
+          IconButton(
+            tooltip: '사업장 전환',
+            onPressed: () {
+              context.go(
+                SellerRoutes.dashboard,
+              );
+            },
+            icon: const Icon(
+              Icons.swap_horiz_rounded,
             ),
-            IconButton(
-              tooltip: '로그아웃',
-              onPressed: () {
-                _signOut(context);
-              },
-              icon: const Icon(
-                Icons.logout_rounded,
-              ),
-            ),
-          ],
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (index) {
-            unawaited(
-              _refreshCustomerUnreadCount(),
-            );
-
-            final nextLocation = _locations[index];
-
-            if (nextLocation == widget.location) {
-              return;
-            }
-
-            _lastBackPressedAt = null;
-
-            context.go(nextLocation);
-          },
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(
-                Icons.business_outlined,
-              ),
-              selectedIcon: Icon(
-                Icons.business_rounded,
-              ),
-              label: '대시보드',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.tune_outlined,
-              ),
-              selectedIcon: Icon(
-                Icons.tune_rounded,
-              ),
-              label: '운영',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.notifications_none_rounded,
-              ),
-              selectedIcon: Icon(
-                Icons.notifications_rounded,
-              ),
-              label: '주문',
-            ),
-            NavigationDestination(
-              icon: _CustomerNavigationIcon(
-                icon: Icons.forum_outlined,
-                unreadCount: _customerUnreadCount,
-              ),
-              selectedIcon: _CustomerNavigationIcon(
-                icon: Icons.forum_rounded,
-                unreadCount: _customerUnreadCount,
-              ),
-              label: '고객',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.query_stats_outlined,
-              ),
-              selectedIcon: Icon(
-                Icons.query_stats_rounded,
-              ),
-              label: '매출',
-            ),
-          ],
-          body: widget.child,
-        ),
-      ),
-    );
-  }
-
-  Future<bool> _handleRootBackButtonPressed() {
-    _handleSystemBack();
-
-    return Future<bool>.value(true);
-  }
-
-  void _handleSystemBack() {
-    if (!mounted) {
-      return;
-    }
-
-    if (widget.location != SellerRoutes.dashboard) {
-      _lastBackPressedAt = null;
-
-      context.go(
-        SellerRoutes.dashboard,
-      );
-
-      return;
-    }
-
-    final now = DateTime.now();
-    final previousPressedAt = _lastBackPressedAt;
-
-    final shouldExit =
-        previousPressedAt != null &&
-            now.difference(previousPressedAt) <=
-                _exitConfirmDuration;
-
-    if (shouldExit) {
-      _lastBackPressedAt = null;
-
-      unawaited(
-        SystemNavigator.pop(),
-      );
-
-      return;
-    }
-
-    _lastBackPressedAt = now;
-
-    final messenger = ScaffoldMessenger.of(context);
-
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            '한 번 더 누르면 앱이 종료됩니다.',
           ),
-          duration: _exitConfirmDuration,
+        if (widget.themeController != null)
+          ThemeModeToggle(
+            controller: widget.themeController!,
+          ),
+        IconButton(
+          tooltip: '판매자 설정',
+          onPressed: () {
+            context.push(
+              SellerRoutes.settings,
+            );
+          },
+          icon: const Icon(
+            Icons.settings_rounded,
+          ),
         ),
-      );
+        IconButton(
+          tooltip: '로그아웃',
+          onPressed: () {
+            _signOut(context);
+          },
+          icon: const Icon(
+            Icons.logout_rounded,
+          ),
+        ),
+      ],
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (index) {
+        unawaited(
+          _refreshCustomerUnreadCount(),
+        );
+
+        final nextLocation = _locations[index];
+
+        if (nextLocation == widget.location) {
+          return;
+        }
+
+        context.go(nextLocation);
+      },
+      destinations: [
+        const NavigationDestination(
+          icon: Icon(
+            Icons.business_outlined,
+          ),
+          selectedIcon: Icon(
+            Icons.business_rounded,
+          ),
+          label: '대시보드',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.tune_outlined,
+          ),
+          selectedIcon: Icon(
+            Icons.tune_rounded,
+          ),
+          label: '운영',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.notifications_none_rounded,
+          ),
+          selectedIcon: Icon(
+            Icons.notifications_rounded,
+          ),
+          label: '주문',
+        ),
+        NavigationDestination(
+          icon: _CustomerNavigationIcon(
+            icon: Icons.forum_outlined,
+            unreadCount: _customerUnreadCount,
+          ),
+          selectedIcon: _CustomerNavigationIcon(
+            icon: Icons.forum_rounded,
+            unreadCount: _customerUnreadCount,
+          ),
+          label: '고객',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.person_outline_rounded,
+          ),
+          selectedIcon: Icon(
+            Icons.person_rounded,
+          ),
+          label: '마이',
+        ),
+      ],
+      body: widget.child,
+    );
   }
 
   void _handleStoreSelectionChanged() {
@@ -484,8 +388,6 @@ class _SellerRootScreenState extends State<SellerRootScreen>
   Future<void> _signOut(
       BuildContext context,
       ) async {
-    _lastBackPressedAt = null;
-
     await widget.onSignOut();
 
     if (context.mounted) {

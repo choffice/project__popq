@@ -3,14 +3,14 @@ enum CustomerOrderMessageSenderType {
   seller;
 
   factory CustomerOrderMessageSenderType.fromJson(
-      String value,
-      ) {
+    String value,
+  ) {
     return switch (value) {
       'CUSTOMER' => CustomerOrderMessageSenderType.customer,
       'SELLER' => CustomerOrderMessageSenderType.seller,
       _ => throw FormatException(
-        '지원하지 않는 메시지 발신자 유형입니다: $value',
-      ),
+          '지원하지 않는 메시지 발신자 유형입니다: $value',
+        ),
     };
   }
 
@@ -35,8 +35,8 @@ class CustomerOrderMessage {
   });
 
   factory CustomerOrderMessage.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return CustomerOrderMessage(
       orderMessageId: (json['orderMessageId'] as num).toInt(),
       senderUserId: (json['senderUserId'] as num).toInt(),
@@ -49,8 +49,8 @@ class CustomerOrderMessage {
       readAt: json['readAt'] == null
           ? null
           : DateTime.parse(
-        json['readAt'] as String,
-      ),
+              json['readAt'] as String,
+            ),
       createdAt: DateTime.parse(
         json['createdAt'] as String,
       ),
@@ -67,14 +67,43 @@ class CustomerOrderMessage {
   final DateTime createdAt;
 
   bool get sentByCustomer {
-    return senderType ==
-        CustomerOrderMessageSenderType.customer;
+    return senderType == CustomerOrderMessageSenderType.customer;
   }
 
   bool get sentBySeller {
-    return senderType ==
-        CustomerOrderMessageSenderType.seller;
+    return senderType == CustomerOrderMessageSenderType.seller;
   }
+}
+
+class CustomerOrderMessagePage {
+  const CustomerOrderMessagePage({
+    required this.messages,
+    required this.hasMore,
+    required this.nextBeforeMessageId,
+  });
+
+  factory CustomerOrderMessagePage.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerOrderMessagePage(
+      messages: (json['messages'] as List<Object?>? ?? const [])
+          .map(
+            (Object? item) => CustomerOrderMessage.fromJson(
+              Map<String, Object?>.from(
+                item as Map,
+              ),
+            ),
+          )
+          .toList(),
+      hasMore: json['hasMore'] as bool,
+      nextBeforeMessageId:
+          (json['nextBeforeMessageId'] as num?)?.toInt(),
+    );
+  }
+
+  final List<CustomerOrderMessage> messages;
+  final bool hasMore;
+  final int? nextBeforeMessageId;
 }
 
 class CustomerOrderUnreadMessageCount {
@@ -84,8 +113,8 @@ class CustomerOrderUnreadMessageCount {
   });
 
   factory CustomerOrderUnreadMessageCount.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return CustomerOrderUnreadMessageCount(
       orderPublicId: json['orderPublicId'] as String,
       unreadCount: (json['unreadCount'] as num).toInt(),

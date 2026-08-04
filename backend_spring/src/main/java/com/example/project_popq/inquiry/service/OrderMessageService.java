@@ -5,6 +5,7 @@ import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.inquiry.domain.MessageSenderType;
 import com.example.project_popq.inquiry.domain.OrderMessage;
 import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
+import com.example.project_popq.inquiry.dto.OrderMessagePageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationDetailResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationSummaryResponse;
@@ -19,12 +20,17 @@ import com.example.project_popq.user.domain.User;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 public class OrderMessageService {
+
+  private static final int DEFAULT_MESSAGE_PAGE_SIZE = 30;
+  private static final int MAX_MESSAGE_PAGE_SIZE = 100;
 
   private final StoreAuthorizationService storeAuthorizationService;
   private final OrderRepository orderRepository;
@@ -76,6 +82,48 @@ public class OrderMessageService {
     return SellerConversationDetailResponse.of(
         order,
         messages
+    );
+  }
+
+  @Transactional(readOnly = true)
+  public SellerConversationDetailResponse findSellerConversationMetadata(
+      User seller,
+      Long storeId,
+      String orderPublicId
+  ) {
+    requireStoreMember(seller.getId(), storeId);
+
+    Order order = findSellerOrder(storeId, orderPublicId);
+    requireCustomerOrder(order);
+
+    return SellerConversationDetailResponse.of(
+        order,
+        List.of()
+    );
+  }
+
+  @Transactional
+  public OrderMessagePageResponse findSellerMessagePage(
+      User seller,
+      Long storeId,
+      String orderPublicId,
+      Long beforeMessageId,
+      Integer size
+  ) {
+    requireStoreMember(seller.getId(), storeId);
+
+    Order order = findSellerOrder(storeId, orderPublicId);
+    requireCustomerOrder(order);
+
+    markMessagesAsRead(
+        order.getId(),
+        MessageSenderType.CUSTOMER
+    );
+
+    return findMessagePage(
+        order.getId(),
+        beforeMessageId,
+        size
     );
   }
 
@@ -158,6 +206,32 @@ public class OrderMessageService {
   }
 
   @Transactional
+  public OrderMessagePageResponse findCustomerMessagePage(
+      User customer,
+      String orderPublicId,
+      Long beforeMessageId,
+      Integer size
+  ) {
+    requireCustomer(customer);
+
+    Order order = findCustomerOrder(
+        customer.getId(),
+        orderPublicId
+    );
+
+    markMessagesAsRead(
+        order.getId(),
+        MessageSenderType.SELLER
+    );
+
+    return findMessagePage(
+        order.getId(),
+        beforeMessageId,
+        size
+    );
+  }
+
+  @Transactional
   public OrderMessageResponse sendCustomerMessage(
       User customer,
       String orderPublicId,
@@ -181,6 +255,60 @@ public class OrderMessageService {
         orderMessageRepository.saveAndFlush(message);
 
     return OrderMessageResponse.from(saved);
+  }
+
+  private OrderMessagePageResponse findMessagePage(
+      Long orderId,
+      Long beforeMessageId,
+      Integer requestedSize
+  ) {
+    int pageSize = normalizePageSize(requestedSize);
+    Pageable pageable = PageRequest.of(0, pageSize + 1);
+
+    List<OrderMessage> messagesInDescendingOrder;
+
+    if (beforeMessageId == null) {
+      messagesInDescendingOrder =
+          orderMessageRepository.findAllByOrderIdOrderByIdDesc(
+              orderId,
+              pageable
+          );
+    } else {
+      if (beforeMessageId <= 0) {
+        throw new BusinessException(
+            ErrorCode.INVALID_REQUEST,
+            "beforeMessageId는 1 이상이어야 합니다."
+        );
+      }
+
+      messagesInDescendingOrder =
+          orderMessageRepository
+              .findAllByOrderIdAndIdLessThanOrderByIdDesc(
+                  orderId,
+                  beforeMessageId,
+                  pageable
+              );
+    }
+
+    return OrderMessagePageResponse.of(
+        messagesInDescendingOrder,
+        pageSize
+    );
+  }
+
+  private int normalizePageSize(Integer requestedSize) {
+    if (requestedSize == null) {
+      return DEFAULT_MESSAGE_PAGE_SIZE;
+    }
+
+    if (requestedSize < 1 || requestedSize > MAX_MESSAGE_PAGE_SIZE) {
+      throw new BusinessException(
+          ErrorCode.INVALID_REQUEST,
+          "size는 1 이상 100 이하로 입력해야 합니다."
+      );
+    }
+
+    return requestedSize;
   }
 
   private Order findSellerOrder(

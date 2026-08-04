@@ -61,6 +61,10 @@ popq:
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
 
+  social:
+    google:
+      client-id: ${POPQ_GOOGLE_CLIENT_ID}
+
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}
     guest-session-ttl: ${POPQ_GUEST_SESSION_TTL:PT12H}

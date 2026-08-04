@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
+import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
 
 /// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
@@ -23,11 +26,13 @@ const _dangerColor = Color(0xFFE5484D);
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({
     required this.repository,
+    required this.messageRepository,
     required this.onSignOut,
     super.key,
   });
 
   final CustomerEngagementRepository repository;
+  final CustomerOrderMessageRepository messageRepository;
   final Future<void> Function() onSignOut;
 
   @override
@@ -36,13 +41,85 @@ class CustomerProfileScreen extends StatefulWidget {
 }
 
 class _CustomerProfileScreenState
-    extends State<CustomerProfileScreen> {
+    extends State<CustomerProfileScreen>
+    with WidgetsBindingObserver {
+  static const Duration _unreadPollingInterval =
+  Duration(seconds: 3);
+
   late Future<CustomerProfile> _profile;
+
+  Timer? _unreadPollingTimer;
+
+  int _unreadMessageCount = 0;
+  int _requestGeneration = 0;
+
+  bool _unreadRequestInProgress = false;
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
     _profile = widget.repository.getProfile();
+
+    _startUnreadPolling();
+
+    unawaited(
+      _refreshUnreadMessageCount(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(
+      covariant CustomerProfileScreen oldWidget,
+      ) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.repository != widget.repository) {
+      setState(() {
+        _profile = widget.repository.getProfile();
+      });
+    }
+
+    if (oldWidget.messageRepository !=
+        widget.messageRepository) {
+      _requestGeneration++;
+
+      unawaited(
+        _refreshUnreadMessageCount(),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startUnreadPolling();
+
+      unawaited(
+        _refreshUnreadMessageCount(),
+      );
+
+      return;
+    }
+
+    _stopUnreadPolling();
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+
+    _stopUnreadPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
+
+    super.dispose();
   }
 
   @override
@@ -67,7 +144,7 @@ class _CustomerProfileScreenState
         final profile = snapshot.requireData;
 
         return RefreshIndicator(
-          onRefresh: () async => _reload(),
+          onRefresh: _reload,
           child: ListView(
             physics:
             const AlwaysScrollableScrollPhysics(),
@@ -97,10 +174,13 @@ class _CustomerProfileScreenState
                     icon:
                     Icons.confirmation_number_outlined,
                     title: '예약 내역',
-                    subtitle:
-                    '예매한 이벤트와 예약 정보를 확인해요',
+                    subtitle: _unreadMessageCount > 0
+                        ? '매장에서 보낸 새 답변이 '
+                        '$_unreadMessageCount개 있어요'
+                        : '예매한 이벤트와 예약 정보를 확인해요',
+                    badgeCount: _unreadMessageCount,
                     onTap: () {
-                      context.go(
+                      context.push(
                         CustomerRoutes.orders,
                       );
                     },
@@ -196,10 +276,84 @@ class _CustomerProfileScreenState
     );
   }
 
-  void _reload() {
+  Future<void> _reload() async {
+    final nextProfile =
+    widget.repository.getProfile();
+
     setState(() {
-      _profile = widget.repository.getProfile();
+      _profile = nextProfile;
     });
+
+    await Future.wait<void>([
+      nextProfile.then<void>((_) {}),
+      _refreshUnreadMessageCount(),
+    ]);
+  }
+
+  void _startUnreadPolling() {
+    if (_unreadPollingTimer?.isActive ?? false) {
+      return;
+    }
+
+    _unreadPollingTimer = Timer.periodic(
+      _unreadPollingInterval,
+          (_) {
+        unawaited(
+          _refreshUnreadMessageCount(),
+        );
+      },
+    );
+  }
+
+  void _stopUnreadPolling() {
+    _unreadPollingTimer?.cancel();
+    _unreadPollingTimer = null;
+  }
+
+  Future<void> _refreshUnreadMessageCount() async {
+    if (!mounted || _unreadRequestInProgress) {
+      return;
+    }
+
+    final generation = _requestGeneration;
+
+    _unreadRequestInProgress = true;
+
+    try {
+      final unreadCounts =
+      await widget.messageRepository
+          .findUnreadMessageCounts();
+
+      final totalUnreadCount =
+      unreadCounts.fold<int>(
+        0,
+            (total, item) =>
+        total + item.unreadCount,
+      );
+
+      if (!mounted ||
+          generation != _requestGeneration ||
+          totalUnreadCount ==
+              _unreadMessageCount) {
+        return;
+      }
+
+      setState(() {
+        _unreadMessageCount =
+            totalUnreadCount;
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '예약 내역의 읽지 않은 답변 수를 '
+            '불러오지 못했습니다: $error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _unreadRequestInProgress = false;
+    }
   }
 
   void _showComingSoon() {
@@ -252,168 +406,168 @@ class _ProfileHeaderCard extends StatelessWidget {
               CrossAxisAlignment.start,
               children: [
                 Row(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Stack(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
-                    const CircleAvatar(
-                      radius: 32,
-                      child: Icon(
-                        Icons.person_rounded,
-                        size: 34,
-                      ),
-                    ),
-                    Positioned(
-                      right: -2,
-                      bottom: -2,
-                      child: Material(
-                        color: isDark
-                            ? PopqPalette.nightElevated
-                            : PopqPalette.lightCard,
-                        shape: const CircleBorder(),
-                        child: InkWell(
-                          onTap: onEditProfile,
-                          customBorder:
-                          const CircleBorder(),
-                          child: Padding(
-                            padding:
-                            const EdgeInsets.all(
-                              5,
-                            ),
-                            child: Icon(
-                              Icons
-                                  .photo_camera_rounded,
-                              size: 15,
-                              color: isDark
-                                  ? PopqPalette.lime
-                                  : PopqPalette
-                                  .forest,
+                    Stack(
+                      children: [
+                        const CircleAvatar(
+                          radius: 32,
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 34,
+                          ),
+                        ),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Material(
+                            color: isDark
+                                ? PopqPalette.nightElevated
+                                : PopqPalette.lightCard,
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              onTap: onEditProfile,
+                              customBorder:
+                              const CircleBorder(),
+                              child: Padding(
+                                padding:
+                                const EdgeInsets.all(
+                                  5,
+                                ),
+                                child: Icon(
+                                  Icons
+                                      .photo_camera_rounded,
+                                  size: 15,
+                                  color: isDark
+                                      ? PopqPalette.lime
+                                      : PopqPalette
+                                      .forest,
+                                ),
+                              ),
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(
+                      width: PopqSpacing.md,
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  '${profile.name}님',
+                                  maxLines: 1,
+                                  overflow: TextOverflow
+                                      .ellipsis,
+                                  style: theme
+                                      .textTheme
+                                      .titleLarge,
+                                ),
+                              ),
+                              const SizedBox(
+                                width: PopqSpacing.xs,
+                              ),
+                              Container(
+                                padding:
+                                const EdgeInsets
+                                    .symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  borderRadius:
+                                  BorderRadius
+                                      .circular(999),
+                                  border: Border.all(
+                                    color: isDark
+                                        ? PopqPalette
+                                        .lime
+                                        : PopqPalette
+                                        .forest,
+                                  ),
+                                ),
+                                child: Text(
+                                  _ProfileTemporaryStats
+                                      .levelLabel,
+                                  style: theme
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
+                                    color: isDark
+                                        ? PopqPalette
+                                        .lime
+                                        : PopqPalette
+                                        .forest,
+                                    fontWeight:
+                                    FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(
+                            height: PopqSpacing.xs,
+                          ),
+                          Text(
+                            _ProfileTemporaryStats
+                                .daysTogetherLabel,
+                            style: theme
+                                .textTheme.bodySmall
+                                ?.copyWith(
+                              color: mutedColor,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons
+                                    .location_on_outlined,
+                                size: 15,
+                                color: mutedColor,
+                              ),
+                              const SizedBox(
+                                width: PopqSpacing.xs,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  _ProfileTemporaryStats
+                                      .locationLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow
+                                      .ellipsis,
+                                  style: theme
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                    color: mutedColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(
-                  width: PopqSpacing.md,
+                  height: PopqSpacing.md,
                 ),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              '${profile.name}님',
-                              maxLines: 1,
-                              overflow: TextOverflow
-                                  .ellipsis,
-                              style: theme
-                                  .textTheme
-                                  .titleLarge,
-                            ),
-                          ),
-                          const SizedBox(
-                            width: PopqSpacing.xs,
-                          ),
-                          Container(
-                            padding:
-                            const EdgeInsets
-                                .symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius:
-                              BorderRadius
-                                  .circular(999),
-                              border: Border.all(
-                                color: isDark
-                                    ? PopqPalette
-                                    .lime
-                                    : PopqPalette
-                                    .forest,
-                              ),
-                            ),
-                            child: Text(
-                              _ProfileTemporaryStats
-                                  .levelLabel,
-                              style: theme
-                                  .textTheme
-                                  .labelMedium
-                                  ?.copyWith(
-                                color: isDark
-                                    ? PopqPalette
-                                    .lime
-                                    : PopqPalette
-                                    .forest,
-                                fontWeight:
-                                FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(
-                        height: PopqSpacing.xs,
-                      ),
-                      Text(
-                        _ProfileTemporaryStats
-                            .daysTogetherLabel,
-                        style: theme
-                            .textTheme.bodySmall
-                            ?.copyWith(
-                          color: mutedColor,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons
-                                .location_on_outlined,
-                            size: 15,
-                            color: mutedColor,
-                          ),
-                          const SizedBox(
-                            width: PopqSpacing.xs,
-                          ),
-                          Expanded(
-                            child: Text(
-                              _ProfileTemporaryStats
-                                  .locationLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow
-                                  .ellipsis,
-                              style: theme
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                color: mutedColor,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: onEditProfile,
+                    child: const Text('내 프로필'),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: onEditProfile,
-                child: const Text('내 프로필'),
-              ),
-            ),
               ],
             ),
           ),
@@ -557,6 +711,7 @@ class _MenuRowData {
     required this.subtitle,
     required this.onTap,
     this.color,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -564,6 +719,7 @@ class _MenuRowData {
   final String subtitle;
   final VoidCallback onTap;
   final Color? color;
+  final int badgeCount;
 }
 
 class _MenuGroupCard extends StatelessWidget {
@@ -626,11 +782,58 @@ class _MenuRow extends StatelessWidget {
         style: theme.textTheme.bodySmall
             ?.copyWith(color: mutedColor),
       ),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: mutedColor,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (data.badgeCount > 0) ...[
+            _UnreadMessageBadge(
+              count: data.badgeCount,
+            ),
+            const SizedBox(
+              width: PopqSpacing.sm,
+            ),
+          ],
+          Icon(
+            Icons.chevron_right_rounded,
+            color: mutedColor,
+          ),
+        ],
       ),
       onTap: data.onTap,
+    );
+  }
+}
+
+
+class _UnreadMessageBadge extends StatelessWidget {
+  const _UnreadMessageBadge({
+    required this.count,
+  });
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme =
+        Theme.of(context).colorScheme;
+
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colorScheme.error,
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        count > 9 ? '9+' : count.toString(),
+        style: TextStyle(
+          color: colorScheme.onError,
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
     );
   }
 }

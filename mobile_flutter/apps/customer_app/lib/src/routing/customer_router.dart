@@ -508,6 +508,8 @@ GoRouter createCustomerRouter({
             location: state.uri.path,
             notificationRepository:
             notificationRepository,
+            orderMessageRepository:
+            orderMessageRepository,
             sessionController:
             sessionController,
             themeController: themeController,
@@ -590,6 +592,8 @@ GoRouter createCustomerRouter({
               return CustomerProfileScreen(
                 repository:
                 engagementRepository,
+                messageRepository:
+                orderMessageRepository,
                 onSignOut:
                 sessionController.signOut,
               );

@@ -105,7 +105,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
                   '${sellerOrderTypeLabel(order.orderType)} · '
-                      '${order.orderPublicId}',
+                      '${formatPopqOrderNumber(order.orderPublicId)}',
                   style: const TextStyle(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
