@@ -10,12 +10,16 @@ class SellerSignInScreen extends StatefulWidget {
     required this.roleMismatch,
     required this.onSignIn,
     this.onDevelopmentSignIn,
+    this.onGoogleSignIn,
+    this.onKakaoSignIn,
     super.key,
   });
 
   final bool roleMismatch;
   final Future<void> Function(String email, String password) onSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
+  final Future<void> Function()? onGoogleSignIn;
+  final Future<void> Function()? onKakaoSignIn;
 
   @override
   State<SellerSignInScreen> createState() => _SellerSignInScreenState();
@@ -158,9 +162,18 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
             const SizedBox(height: PopqSpacing.md),
             const Divider(),
             const SizedBox(height: PopqSpacing.md),
-            const _ProviderButton(label: '판매자 Google 계정으로 계속하기'),
+             _ProviderButton(
+              label: '판매자 Google 계정으로 계속하기',
+              onPressed: widget.onGoogleSignIn == null || _busy
+                  ? null
+                  : _handleGoogleSignIn,),
             const SizedBox(height: PopqSpacing.sm),
-            const _ProviderButton(label: '판매자 Kakao 계정으로 계속하기'),
+             _ProviderButton(
+                label: '판매자 Kakao 계정으로 계속하기',
+            onPressed: widget.onKakaoSignIn == null || _busy
+              ? null
+              : _handleKakaoSignIn,
+             ),
             if (widget.onDevelopmentSignIn != null) ...[
               const SizedBox(height: PopqSpacing.lg),
               const Divider(),
@@ -195,12 +208,68 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
     );
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    if (_busy || widget.onGoogleSignIn == null) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onGoogleSignIn!();
+    } catch (error) {
+      debugPrint('판매자 Google 로그인 오류: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Google 로그인에 실패했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleKakaoSignIn() async {
+    if (_busy || widget.onKakaoSignIn == null) return;
+
+    setState(() {
+      _busy = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await widget.onKakaoSignIn!();
+    } catch (error) {
+      debugPrint('판매자 Kakao 로그인 오류: $error');
+
+      if (!mounted) return;
+
+      setState(() {
+        _errorMessage = 'Kakao 로그인에 실패했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() {
       _busy = true;
       _errorMessage = null;
     });
+
+
     try {
       await widget.onSignIn(_email.text.trim(), _password.text);
     } on PopqFailure catch (failure) {
@@ -236,14 +305,18 @@ class _SellerSignInScreenState extends State<SellerSignInScreen> {
 }
 
 class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({required this.label});
+  const _ProviderButton({
+    required this.label,
+    this.onPressed,
+  });
 
   final String label;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: null,
+      onPressed: onPressed,
       style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52)),
       child: Text(label),
     );
