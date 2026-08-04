@@ -8,6 +8,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 
 import 'features/announcements/seller_announcement_repository.dart';
 import 'features/auth/seller_auth_repository.dart';
+import 'features/auth/kakao_auth_service.dart';
 import 'features/auth/seller_bootstrap_controller.dart';
 import 'features/auth/seller_identity_repository.dart';
 import 'features/customers/seller_customer_repository.dart';
@@ -82,6 +83,11 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final SellerAuthRepository _authRepository;
 
   late final PopqThemeController _themeController;
+
+  late final GoogleAuthService _googleAuthService;
+
+  late final KakaoAuthService _kakaoAuthService;
+
   late final bool _ownsThemeController;
 
   late final PopqApiClient _apiClient;
@@ -132,6 +138,10 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         return session?.accessToken;
       },
     );
+
+    _googleAuthService = GoogleAuthService(webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
+
+    _kakaoAuthService = KakaoAuthService();
 
     _storeRepository =
         widget.storeRepository ??
@@ -208,6 +218,9 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
+      onGoogleSignIn: _googleSignIn,
+      onKakaoSignIn: _kakaoSignIn,
+
     );
 
     _backButtonDispatcher = _SellerBackButtonDispatcher(
@@ -285,6 +298,31 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
         stores.single.storeId,
       );
     }
+  }
+
+  Future<void> _googleSignIn() async {
+    final idToken = await _googleAuthService.signInAndGetIdToken();
+
+    debugPrint(
+      '판매자 Google 로그인 성공: ID Token 수신 '
+          '(${idToken.length}자)',
+    );
+
+    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
+     idToken을 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+  }
+
+  Future<void> _kakaoSignIn() async {
+    final accessToken =
+    await _kakaoAuthService.signInAndGetAccessToken();
+
+    debugPrint(
+      '판매자 Kakao 로그인 성공: Access Token 수신 '
+          '(${accessToken.length}자)',
+    );
+
+    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
+     accessToken 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
   }
 
   Future<void> _developmentSignIn() async {

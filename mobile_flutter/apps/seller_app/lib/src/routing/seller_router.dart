@@ -83,6 +83,8 @@ GoRouter createSellerRouter({
   onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
+  Future<void> Function()? onGoogleSignIn,
+  Future<void> Function()? onKakaoSignIn,
 }) {
   return GoRouter(
     initialLocation: SellerRoutes.dashboard,
@@ -205,6 +207,8 @@ GoRouter createSellerRouter({
             onSignIn: onSignIn,
             onDevelopmentSignIn:
             onDevelopmentSignIn,
+            onGoogleSignIn: onGoogleSignIn,
+            onKakaoSignIn : onKakaoSignIn,
           );
         },
       ),
