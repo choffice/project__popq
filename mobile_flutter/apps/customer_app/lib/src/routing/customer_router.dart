@@ -81,6 +81,8 @@ GoRouter createCustomerRouter({
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
   Future<void> Function()? onGoogleSignIn,
+  Future<void> Function()? onKakaoSignIn,
+  Future<void> Function()? onNaverSignIn,
 }) {
   return GoRouter(
     initialLocation: CustomerRoutes.home,
@@ -261,6 +263,8 @@ GoRouter createCustomerRouter({
           return SignInScreen(
             onSignIn: onSignIn,
             onGoogleSignIn: onGoogleSignIn,
+            onKakaoSignIn: onKakaoSignIn,
+            onNaverSignIn: onNaverSignIn,
             onBackHome: () {
               context.go(
                 CustomerRoutes.home,
