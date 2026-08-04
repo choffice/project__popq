@@ -3,7 +3,7 @@ spring:
     name: popq
 
   datasource:
-    url: ${POPQ_DB_URL:jdbc:mysql://localhost:3306/popq?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
+    url: ${POPQ_DB_URL:jdbc:mysql://localhost:3307/popq?useUnicode=true&characterEncoding=utf8&serverTimezone=UTC}
     username: ${POPQ_DB_USERNAME:popq}
     password: ${POPQ_DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -48,6 +48,10 @@ popq:
   upload:
     path: ${POPQ_UPLOAD_PATH:./uploads}
 
+  kakao:
+    rest-api-base-url: ${POPQ_KAKAO_REST_API_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
+
   security:
     jwt:
       issuer: ${POPQ_JWT_ISSUER:popq}
@@ -56,6 +60,10 @@ popq:
 
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+
+  social:
+    google:
+      client-id: ${POPQ_GOOGLE_CLIENT_ID}
 
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}

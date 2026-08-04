@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flutter Android Emulator - Seller" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--web-hostname=0.0.0.0 --web-port=5184 --dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.30:8082" />
-    <option name="filePath" value="$PROJECT_DIR$/apps/seller_app/lib/main.dart" />
-    <method v="2" />
-  </configuration>
-</component>

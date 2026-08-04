@@ -45,6 +45,69 @@ class CustomerStore {
   final int? distanceMeters;
 }
 
+class StoreWalkingRoute {
+  const StoreWalkingRoute({
+    required this.distanceMeters,
+    required this.durationSeconds,
+    this.landingUrl,
+  });
+
+  final int distanceMeters;
+  final int durationSeconds;
+  final String? landingUrl;
+
+  int get durationMinutes {
+    if (durationSeconds <= 0) {
+      return 0;
+    }
+
+    return (durationSeconds / 60).ceil();
+  }
+
+  factory StoreWalkingRoute.fromJson(
+      Map<String, dynamic> json,
+      ) {
+    return StoreWalkingRoute(
+      distanceMeters: _readInt(
+        json['distanceMeters'],
+      ),
+      durationSeconds: _readInt(
+        json['durationSeconds'],
+      ),
+      landingUrl: _readNullableString(
+        json['landingUrl'],
+      ),
+    );
+  }
+
+  static int _readInt(dynamic value) {
+    if (value is int) {
+      return value;
+    }
+
+    if (value is num) {
+      return value.toInt();
+    }
+
+    return int.tryParse(
+      value?.toString() ?? '',
+    ) ??
+        0;
+  }
+
+  static String? _readNullableString(
+      dynamic value,
+      ) {
+    final text = value?.toString().trim();
+
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return text;
+  }
+}
+
 abstract interface class StoreDiscoveryRepository {
   Future<List<CustomerStore>> search({
     String? query,
@@ -54,6 +117,11 @@ abstract interface class StoreDiscoveryRepository {
   });
 
   Future<CustomerStore> findDetail(int storeId);
+
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  });
 }
 
 class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
@@ -98,6 +166,23 @@ class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
           CustomerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
+
+  @override
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  }) {
+    return _apiClient.get(
+      '/api/v1/public/stores/$storeId/walking-route',
+      query: {
+        'startLatitude': startLocation.latitude,
+        'startLongitude': startLocation.longitude,
+      },
+      decode: (value) => StoreWalkingRoute.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
 }
 
 class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
@@ -112,6 +197,8 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
       description: '매일 새로운 원두를 소개하는 작은 로스터리',
       businessStatus: 'OPEN',
       address: '서울 성동구 연무장길',
+      latitude: 37.544700,
+      longitude: 127.055700,
       tags: ['coffee', 'local'],
       distanceMeters: 280,
     ),
@@ -121,9 +208,35 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
       name: '주말 디저트 마켓',
       description: '이번 주말에만 만나는 디저트 셀렉션',
       businessStatus: 'OPEN',
-      address: '서울 성동구 서울숲길',
+      address: '서울 성동구 성수이로',
+      latitude: 37.545300,
+      longitude: 127.052800,
       tags: ['dessert', 'event'],
-      distanceMeters: 840,
+      distanceMeters: 430,
+    ),
+    CustomerStore(
+      storeId: 3,
+      storeType: 'LOCAL_STORE',
+      name: '연무장 수제버거',
+      description: '직접 만든 패티와 소스로 준비하는 수제버거 매장',
+      businessStatus: 'OPEN',
+      address: '서울 성동구 연무장7길',
+      latitude: 37.543800,
+      longitude: 127.057500,
+      tags: ['burger', 'local', 'food'],
+      distanceMeters: 520,
+    ),
+    CustomerStore(
+      storeId: 4,
+      storeType: 'EVENT_COMMERCE',
+      name: '성수 야외 플리마켓',
+      description: '소품과 디저트 브랜드가 함께하는 주말 야외 행사',
+      businessStatus: 'OPEN',
+      address: '서울 성동구 아차산로',
+      latitude: 37.546000,
+      longitude: 127.050900,
+      tags: ['market', 'event', 'weekend'],
+      distanceMeters: 670,
     ),
   ];
 
@@ -132,6 +245,23 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
   @override
   Future<CustomerStore> findDetail(int storeId) async {
     return _stores.firstWhere((store) => store.storeId == storeId);
+  }
+
+  @override
+  Future<StoreWalkingRoute> findWalkingRoute({
+    required int storeId,
+    required CustomerLocation startLocation,
+  }) async {
+    final store = _stores.firstWhere(
+          (store) => store.storeId == storeId,
+    );
+
+    final distanceMeters = store.distanceMeters ?? 500;
+
+    return StoreWalkingRoute(
+      distanceMeters: distanceMeters,
+      durationSeconds: (distanceMeters / 75).ceil() * 60,
+    );
   }
 
   @override

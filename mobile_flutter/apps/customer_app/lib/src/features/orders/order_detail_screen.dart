@@ -3,58 +3,95 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
+import '../inquiry/customer_order_message_repository.dart';
 import 'customer_order_repository.dart';
 
 class OrderDetailScreen extends StatefulWidget {
   const OrderDetailScreen({
     required this.orderPublicId,
     required this.repository,
+    required this.messageRepository,
     super.key,
   });
 
   final String orderPublicId;
   final CustomerOrderRepository repository;
+  final CustomerOrderMessageRepository messageRepository;
 
   @override
-  State<OrderDetailScreen> createState() => _OrderDetailScreenState();
+  State<OrderDetailScreen> createState() {
+    return _OrderDetailScreenState();
+  }
 }
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   CustomerOrder? _order;
+
   Object? _error;
+
+  var _unreadCount = 0;
   var _loading = true;
   var _syncing = false;
 
   @override
   void initState() {
     super.initState();
+
     _load();
+  }
+
+  @override
+  void didUpdateWidget(
+      covariant OrderDetailScreen oldWidget,
+      ) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.orderPublicId != widget.orderPublicId ||
+        oldWidget.repository != widget.repository ||
+        oldWidget.messageRepository !=
+            widget.messageRepository) {
+      _load();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('주문 상세')),
+      appBar: AppBar(
+        title: const Text('주문 상세'),
+      ),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (_loading) {
-      return const PopqLoadingView(message: '최신 주문 상태를 확인하고 있어요.');
+      return const PopqLoadingView(
+        message: '최신 주문 상태를 확인하고 있어요.',
+      );
     }
+
     if (_error != null || _order == null) {
-      return PopqErrorView(message: '주문 상세를 불러오지 못했습니다.', onRetry: _load);
+      return PopqErrorView(
+        message: '주문 상세를 불러오지 못했습니다.',
+        onRetry: _load,
+      );
     }
+
     final order = _order!;
+
     return RefreshIndicator(
-      onRefresh: _sync,
+      onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(PopqSpacing.lg),
+        padding: const EdgeInsets.all(
+          PopqSpacing.lg,
+        ),
         children: [
           Container(
-            padding: const EdgeInsets.all(PopqSpacing.lg),
+            padding: const EdgeInsets.all(
+              PopqSpacing.lg,
+            ),
             decoration: BoxDecoration(
               color: PopqPalette.forest,
               borderRadius: BorderRadius.circular(24),
@@ -66,66 +103,165 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                   color: PopqPalette.lime,
                   size: 48,
                 ),
-                const SizedBox(height: PopqSpacing.sm),
+                const SizedBox(
+                  height: PopqSpacing.sm,
+                ),
                 Text(
                   _statusLabel(order.status),
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(color: Colors.white),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(
+                    color: Colors.white,
+                  ),
                 ),
-                const SizedBox(height: PopqSpacing.xs),
+                const SizedBox(
+                  height: PopqSpacing.xs,
+                ),
                 Text(
                   order.storeName,
-                  style: const TextStyle(color: Colors.white70),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: PopqSpacing.lg),
+          const SizedBox(
+            height: PopqSpacing.lg,
+          ),
+
+          _OrderNumberSection(
+            orderPublicId: order.orderPublicId,
+          ),
+
+          const SizedBox(
+            height: PopqSpacing.lg,
+          ),
+
+          Text(
+            '주문 상품',
+            style:
+            Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+
           for (final item in order.items)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(item.productName),
-              subtitle: Text('${item.quantity}개'),
-              trailing: Text(_won(item.itemTotalPrice)),
+              title: Text(
+                item.productName,
+              ),
+              subtitle: Text(
+                '${item.quantity}개',
+              ),
+              trailing: Text(
+                _won(item.itemTotalPrice),
+              ),
             ),
+
           const Divider(),
+
           ListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('총 결제 금액'),
+            title: const Text(
+              '총 결제 금액',
+            ),
             trailing: Text(
               _won(order.totalAmount),
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge
+                  ?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
-          const SizedBox(height: PopqSpacing.lg),
+
+          const SizedBox(
+            height: PopqSpacing.lg,
+          ),
+
+          _InquirySection(
+            unreadCount: _unreadCount,
+            onPressed: _openInquiry,
+          ),
+
+          const SizedBox(
+            height: PopqSpacing.lg,
+          ),
+
           if (order.status == 'COMPLETED') ...[
             FilledButton.icon(
               onPressed: () async {
-                final created = await context.push<bool>(
-                  '${CustomerRoutes.orders}/${order.orderPublicId}/review',
+                final created =
+                await context.push<bool>(
+                  '${CustomerRoutes.orders}/'
+                      '${order.orderPublicId}/review',
                 );
-                if (!mounted) return;
+
+                if (!mounted) {
+                  return;
+                }
+
                 if (created == true) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(const SnackBar(content: Text('리뷰를 등록했어요.')));
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        '리뷰를 등록했어요.',
+                      ),
+                    ),
+                  );
                 }
               },
-              icon: const Icon(Icons.rate_review_rounded),
-              label: const Text('리뷰 작성'),
+              icon: const Icon(
+                Icons.rate_review_rounded,
+              ),
+              label: const Text(
+                '리뷰 작성',
+              ),
             ),
-            const SizedBox(height: PopqSpacing.sm),
+            const SizedBox(
+              height: PopqSpacing.sm,
+            ),
           ],
+
           OutlinedButton.icon(
             onPressed: _syncing ? null : _sync,
-            icon: const Icon(Icons.sync_rounded),
-            label: Text(_syncing ? '확인 중...' : '최신 상태 확인'),
+            icon: _syncing
+                ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
+              Icons.sync_rounded,
+            ),
+            label: Text(
+              _syncing
+                  ? '확인 중...'
+                  : '최신 상태 확인',
+            ),
           ),
-          const SizedBox(height: PopqSpacing.sm),
+
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+
           Text(
-            '서버 버전 ${order.version} · 알림 수신 후에도 이 API로 최신 상태를 다시 확인합니다.',
+            '서버 버전 ${order.version} · '
+                '알림 수신 후에도 이 API로 최신 상태를 '
+                '다시 확인합니다.',
             textAlign: TextAlign.center,
+            style:
+            Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ),
@@ -137,15 +273,30 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       _loading = true;
       _error = null;
     });
+
     try {
-      final order = await widget.repository.findOne(widget.orderPublicId);
-      if (!mounted) return;
+      final order = await widget.repository.findOne(
+        widget.orderPublicId,
+      );
+
+      final unreadCount =
+      await _findUnreadCount();
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _order = order;
+        _unreadCount = unreadCount ?? 0;
         _loading = false;
+        _error = null;
       });
     } catch (caught) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _error = caught;
         _loading = false;
@@ -153,34 +304,365 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _refresh() async {
+    try {
+      final order = await widget.repository.findOne(
+        widget.orderPublicId,
+      );
+
+      final unreadCount =
+      await _findUnreadCount();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _order = order;
+
+        if (unreadCount != null) {
+          _unreadCount = unreadCount;
+        }
+
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '최신 주문 정보를 불러오지 못했습니다.',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _sync() async {
     final current = _order;
-    if (current == null) return;
-    setState(() => _syncing = true);
+
+    if (current == null || _syncing) {
+      return;
+    }
+
+    setState(() {
+      _syncing = true;
+    });
+
     try {
       final result = await widget.repository.sync(
         current.orderPublicId,
         current.version,
       );
-      if (!mounted) return;
+
+      final unreadCount =
+      await _findUnreadCount();
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        if (result.order != null) _order = result.order;
+        if (result.order != null) {
+          _order = result.order;
+        }
+
+        if (unreadCount != null) {
+          _unreadCount = unreadCount;
+        }
+
         _syncing = false;
       });
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.refreshRequired ? '최신 주문 상태로 갱신했습니다.' : '이미 최신 상태입니다.',
+            result.refreshRequired
+                ? '최신 주문 상태로 갱신했습니다.'
+                : '이미 최신 상태입니다.',
           ),
         ),
       );
     } catch (_) {
-      if (!mounted) return;
-      setState(() => _syncing = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('최신 상태를 확인하지 못했습니다.')));
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _syncing = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '최신 상태를 확인하지 못했습니다.',
+          ),
+        ),
+      );
     }
+  }
+
+  Future<void> _openInquiry() async {
+    final order = _order;
+
+    if (order == null) {
+      return;
+    }
+
+    await context.push(
+      CustomerRoutes.orderMessages(
+        order.orderPublicId,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    /*
+     * 채팅 화면에서 판매자 답변을 조회하면
+     * 백엔드가 해당 메시지를 읽음 처리합니다.
+     *
+     * 화면 복귀 즉시 배지를 제거한 뒤
+     * 서버의 최신 주문 및 읽지 않은 개수를 다시 확인합니다.
+     */
+    setState(() {
+      _unreadCount = 0;
+    });
+
+    await _refreshAfterInquiry();
+  }
+
+  Future<void> _refreshAfterInquiry() async {
+    try {
+      final order = await widget.repository.findOne(
+        widget.orderPublicId,
+      );
+
+      final unreadCount =
+      await _findUnreadCount();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _order = order;
+        _unreadCount = unreadCount ?? 0;
+        _error = null;
+      });
+    } catch (_) {
+      /*
+       * 채팅 화면에서 정상적으로 돌아온 경우에는
+       * 주문 상세 화면을 오류 화면으로 바꾸지 않습니다.
+       */
+    }
+  }
+
+  Future<int?> _findUnreadCount() async {
+    try {
+      final counts = await widget.messageRepository
+          .findUnreadMessageCounts();
+
+      for (final item in counts) {
+        if (item.orderPublicId ==
+            widget.orderPublicId) {
+          return item.unreadCount;
+        }
+      }
+
+      return 0;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class _OrderNumberSection extends StatelessWidget {
+  const _OrderNumberSection({
+    required this.orderPublicId,
+  });
+
+  final String orderPublicId;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        PopqSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '주문번호',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(
+            height: PopqSpacing.xs,
+          ),
+          SelectableText(
+            formatPopqOrderNumber(orderPublicId),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InquirySection extends StatelessWidget {
+  const _InquirySection({
+    required this.unreadCount,
+    required this.onPressed,
+  });
+
+  final int unreadCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasUnreadMessage = unreadCount > 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        PopqSpacing.md,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: hasUnreadMessage
+              ? colorScheme.error
+              : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasUnreadMessage
+                    ? Icons.mark_chat_unread_rounded
+                    : Icons.chat_bubble_outline_rounded,
+                color: hasUnreadMessage
+                    ? colorScheme.error
+                    : colorScheme.primary,
+              ),
+              const SizedBox(
+                width: PopqSpacing.sm,
+              ),
+              Expanded(
+                child: Text(
+                  '1:1 문의',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (hasUnreadMessage)
+                _UnreadCountBadge(
+                  unreadCount: unreadCount,
+                ),
+            ],
+          ),
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          Text(
+            hasUnreadMessage
+                ? '매장에서 보낸 새 답변이 있어요.'
+                : '주문이나 상품에 궁금한 점을 매장에 문의해 보세요.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: hasUnreadMessage
+                  ? colorScheme.error
+                  : colorScheme.onSurfaceVariant,
+              fontWeight: hasUnreadMessage
+                  ? FontWeight.w700
+                  : FontWeight.normal,
+            ),
+          ),
+          const SizedBox(
+            height: PopqSpacing.md,
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onPressed,
+              icon: const Icon(
+                Icons.chat_rounded,
+              ),
+              label: Text(
+                hasUnreadMessage
+                    ? '새 답변 확인하기'
+                    : '문의하기',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UnreadCountBadge extends StatelessWidget {
+  const _UnreadCountBadge({
+    required this.unreadCount,
+  });
+
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: 24,
+        minHeight: 24,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+      ),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: colorScheme.error,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        unreadCount > 99
+            ? '99+'
+            : unreadCount.toString(),
+        style: TextStyle(
+          color: colorScheme.onError,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          height: 1,
+        ),
+      ),
+    );
   }
 }
 
@@ -202,9 +684,17 @@ String _statusLabel(String status) {
 String _won(int amount) {
   final digits = amount.toString();
   final buffer = StringBuffer();
-  for (var index = 0; index < digits.length; index++) {
-    if (index > 0 && (digits.length - index) % 3 == 0) buffer.write(',');
+
+  for (var index = 0;
+  index < digits.length;
+  index++) {
+    if (index > 0 &&
+        (digits.length - index) % 3 == 0) {
+      buffer.write(',');
+    }
+
     buffer.write(digits[index]);
   }
+
   return '$buffer원';
 }

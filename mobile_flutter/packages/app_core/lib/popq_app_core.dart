@@ -6,3 +6,5 @@ export 'src/config/app_environment.dart';
 export 'src/network/api_envelope.dart';
 export 'src/network/popq_api_client.dart';
 export 'src/network/popq_failure.dart';
+export 'src/theme/popq_theme_controller.dart';
+export 'src/auth/google_auth_service.dart';

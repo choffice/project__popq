@@ -4,6 +4,9 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../customer_root_screen.dart';
+import '../features/auth/customer_find_id_screen.dart';
+import '../features/auth/customer_find_password_screen.dart';
+import '../features/auth/customer_sign_up_screen.dart';
 import '../features/auth/sign_in_screen.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_screen.dart';
@@ -13,19 +16,24 @@ import '../features/catalog/product_list_screen.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
+import '../features/favorites/customer_favorite_store_screen.dart';
 import '../features/home/customer_home_screen.dart';
-import '../features/onboarding/onboarding_controller.dart';
-import '../features/onboarding/onboarding_screen.dart';
+import '../features/inquiry/customer_order_chat_screen.dart';
+import '../features/inquiry/customer_order_message_repository.dart';
 import '../features/notifications/customer_notification_repository.dart';
 import '../features/notifications/notification_list_screen.dart';
+import '../features/onboarding/onboarding_controller.dart';
+import '../features/onboarding/onboarding_screen.dart';
 import '../features/orders/checkout_screen.dart';
 import '../features/orders/customer_order_repository.dart';
 import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
 import '../features/permissions/customer_permission_gateway.dart';
 import '../features/profile/customer_engagement_repository.dart';
+import '../features/profile/customer_my_reviews_screen.dart';
 import '../features/profile/customer_profile_screen.dart';
 import '../features/profile/review_editor_screen.dart';
+import '../features/qr/customer_qr_scanner_screen.dart';
 
 abstract final class CustomerRoutes {
   static const bootstrap = '/bootstrap';
@@ -33,14 +41,25 @@ abstract final class CustomerRoutes {
   static const onboardingError = '/onboarding-error';
   static const onboarding = '/onboarding';
   static const signIn = '/sign-in';
+  static const signUp = '/sign-up';
+  static const findId = '/find-id';
+  static const findPassword = '/find-password';
+
   static const home = '/home';
   static const discover = '/discover';
+  static const qrScanner = '/qr-scanner';
+  static const favorites = '/favorites';
   static const stores = '/stores';
   static const cart = '/cart';
   static const checkout = '/checkout';
   static const orders = '/orders';
   static const profile = '/profile';
+  static const myReviews = '/my-reviews';
   static const notifications = '/notifications';
+
+  static String orderMessages(String orderPublicId) {
+    return '$orders/$orderPublicId/messages';
+  }
 }
 
 GoRouter createCustomerRouter({
@@ -49,12 +68,45 @@ GoRouter createCustomerRouter({
   required StoreDiscoveryRepository storeDiscoveryRepository,
   required CatalogRepository catalogRepository,
   required CustomerOrderRepository orderRepository,
+  required CustomerOrderMessageRepository orderMessageRepository,
   required CustomerEngagementRepository engagementRepository,
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   required String tossClientKey,
+  required Future<void> Function(
+      String email,
+      String password,
+      )
+  onSignIn,
+  required Future<void> Function({
+  required String email,
+  required String password,
+  required String name,
+  required String phone,
+  })
+  onSignUp,
+  required Future<String> Function(
+      String name,
+      String phone,
+      )
+  onFindId,
+  required Future<void> Function(
+      String email,
+      String phone,
+      )
+  onVerifyForPasswordReset,
+  required Future<void> Function(
+      String email,
+      String phone,
+      String newPassword,
+      )
+  onResetPassword,
+  PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
+  Future<void> Function()? onGoogleSignIn,
+  Future<void> Function()? onKakaoSignIn,
+  Future<void> Function()? onNaverSignIn,
 }) {
   return GoRouter(
     initialLocation: CustomerRoutes.home,
@@ -64,57 +116,123 @@ GoRouter createCustomerRouter({
     ]),
     redirect: (context, state) {
       final location = state.matchedLocation;
-      final isBootstrap = location == CustomerRoutes.bootstrap;
-      final isSessionError = location == CustomerRoutes.sessionError;
-      final isOnboardingError = location == CustomerRoutes.onboardingError;
-      final isOnboarding = location == CustomerRoutes.onboarding;
-      final isSignIn = location == CustomerRoutes.signIn;
+
+      final isBootstrap =
+          location == CustomerRoutes.bootstrap;
+
+      final isSessionError =
+          location == CustomerRoutes.sessionError;
+
+      final isOnboardingError =
+          location == CustomerRoutes.onboardingError;
+
+      final isOnboarding =
+          location == CustomerRoutes.onboarding;
+
+      final isSignIn =
+          location == CustomerRoutes.signIn;
+
+      final isSignUp =
+          location == CustomerRoutes.signUp;
+
+      final isFindId =
+          location == CustomerRoutes.findId;
+
+      final isFindPassword =
+          location == CustomerRoutes.findPassword;
 
       final isRestoring =
-          sessionController.status == SessionStatus.restoring ||
-          onboardingController.status == OnboardingStatus.restoring;
+          sessionController.status ==
+              SessionStatus.restoring ||
+              onboardingController.status ==
+                  OnboardingStatus.restoring;
+
       if (isRestoring) {
-        return isBootstrap ? null : CustomerRoutes.bootstrap;
+        return isBootstrap
+            ? null
+            : CustomerRoutes.bootstrap;
       }
-      if (sessionController.status == SessionStatus.failure) {
-        return isSessionError ? null : CustomerRoutes.sessionError;
+
+      if (sessionController.status ==
+          SessionStatus.failure) {
+        return isSessionError
+            ? null
+            : CustomerRoutes.sessionError;
       }
-      if (onboardingController.status == OnboardingStatus.failure) {
-        return isOnboardingError ? null : CustomerRoutes.onboardingError;
+
+      if (onboardingController.status ==
+          OnboardingStatus.failure) {
+        return isOnboardingError
+            ? null
+            : CustomerRoutes.onboardingError;
       }
+
       if (!onboardingController.isComplete) {
-        return isOnboarding ? null : CustomerRoutes.onboarding;
+        return isOnboarding
+            ? null
+            : CustomerRoutes.onboarding;
       }
-      if (isBootstrap || isSessionError || isOnboardingError || isOnboarding) {
+
+      if (isBootstrap ||
+          isSessionError ||
+          isOnboardingError ||
+          isOnboarding) {
         return CustomerRoutes.home;
       }
 
       final requiresSession =
           location == CustomerRoutes.checkout ||
-          location == CustomerRoutes.orders ||
-          location.startsWith('${CustomerRoutes.orders}/') ||
-          location == CustomerRoutes.profile ||
-          location == CustomerRoutes.notifications;
-      if (requiresSession && !sessionController.isSignedIn) {
-        final from = Uri.encodeComponent(state.uri.toString());
-        return '${CustomerRoutes.signIn}?from=$from';
+              location == CustomerRoutes.orders ||
+              location.startsWith(
+                '${CustomerRoutes.orders}/',
+              ) ||
+              location == CustomerRoutes.favorites ||
+              location == CustomerRoutes.profile ||
+              location ==
+                  CustomerRoutes.myReviews ||
+              location ==
+                  CustomerRoutes.notifications;
+
+      if (requiresSession &&
+          !sessionController.isSignedIn) {
+        return Uri(
+          path: CustomerRoutes.signIn,
+          queryParameters: {
+            'from': state.uri.toString(),
+          },
+        ).toString();
       }
-      if (isSignIn && sessionController.isSignedIn) {
-        return state.uri.queryParameters['from'] ?? CustomerRoutes.home;
+
+      if ((isSignIn ||
+          isSignUp ||
+          isFindId ||
+          isFindPassword) &&
+          sessionController.isSignedIn) {
+        return state.uri.queryParameters['from'] ??
+            CustomerRoutes.home;
       }
+
       return null;
     },
     errorBuilder: (context, state) {
       return PopqErrorView(
         message: '요청한 화면을 찾을 수 없습니다.',
-        onRetry: () => context.go(CustomerRoutes.home),
+        onRetry: () {
+          context.go(
+            CustomerRoutes.home,
+          );
+        },
       );
     },
     routes: [
       GoRoute(
         path: CustomerRoutes.bootstrap,
         builder: (context, state) {
-          return const Scaffold(body: PopqLoadingView(message: '앱을 준비하고 있어요.'));
+          return const Scaffold(
+            body: PopqLoadingView(
+              message: '앱을 준비하고 있어요.',
+            ),
+          );
         },
       ),
       GoRoute(
@@ -122,7 +240,8 @@ GoRouter createCustomerRouter({
         builder: (context, state) {
           return Scaffold(
             body: PopqErrorView(
-              message: '보안 저장소에서 로그인 정보를 불러오지 못했습니다.',
+              message:
+              '보안 저장소에서 로그인 정보를 불러오지 못했습니다.',
               onRetry: sessionController.restore,
             ),
           );
@@ -133,8 +252,10 @@ GoRouter createCustomerRouter({
         builder: (context, state) {
           return Scaffold(
             body: PopqErrorView(
-              message: '앱 시작 정보를 불러오지 못했습니다.',
-              onRetry: onboardingController.restore,
+              message:
+              '앱 시작 정보를 불러오지 못했습니다.',
+              onRetry:
+              onboardingController.restore,
             ),
           );
         },
@@ -143,139 +264,334 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.onboarding,
         builder: (context, state) {
           return OnboardingScreen(
-            controller: onboardingController,
-            permissionGateway: permissionGateway,
+            controller:
+            onboardingController,
+            permissionGateway:
+            permissionGateway,
           );
         },
       ),
       GoRoute(
         path: CustomerRoutes.signIn,
         builder: (context, state) {
+          final returnLocation =
+          state.uri.queryParameters['from'];
+
           return SignInScreen(
-            onBackHome: () => context.go(CustomerRoutes.home),
-            onDevelopmentSignIn: onDevelopmentSignIn,
+            onSignIn: onSignIn,
+            onGoogleSignIn: onGoogleSignIn,
+            onKakaoSignIn: onKakaoSignIn,
+            onNaverSignIn: onNaverSignIn,
+            onBackHome: () {
+              context.go(
+                CustomerRoutes.home,
+              );
+            },
+            onDevelopmentSignIn:
+            onDevelopmentSignIn,
+            returnLocation:
+            returnLocation,
           );
         },
       ),
       GoRoute(
-        path: '${CustomerRoutes.stores}/:storeId/products/:productId',
+        path: CustomerRoutes.signUp,
         builder: (context, state) {
-          final storeId = int.tryParse(state.pathParameters['storeId'] ?? '');
-          final productId = int.tryParse(
-            state.pathParameters['productId'] ?? '',
+          return CustomerSignUpScreen(
+            onSignUp: onSignUp,
           );
-          if (storeId == null || productId == null) {
-            return const PopqErrorView(message: '상품 번호가 올바르지 않습니다.');
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.findId,
+        builder: (context, state) {
+          return CustomerFindIdScreen(
+            onFindId: onFindId,
+          );
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.findPassword,
+        builder: (context, state) {
+          return CustomerFindPasswordScreen(
+            onVerify:
+            onVerifyForPasswordReset,
+            onResetPassword:
+            onResetPassword,
+          );
+        },
+      ),
+      GoRoute(
+        path:
+        '${CustomerRoutes.stores}/:storeId/products/:productId',
+        builder: (context, state) {
+          final storeId = int.tryParse(
+            state.pathParameters['storeId'] ??
+                '',
+          );
+
+          final productId = int.tryParse(
+            state.pathParameters['productId'] ??
+                '',
+          );
+
+          if (storeId == null ||
+              productId == null) {
+            return const PopqErrorView(
+              message:
+              '상품 번호가 올바르지 않습니다.',
+            );
           }
+
           return ProductDetailScreen(
             storeId: storeId,
             productId: productId,
-            repository: catalogRepository,
-            cartController: cartController,
+            repository:
+            catalogRepository,
+            cartController:
+            cartController,
           );
         },
       ),
       GoRoute(
-        path: '${CustomerRoutes.stores}/:storeId/products',
+        path:
+        '${CustomerRoutes.stores}/:storeId/products',
         builder: (context, state) {
-          final storeId = int.tryParse(state.pathParameters['storeId'] ?? '');
+          final storeId = int.tryParse(
+            state.pathParameters['storeId'] ??
+                '',
+          );
+
           if (storeId == null) {
-            return const PopqErrorView(message: '스토어 번호가 올바르지 않습니다.');
+            return const PopqErrorView(
+              message:
+              '스토어 번호가 올바르지 않습니다.',
+            );
           }
+
           return ProductListScreen(
             storeId: storeId,
-            repository: catalogRepository,
-            cartController: cartController,
+            repository:
+            catalogRepository,
+            cartController:
+            cartController,
           );
         },
       ),
       GoRoute(
-        path: '${CustomerRoutes.stores}/:storeId',
+        path:
+        '${CustomerRoutes.stores}/:storeId',
         builder: (context, state) {
-          final storeId = int.tryParse(state.pathParameters['storeId'] ?? '');
+          final storeId = int.tryParse(
+            state.pathParameters['storeId'] ??
+                '',
+          );
+
           if (storeId == null) {
-            return const PopqErrorView(message: '스토어 번호가 올바르지 않습니다.');
+            return const PopqErrorView(
+              message:
+              '스토어 번호가 올바르지 않습니다.',
+            );
           }
+
           return StoreDetailScreen(
             storeId: storeId,
-            repository: storeDiscoveryRepository,
-            engagementRepository: engagementRepository,
-            sessionController: sessionController,
+            repository:
+            storeDiscoveryRepository,
+            engagementRepository:
+            engagementRepository,
+            sessionController:
+            sessionController,
           );
         },
       ),
       GoRoute(
         path: CustomerRoutes.cart,
-        builder: (context, state) => CartScreen(controller: cartController),
+        builder: (context, state) {
+          return CartScreen(
+            controller:
+            cartController,
+            sessionController:
+            sessionController,
+            onSignIn: onSignIn,
+            onDevelopmentSignIn:
+            onDevelopmentSignIn,
+          );
+        },
       ),
       GoRoute(
         path: CustomerRoutes.checkout,
         builder: (context, state) {
           return CheckoutScreen(
-            cartController: cartController,
-            orderRepository: orderRepository,
-            tossClientKey: tossClientKey,
+            cartController:
+            cartController,
+            orderRepository:
+            orderRepository,
+            tossClientKey:
+            tossClientKey,
           );
         },
       ),
       GoRoute(
         path: CustomerRoutes.notifications,
         builder: (context, state) {
-          return NotificationListScreen(repository: notificationRepository);
-        },
-      ),
-      GoRoute(
-        path: '${CustomerRoutes.orders}/:orderPublicId/review',
-        builder: (context, state) {
-          return ReviewEditorScreen(
-            orderPublicId: state.pathParameters['orderPublicId'] ?? '',
-            repository: engagementRepository,
+          return NotificationListScreen(
+            repository:
+            notificationRepository,
           );
         },
       ),
       GoRoute(
-        path: '${CustomerRoutes.orders}/:orderPublicId',
+        path:
+        '${CustomerRoutes.orders}/:orderPublicId/messages',
+        builder: (context, state) {
+          final orderPublicId =
+              state.pathParameters[
+              'orderPublicId'] ??
+                  '';
+
+          if (orderPublicId.isEmpty) {
+            return const PopqErrorView(
+              message:
+              '주문 번호가 올바르지 않습니다.',
+            );
+          }
+
+          return CustomerOrderChatScreen(
+            orderPublicId: orderPublicId,
+            orderRepository:
+            orderRepository,
+            messageRepository:
+            orderMessageRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path:
+        '${CustomerRoutes.orders}/:orderPublicId/review',
+        builder: (context, state) {
+          return ReviewEditorScreen(
+            orderPublicId:
+            state.pathParameters[
+            'orderPublicId'] ??
+                '',
+            repository:
+            engagementRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path:
+        '${CustomerRoutes.orders}/:orderPublicId',
         builder: (context, state) {
           return OrderDetailScreen(
-            orderPublicId: state.pathParameters['orderPublicId'] ?? '',
-            repository: orderRepository,
+            orderPublicId:
+            state.pathParameters[
+            'orderPublicId'] ??
+                '',
+            repository:
+            orderRepository,
+            messageRepository:
+            orderMessageRepository,
           );
         },
       ),
       ShellRoute(
-        builder: (context, state, child) {
+        builder: (
+            context,
+            state,
+            child,
+            ) {
           return CustomerRootScreen(
             location: state.uri.path,
-            notificationRepository: notificationRepository,
-            sessionController: sessionController,
+            notificationRepository:
+            notificationRepository,
+            orderMessageRepository:
+            orderMessageRepository,
+            sessionController:
+            sessionController,
+            themeController: themeController,
             child: child,
           );
         },
         routes: [
           GoRoute(
             path: CustomerRoutes.home,
-            builder: (context, state) => const CustomerHomeScreen(),
+            builder: (context, state) {
+              return CustomerHomeScreen(
+                storeDiscoveryRepository:
+                storeDiscoveryRepository,
+                orderRepository:
+                orderRepository,
+                sessionController:
+                sessionController,
+                permissionGateway:
+                permissionGateway,
+              );
+            },
           ),
           GoRoute(
             path: CustomerRoutes.discover,
             builder: (context, state) {
               return StoreDiscoveryScreen(
-                repository: storeDiscoveryRepository,
-                permissionGateway: permissionGateway,
+                repository:
+                storeDiscoveryRepository,
+                permissionGateway:
+                permissionGateway,
+                engagementRepository:
+                engagementRepository,
+                sessionController:
+                sessionController,
+              );
+            },
+          ),
+          GoRoute(
+            path:
+            CustomerRoutes.qrScanner,
+            builder: (context, state) {
+              return const CustomerQrScannerScreen();
+            },
+          ),
+          GoRoute(
+            path:
+            CustomerRoutes.favorites,
+            builder: (context, state) {
+              return CustomerFavoriteStoreScreen(
+                repository:
+                engagementRepository,
               );
             },
           ),
           GoRoute(
             path: CustomerRoutes.orders,
-            builder: (context, state) =>
-                OrderListScreen(repository: orderRepository),
+            builder: (context, state) {
+              return OrderListScreen(
+                repository:
+                orderRepository,
+                messageRepository:
+                orderMessageRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.myReviews,
+            builder: (context, state) {
+              return CustomerMyReviewsScreen(
+                repository:
+                engagementRepository,
+              );
+            },
           ),
           GoRoute(
             path: CustomerRoutes.profile,
             builder: (context, state) {
               return CustomerProfileScreen(
-                repository: engagementRepository,
-                onSignOut: sessionController.signOut,
+                repository:
+                engagementRepository,
+                messageRepository:
+                orderMessageRepository,
+                onSignOut:
+                sessionController.signOut,
               );
             },
           ),

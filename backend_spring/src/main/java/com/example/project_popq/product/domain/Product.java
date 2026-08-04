@@ -59,29 +59,29 @@ public class Product extends BaseTimeEntity {
     private CatalogStatus status;
 
     @OneToOne(
-            mappedBy = "product",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY,
-            optional = false
+        mappedBy = "product",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true,
+        fetch = FetchType.LAZY,
+        optional = false
     )
     private ProductAvailability availability;
 
     @OneToMany(
-            mappedBy = "product",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
+        mappedBy = "product",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
     )
     @OrderBy("displayOrder ASC, id ASC")
     private List<ProductOptionGroup> optionGroups = new ArrayList<>();
 
     private Product(
-            Store store,
-            ProductCategory category,
-            String name,
-            String description,
-            String imageUrl,
-            long basePrice
+        Store store,
+        ProductCategory category,
+        String name,
+        String description,
+        String imageUrl,
+        long basePrice
     ) {
         this.store = store;
         this.category = category;
@@ -94,32 +94,57 @@ public class Product extends BaseTimeEntity {
     }
 
     public static Product create(
-            Store store,
-            ProductCategory category,
-            String name,
-            String description,
-            String imageUrl,
-            long basePrice
+        Store store,
+        ProductCategory category,
+        String name,
+        String description,
+        String imageUrl,
+        long basePrice
     ) {
-        return new Product(store, category, name, description, imageUrl, basePrice);
+        return new Product(
+            store,
+            category,
+            name,
+            description,
+            imageUrl,
+            basePrice
+        );
     }
 
-    public void replaceOptionGroups(List<ProductOptionGroup> newGroups) {
+    public void replaceOptionGroups(
+        List<ProductOptionGroup> newGroups
+    ) {
         optionGroups.clear();
         optionGroups.addAll(newGroups);
     }
 
     public void update(
-            ProductCategory category,
-            String name,
-            String description,
-            String imageUrl,
-            long basePrice
+        ProductCategory category,
+        String name,
+        String description,
+        String imageUrl,
+        long basePrice
     ) {
         this.category = category;
         this.name = name;
         this.description = description;
         this.imageUrl = imageUrl;
         this.basePrice = basePrice;
+    }
+
+    public void delete() {
+        this.status = CatalogStatus.DELETED;
+
+        this.availability.update(
+            true,
+            this.availability.getSalesStartAt(),
+            this.availability.getSalesEndAt(),
+            false,
+            false
+        );
+    }
+
+    public boolean isDeleted() {
+        return this.status == CatalogStatus.DELETED;
     }
 }

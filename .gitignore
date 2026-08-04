@@ -11,3 +11,4 @@
 uploads/
 .env.intellij
 .env.example
+.idea/workspace.xml

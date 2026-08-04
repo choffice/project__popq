@@ -68,5 +68,29 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+    <string>QR 코드를 스캔하기 위해 카메라를 사용합니다.</string>
+	<key>NidClientID</key>
+	<string>GxL8Qnbr3tbzqhIvXYir</string>
+	<key>NidClientSecret</key>
+	<string>$(NAVER_CLIENT_SECRET)</string>
+	<key>NidAppName</key>
+	<string>POPQ</string>
+	<key>NidUrlScheme</key>
+	<string>popqnaver</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>naversearchapp</string>
+		<string>naversearchthirdlogin</string>
+	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>popqnaver</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

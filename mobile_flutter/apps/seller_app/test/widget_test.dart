@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_seller_app/src/features/announcements/seller_announcement_repository.dart';
+import 'package:popq_seller_app/src/features/auth/seller_auth_repository.dart';
 import 'package:popq_seller_app/src/features/auth/seller_identity_repository.dart';
 import 'package:popq_seller_app/src/features/home/seller_analytics_repository.dart';
 import 'package:popq_seller_app/src/features/orders/seller_order_repository.dart';
@@ -31,9 +32,169 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('POPQ SELLER'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
     expect(find.text('개발용 판매자로 로그인'), findsOneWidget);
     expect(find.textContaining('고객 앱과 다른 SELLER 계정'), findsOneWidget);
   });
+
+  testWidgets('seller signs in with email and password', (tester) async {
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(),
+        storeRepository: MemorySellerStoreRepository(stores: const []),
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+        authRepository: MemorySellerAuthRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('sign-in-email')),
+      'seller@popq.test',
+    );
+    await tester.enterText(
+      find.byKey(const Key('sign-in-password')),
+      'password1',
+    );
+    await tester.tap(find.byKey(const Key('sign-in-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('사업장 대시보드'), findsOneWidget);
+  });
+
+  testWidgets('seller signs up and returns to sign-in without auto-login', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(),
+        storeRepository: MemorySellerStoreRepository(stores: const []),
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+        authRepository: MemorySellerAuthRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('go-to-sign-up')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('판매자 회원가입'), findsAtLeastNWidgets(1));
+    await tester.enterText(
+      find.byKey(const Key('sign-up-email')),
+      'new-seller@popq.test',
+    );
+    await tester.enterText(
+      find.byKey(const Key('sign-up-name')),
+      '신규 판매자',
+    );
+    await tester.enterText(
+      find.byKey(const Key('sign-up-phone')),
+      '010-1234-5678',
+    );
+    await tester.enterText(
+      find.byKey(const Key('sign-up-password')),
+      'password1',
+    );
+    await tester.enterText(
+      find.byKey(const Key('sign-up-password-confirm')),
+      'password1',
+    );
+    await tester.tap(find.byKey(const Key('sign-up-agree')));
+    await tester.tap(find.byKey(const Key('sign-up-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('회원가입이 완료되었습니다. 로그인해 주세요.'), findsOneWidget);
+    expect(find.byKey(const Key('sign-in-submit')), findsOneWidget);
+  });
+
+  testWidgets('seller finds their id with name and phone', (tester) async {
+    await tester.pumpWidget(
+      PopqSellerApp(
+        environment: const AppEnvironment.local(),
+        sessionStore: MemorySessionStore(),
+        storeSelectionStore: MemorySellerStoreSelectionStore(),
+        storeRepository: MemorySellerStoreRepository(stores: const []),
+        identityRepository: const MemorySellerIdentityRepository(),
+        orderRepository: MemorySellerOrderRepository(),
+        productRepository: MemorySellerProductRepository(),
+        analyticsRepository: MemorySellerAnalyticsRepository(),
+        authRepository: MemorySellerAuthRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('go-to-find-id')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('find-id-name')), '홍길동');
+    await tester.enterText(
+      find.byKey(const Key('find-id-phone')),
+      '010-1234-5678',
+    );
+    await tester.tap(find.byKey(const Key('find-id-submit')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('se***@popq.test'), findsOneWidget);
+  });
+
+  testWidgets(
+    'seller resets password via find-password flow',
+    (tester) async {
+      await tester.pumpWidget(
+        PopqSellerApp(
+          environment: const AppEnvironment.local(),
+          sessionStore: MemorySessionStore(),
+          storeSelectionStore: MemorySellerStoreSelectionStore(),
+          storeRepository: MemorySellerStoreRepository(stores: const []),
+          identityRepository: const MemorySellerIdentityRepository(),
+          orderRepository: MemorySellerOrderRepository(),
+          productRepository: MemorySellerProductRepository(),
+          analyticsRepository: MemorySellerAnalyticsRepository(),
+          authRepository: MemorySellerAuthRepository(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('go-to-find-password')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('find-password-email')),
+        'seller@popq.test',
+      );
+      await tester.enterText(
+        find.byKey(const Key('find-password-phone')),
+        '010-1234-5678',
+      );
+      await tester.tap(find.byKey(const Key('find-password-verify')));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('find-password-new')),
+        'newpassword1',
+      );
+      await tester.enterText(
+        find.byKey(const Key('find-password-new-confirm')),
+        'newpassword1',
+      );
+      await tester.tap(find.byKey(const Key('find-password-submit')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('비밀번호가 변경되었습니다. 로그인해 주세요.'), findsOneWidget);
+      expect(find.byKey(const Key('sign-in-submit')), findsOneWidget);
+    },
+  );
 
   testWidgets('restored seller session opens the selected store workspace', (
     tester,
