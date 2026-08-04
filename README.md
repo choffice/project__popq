@@ -1,42 +1,19 @@
-# 판매자/고객 이메일·비밀번호 로그인, 회원가입 추가
+# 고객 앱 홈 · 마이페이지 UI 리뉴얼
 
-개발용 로그인과 소셜 로그인 버튼만 있던 판매자 앱(`seller_app`)에 실제 이메일/비밀번호 인증을 추가했고, 고객 앱(`customer_app`)에도 동일한 방식으로 추가했습니다. 이후 전화번호 필수 입력 및 중복 확인, 아이디/비밀번호 찾기, 회원가입 후 자동 로그인 제거, 데이터 이용 동의 체크박스를 이어서 추가했습니다.
-
-## 백엔드 (`backend_spring`)
-
-- `POST /api/v1/auth/signup`, `POST /api/v1/auth/login` — 최초 로그인/회원가입 API (`role`로 SELLER/CUSTOMER 구분)
-- `POST /api/v1/auth/find-id` (신규) — 이름+전화번호로 가입된 이메일을 마스킹해서 반환
-- `POST /api/v1/auth/password-reset/verify` (신규) — 이메일+전화번호로 본인 확인
-- `POST /api/v1/auth/password-reset/confirm` (신규) — 확인 후 새 비밀번호로 변경
-- `auth/service/AuthService.java` — 이메일/전화번호 중복 확인 → BCrypt 해시 저장 → SELLER면 SellerProfile 자동 생성 → JWT 발급 (`signup`); `findId`, `verifyForPasswordReset`, `resetPassword` 메서드 추가; 전화번호 정규화(`-` 제거), 이메일 마스킹 유틸 포함
-- `auth/dto/SignupRequest.java` — `phone`을 선택 입력에서 **필수**(`@NotBlank` + 휴대폰 번호 형식 검증)로 변경
-- `auth/dto/FindIdRequest.java`, `FindIdResponse.java`, `PasswordResetVerifyRequest.java`, `PasswordResetConfirmRequest.java`, `AckResponse.java` (모두 신규)
-- `user/domain/User.java` — `passwordHash`를 받는 `createWithPassword()` 팩토리, 비밀번호 재설정용 `changePasswordHash()` 추가 (기존 `create()`는 유지)
-- `user/repository/UserRepository.java` — `existsByEmailIgnoreCase`, `existsByPhone`, `findByNameAndPhone`, `findByEmailIgnoreCaseAndPhone` 추가
-- `auth/config/SecurityConfig.java` — `PasswordEncoder`(BCrypt) 빈 추가, signup/login/find-id/password-reset 경로 공개 처리
-- `common/error/ErrorCode.java` — `INVALID_CREDENTIALS`(401), `IDENTITY_VERIFICATION_FAILED`(400), `DUPLICATE_PHONE`(409) 추가
-- `db/migration/V9__add_password_hash_to_users.sql` — `users` 테이블에 `password_hash` 컬럼 추가
-- `db/migration/V10__add_unique_constraint_to_users_phone.sql` (신규) — `users.phone` 유니크 제약 추가 (전화번호 중복 가입 방지)
-- `test/auth/AuthSignupLoginIntegrationTests.java` — 가입/로그인 기본 테스트에 더해 전화번호 중복, 잘못된/누락된 전화번호, 아이디 찾기 성공/실패, 비밀번호 재설정 후 재로그인 등 테스트 추가
-
-## 판매자 앱 (`mobile_flutter/apps/seller_app`)
-
-- `features/auth/seller_auth_repository.dart` — `signUp()`에 `phone` 필수 파라미터 추가, `findId()`/`verifyForPasswordReset()`/`resetPassword()` API 연동 추가
-- `features/auth/seller_sign_up_screen.dart` — 전화번호 필수 입력 + 형식 검증 추가; 폼 맨 아래 "데이터 잘 쓸게요" 동의 체크박스 추가(미체크 시 제출 불가); 가입 성공 시 자동 로그인하지 않고 안내 메시지와 함께 로그인 화면으로 이동
-- `features/auth/seller_sign_in_screen.dart` — "아이디 찾기 / 비밀번호 찾기" 링크 추가, 버튼 텍스트 "이메일로 로그인" → "로그인"
-- `features/auth/seller_find_id_screen.dart` (신규) — 이름+전화번호로 아이디(마스킹된 이메일) 찾기 화면
-- `features/auth/seller_find_password_screen.dart` (신규) — 이메일+전화번호 확인 후 새 비밀번호 설정 화면
-- `routing/seller_router.dart` — `/find-id`, `/find-password` 라우트 및 로그인 전 화면 리다이렉트 처리 추가
-- `seller_app.dart` — `_signUp`이 더 이상 세션을 저장하지 않도록 변경(자동 로그인 제거), `_findId`/`_verifyForPasswordReset`/`_resetPassword` 추가해 라우터에 연결
-- `test/widget_test.dart` — 회원가입 후 자동 로그인 없이 로그인 화면으로 돌아가는지, 아이디 찾기, 비밀번호 찾기 흐름에 대한 위젯 테스트 추가
+고객 앱(`customer_app`)의 홈 화면과 마이페이지를 목업 디자인에 맞춰 새로 구성했습니다. 하단 탭 구성, `PopqAppScaffold`, 라우팅 구조 등 기존 틀은 그대로 두고 화면 내부 UI만 다시 짰습니다. 백엔드에 아직 없는 데이터(랭킹, 포인트, 레벨 등)는 기존 코드의 "임시 콘텐츠" 패턴을 그대로 따라 표시했고, 주석에 API 연동 전 임시값이라고 표시해뒀습니다.
 
 ## 고객 앱 (`mobile_flutter/apps/customer_app`)
 
-- `features/auth/customer_auth_repository.dart` — `signUp()`에 `phone` 필수 파라미터 추가, `findId()`/`verifyForPasswordReset()`/`resetPassword()` API 연동 추가
-- `features/auth/customer_sign_up_screen.dart` — 전화번호 필수 입력 + 형식 검증 추가; 폼 맨 아래 "데이터 잘 쓸게요" 동의 체크박스 추가(미체크 시 제출 불가); 가입 성공 시 자동 로그인하지 않고 안내 메시지와 함께 로그인 화면으로 이동
-- `features/auth/sign_in_screen.dart` — "아이디 찾기 / 비밀번호 찾기" 링크 추가 (기존 Google/Kakao/Naver 버튼, 개발용 로그인, 장바구니 모달 로그인 흐름은 유지)
-- `features/auth/customer_find_id_screen.dart` (신규) — 이름+전화번호로 아이디(마스킹된 이메일) 찾기 화면
-- `features/auth/customer_find_password_screen.dart` (신규) — 이메일+전화번호 확인 후 새 비밀번호 설정 화면
-- `routing/customer_router.dart` — `/find-id`, `/find-password` 라우트 및 로그인 전 화면 리다이렉트 처리 추가
-- `customer_app.dart` — `_signUp`이 더 이상 세션을 저장하지 않도록 변경(자동 로그인 제거), `_findId`/`_verifyForPasswordReset`/`_resetPassword` 추가해 라우터에 연결
-- `features/cart/cart_screen.dart` — 장바구니 로그인 모달에도 동일한 `onSignIn` 흐름 연결
+### 홈 화면
+
+- `features/home/customer_home_content.dart` — 검색바 밑 카테고리 라벨, "이번 주 추천 이벤트" 배너용 `CustomerHomeFeatureBanner` 모델 추가; 팝업/추천 항목에 D-day·방문 횟수 필드 추가; 위치 권한 허용 여부에 따라 다른 임시 데이터를 보여주기 위해 권역(수도권/부산)별 팝업·추천 목록 분리
+- `features/home/customer_home_controller.dart` — `CustomerPermissionGateway`로 위치 권한을 확인해 현재 위치와 가장 가까운 권역을 판정(허용 안 하면 수도권 기본값), 인기 랭킹·진행 중인 이벤트 데이터를 이 권역 기준으로 필터링/선택하도록 변경
+- `features/home/customer_home_screen.dart` — 검색바, 카테고리 탭(전체/식당/팝업스토어/플리마켓/푸드트럭/카페), "이번 주 추천 이벤트" 스와이프 배너, "인기 랭킹 TOP 5"(가로 스크롤, 순위 배지), "진행 중인 이벤트"(가로 스크롤, D-day 배지) 섹션 추가. 기존 진행 중 주문 카드·실제 매장 소개·회원 혜택 배너는 그대로 유지하고 아래로 배치
+
+### 마이페이지
+
+- `features/profile/customer_profile_screen.dart` — 프로필 정보(아바타·이름·레벨·위치)와 활동 통계(찜한 이벤트/참여한 이벤트/방문 횟수/보유 포인트)를 카드 하나로 통합, 메뉴 목록(내 정보/예약 내역/찜한 이벤트/최근 본 이벤트/내 리뷰/포인트 내역/이벤트 참여 내역/알림 설정/고객센터)과 로그아웃·회원 탈퇴 카드로 재구성. 아직 연결된 화면이 없는 메뉴는 탭하면 "준비 중" 스낵바를 띄움. 기존 "화면 설정" 카드는 상단바 토글로 대체되어 삭제
+- `features/profile/customer_my_reviews_screen.dart` (신규) — 기존에 마이페이지 안에 있던 리뷰 수정/삭제 로직을 별도 화면(`/my-reviews`)으로 분리
+- `features/common/theme_mode_toggle.dart` (신규) — 기본/다크 모드를 전환하는 원형 버튼. 탭하면 같은 자리에서 해 아이콘 ↔ 초승달 아이콘으로 바뀜(슬라이드 아님)
+- `customer_root_screen.dart` — 상단바 알림 버튼 왼쪽에 `ThemeModeToggle` 추가 (홈/탐색/QR/찜/마이 5개 탭 공통)
+- `routing/customer_router.dart` — `/my-reviews` 라우트 추가(로그인 필요), 홈 화면에 `permissionGateway` 전달, 루트 화면에 `themeController` 전달
