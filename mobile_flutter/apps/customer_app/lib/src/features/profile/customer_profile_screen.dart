@@ -180,7 +180,7 @@ class _CustomerProfileScreenState
                         : '예매한 이벤트와 예약 정보를 확인해요',
                     badgeCount: _unreadMessageCount,
                     onTap: () {
-                      context.go(
+                      context.push(
                         CustomerRoutes.orders,
                       );
                     },

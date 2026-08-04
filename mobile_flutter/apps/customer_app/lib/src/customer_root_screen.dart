@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -76,13 +75,8 @@ class _CustomerRootScreenState
     3,
   ];
 
-  static const Duration _exitConfirmDuration =
-  Duration(seconds: 2);
-
   static const Duration _unreadPollingInterval =
   Duration(seconds: 3);
-
-  DateTime? _lastBackPressedAt;
 
   Timer? _unreadPollingTimer;
 
@@ -100,10 +94,6 @@ class _CustomerRootScreenState
       _handleSessionChanged,
     );
 
-    unawaited(
-      SystemNavigator.setFrameworkHandlesBack(true),
-    );
-
     _startUnreadPolling();
     _scheduleUnreadRefresh();
   }
@@ -115,8 +105,6 @@ class _CustomerRootScreenState
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.location != widget.location) {
-      _lastBackPressedAt = null;
-
       /*
        * 주문 채팅에서 하단 화면으로 돌아왔을 때
        * 읽음 처리 결과를 즉시 반영합니다.
@@ -181,10 +169,6 @@ class _CustomerRootScreenState
       _handleSessionChanged,
     );
 
-    unawaited(
-      SystemNavigator.setFrameworkHandlesBack(false),
-    );
-
     super.dispose();
   }
 
@@ -198,175 +182,93 @@ class _CustomerRootScreenState
       routeIndex,
     );
 
-    return BackButtonListener(
-      onBackButtonPressed:
-      _handleRootBackButtonPressed,
-      child: PopScope<Object?>(
-        canPop: false,
-        onPopInvokedWithResult: (
-            didPop,
-            result,
-            ) {
-          if (didPop) {
-            return;
-          }
-
-          _handleSystemBack();
-        },
-        child: PopqAppScaffold(
-          title: _titles[routeIndex],
-          actions: [
-            if (widget.themeController != null)
-              ThemeModeToggle(
-                controller:
-                widget.themeController!,
-              ),
-            NotificationAction(
-              repository:
-              widget.notificationRepository,
-              sessionController:
-              widget.sessionController,
-            ),
-          ],
-          selectedIndex: selectedIndex,
-          onDestinationSelected: (uiIndex) {
-            final nextRouteIndex =
-            _uiToRouteIndex[uiIndex];
-
-            final nextLocation =
-            _locations[nextRouteIndex];
-
-            unawaited(
-              _refreshUnreadMessageCount(),
-            );
-
-            if (nextLocation == widget.location) {
-              return;
-            }
-
-            _lastBackPressedAt = null;
-
-            context.go(nextLocation);
-          },
-          destinations: [
-            const NavigationDestination(
-              icon: Icon(
-                Icons.home_outlined,
-              ),
-              selectedIcon: Icon(
-                Icons.home_rounded,
-              ),
-              label: '홈',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.search_rounded,
-              ),
-              selectedIcon: Icon(
-                Icons.manage_search_rounded,
-              ),
-              label: '탐색',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.qr_code_scanner_rounded,
-              ),
-              selectedIcon: Icon(
-                Icons.qr_code_scanner_rounded,
-              ),
-              label: 'QR',
-            ),
-            const NavigationDestination(
-              icon: Icon(
-                Icons.favorite_border_rounded,
-              ),
-              selectedIcon: Icon(
-                Icons.favorite_rounded,
-              ),
-              label: '찜',
-            ),
-            NavigationDestination(
-              icon: _MyNavigationIcon(
-                icon:
-                Icons.person_outline_rounded,
-                unreadCount:
-                _unreadMessageCount,
-              ),
-              selectedIcon: _MyNavigationIcon(
-                icon: Icons.person_rounded,
-                unreadCount:
-                _unreadMessageCount,
-              ),
-              label: '마이',
-            ),
-          ],
-          body: widget.child,
-        ),
-      ),
-    );
-  }
-
-  Future<bool> _handleRootBackButtonPressed() {
-    _handleSystemBack();
-
-    return Future<bool>.value(true);
-  }
-
-  void _handleSystemBack() {
-    if (!mounted) {
-      return;
-    }
-
-    // 홈이 아닌 하단 탭에서는 앱을 종료하지 않고 홈으로 이동합니다.
-    if (widget.location != CustomerRoutes.home) {
-      _lastBackPressedAt = null;
-
-      context.go(
-        CustomerRoutes.home,
-      );
-
-      return;
-    }
-
-    final now = DateTime.now();
-    final previousPressedAt =
-        _lastBackPressedAt;
-
-    final shouldExit =
-        previousPressedAt != null &&
-            now.difference(
-              previousPressedAt,
-            ) <=
-                _exitConfirmDuration;
-
-    // 홈에서 2초 안에 두 번째로 누른 경우에만 종료합니다.
-    if (shouldExit) {
-      _lastBackPressedAt = null;
-
-      unawaited(
-        SystemNavigator.pop(),
-      );
-
-      return;
-    }
-
-    // 홈에서 첫 번째 뒤로가기입니다.
-    _lastBackPressedAt = now;
-
-    final messenger =
-    ScaffoldMessenger.of(context);
-
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(
-          content: Text(
-            '한 번 더 누르면 앱이 종료됩니다.',
+    return PopqAppScaffold(
+      title: _titles[routeIndex],
+      actions: [
+        if (widget.themeController != null)
+          ThemeModeToggle(
+            controller:
+            widget.themeController!,
           ),
-          duration:
-          _exitConfirmDuration,
+        NotificationAction(
+          repository:
+          widget.notificationRepository,
+          sessionController:
+          widget.sessionController,
         ),
-      );
+      ],
+      selectedIndex: selectedIndex,
+      onDestinationSelected: (uiIndex) {
+        final nextRouteIndex =
+        _uiToRouteIndex[uiIndex];
+
+        final nextLocation =
+        _locations[nextRouteIndex];
+
+        unawaited(
+          _refreshUnreadMessageCount(),
+        );
+
+        if (nextLocation == widget.location) {
+          return;
+        }
+
+        context.go(nextLocation);
+      },
+      destinations: [
+        const NavigationDestination(
+          icon: Icon(
+            Icons.home_outlined,
+          ),
+          selectedIcon: Icon(
+            Icons.home_rounded,
+          ),
+          label: '홈',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.search_rounded,
+          ),
+          selectedIcon: Icon(
+            Icons.manage_search_rounded,
+          ),
+          label: '탐색',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.qr_code_scanner_rounded,
+          ),
+          selectedIcon: Icon(
+            Icons.qr_code_scanner_rounded,
+          ),
+          label: 'QR',
+        ),
+        const NavigationDestination(
+          icon: Icon(
+            Icons.favorite_border_rounded,
+          ),
+          selectedIcon: Icon(
+            Icons.favorite_rounded,
+          ),
+          label: '찜',
+        ),
+        NavigationDestination(
+          icon: _MyNavigationIcon(
+            icon:
+            Icons.person_outline_rounded,
+            unreadCount:
+            _unreadMessageCount,
+          ),
+          selectedIcon: _MyNavigationIcon(
+            icon: Icons.person_rounded,
+            unreadCount:
+            _unreadMessageCount,
+          ),
+          label: '마이',
+        ),
+      ],
+      body: widget.child,
+    );
   }
 
   void _handleSessionChanged() {
