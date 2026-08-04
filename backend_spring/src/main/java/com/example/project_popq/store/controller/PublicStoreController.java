@@ -5,7 +5,9 @@ import com.example.project_popq.store.dto.PublicStoreResponse;
 import com.example.project_popq.store.service.PublicStoreQueryService;
 import com.example.project_popq.product.dto.ProductDetailResponse;
 import com.example.project_popq.product.dto.ProductSummaryResponse;
+import com.example.project_popq.store.dto.StoreWalkingRouteResponse;
 import com.example.project_popq.product.service.CatalogService;
+import com.example.project_popq.store.service.StoreWalkingRouteService;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import java.math.BigDecimal;
@@ -26,6 +28,8 @@ public class PublicStoreController {
 
     private final PublicStoreQueryService publicStoreQueryService;
     private final CatalogService catalogService;
+    private final StoreWalkingRouteService storeWalkingRouteService;
+
 
     @GetMapping
     public ApiResponse<List<PublicStoreResponse>> search(
@@ -52,6 +56,29 @@ public class PublicStoreController {
     ) {
         return ApiResponse.success(
                 publicStoreQueryService.findDetail(storeId)
+        );
+    }
+
+    @GetMapping("/{storeId}/walking-route")
+    public ApiResponse<StoreWalkingRouteResponse> findWalkingRoute(
+        @PathVariable Long storeId,
+
+        @RequestParam
+        @DecimalMin("-90.0")
+        @DecimalMax("90.0")
+        BigDecimal startLatitude,
+
+        @RequestParam
+        @DecimalMin("-180.0")
+        @DecimalMax("180.0")
+        BigDecimal startLongitude
+    ) {
+        return ApiResponse.success(
+            storeWalkingRouteService.findWalkingRoute(
+                storeId,
+                startLatitude,
+                startLongitude
+            )
         );
     }
 

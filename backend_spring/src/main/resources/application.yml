@@ -48,6 +48,10 @@ popq:
   upload:
     path: ${POPQ_UPLOAD_PATH:./uploads}
 
+  kakao:
+    rest-api-base-url: ${POPQ_KAKAO_REST_API_BASE_URL:https://dapi.kakao.com}
+    rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
+
   security:
     jwt:
       issuer: ${POPQ_JWT_ISSUER:popq}

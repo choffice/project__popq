@@ -47,20 +47,31 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   static const _greenColor = Color(0xFF17643E);
 
   static const _filters = [
-    _StoreFilter(label: '전체', icon: Icons.apps_rounded, storeType: null),
     _StoreFilter(
-      label: '로컬마켓',
-      icon: Icons.storefront_rounded,
-      storeType: 'LOCAL_STORE',
+      type: _StoreFilterType.all,
+      label: '전체',
+      icon: Icons.apps_rounded,
     ),
     _StoreFilter(
+      type: _StoreFilterType.localStore,
+      label: '로컬마켓',
+      icon: Icons.storefront_rounded,
+    ),
+    _StoreFilter(
+      type: _StoreFilterType.eventCommerce,
       label: '행사·이벤트',
       icon: Icons.celebration_rounded,
-      storeType: 'EVENT_COMMERCE',
+    ),
+    _StoreFilter(
+      type: _StoreFilterType.favorites,
+      label: '마이픽',
+      icon: Icons.favorite_rounded,
     ),
   ];
 
   late final StoreDiscoveryController _controller;
+
+  late final KakaoStoreMapController _mapController;
 
   final TextEditingController _queryController = TextEditingController();
 
@@ -72,7 +83,15 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   CustomerStore? _selectedStore;
 
-  String? _selectedStoreType;
+  StoreWalkingRoute? _walkingRoute;
+
+  bool _walkingRouteLoading = false;
+
+  Object? _walkingRouteError;
+
+  int _walkingRouteRequestSerial = 0;
+
+  _StoreFilterType _selectedFilter = _StoreFilterType.all;
 
   bool _showSuggestions = false;
 
@@ -84,9 +103,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   Object? _lastShownRefreshError;
 
+  bool _lastSearchWasMapMove = false;
+
   @override
   void initState() {
     super.initState();
+
+    _mapController =
+        KakaoStoreMapController();
 
     _controller = StoreDiscoveryController(
       repository: widget.repository,
@@ -106,10 +130,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           oldWidget.engagementRepository,
           widget.engagementRepository,
         ) ||
-        !identical(
-          oldWidget.sessionController,
-          widget.sessionController,
-        );
+        !identical(oldWidget.sessionController, widget.sessionController);
 
     if (!interestDependenciesChanged) {
       return;
@@ -123,8 +144,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final engagementRepository = widget.engagementRepository;
     final sessionController = widget.sessionController;
 
-    if (engagementRepository == null ||
-        sessionController == null) {
+    if (engagementRepository == null || sessionController == null) {
       return;
     }
 
@@ -150,7 +170,38 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
-    setState(() {});
+    final interestController = _interestController;
+
+    setState(() {
+      /*
+     * 로그아웃되면 마이픽 필터를 유지하지 않고
+     * 전체 필터로 되돌립니다.
+     */
+      if (_selectedFilter == _StoreFilterType.favorites &&
+          interestController != null &&
+          !interestController.isSignedIn) {
+        _selectedFilter = _StoreFilterType.all;
+
+        _clearSelectedStoreState();
+        return;
+      }
+
+      /*
+     * 마이픽 화면에서 선택한 업체의 하트를 해제하면
+     * 해당 업체는 필터 결과에서 빠지므로
+     * 하단 선택 카드도 함께 닫습니다.
+     */
+      if (_selectedFilter != _StoreFilterType.favorites) {
+        return;
+      }
+
+      final selectedStoreId = _selectedStore?.storeId;
+
+      if (selectedStoreId != null &&
+          !_favoriteStoreIds.contains(selectedStoreId)) {
+        _clearSelectedStoreState();
+      }
+    });
   }
 
   @override
@@ -170,6 +221,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   Future<void> _initializeDiscovery() async {
+    _lastSearchWasMapMove = false;
     /*
    * 부산 기본 위치를 기준으로 업체 API를 호출합니다.
    *
@@ -208,13 +260,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
    */
     if (refreshError == null) {
       _lastShownRefreshError = null;
-    } else if (
-    _controller.hasCompletedInitialLoad &&
+    } else if (_controller.hasCompletedInitialLoad &&
         !_controller.isRefreshing &&
-        !identical(
-          _lastShownRefreshError,
-          refreshError,
-        )) {
+        !identical(_lastShownRefreshError, refreshError)) {
       /*
      * 최초 연결 실패는 중앙 오류 화면에서 처리합니다.
      *
@@ -223,23 +271,20 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
      */
       _lastShownRefreshError = refreshError;
 
-      WidgetsBinding.instance.addPostFrameCallback(
-            (_) {
-          if (!mounted) {
-            return;
-          }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
 
-          ScaffoldMessenger.of(context)
-              .showSnackBar(
-            const SnackBar(
-              content: Text(
-                '새 지역의 업체를 불러오지 못했습니다. '
-                    '기존 검색 결과를 유지합니다.',
-              ),
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '새 지역의 업체를 불러오지 못했습니다. '
+              '기존 검색 결과를 유지합니다.',
             ),
-          );
-        },
-      );
+          ),
+        );
+      });
     }
 
     setState(() {
@@ -250,26 +295,58 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         return;
       }
 
-      final selectedStoreStillExists =
-      _filteredStores.any(
-            (store) =>
-        store.storeId == selectedStoreId,
-      );
-
-      if (!selectedStoreStillExists) {
-        _selectedStore = null;
+      /*
+   * 새 검색 결과에도 선택 업체가 포함되어 있다면
+   * 최신 업체 정보로 카드 객체만 갱신합니다.
+   *
+   * 검색 결과에서 벗어났더라도 기존 카드는 유지합니다.
+   */
+      for (final store in _controller.stores) {
+        if (store.storeId == selectedStoreId) {
+          _selectedStore = store;
+          break;
+        }
       }
     });
   }
 
   List<CustomerStore> get _filteredStores {
-    if (_selectedStoreType == null) {
-      return _controller.stores;
+    final stores = _controller.stores;
+
+    return switch (_selectedFilter) {
+      _StoreFilterType.all => stores,
+
+      _StoreFilterType.localStore =>
+        stores.where((store) => store.storeType == 'LOCAL_STORE').toList(),
+
+      _StoreFilterType.eventCommerce =>
+        stores.where((store) => store.storeType == 'EVENT_COMMERCE').toList(),
+
+      /*
+     * 서버에서 받은 현재 지도 영역의 업체 중
+     * 사용자가 찜한 업체만 표시합니다.
+     */
+      _StoreFilterType.favorites =>
+        stores
+            .where((store) => _favoriteStoreIds.contains(store.storeId))
+            .toList(),
+    };
+  }
+
+  /*
+ * 카카오맵 마커에 표시할 현재 찜 업체 ID입니다.
+ *
+ * 실제 API Controller가 있으면 서버 상태를 사용하고,
+ * 없으면 임시 로컬 즐겨찾기 상태를 사용합니다.
+ */
+  Set<int> get _favoriteStoreIds {
+    final controller = _interestController;
+
+    if (controller != null) {
+      return controller.interestedStoreIds;
     }
 
-    return _controller.stores
-        .where((store) => store.storeType == _selectedStoreType)
-        .toList();
+    return Set<int>.unmodifiable(_localFavoriteStoreIds);
   }
 
   List<CustomerStore> get _searchSuggestions {
@@ -310,7 +387,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       fit: StackFit.expand,
       children: [
         KakaoStoreMap(
+          controller: _mapController,
           stores: stores,
+          favoriteStoreIds: _favoriteStoreIds,
           currentLocation: _controller.location,
           searchCenter: _controller.searchCenter,
           selectedStoreId: _selectedStore?.storeId,
@@ -338,17 +417,19 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             bottom: 12,
             child: _SelectedStoreCard(
               store: _selectedStore!,
-              favorite: _isFavorite(
-                _selectedStore!.storeId,
-              ),
-              favoriteUpdating: _isFavoriteUpdating(
-                _selectedStore!.storeId,
-              ),
+              favorite: _isFavorite(_selectedStore!.storeId),
+              favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
+              walkingRoute: _walkingRoute,
+              walkingRouteLoading: _walkingRouteLoading,
+              walkingRouteError: _walkingRouteError,
+              onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
+              onStoreLocationPressed:
+              _focusSelectedStoreOnMap,
               onFavoritePressed: _toggleFavorite,
               onDetailsPressed: _openStoreDetail,
               onClose: () {
                 setState(() {
-                  _selectedStore = null;
+                  _clearSelectedStoreState();
                 });
               },
             ),
@@ -409,7 +490,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         else
           _StoreFilterBar(
             filters: _filters,
-            selectedStoreType: _selectedStoreType,
+            selectedFilter: _selectedFilter,
             onSelected: _selectFilter,
           ),
 
@@ -432,8 +513,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           ),
         ],
 
-        if (_controller.isRefreshing &&
-            !_showSuggestions) ...[
+        if (_controller.isRefreshing && !_showSuggestions) ...[
           const SizedBox(height: 6),
           const Align(
             alignment: Alignment.center,
@@ -453,6 +533,21 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return const SizedBox.shrink();
     }
 
+    /*
+   * 사용자가 지도를 이동해서 조회한 결과가 비어 있을 때는
+   * 중앙의 결과 없음 카드를 표시하지 않습니다.
+   */
+    if (_lastSearchWasMapMove) {
+      final viewportHasNoResult =
+          _controller.status == DiscoveryStatus.empty ||
+          (_controller.status == DiscoveryStatus.data &&
+              filteredStores.isEmpty);
+
+      if (viewportHasNoResult) {
+        return const SizedBox.shrink();
+      }
+    }
+
     return switch (_controller.status) {
       DiscoveryStatus.loading => const Center(
         child: _MapStatusCard(
@@ -461,6 +556,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           loading: true,
         ),
       ),
+
       DiscoveryStatus.failure => Center(
         child: _MapStatusCard(
           icon: Icons.cloud_off_rounded,
@@ -473,38 +569,69 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           },
         ),
       ),
+
       DiscoveryStatus.empty => const Center(
         child: _MapStatusCard(
           icon: Icons.storefront_outlined,
           message: '검색 조건에 맞는 업체가 없습니다.',
         ),
       ),
-      DiscoveryStatus.data when filteredStores.isEmpty => const Center(
+
+      DiscoveryStatus.data when filteredStores.isEmpty => Center(
         child: _MapStatusCard(
-          icon: Icons.filter_alt_off_rounded,
-          message: '선택한 분류의 업체가 없습니다.',
+          icon: _selectedFilter == _StoreFilterType.favorites
+              ? Icons.favorite_border_rounded
+              : Icons.filter_alt_off_rounded,
+          message: _selectedFilter == _StoreFilterType.favorites
+              ? '이 지도 영역에 찜한 업체가 없습니다.'
+              : '선택한 분류의 업체가 없습니다.',
         ),
       ),
+
       DiscoveryStatus.data => const SizedBox.shrink(),
     };
   }
 
-  void _selectFilter(String? storeType) {
+  void _selectFilter(_StoreFilterType filter) {
+    _searchFocusNode.unfocus();
+
+    /*
+   * 실제 즐겨찾기 Controller가 있는데 로그인하지 않은 경우,
+   * 마이픽을 빈 화면으로 보여주지 않고 로그인 화면으로 이동합니다.
+   *
+   * Controller가 없는 메모리 테스트 환경에서는
+   * 로컬 즐겨찾기 Set을 그대로 사용합니다.
+   */
+    final interestController = _interestController;
+
+    if (filter == _StoreFilterType.favorites &&
+        interestController != null &&
+        !interestController.isSignedIn) {
+      context.push(
+        Uri(
+          path: CustomerRoutes.signIn,
+          queryParameters: const {'from': CustomerRoutes.discover},
+        ).toString(),
+      );
+
+      return;
+    }
+
     setState(() {
-      _selectedStoreType = storeType;
-      _selectedStore = null;
+      _lastSearchWasMapMove = false;
+      _selectedFilter = filter;
+      _clearSelectedStoreState();
       _showSuggestions = false;
     });
-
-    _searchFocusNode.unfocus();
   }
 
   Future<void> _submitSearch(String value) async {
     _searchFocusNode.unfocus();
 
     setState(() {
+      _lastSearchWasMapMove = false;
       _showSuggestions = false;
-      _selectedStore = null;
+      _clearSelectedStoreState();
     });
 
     await _controller.search(query: value);
@@ -516,9 +643,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final stores = _filteredStores;
 
     if (stores.length == 1) {
-      setState(() {
-        _selectedStore = stores.first;
-      });
+      _selectStore(stores.first);
     }
   }
 
@@ -527,8 +652,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _searchFocusNode.unfocus();
 
     setState(() {
+      _lastSearchWasMapMove = false;
       _showSuggestions = false;
-      _selectedStore = null;
+      _clearSelectedStoreState();
     });
 
     _controller.search();
@@ -539,17 +665,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       ..text = store.name
       ..selection = TextSelection.collapsed(offset: store.name.length);
 
-    _searchFocusNode.unfocus();
-
-    setState(() {
-      _showSuggestions = false;
-      _selectedStore = store;
-    });
+    _selectStore(store);
   }
 
-  void _onMapViewportIdle(
-      KakaoMapViewport viewport,
-      ) {
+  void _onMapViewportIdle(KakaoMapViewport viewport) {
     /*
    * 이전에 예약해 둔 지도 검색이 있다면 취소합니다.
    *
@@ -558,14 +677,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
    */
     _mapSearchDebounce?.cancel();
 
+    _lastSearchWasMapMove = true;
+
     /*
-   * 지도를 다른 지역으로 옮기면 기존에 선택했던
-   * 업체 카드는 닫습니다.
-   */
-    if (_selectedStore != null ||
-        _showSuggestions) {
+ * 지도를 이동해도 선택 업체 카드는 유지합니다.
+ *
+ * 검색 추천 목록만 닫고,
+ * 사용자가 카드의 닫기 버튼을 누르거나
+ * 다른 업체를 선택하기 전까지 현재 카드를 유지합니다.
+ */
+    if (_showSuggestions) {
       setState(() {
-        _selectedStore = null;
         _showSuggestions = false;
       });
     }
@@ -576,20 +698,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
    * 지도가 멈춘 뒤 500ms 동안 추가 조작이 없을 때만
    * 현재 지도 영역의 업체를 다시 조회합니다.
    */
-    _mapSearchDebounce = Timer(
-      const Duration(milliseconds: 500),
-          () async {
-        if (!mounted) {
-          return;
-        }
+    _mapSearchDebounce = Timer(const Duration(milliseconds: 500), () async {
+      if (!mounted) {
+        return;
+      }
 
-        await _controller.searchAround(
-          center: viewport.center,
-          radiusKm: viewport.radiusKm,
-          query: _queryController.text.trim(),
-        );
-      },
-    );
+      await _controller.searchAround(
+        center: viewport.center,
+        radiusKm: viewport.radiusKm,
+        query: _queryController.text.trim(),
+      );
+    });
   }
 
   void _selectStore(CustomerStore store) {
@@ -598,7 +717,157 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     setState(() {
       _showSuggestions = false;
       _selectedStore = store;
+
+      /*
+     * 이전에 선택한 업체의 도보 정보가
+     * 새 업체 카드에 잠깐 보이지 않도록 초기화합니다.
+     */
+      _walkingRoute = null;
+      _walkingRouteLoading = false;
+      _walkingRouteError = null;
     });
+
+    unawaited(_loadWalkingRoute(store));
+  }
+
+  Future<void> _focusSelectedStoreOnMap() async {
+    final store = _selectedStore;
+
+    final latitude = store?.latitude;
+    final longitude = store?.longitude;
+
+    if (store == null ||
+        latitude == null ||
+        longitude == null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              '업체 위치 정보가 없습니다.',
+            ),
+          ),
+        );
+
+      return;
+    }
+
+    /*
+   * 이전에 예약된 지도 이동 검색이 있다면 취소합니다.
+   *
+   * 버튼으로 업체 위치에 이동한 뒤 발생하는
+   * 새 viewport 이벤트만 처리하도록 합니다.
+   */
+    _mapSearchDebounce?.cancel();
+
+    _searchFocusNode.unfocus();
+
+    await _mapController.focusStoreLocation(
+      CustomerLocation(
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    );
+  }
+
+  Future<void> _loadWalkingRoute(CustomerStore store) async {
+    /*
+   * 새 업체를 선택할 때마다 요청 번호를 증가시킵니다.
+   *
+   * A 업체를 조회하는 도중 B 업체를 선택했을 때
+   * 늦게 도착한 A 업체 응답을 무시하기 위한 값입니다.
+   */
+    final requestSerial = ++_walkingRouteRequestSerial;
+
+    /*
+   * searchCenter가 아니라 실제 GPS 위치를 사용합니다.
+   *
+   * searchCenter는 사용자가 지도를 움직이면 바뀌지만,
+   * location은 사용자의 실제 현재 위치입니다.
+   */
+    final startLocation = _controller.location;
+
+    if (startLocation == null) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _walkingRoute = null;
+        _walkingRouteLoading = false;
+        _walkingRouteError = null;
+      });
+
+      return;
+    }
+
+    setState(() {
+      _walkingRoute = null;
+      _walkingRouteLoading = true;
+      _walkingRouteError = null;
+    });
+
+    try {
+      final route = await widget.repository.findWalkingRoute(
+        storeId: store.storeId,
+        startLocation: startLocation,
+      );
+
+      /*
+     * 요청 중 화면이 닫혔거나,
+     * 다른 업체가 선택되었거나,
+     * 더 최신 요청이 시작된 경우에는
+     * 현재 응답을 화면에 반영하지 않습니다.
+     */
+      if (!mounted ||
+          requestSerial != _walkingRouteRequestSerial ||
+          _selectedStore?.storeId != store.storeId) {
+        return;
+      }
+
+      setState(() {
+        _walkingRoute = route;
+        _walkingRouteLoading = false;
+        _walkingRouteError = null;
+      });
+    } catch (error) {
+      if (!mounted ||
+          requestSerial != _walkingRouteRequestSerial ||
+          _selectedStore?.storeId != store.storeId) {
+        return;
+      }
+
+      setState(() {
+        _walkingRoute = null;
+        _walkingRouteLoading = false;
+        _walkingRouteError = error;
+      });
+    }
+  }
+
+  void _clearSelectedStoreState() {
+    /*
+   * 진행 중인 도보 경로 요청을 무효화합니다.
+   *
+   * 응답이 나중에 도착하더라도
+   * 닫힌 카드에 결과가 다시 적용되지 않습니다.
+   */
+    _walkingRouteRequestSerial++;
+
+    _selectedStore = null;
+    _walkingRoute = null;
+    _walkingRouteLoading = false;
+    _walkingRouteError = null;
+  }
+
+  void _reloadWalkingRouteForSelectedStore() {
+    final store = _selectedStore;
+
+    if (store == null) {
+      return;
+    }
+
+    unawaited(_loadWalkingRoute(store));
   }
 
   bool _isFavorite(int storeId) {
@@ -642,35 +911,26 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (result == CustomerStoreInterestToggleResult.added) {
-      _showFavoriteMessage(
-        '${store.name}을(를) 찜에 추가했어요.',
-      );
+      _showFavoriteMessage('${store.name}을(를) 찜에 추가했어요.');
       return;
     }
 
     if (result == CustomerStoreInterestToggleResult.removed) {
-      _showFavoriteMessage(
-        '${store.name}을(를) 찜에서 삭제했어요.',
-      );
+      _showFavoriteMessage('${store.name}을(를) 찜에서 삭제했어요.');
       return;
     }
 
-    if (result ==
-        CustomerStoreInterestToggleResult.signInRequired) {
+    if (result == CustomerStoreInterestToggleResult.signInRequired) {
       context.push(
         Uri(
           path: CustomerRoutes.signIn,
-          queryParameters: const {
-            'from': CustomerRoutes.discover,
-          },
+          queryParameters: const {'from': CustomerRoutes.discover},
         ).toString(),
       );
       return;
     }
 
-    _showFavoriteMessage(
-      '찜 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.',
-    );
+    _showFavoriteMessage('찜 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.');
   }
 
   void _showFavoriteMessage(String message) {
@@ -678,11 +938,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openStoreDetail() async {
@@ -708,6 +964,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     _mapSearchDebounce?.cancel();
 
+    _lastSearchWasMapMove = false;
+
     setState(() {
       _requestingInitialLocation = true;
     });
@@ -732,6 +990,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
 
     if (decision == PermissionDecision.granted) {
+      _reloadWalkingRouteForSelectedStore();
       return;
     }
 
@@ -746,9 +1005,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   Future<void> _useCurrentLocation() async {
     _mapSearchDebounce?.cancel();
+    _lastSearchWasMapMove = false;
 
-    final decision =
-    await _controller.useCurrentLocation(
+    final decision = await _controller.useCurrentLocation(
       query: _queryController.text.trim(),
     );
 
@@ -757,6 +1016,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (decision == PermissionDecision.granted) {
+      _reloadWalkingRouteForSelectedStore();
       return;
     }
 
@@ -765,17 +1025,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   void _showLocationDecisionMessage(PermissionDecision decision) {
     final message = switch (decision) {
-      PermissionDecision.denied =>
-      '위치 권한을 허용하지 않아 부산 지역을 계속 보여드려요.',
+      PermissionDecision.denied => '위치 권한을 허용하지 않아 부산 지역을 계속 보여드려요.',
 
       PermissionDecision.permanentlyDenied =>
-      '현재 위치를 사용하려면 기기 설정에서 위치 권한을 허용해 주세요.',
+        '현재 위치를 사용하려면 기기 설정에서 위치 권한을 허용해 주세요.',
 
-      PermissionDecision.serviceDisabled =>
-      '기기의 위치 서비스가 꺼져 있어요.',
+      PermissionDecision.serviceDisabled => '기기의 위치 서비스가 꺼져 있어요.',
 
-      PermissionDecision.timeout =>
-      '현재 위치를 확인하지 못해 부산 지역을 보여드려요.',
+      PermissionDecision.timeout => '현재 위치를 확인하지 못해 부산 지역을 보여드려요.',
 
       PermissionDecision.granted => '',
     };
@@ -798,31 +1055,36 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 }
 
+enum _StoreFilterType { all, localStore, eventCommerce, favorites }
+
 class _StoreFilter {
   const _StoreFilter({
+    required this.type,
     required this.label,
     required this.icon,
-    required this.storeType,
   });
 
+  final _StoreFilterType type;
   final String label;
   final IconData icon;
-  final String? storeType;
 }
 
 class _StoreFilterBar extends StatelessWidget {
   const _StoreFilterBar({
     required this.filters,
-    required this.selectedStoreType,
+    required this.selectedFilter,
     required this.onSelected,
   });
 
   static const _accentColor = Color(0xFFB7FF00);
+
   static const _darkColor = Color(0xFF08110E);
 
   final List<_StoreFilter> filters;
-  final String? selectedStoreType;
-  final ValueChanged<String?> onSelected;
+
+  final _StoreFilterType selectedFilter;
+
+  final ValueChanged<_StoreFilterType> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -834,21 +1096,21 @@ class _StoreFilterBar extends StatelessWidget {
         padding: const EdgeInsets.all(4),
         child: Row(
           children: filters.map((filter) {
-            final selected = filter.storeType == selectedStoreType;
+            final selected = filter.type == selectedFilter;
 
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: InkWell(
                   onTap: () {
-                    onSelected(filter.storeType);
+                    onSelected(filter.type);
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 6,
+                      horizontal: 3,
+                      vertical: 7,
                     ),
                     decoration: BoxDecoration(
                       color: selected ? _accentColor : Colors.transparent,
@@ -859,12 +1121,12 @@ class _StoreFilterBar extends StatelessWidget {
                       children: [
                         Icon(
                           filter.icon,
-                          size: 17,
+                          size: 15,
                           color: selected
                               ? _darkColor
                               : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 2),
                         Flexible(
                           child: Text(
                             filter.label,
@@ -872,7 +1134,7 @@ class _StoreFilterBar extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: selected ? _darkColor : null,
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: selected
                                   ? FontWeight.w800
                                   : FontWeight.w600,
@@ -995,6 +1257,11 @@ class _SelectedStoreCard extends StatelessWidget {
     required this.store,
     required this.favorite,
     required this.favoriteUpdating,
+    required this.walkingRoute,
+    required this.walkingRouteLoading,
+    required this.walkingRouteError,
+    required this.onWalkingRouteRetry,
+    required this.onStoreLocationPressed,
     required this.onFavoritePressed,
     required this.onDetailsPressed,
     required this.onClose,
@@ -1007,6 +1274,11 @@ class _SelectedStoreCard extends StatelessWidget {
   final CustomerStore store;
   final bool favorite;
   final bool favoriteUpdating;
+  final StoreWalkingRoute? walkingRoute;
+  final bool walkingRouteLoading;
+  final Object? walkingRouteError;
+  final VoidCallback onWalkingRouteRetry;
+  final VoidCallback onStoreLocationPressed;
   final VoidCallback onFavoritePressed;
   final VoidCallback onDetailsPressed;
   final VoidCallback onClose;
@@ -1019,16 +1291,11 @@ class _SelectedStoreCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       elevation: 8,
       clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: InkWell(
         onTap: onDetailsPressed,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 10,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
               Container(
@@ -1088,14 +1355,12 @@ class _SelectedStoreCard extends StatelessWidget {
                       store.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleMedium
-                          ?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 3),
+
                     Row(
                       children: [
                         Icon(
@@ -1115,16 +1380,74 @@ class _SelectedStoreCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (store.distanceMeters != null) ...[
-                          const SizedBox(width: 6),
+                      ],
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.directions_walk_rounded,
+                          size: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+
+                        if (walkingRouteLoading) ...[
+                          const SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 5),
                           Text(
-                            _formatDistance(store.distanceMeters!),
+                            '도보 경로 확인 중...',
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ] else if (walkingRoute != null)
+                          Text(
+                            '도보 '
+                            '${_formatDistance(walkingRoute!.distanceMeters)}'
+                            ' · 약 ${walkingRoute!.durationMinutes}분',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                             ),
+                          )
+                        else if (walkingRouteError != null)
+                          TextButton.icon(
+                            onPressed: onWalkingRouteRetry,
+                            style: TextButton.styleFrom(
+                              foregroundColor: colorScheme.error,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                            icon: const Icon(Icons.refresh_rounded, size: 14),
+                            label: const Text(
+                              '도보 정보 다시 시도',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        else
+                          Text(
+                            '현재 위치를 켜면 도보 정보를 확인할 수 있어요.',
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
                           ),
-                        ],
                       ],
                     ),
                   ],
@@ -1132,9 +1455,27 @@ class _SelectedStoreCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               IconButton(
-                tooltip: favorite ? '관심 업체 해제' : '관심 업체 추가',
+                tooltip: '선택 업체 위치로 이동',
                 onPressed:
-                    favoriteUpdating ? null : onFavoritePressed,
+                store.latitude != null &&
+                    store.longitude != null
+                    ? onStoreLocationPressed
+                    : null,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 34,
+                  height: 34,
+                ),
+                icon: const Icon(
+                  Icons.gps_fixed_rounded,
+                  size: 19,
+                  color: _greenColor,
+                ),
+              ),
+              IconButton(
+                tooltip: favorite ? '관심 업체 해제' : '관심 업체 추가',
+                onPressed: favoriteUpdating ? null : onFavoritePressed,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
@@ -1145,9 +1486,7 @@ class _SelectedStoreCard extends StatelessWidget {
                     ? const SizedBox(
                         width: 17,
                         height: 17,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : Icon(
                         favorite
@@ -1157,10 +1496,7 @@ class _SelectedStoreCard extends StatelessWidget {
                         color: favorite ? Colors.redAccent : null,
                       ),
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 22,
-              ),
+              const Icon(Icons.chevron_right_rounded, size: 22),
               IconButton(
                 tooltip: '선택 닫기',
                 onPressed: onClose,
@@ -1170,10 +1506,7 @@ class _SelectedStoreCard extends StatelessWidget {
                   width: 30,
                   height: 34,
                 ),
-                icon: const Icon(
-                  Icons.close_rounded,
-                  size: 18,
-                ),
+                icon: const Icon(Icons.close_rounded, size: 18),
               ),
             ],
           ),
@@ -1206,9 +1539,7 @@ class _InitialLocationChoice extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: 420,
-              ),
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Card(
                 margin: EdgeInsets.zero,
                 elevation: 12,
@@ -1239,10 +1570,7 @@ class _InitialLocationChoice extends StatelessWidget {
                       Text(
                         '내 주변 업체를 찾아볼까요?',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -1251,14 +1579,12 @@ class _InitialLocationChoice extends StatelessWidget {
 
                       Text(
                         '현재 위치를 사용하면 가까운 로컬마켓과 '
-                            '행사·이벤트를 먼저 보여드려요.\n\n'
-                            '위치를 사용하지 않아도 부산 지역을 '
-                            '둘러볼 수 있습니다.',
+                        '행사·이벤트를 먼저 보여드려요.\n\n'
+                        '위치를 사용하지 않아도 부산 지역을 '
+                        '둘러볼 수 있습니다.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.45,
                         ),
                       ),
@@ -1274,30 +1600,21 @@ class _InitialLocationChoice extends StatelessWidget {
                           style: FilledButton.styleFrom(
                             backgroundColor: _accentColor,
                             foregroundColor: _darkColor,
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           icon: requestingLocation
                               ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child:
-                            CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: _darkColor,
-                            ),
-                          )
-                              : const Icon(
-                            Icons.my_location_rounded,
-                          ),
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: _darkColor,
+                                  ),
+                                )
+                              : const Icon(Icons.my_location_rounded),
                           label: Text(
-                            requestingLocation
-                                ? '현재 위치 확인 중...'
-                                : '현재 위치로 보기',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                            ),
+                            requestingLocation ? '현재 위치 확인 중...' : '현재 위치로 보기',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
                       ),
@@ -1311,15 +1628,11 @@ class _InitialLocationChoice extends StatelessWidget {
                               ? null
                               : onContinueWithBusan,
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 14,
-                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           child: const Text(
                             '부산에서 둘러보기',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                       ),
@@ -1328,12 +1641,10 @@ class _InitialLocationChoice extends StatelessWidget {
 
                       Text(
                         '위치 설정은 지도 아래의 GPS 버튼에서 '
-                            '언제든 다시 변경할 수 있어요.',
+                        '언제든 다시 변경할 수 있어요.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 11,
                         ),
                       ),
@@ -1349,37 +1660,27 @@ class _InitialLocationChoice extends StatelessWidget {
   }
 }
 
-class _MapRefreshIndicator
-    extends StatelessWidget {
+class _MapRefreshIndicator extends StatelessWidget {
   const _MapRefreshIndicator();
 
-  static const _darkColor =
-  Color(0xFF08110E);
+  static const _darkColor = Color(0xFF08110E);
 
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
       child: Material(
-        color: Theme.of(context)
-            .colorScheme
-            .surface
-            .withOpacity(0.94),
-        borderRadius:
-        BorderRadius.circular(999),
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
+        borderRadius: BorderRadius.circular(999),
         elevation: 3,
         child: const Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 7,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(
                 width: 15,
                 height: 15,
-                child:
-                CircularProgressIndicator(
+                child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: _darkColor,
                 ),
