@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -24,7 +26,12 @@ class CustomerOrderChatScreen extends StatefulWidget {
 }
 
 class _CustomerOrderChatScreenState
-    extends State<CustomerOrderChatScreen> {
+    extends State<CustomerOrderChatScreen>
+    with WidgetsBindingObserver {
+  static const Duration _pollingInterval = Duration(
+    seconds: 3,
+  );
+
   final TextEditingController _messageController =
   TextEditingController();
 
@@ -35,19 +42,27 @@ class _CustomerOrderChatScreenState
 
   CustomerOrder? _order;
 
-  List<CustomerOrderMessage> _messages =
-  const [];
+  List<CustomerOrderMessage> _messages = const [];
 
   Object? _error;
 
+  Timer? _pollingTimer;
+
   bool _loading = true;
   bool _sending = false;
+  bool _refreshing = false;
+  bool _polling = false;
+
+  int _requestGeneration = 0;
 
   @override
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
+
     _loadConversation();
+    _startPolling();
   }
 
   @override
@@ -56,18 +71,43 @@ class _CustomerOrderChatScreenState
       ) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.orderPublicId !=
-        widget.orderPublicId ||
-        oldWidget.orderRepository !=
-            widget.orderRepository ||
-        oldWidget.messageRepository !=
-            widget.messageRepository) {
+    if (oldWidget.orderPublicId != widget.orderPublicId ||
+        oldWidget.orderRepository != widget.orderRepository ||
+        oldWidget.messageRepository != widget.messageRepository) {
+      _requestGeneration++;
+
       _loadConversation();
+      _restartPolling();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startPolling();
+
+      unawaited(
+        _pollConversation(),
+      );
+
+      return;
+    }
+
+    _stopPolling();
+  }
+
+  @override
   void dispose() {
+    _requestGeneration++;
+
+    _stopPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
+
     _messageController.dispose();
     _messageFocusNode.dispose();
     _scrollController.dispose();
@@ -85,10 +125,19 @@ class _CustomerOrderChatScreenState
         actions: [
           IconButton(
             tooltip: '새로고침',
-            onPressed: _loading || _sending
+            onPressed: _loading ||
+                _sending ||
+                _refreshing
                 ? null
                 : _refreshConversation,
-            icon: const Icon(
+            icon: _refreshing
+                ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
               Icons.refresh_rounded,
             ),
           ),
@@ -142,8 +191,7 @@ class _CustomerOrderChatScreenState
               controller: _scrollController,
               physics:
               const AlwaysScrollableScrollPhysics(),
-              padding:
-              const EdgeInsets.fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                 PopqSpacing.md,
                 PopqSpacing.md,
                 PopqSpacing.md,
@@ -203,8 +251,11 @@ class _CustomerOrderChatScreenState
   }
 
   Future<void> _loadConversation() async {
+    final generation = _requestGeneration;
+
     setState(() {
       _loading = true;
+      _refreshing = false;
       _error = null;
     });
 
@@ -226,7 +277,8 @@ class _CustomerOrderChatScreenState
       final order = await orderFuture;
       final messages = await messagesFuture;
 
-      if (!mounted) {
+      if (!mounted ||
+          generation != _requestGeneration) {
         return;
       }
 
@@ -239,7 +291,8 @@ class _CustomerOrderChatScreenState
 
       _scrollToLatestMessage();
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          generation != _requestGeneration) {
         return;
       }
 
@@ -251,6 +304,16 @@ class _CustomerOrderChatScreenState
   }
 
   Future<void> _refreshConversation() async {
+    if (_refreshing) {
+      return;
+    }
+
+    final generation = _requestGeneration;
+
+    setState(() {
+      _refreshing = true;
+    });
+
     try {
       final orderFuture =
       widget.orderRepository.findOne(
@@ -265,9 +328,13 @@ class _CustomerOrderChatScreenState
       final order = await orderFuture;
       final messages = await messagesFuture;
 
-      if (!mounted) {
+      if (!mounted ||
+          generation != _requestGeneration) {
         return;
       }
+
+      final hasNewMessage =
+          messages.length > _messages.length;
 
       setState(() {
         _order = order;
@@ -275,9 +342,12 @@ class _CustomerOrderChatScreenState
         _error = null;
       });
 
-      _scrollToLatestMessage();
+      if (hasNewMessage) {
+        _scrollToLatestMessage();
+      }
     } catch (_) {
-      if (!mounted) {
+      if (!mounted ||
+          generation != _requestGeneration) {
         return;
       }
 
@@ -288,6 +358,104 @@ class _CustomerOrderChatScreenState
           ),
         ),
       );
+    } finally {
+      if (mounted &&
+          generation == _requestGeneration) {
+        setState(() {
+          _refreshing = false;
+        });
+      }
+    }
+  }
+
+  void _startPolling() {
+    if (_pollingTimer?.isActive ?? false) {
+      return;
+    }
+
+    _pollingTimer = Timer.periodic(
+      _pollingInterval,
+          (_) {
+        unawaited(
+          _pollConversation(),
+        );
+      },
+    );
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
+  }
+
+  void _restartPolling() {
+    _stopPolling();
+    _startPolling();
+  }
+
+  Future<void> _pollConversation() async {
+    if (!mounted ||
+        _loading ||
+        _sending ||
+        _refreshing ||
+        _polling) {
+      return;
+    }
+
+    final generation = _requestGeneration;
+
+    _polling = true;
+
+    try {
+      /*
+       * 이 API 호출은 새 판매자 답변을 가져오면서
+       * 해당 판매자 메시지를 읽음 처리합니다.
+       *
+       * 판매자가 고객 메시지를 확인했다면
+       * 고객 메시지의 read 값도 최신 상태로 내려옵니다.
+       */
+      final messages =
+      await widget.messageRepository.findMessages(
+        widget.orderPublicId,
+      );
+
+      if (!mounted ||
+          generation != _requestGeneration) {
+        return;
+      }
+
+      if (!_haveMessagesChanged(
+        _messages,
+        messages,
+      )) {
+        return;
+      }
+
+      final hasNewMessage =
+          messages.length > _messages.length;
+
+      setState(() {
+        _messages = messages;
+        _error = null;
+      });
+
+      if (hasNewMessage) {
+        _scrollToLatestMessage();
+      }
+    } catch (error, stackTrace) {
+      /*
+       * 자동 갱신 실패 시 기존 채팅 화면은 유지하고
+       * 다음 주기에 다시 조회합니다.
+       */
+      debugPrint(
+        '고객 주문 문의 자동 갱신 실패: $error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _polling = false;
     }
   }
 
@@ -359,6 +527,48 @@ class _CustomerOrderChatScreenState
         });
       }
     }
+  }
+
+  bool _haveMessagesChanged(
+      List<CustomerOrderMessage> previous,
+      List<CustomerOrderMessage> next,
+      ) {
+    if (previous.length != next.length) {
+      return true;
+    }
+
+    for (
+    var index = 0;
+    index < next.length;
+    index++
+    ) {
+      final previousMessage =
+      previous[index];
+
+      final nextMessage =
+      next[index];
+
+      if (previousMessage.orderMessageId !=
+          nextMessage.orderMessageId ||
+          previousMessage.senderUserId !=
+              nextMessage.senderUserId ||
+          previousMessage.senderName !=
+              nextMessage.senderName ||
+          previousMessage.senderType !=
+              nextMessage.senderType ||
+          previousMessage.content !=
+              nextMessage.content ||
+          previousMessage.read !=
+              nextMessage.read ||
+          previousMessage.readAt !=
+              nextMessage.readAt ||
+          previousMessage.createdAt !=
+              nextMessage.createdAt) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   void _scrollToLatestMessage() {

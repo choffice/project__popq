@@ -7,6 +7,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/common/theme_mode_toggle.dart';
+import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
 import 'features/notifications/notification_action.dart';
 import 'routing/customer_router.dart';
@@ -16,6 +17,7 @@ class CustomerRootScreen extends StatefulWidget {
     required this.location,
     required this.child,
     required this.notificationRepository,
+    required this.orderMessageRepository,
     required this.sessionController,
     this.themeController,
     super.key,
@@ -24,6 +26,7 @@ class CustomerRootScreen extends StatefulWidget {
   final String location;
   final Widget child;
   final CustomerNotificationRepository notificationRepository;
+  final CustomerOrderMessageRepository orderMessageRepository;
   final SessionController sessionController;
   final PopqThemeController? themeController;
 
@@ -33,7 +36,8 @@ class CustomerRootScreen extends StatefulWidget {
 }
 
 class _CustomerRootScreenState
-    extends State<CustomerRootScreen> {
+    extends State<CustomerRootScreen>
+    with WidgetsBindingObserver {
   // 실제 라우트 순서
   //
   // 0 홈
@@ -75,30 +79,108 @@ class _CustomerRootScreenState
   static const Duration _exitConfirmDuration =
   Duration(seconds: 2);
 
+  static const Duration _unreadPollingInterval =
+  Duration(seconds: 3);
+
   DateTime? _lastBackPressedAt;
+
+  Timer? _unreadPollingTimer;
+
+  var _unreadMessageCount = 0;
+  var _unreadRequestInProgress = false;
+  var _requestGeneration = 0;
 
   @override
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
+
+    widget.sessionController.addListener(
+      _handleSessionChanged,
+    );
+
     unawaited(
       SystemNavigator.setFrameworkHandlesBack(true),
     );
+
+    _startUnreadPolling();
+    _scheduleUnreadRefresh();
   }
 
   @override
   void didUpdateWidget(
-      CustomerRootScreen oldWidget,
+      covariant CustomerRootScreen oldWidget,
       ) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.location != widget.location) {
       _lastBackPressedAt = null;
+
+      /*
+       * 주문 채팅에서 하단 화면으로 돌아왔을 때
+       * 읽음 처리 결과를 즉시 반영합니다.
+       */
+      _scheduleUnreadRefresh();
+    }
+
+    if (oldWidget.sessionController !=
+        widget.sessionController) {
+      oldWidget.sessionController.removeListener(
+        _handleSessionChanged,
+      );
+
+      widget.sessionController.addListener(
+        _handleSessionChanged,
+      );
+
+      _requestGeneration++;
+      _resetUnreadMessageCount();
+      _scheduleUnreadRefresh();
+    }
+
+    if (oldWidget.orderMessageRepository !=
+        widget.orderMessageRepository) {
+      _requestGeneration++;
+      _scheduleUnreadRefresh();
     }
   }
 
   @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    if (state == AppLifecycleState.resumed) {
+      _startUnreadPolling();
+
+      unawaited(
+        _refreshUnreadMessageCount(),
+      );
+
+      return;
+    }
+
+    /*
+     * 앱이 백그라운드에 있을 때는
+     * 불필요한 REST 요청을 중지합니다.
+     */
+    _stopUnreadPolling();
+  }
+
+  @override
   void dispose() {
+    _requestGeneration++;
+
+    _stopUnreadPolling();
+
+    WidgetsBinding.instance.removeObserver(this);
+
+    widget.sessionController.removeListener(
+      _handleSessionChanged,
+    );
+
     unawaited(
       SystemNavigator.setFrameworkHandlesBack(false),
     );
@@ -117,7 +199,8 @@ class _CustomerRootScreenState
     );
 
     return BackButtonListener(
-      onBackButtonPressed: _handleRootBackButtonPressed,
+      onBackButtonPressed:
+      _handleRootBackButtonPressed,
       child: PopScope<Object?>(
         canPop: false,
         onPopInvokedWithResult: (
@@ -153,6 +236,10 @@ class _CustomerRootScreenState
             final nextLocation =
             _locations[nextRouteIndex];
 
+            unawaited(
+              _refreshUnreadMessageCount(),
+            );
+
             if (nextLocation == widget.location) {
               return;
             }
@@ -161,8 +248,8 @@ class _CustomerRootScreenState
 
             context.go(nextLocation);
           },
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(
                 Icons.home_outlined,
               ),
@@ -171,7 +258,7 @@ class _CustomerRootScreenState
               ),
               label: '홈',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.search_rounded,
               ),
@@ -180,7 +267,7 @@ class _CustomerRootScreenState
               ),
               label: '탐색',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.qr_code_scanner_rounded,
               ),
@@ -189,7 +276,7 @@ class _CustomerRootScreenState
               ),
               label: 'QR',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.favorite_border_rounded,
               ),
@@ -199,11 +286,16 @@ class _CustomerRootScreenState
               label: '찜',
             ),
             NavigationDestination(
-              icon: Icon(
+              icon: _MyNavigationIcon(
+                icon:
                 Icons.person_outline_rounded,
+                unreadCount:
+                _unreadMessageCount,
               ),
-              selectedIcon: Icon(
-                Icons.person_rounded,
+              selectedIcon: _MyNavigationIcon(
+                icon: Icons.person_rounded,
+                unreadCount:
+                _unreadMessageCount,
               ),
               label: '마이',
             ),
@@ -237,11 +329,14 @@ class _CustomerRootScreenState
     }
 
     final now = DateTime.now();
-    final previousPressedAt = _lastBackPressedAt;
+    final previousPressedAt =
+        _lastBackPressedAt;
 
     final shouldExit =
         previousPressedAt != null &&
-            now.difference(previousPressedAt) <=
+            now.difference(
+              previousPressedAt,
+            ) <=
                 _exitConfirmDuration;
 
     // 홈에서 2초 안에 두 번째로 누른 경우에만 종료합니다.
@@ -258,7 +353,8 @@ class _CustomerRootScreenState
     // 홈에서 첫 번째 뒤로가기입니다.
     _lastBackPressedAt = now;
 
-    final messenger = ScaffoldMessenger.of(context);
+    final messenger =
+    ScaffoldMessenger.of(context);
 
     messenger
       ..hideCurrentSnackBar()
@@ -267,18 +363,217 @@ class _CustomerRootScreenState
           content: Text(
             '한 번 더 누르면 앱이 종료됩니다.',
           ),
-          duration: _exitConfirmDuration,
+          duration:
+          _exitConfirmDuration,
         ),
       );
+  }
+
+  void _handleSessionChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    _requestGeneration++;
+
+    if (!widget.sessionController.isSignedIn) {
+      _resetUnreadMessageCount();
+      return;
+    }
+
+    unawaited(
+      _refreshUnreadMessageCount(),
+    );
+  }
+
+  void _scheduleUnreadRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback(
+          (_) {
+        if (!mounted) {
+          return;
+        }
+
+        unawaited(
+          _refreshUnreadMessageCount(),
+        );
+      },
+    );
+  }
+
+  void _startUnreadPolling() {
+    if (_unreadPollingTimer?.isActive ??
+        false) {
+      return;
+    }
+
+    _unreadPollingTimer = Timer.periodic(
+      _unreadPollingInterval,
+          (_) {
+        unawaited(
+          _refreshUnreadMessageCount(),
+        );
+      },
+    );
+  }
+
+  void _stopUnreadPolling() {
+    _unreadPollingTimer?.cancel();
+    _unreadPollingTimer = null;
+  }
+
+  Future<void>
+  _refreshUnreadMessageCount() async {
+    if (!mounted ||
+        _unreadRequestInProgress) {
+      return;
+    }
+
+    if (!widget.sessionController.isSignedIn) {
+      _resetUnreadMessageCount();
+      return;
+    }
+
+    final generation = _requestGeneration;
+
+    _unreadRequestInProgress = true;
+
+    try {
+      final unreadCounts =
+      await widget.orderMessageRepository
+          .findUnreadMessageCounts();
+
+      final totalUnreadCount =
+      unreadCounts.fold<int>(
+        0,
+            (
+            total,
+            item,
+            ) {
+          return total + item.unreadCount;
+        },
+      );
+
+      if (!mounted ||
+          generation != _requestGeneration) {
+        return;
+      }
+
+      if (_unreadMessageCount ==
+          totalUnreadCount) {
+        return;
+      }
+
+      setState(() {
+        _unreadMessageCount =
+            totalUnreadCount;
+      });
+    } catch (error, stackTrace) {
+      /*
+       * 자동 조회가 잠시 실패해도
+       * 기존 배지는 유지하고 다음 주기에 재시도합니다.
+       */
+      debugPrint(
+        '읽지 않은 판매자 답변 수를 '
+            '불러오지 못했습니다: $error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _unreadRequestInProgress = false;
+    }
+  }
+
+  void _resetUnreadMessageCount() {
+    if (!mounted ||
+        _unreadMessageCount == 0) {
+      return;
+    }
+
+    setState(() {
+      _unreadMessageCount = 0;
+    });
   }
 
   int _routeIndexForLocation(
       String value,
       ) {
     final index = _locations.indexWhere(
-          (candidate) => value.startsWith(candidate),
+          (candidate) =>
+          value.startsWith(candidate),
     );
 
     return index < 0 ? 0 : index;
+  }
+}
+
+class _MyNavigationIcon
+    extends StatelessWidget {
+  const _MyNavigationIcon({
+    required this.icon,
+    required this.unreadCount,
+  });
+
+  final IconData icon;
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (unreadCount <= 0) {
+      return Icon(icon);
+    }
+
+    final colorScheme =
+        Theme.of(context).colorScheme;
+
+    final badgeText = unreadCount > 99
+        ? '99+'
+        : unreadCount.toString();
+
+    return SizedBox(
+      width: 38,
+      height: 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Icon(icon),
+          Positioned(
+            top: -5,
+            right: -3,
+            child: Container(
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              padding:
+              const EdgeInsets.symmetric(
+                horizontal: 5,
+              ),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colorScheme.error,
+                borderRadius:
+                BorderRadius.circular(999),
+                border: Border.all(
+                  color: colorScheme.surface,
+                  width: 1.5,
+                ),
+              ),
+              child: Text(
+                badgeText,
+                style: TextStyle(
+                  color: colorScheme.onError,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
