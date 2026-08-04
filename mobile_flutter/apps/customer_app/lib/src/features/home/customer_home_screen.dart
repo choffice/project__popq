@@ -8,6 +8,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
+import '../permissions/customer_permission_gateway.dart';
 import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
 
@@ -17,12 +18,14 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.storeDiscoveryRepository,
     required this.orderRepository,
     required this.sessionController,
+    required this.permissionGateway,
     super.key,
   });
 
   final StoreDiscoveryRepository storeDiscoveryRepository;
   final CustomerOrderRepository orderRepository;
   final SessionController sessionController;
+  final CustomerPermissionGateway permissionGateway;
 
   @override
   State<CustomerHomeScreen> createState() =>
@@ -32,6 +35,11 @@ class CustomerHomeScreen extends StatefulWidget {
 class _CustomerHomeScreenState
     extends State<CustomerHomeScreen> {
   late CustomerHomeController _controller;
+
+  /// 현재 선택된 카테고리 필터입니다.
+  ///
+  /// 백엔드 카테고리 필터 API가 아직 없어 화면 표시 용도로만 사용합니다.
+  int _selectedCategoryIndex = 0;
 
   @override
   void initState() {
@@ -57,6 +65,10 @@ class _CustomerHomeScreenState
             !identical(
               oldWidget.sessionController,
               widget.sessionController,
+            ) ||
+            !identical(
+              oldWidget.permissionGateway,
+              widget.permissionGateway,
             );
 
     if (!dependenciesChanged) {
@@ -72,6 +84,7 @@ class _CustomerHomeScreenState
       widget.storeDiscoveryRepository,
       widget.orderRepository,
       widget.sessionController,
+      widget.permissionGateway,
     );
 
     unawaited(_controller.load());
@@ -129,9 +142,191 @@ class _CustomerHomeScreenState
                 },
               ),
 
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+
+              _HomeSearchBar(
+                onTap: () {
+                  context.go(
+                    CustomerRoutes.discover,
+                  );
+                },
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.lg,
+              ),
+
+              const _SectionHeader(
+                eyebrow: 'FEATURED',
+                title: '이번 주 추천 이벤트',
+                description:
+                '지금 놓치면 아쉬운 이벤트를 모았어요.',
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+
+              _FeatureEventCarousel(
+                banners: snapshot.featureBanners,
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.xl,
+              ),
+
+              _SectionHeader(
+                eyebrow: 'RANKING',
+                title: '인기 랭킹 TOP 5',
+                description:
+                '${snapshot.regionLabel}에서 지금 가장 인기 있는 곳을 모았어요.',
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.sm,
+              ),
+
+              _CategoryTabsRow(
+                selectedIndex:
+                _selectedCategoryIndex,
+                onSelected: (index) {
+                  setState(() {
+                    _selectedCategoryIndex =
+                        index;
+                  });
+                },
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+
+              SizedBox(
+                height: 216,
+                child: snapshot.recommendedStores.isNotEmpty
+                    ? ListView.separated(
+                  scrollDirection:
+                  Axis.horizontal,
+                  itemCount:
+                  snapshot.recommendedStores.length,
+                  separatorBuilder:
+                      (context, index) {
+                    return const SizedBox(
+                      width: PopqSpacing.sm,
+                    );
+                  },
+                  itemBuilder:
+                      (context, index) {
+                    final store =
+                    snapshot
+                        .recommendedStores[index];
+
+                    return _RankingStoreCard(
+                      rank: index + 1,
+                      store: store,
+                      onTap: () {
+                        context.push(
+                          '${CustomerRoutes.stores}/'
+                              '${store.storeId}',
+                        );
+                      },
+                    );
+                  },
+                )
+                    : ListView.separated(
+                  scrollDirection:
+                  Axis.horizontal,
+                  itemCount: snapshot
+                      .temporaryRecommendations.length,
+                  separatorBuilder:
+                      (context, index) {
+                    return const SizedBox(
+                      width: PopqSpacing.sm,
+                    );
+                  },
+                  itemBuilder:
+                      (context, index) {
+                    return _RankingTemporaryCard(
+                      rank: index + 1,
+                      item: snapshot
+                          .temporaryRecommendations[index],
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.xl,
+              ),
+
+              _SectionHeader(
+                eyebrow: 'EVENT',
+                title: '진행 중인 이벤트',
+                description:
+                '${snapshot.regionLabel}에서 지금만 만날 수 있는 공간을 확인해 보세요.',
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+
+              SizedBox(
+                height: 216,
+                child: snapshot.eventStores.isNotEmpty
+                    ? ListView.separated(
+                  scrollDirection:
+                  Axis.horizontal,
+                  itemCount:
+                  snapshot.eventStores.length,
+                  separatorBuilder:
+                      (context, index) {
+                    return const SizedBox(
+                      width: PopqSpacing.sm,
+                    );
+                  },
+                  itemBuilder:
+                      (context, index) {
+                    final store =
+                    snapshot
+                        .eventStores[index];
+
+                    return _OngoingEventStoreCard(
+                      store: store,
+                      onTap: () {
+                        context.push(
+                          '${CustomerRoutes.stores}/'
+                              '${store.storeId}',
+                        );
+                      },
+                    );
+                  },
+                )
+                    : ListView.separated(
+                  scrollDirection:
+                  Axis.horizontal,
+                  itemCount: snapshot
+                      .temporaryPopups.length,
+                  separatorBuilder:
+                      (context, index) {
+                    return const SizedBox(
+                      width: PopqSpacing.sm,
+                    );
+                  },
+                  itemBuilder:
+                      (context, index) {
+                    return _OngoingEventTemporaryCard(
+                      item: snapshot
+                          .temporaryPopups[index],
+                    );
+                  },
+                ),
+              ),
+
               if (snapshot.activeOrder != null) ...[
                 const SizedBox(
-                  height: PopqSpacing.md,
+                  height: PopqSpacing.xl,
                 ),
                 _ActiveOrderCard(
                   order: snapshot.activeOrder!,
@@ -156,7 +351,7 @@ class _CustomerHomeScreenState
               ],
 
               const SizedBox(
-                height: PopqSpacing.lg,
+                height: PopqSpacing.xl,
               ),
 
               const _SectionHeader(
@@ -183,126 +378,6 @@ class _CustomerHomeScreenState
               else
                 _FeaturedStoreEmptyCard(
                   onRetry: _controller.refresh,
-                ),
-
-              const SizedBox(
-                height: PopqSpacing.xl,
-              ),
-
-              const _SectionHeader(
-                eyebrow: 'LIMITED',
-                title: '기간 한정 팝업·부스',
-                description:
-                '지금만 만날 수 있는 공간을 확인해 보세요.',
-              ),
-
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
-
-              SizedBox(
-                height: 224,
-                child: snapshot.eventStores.isNotEmpty
-                    ? ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount:
-                  snapshot.eventStores.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    final store =
-                    snapshot
-                        .eventStores[index];
-
-                    return _EventStoreCard(
-                      store: store,
-                      onTap: () {
-                        context.push(
-                          '${CustomerRoutes.stores}/'
-                              '${store.storeId}',
-                        );
-                      },
-                    );
-                  },
-                )
-                    : ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount: snapshot
-                      .temporaryPopups.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    return _TemporaryPopupCard(
-                      item: snapshot
-                          .temporaryPopups[index],
-                    );
-                  },
-                ),
-              ),
-
-              const SizedBox(
-                height: PopqSpacing.xl,
-              ),
-
-              const _SectionHeader(
-                eyebrow: 'RECOMMENDED',
-                title: '추천 매장',
-                description:
-                '가볍게 둘러보기 좋은 매장을 모았어요.',
-              ),
-
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
-
-              if (snapshot.recommendedStores.isNotEmpty)
-                ...snapshot.recommendedStores.map(
-                      (store) {
-                    return Padding(
-                      padding:
-                      const EdgeInsets.only(
-                        bottom: PopqSpacing.sm,
-                      ),
-                      child: _RecommendedStoreCard(
-                        store: store,
-                        onTap: () {
-                          context.push(
-                            '${CustomerRoutes.stores}/'
-                                '${store.storeId}',
-                          );
-                        },
-                      ),
-                    );
-                  },
-                )
-              else
-                ...snapshot
-                    .temporaryRecommendations
-                    .map(
-                      (item) {
-                    return Padding(
-                      padding:
-                      const EdgeInsets.only(
-                        bottom: PopqSpacing.sm,
-                      ),
-                      child:
-                      _TemporaryRecommendedCard(
-                        item: item,
-                      ),
-                    );
-                  },
                 ),
 
               const SizedBox(
@@ -1048,14 +1123,11 @@ class _FeaturedStoreEmptyCard
   }
 }
 
-class _EventStoreCard
-    extends StatelessWidget {
-  const _EventStoreCard({
-    required this.store,
+class _HomeSearchBar extends StatelessWidget {
+  const _HomeSearchBar({
     required this.onTap,
   });
 
-  final CustomerStore store;
   final VoidCallback onTap;
 
   @override
@@ -1064,100 +1136,54 @@ class _EventStoreCard
     final isDark =
         theme.brightness == Brightness.dark;
 
-    return SizedBox(
-      width: 206,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
+    final mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return Material(
+      color: isDark
+          ? PopqPalette.nightCard
+          : PopqPalette.lightCard,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(
+            horizontal: PopqSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            borderRadius:
+            BorderRadius.circular(18),
+            border: Border.all(
+              color: isDark
+                  ? PopqPalette.nightBorder
+                  : PopqPalette.lightBorder,
+            ),
+          ),
+          child: Row(
             children: [
-              Container(
-                height: 106,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: isDark
-                        ? const [
-                      PopqPalette.purple,
-                      PopqPalette
-                          .nightElevated,
-                    ]
-                        : const [
-                      PopqPalette.coral,
-                      Color(
-                        0xFFFFB26B,
-                      ),
-                    ],
-                  ),
-                ),
-                child: const Icon(
-                  Icons.local_activity_rounded,
-                  size: 52,
-                  color: Colors.white,
-                ),
+              Icon(
+                Icons.search_rounded,
+                color: mutedColor,
+              ),
+              const SizedBox(
+                width: PopqSpacing.sm,
               ),
               Expanded(
-                child: Padding(
-                  padding:
-                  const EdgeInsets.all(
-                    PopqSpacing.md,
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '기간 한정',
-                        style: theme
-                            .textTheme
-                            .labelMedium
-                            ?.copyWith(
-                          color: isDark
-                              ? PopqPalette.lime
-                              : PopqPalette
-                              .coral,
-                          fontWeight:
-                          FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(
-                        height:
-                        PopqSpacing.xs,
-                      ),
-                      Text(
-                        store.name,
-                        maxLines: 1,
-                        overflow:
-                        TextOverflow
-                            .ellipsis,
-                        style: theme
-                            .textTheme
-                            .titleMedium
-                            ?.copyWith(
-                          fontWeight:
-                          FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(
-                        height:
-                        PopqSpacing.xs,
-                      ),
-                      Text(
-                        store.address ??
-                            '매장 상세에서 위치 확인',
-                        maxLines: 1,
-                        overflow:
-                        TextOverflow
-                            .ellipsis,
-                        style: theme
-                            .textTheme.bodySmall,
-                      ),
-                    ],
+                child: Text(
+                  '식당, 행사, 팝업을 검색해 보세요',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(
+                    color: mutedColor,
                   ),
                 ),
+              ),
+              Icon(
+                Icons.tune_rounded,
+                size: 20,
+                color: mutedColor,
               ),
             ],
           ),
@@ -1167,13 +1193,23 @@ class _EventStoreCard
   }
 }
 
-class _TemporaryPopupCard
-    extends StatelessWidget {
-  const _TemporaryPopupCard({
-    required this.item,
+const _homeCategoryLabels = <String>[
+  '전체',
+  '식당',
+  '팝업스토어',
+  '플리마켓',
+  '푸드트럭',
+  '카페',
+];
+
+class _CategoryTabsRow extends StatelessWidget {
+  const _CategoryTabsRow({
+    required this.selectedIndex,
+    required this.onSelected,
   });
 
-  final CustomerHomePopupItem item;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -1181,86 +1217,96 @@ class _TemporaryPopupCard
     final isDark =
         theme.brightness == Brightness.dark;
 
-    return SizedBox(
-      width: 206,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 106,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors:
-                  _temporaryVisualColors(
-                    item.visualKind,
-                    isDark,
-                  ),
+    final accent = isDark
+        ? PopqPalette.lime
+        : PopqPalette.forest;
+
+    final muted = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          for (var index = 0;
+          index < _homeCategoryLabels.length;
+          index++) ...[
+            if (index > 0)
+              Container(
+                width: 1,
+                height: 14,
+                margin:
+                const EdgeInsets.symmetric(
+                  horizontal: PopqSpacing.sm,
+                ),
+                color: muted.withValues(
+                  alpha: 0.4,
                 ),
               ),
-              child: Icon(
-                _temporaryVisualIcon(
-                  item.visualKind,
-                ),
-                size: 52,
-                color: Colors.white,
+            _CategoryTabButton(
+              label: _homeCategoryLabels[index],
+              selected: index == selectedIndex,
+              accent: accent,
+              muted: muted,
+              onTap: () => onSelected(index),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryTabButton extends StatelessWidget {
+  const _CategoryTabButton({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.muted,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final Color accent;
+  final Color muted;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          vertical: PopqSpacing.xs,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(
+                color: selected ? accent : muted,
+                fontWeight: selected
+                    ? FontWeight.w900
+                    : FontWeight.w600,
               ),
             ),
-            Expanded(
-              child: Padding(
-                padding:
-                const EdgeInsets.all(
-                  PopqSpacing.md,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.badgeLabel,
-                      style: theme
-                          .textTheme.labelMedium
-                          ?.copyWith(
-                        color: isDark
-                            ? PopqPalette.lime
-                            : PopqPalette.coral,
-                        fontWeight:
-                        FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: PopqSpacing.xs,
-                    ),
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                        FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(
-                      height: PopqSpacing.xs,
-                    ),
-                    Text(
-                      '${item.locationLabel} · '
-                          '${item.periodLabel}',
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.bodySmall,
-                    ),
-                  ],
-                ),
+            const SizedBox(
+              height: PopqSpacing.xs,
+            ),
+            AnimatedContainer(
+              duration: const Duration(
+                milliseconds: 150,
               ),
+              height: 2,
+              width: selected ? 20 : 0,
+              color: accent,
             ),
           ],
         ),
@@ -1269,9 +1315,535 @@ class _TemporaryPopupCard
   }
 }
 
-class _RecommendedStoreCard
+class _FeatureEventCarousel
+    extends StatefulWidget {
+  const _FeatureEventCarousel({
+    required this.banners,
+  });
+
+  final List<CustomerHomeFeatureBanner> banners;
+
+  @override
+  State<_FeatureEventCarousel>
+  createState() =>
+      _FeatureEventCarouselState();
+}
+
+class _FeatureEventCarouselState
+    extends State<_FeatureEventCarousel> {
+  final _pageController = PageController();
+
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.banners.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 240,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: widget.banners.length,
+            onPageChanged: (index) {
+              setState(() {
+                _page = index;
+              });
+            },
+            itemBuilder: (context, index) {
+              return _FeatureBannerSlide(
+                banner: widget.banners[index],
+              );
+            },
+          ),
+        ),
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+        Row(
+          mainAxisAlignment:
+          MainAxisAlignment.center,
+          children: [
+            for (var index = 0;
+            index < widget.banners.length;
+            index++)
+              AnimatedContainer(
+                duration: const Duration(
+                  milliseconds: 200,
+                ),
+                margin:
+                const EdgeInsets.symmetric(
+                  horizontal: 3,
+                ),
+                width:
+                index == _page ? 20 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: index == _page
+                      ? (isDark
+                      ? PopqPalette.lime
+                      : PopqPalette.forest)
+                      : (isDark
+                      ? PopqPalette
+                      .nightBorder
+                      : PopqPalette
+                      .lightBorder),
+                  borderRadius:
+                  BorderRadius.circular(
+                    999,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureBannerSlide
     extends StatelessWidget {
-  const _RecommendedStoreCard({
+  const _FeatureBannerSlide({
+    required this.banner,
+  });
+
+  final CustomerHomeFeatureBanner banner;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(
+        PopqSpacing.lg,
+      ),
+      decoration: BoxDecoration(
+        borderRadius:
+        BorderRadius.circular(28),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _temporaryVisualColors(
+            banner.visualKind,
+            isDark,
+          ),
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -18,
+            bottom: -22,
+            child: Icon(
+              _temporaryVisualIcon(
+                banner.visualKind,
+              ),
+              size: 140,
+              color: Colors.white.withValues(
+                alpha: 0.12,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            mainAxisAlignment:
+            MainAxisAlignment.end,
+            children: [
+              Text(
+                banner.title,
+                style: theme
+                    .textTheme.headlineSmall
+                    ?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(
+                height: PopqSpacing.xs,
+              ),
+              Text(
+                banner.description,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(
+                  color: Colors.white
+                      .withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.event_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(
+                    width: PopqSpacing.xs,
+                  ),
+                  Text(
+                    banner.periodLabel,
+                    style: theme
+                        .textTheme.bodySmall
+                        ?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(
+                    width: PopqSpacing.sm,
+                  ),
+                  const Icon(
+                    Icons.place_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(
+                    width: PopqSpacing.xs,
+                  ),
+                  Expanded(
+                    child: Text(
+                      banner.locationLabel,
+                      maxLines: 1,
+                      overflow:
+                      TextOverflow.ellipsis,
+                      style: theme
+                          .textTheme.bodySmall
+                          ?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RankBadge extends StatelessWidget {
+  const _RankBadge({
+    required this.rank,
+  });
+
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final isTop = rank == 1;
+
+    return Container(
+      width: 22,
+      height: 22,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: isTop
+            ? PopqPalette.coral
+            : PopqPalette.ink.withValues(
+          alpha: 0.72,
+        ),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        '$rank',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingStoreCard
+    extends StatelessWidget {
+  const _RankingStoreCard({
+    required this.rank,
+    required this.store,
+    required this.onTap,
+  });
+
+  final int rank;
+  final CustomerStore store;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
+
+    return SizedBox(
+      width: 200,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(
+              PopqSpacing.sm,
+            ),
+            child: Column(
+              crossAxisAlignment:
+              CrossAxisAlignment.start,
+              children: [
+                Stack(
+                  children: [
+                    Container(
+                      height: 110,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? PopqPalette.purple
+                            .withValues(
+                          alpha: 0.2,
+                        )
+                            : PopqPalette.lime
+                            .withValues(
+                          alpha: 0.45,
+                        ),
+                        borderRadius:
+                        BorderRadius.circular(
+                          16,
+                        ),
+                      ),
+                      child: Icon(
+                        _storeIcon(store),
+                        color: isDark
+                            ? PopqPalette.lime
+                            : PopqPalette
+                            .forest,
+                        size: 30,
+                      ),
+                    ),
+                    Positioned(
+                      left: 6,
+                      top: 6,
+                      child: _RankBadge(
+                        rank: rank,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(
+                  height: PopqSpacing.xs,
+                ),
+                Text(
+                  store.name,
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style: theme
+                      .textTheme.titleMedium
+                      ?.copyWith(
+                    fontWeight:
+                    FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  _storeCategoryLabel(store),
+                  maxLines: 1,
+                  overflow:
+                  TextOverflow.ellipsis,
+                  style:
+                  theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RankingTemporaryCard
+    extends StatelessWidget {
+  const _RankingTemporaryCard({
+    required this.rank,
+    required this.item,
+  });
+
+  final int rank;
+  final CustomerHomeRecommendedItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
+
+    return SizedBox(
+      width: 200,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.all(
+            PopqSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    height: 110,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors:
+                        _temporaryVisualColors(
+                          item.visualKind,
+                          isDark,
+                        ),
+                      ),
+                      borderRadius:
+                      BorderRadius.circular(
+                        16,
+                      ),
+                    ),
+                    child: Icon(
+                      _temporaryVisualIcon(
+                        item.visualKind,
+                      ),
+                      color: Colors.white,
+                      size: 30,
+                    ),
+                  ),
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: _RankBadge(
+                      rank: rank,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(
+                height: PopqSpacing.xs,
+              ),
+              Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme
+                    .textTheme.titleMedium
+                    ?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                item.categoryLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style:
+                theme.textTheme.bodySmall,
+              ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.star_rounded,
+                    size: 14,
+                    color: PopqPalette.coral,
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    item.rating
+                        .toStringAsFixed(1),
+                    style: theme
+                        .textTheme.bodySmall
+                        ?.copyWith(
+                      fontWeight:
+                      FontWeight.w800,
+                    ),
+                  ),
+                  if (item.visitLabel !=
+                      null) ...[
+                    const SizedBox(
+                      width: PopqSpacing.xs,
+                    ),
+                    Expanded(
+                      child: Text(
+                        item.visitLabel!,
+                        maxLines: 1,
+                        overflow:
+                        TextOverflow.ellipsis,
+                        style: theme
+                            .textTheme
+                            .bodySmall,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DDayBadge extends StatelessWidget {
+  const _DDayBadge({
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: PopqPalette.ink.withValues(
+          alpha: 0.72,
+        ),
+        borderRadius:
+        BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _OngoingEventStoreCard
+    extends StatelessWidget {
+  const _OngoingEventStoreCard({
     required this.store,
     required this.onTap,
   });
@@ -1285,44 +1857,59 @@ class _RecommendedStoreCard
     final isDark =
         theme.brightness == Brightness.dark;
 
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(
-            PopqSpacing.md,
-          ),
-          child: Row(
+    final mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return SizedBox(
+      width: 200,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment:
+            CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? PopqPalette.purple
-                      .withValues(
-                    alpha: 0.2,
-                  )
-                      : PopqPalette.lime
-                      .withValues(
-                    alpha: 0.45,
+              Stack(
+                children: [
+                  Container(
+                    height: 110,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [
+                          PopqPalette.purple,
+                          PopqPalette
+                              .nightElevated,
+                        ]
+                            : const [
+                          PopqPalette.coral,
+                          Color(0xFFFFB26B),
+                        ],
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons
+                          .local_activity_rounded,
+                      size: 52,
+                      color: Colors.white,
+                    ),
                   ),
-                  borderRadius:
-                  BorderRadius.circular(20),
-                ),
-                child: Icon(
-                  _storeIcon(store),
-                  color: isDark
-                      ? PopqPalette.lime
-                      : PopqPalette.forest,
-                  size: 34,
-                ),
+                  const Positioned(
+                    left: PopqSpacing.sm,
+                    top: PopqSpacing.sm,
+                    child: _DDayBadge(
+                      label: '진행중',
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(
-                width: PopqSpacing.md,
-              ),
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.all(
+                  PopqSpacing.md,
+                ),
                 child: Column(
                   crossAxisAlignment:
                   CrossAxisAlignment.start,
@@ -1342,33 +1929,34 @@ class _RecommendedStoreCard
                     const SizedBox(
                       height: PopqSpacing.xs,
                     ),
-                    Text(
-                      _storeCategoryLabel(
-                        store,
-                      ),
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.bodySmall,
-                    ),
-                    const SizedBox(
-                      height: PopqSpacing.xs,
-                    ),
-                    Text(
-                      store.address ??
-                          '상세 화면에서 위치 확인',
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.bodySmall,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.place_rounded,
+                          size: 16,
+                          color: mutedColor,
+                        ),
+                        const SizedBox(
+                          width:
+                          PopqSpacing.xs,
+                        ),
+                        Expanded(
+                          child: Text(
+                            store.address ??
+                                '매장 상세에서 위치 확인',
+                            maxLines: 1,
+                            overflow:
+                            TextOverflow
+                                .ellipsis,
+                            style: theme
+                                .textTheme
+                                .bodySmall,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
               ),
             ],
           ),
@@ -1378,13 +1966,13 @@ class _RecommendedStoreCard
   }
 }
 
-class _TemporaryRecommendedCard
+class _OngoingEventTemporaryCard
     extends StatelessWidget {
-  const _TemporaryRecommendedCard({
+  const _OngoingEventTemporaryCard({
     required this.item,
   });
 
-  final CustomerHomeRecommendedItem item;
+  final CustomerHomePopupItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -1392,49 +1980,63 @@ class _TemporaryRecommendedCard
     final isDark =
         theme.brightness == Brightness.dark;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
-        child: Row(
+    final mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return SizedBox(
+      width: 200,
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment:
+          CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 76,
-              height: 76,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? PopqPalette.purple
-                    .withValues(
-                  alpha: 0.2,
-                )
-                    : PopqPalette.coral
-                    .withValues(
-                  alpha: 0.16,
+            Stack(
+              children: [
+                Container(
+                  height: 110,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors:
+                      _temporaryVisualColors(
+                        item.visualKind,
+                        isDark,
+                      ),
+                    ),
+                  ),
+                  child: Icon(
+                    _temporaryVisualIcon(
+                      item.visualKind,
+                    ),
+                    size: 52,
+                    color: Colors.white,
+                  ),
                 ),
-                borderRadius:
-                BorderRadius.circular(20),
-              ),
-              child: Icon(
-                _temporaryVisualIcon(
-                  item.visualKind,
+                Positioned(
+                  left: PopqSpacing.sm,
+                  top: PopqSpacing.sm,
+                  child: _DDayBadge(
+                    label: item.dDayLabel ??
+                        item.badgeLabel,
+                  ),
                 ),
-                color: isDark
-                    ? PopqPalette.lime
-                    : PopqPalette.forest,
-                size: 34,
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(
+                PopqSpacing.md,
               ),
-            ),
-            const SizedBox(
-              width: PopqSpacing.md,
-            ),
-            Expanded(
               child: Column(
                 crossAxisAlignment:
                 CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.name,
+                    item.title,
+                    maxLines: 1,
+                    overflow:
+                    TextOverflow.ellipsis,
                     style: theme
                         .textTheme.titleMedium
                         ?.copyWith(
@@ -1445,48 +2047,40 @@ class _TemporaryRecommendedCard
                   const SizedBox(
                     height: PopqSpacing.xs,
                   ),
-                  Text(
-                    item.categoryLabel,
-                    style: theme
-                        .textTheme.bodySmall,
-                  ),
-                  const SizedBox(
-                    height: PopqSpacing.xs,
-                  ),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.star_rounded,
-                        size: 17,
-                        color:
-                        PopqPalette.coral,
+                      Icon(
+                        Icons.event_rounded,
+                        size: 16,
+                        color: mutedColor,
                       ),
                       const SizedBox(
-                        width:
-                        PopqSpacing.xs,
+                        width: PopqSpacing.xs,
                       ),
                       Text(
-                        item.rating
-                            .toStringAsFixed(1),
+                        item.periodLabel,
                         style: theme
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(
-                          fontWeight:
-                          FontWeight.w800,
-                        ),
+                            .textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.place_rounded,
+                        size: 16,
+                        color: mutedColor,
                       ),
                       const SizedBox(
-                        width:
-                        PopqSpacing.sm,
+                        width: PopqSpacing.xs,
                       ),
                       Expanded(
                         child: Text(
-                          '홈 전용 임시 콘텐츠',
+                          item.locationLabel,
                           maxLines: 1,
                           overflow:
-                          TextOverflow
-                              .ellipsis,
+                          TextOverflow.ellipsis,
                           style: theme
                               .textTheme
                               .bodySmall,
@@ -1881,6 +2475,11 @@ IconData _temporaryVisualIcon(
     CustomerHomeVisualKind
         .membership =>
     Icons.loyalty_rounded,
+    CustomerHomeVisualKind
+        .popupMarket =>
+    Icons.storefront_rounded,
+    CustomerHomeVisualKind.cafe =>
+    Icons.local_cafe_rounded,
   };
 }
 
@@ -1917,6 +2516,17 @@ List<Color> _temporaryVisualColors(
         PopqPalette.purple,
         PopqPalette.nightElevated,
       ],
+      CustomerHomeVisualKind
+          .popupMarket =>
+      const [
+        PopqPalette.purple,
+        Color(0xFF3A2159),
+      ],
+      CustomerHomeVisualKind.cafe =>
+      const [
+        Color(0xFF5F3B2F),
+        PopqPalette.nightElevated,
+      ],
     };
   }
 
@@ -1947,6 +2557,17 @@ List<Color> _temporaryVisualColors(
     const [
       PopqPalette.purple,
       PopqPalette.coral,
+    ],
+    CustomerHomeVisualKind
+        .popupMarket =>
+    const [
+      PopqPalette.purple,
+      Color(0xFFB794F6),
+    ],
+    CustomerHomeVisualKind.cafe =>
+    const [
+      Color(0xFF7A4D3A),
+      Color(0xFFC67C58),
     ],
   };
 }
