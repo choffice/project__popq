@@ -171,11 +171,13 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
                     );
                   },
                   itemBuilder: (context, index) {
+                    final conversation = items[index];
+
                     return _ConversationCard(
-                      conversation: items[index],
+                      conversation: conversation,
                       onTap: () {
                         _openConversation(
-                          items[index],
+                          conversation,
                         );
                       },
                     );
@@ -244,16 +246,22 @@ class _SellerCustomerScreenState extends State<SellerCustomerScreen> {
     await nextFuture;
   }
 
-  void _openConversation(
+  Future<void> _openConversation(
       SellerConversationSummary conversation,
-      ) {
+      ) async {
     final encodedOrderPublicId = Uri.encodeComponent(
       conversation.orderPublicId,
     );
 
-    context.push(
+    await context.push(
       '${SellerRoutes.customers}/$encodedOrderPublicId',
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    await _reload();
   }
 }
 

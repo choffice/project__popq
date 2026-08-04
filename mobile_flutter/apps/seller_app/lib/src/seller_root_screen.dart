@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/customers/seller_customer_repository.dart';
+import 'features/stores/seller_store_selection_controller.dart';
 import 'routing/seller_router.dart';
 
 class SellerRootScreen extends StatefulWidget {
@@ -12,6 +14,8 @@ class SellerRootScreen extends StatefulWidget {
     required this.location,
     required this.onSignOut,
     required this.child,
+    this.customerRepository,
+    this.storeSelectionController,
     super.key,
   });
 
@@ -19,9 +23,13 @@ class SellerRootScreen extends StatefulWidget {
   final Future<void> Function() onSignOut;
   final Widget child;
 
+  final SellerCustomerRepository? customerRepository;
+  final SellerStoreSelectionController? storeSelectionController;
+
   @override
-  State<SellerRootScreen> createState() =>
-      _SellerRootScreenState();
+  State<SellerRootScreen> createState() {
+    return _SellerRootScreenState();
+  }
 }
 
 class _SellerRootScreenState extends State<SellerRootScreen> {
@@ -41,18 +49,28 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
     '매출',
   ];
 
-  static const Duration _exitConfirmDuration =
-  Duration(seconds: 2);
+  static const Duration _exitConfirmDuration = Duration(
+    seconds: 2,
+  );
 
   DateTime? _lastBackPressedAt;
+
+  int _customerUnreadCount = 0;
+  int _unreadRequestSerial = 0;
 
   @override
   void initState() {
     super.initState();
 
+    widget.storeSelectionController?.addListener(
+      _handleStoreSelectionChanged,
+    );
+
     unawaited(
       SystemNavigator.setFrameworkHandlesBack(true),
     );
+
+    _scheduleUnreadRefresh();
   }
 
   @override
@@ -64,10 +82,38 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
     if (oldWidget.location != widget.location) {
       _lastBackPressedAt = null;
     }
+
+    if (oldWidget.storeSelectionController !=
+        widget.storeSelectionController) {
+      oldWidget.storeSelectionController?.removeListener(
+        _handleStoreSelectionChanged,
+      );
+
+      widget.storeSelectionController?.addListener(
+        _handleStoreSelectionChanged,
+      );
+
+      _resetUnreadCount();
+    }
+
+    if (oldWidget.customerRepository !=
+        widget.customerRepository) {
+      _resetUnreadCount();
+    }
+
+    // 채팅 상세 화면에서 목록으로 돌아왔을 때처럼
+    // 경로 문자열이 같아도 읽지 않은 메시지 수를 다시 조회한다.
+    _scheduleUnreadRefresh();
   }
 
   @override
   void dispose() {
+    _unreadRequestSerial++;
+
+    widget.storeSelectionController?.removeListener(
+      _handleStoreSelectionChanged,
+    );
+
     unawaited(
       SystemNavigator.setFrameworkHandlesBack(false),
     );
@@ -137,6 +183,10 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
           ],
           selectedIndex: selectedIndex,
           onDestinationSelected: (index) {
+            unawaited(
+              _refreshCustomerUnreadCount(),
+            );
+
             final nextLocation = _locations[index];
 
             if (nextLocation == widget.location) {
@@ -147,8 +197,8 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
 
             context.go(nextLocation);
           },
-          destinations: const [
-            NavigationDestination(
+          destinations: [
+            const NavigationDestination(
               icon: Icon(
                 Icons.business_outlined,
               ),
@@ -157,7 +207,7 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
               ),
               label: '대시보드',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.tune_outlined,
               ),
@@ -166,7 +216,7 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
               ),
               label: '운영',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.notifications_none_rounded,
               ),
@@ -176,15 +226,17 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
               label: '주문',
             ),
             NavigationDestination(
-              icon: Icon(
-                Icons.forum_outlined,
+              icon: _CustomerNavigationIcon(
+                icon: Icons.forum_outlined,
+                unreadCount: _customerUnreadCount,
               ),
-              selectedIcon: Icon(
-                Icons.forum_rounded,
+              selectedIcon: _CustomerNavigationIcon(
+                icon: Icons.forum_rounded,
+                unreadCount: _customerUnreadCount,
               ),
               label: '고객',
             ),
-            NavigationDestination(
+            const NavigationDestination(
               icon: Icon(
                 Icons.query_stats_outlined,
               ),
@@ -255,6 +307,89 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
       );
   }
 
+  void _handleStoreSelectionChanged() {
+    _resetUnreadCount();
+
+    unawaited(
+      _refreshCustomerUnreadCount(),
+    );
+  }
+
+  void _scheduleUnreadRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      unawaited(
+        _refreshCustomerUnreadCount(),
+      );
+    });
+  }
+
+  Future<void> _refreshCustomerUnreadCount() async {
+    final repository = widget.customerRepository;
+    final storeId =
+        widget.storeSelectionController?.selectedStoreId;
+
+    final requestSerial = ++_unreadRequestSerial;
+
+    if (repository == null || storeId == null) {
+      if (!mounted) {
+        return;
+      }
+
+      if (_customerUnreadCount != 0) {
+        setState(() {
+          _customerUnreadCount = 0;
+        });
+      }
+
+      return;
+    }
+
+    try {
+      final unreadCount =
+      await repository.countUnreadMessages(
+        storeId,
+      );
+
+      if (!mounted ||
+          requestSerial != _unreadRequestSerial) {
+        return;
+      }
+
+      if (_customerUnreadCount == unreadCount) {
+        return;
+      }
+
+      setState(() {
+        _customerUnreadCount = unreadCount;
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '고객 문의 읽지 않은 메시지 수를 불러오지 못했습니다: '
+            '$error',
+      );
+
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  void _resetUnreadCount() {
+    _unreadRequestSerial++;
+
+    if (!mounted || _customerUnreadCount == 0) {
+      return;
+    }
+
+    setState(() {
+      _customerUnreadCount = 0;
+    });
+  }
+
   int _indexForLocation(String value) {
     final index = _locations.indexWhere(
           (candidate) => value.startsWith(candidate),
@@ -275,5 +410,71 @@ class _SellerRootScreenState extends State<SellerRootScreen> {
         SellerRoutes.signIn,
       );
     }
+  }
+}
+
+class _CustomerNavigationIcon extends StatelessWidget {
+  const _CustomerNavigationIcon({
+    required this.icon,
+    required this.unreadCount,
+  });
+
+  final IconData icon;
+  final int unreadCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (unreadCount <= 0) {
+      return Icon(icon);
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final badgeText = unreadCount > 99
+        ? '99+'
+        : unreadCount.toString();
+
+    return SizedBox(
+      width: 36,
+      height: 28,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          Icon(icon),
+          Positioned(
+            top: -4,
+            right: -2,
+            child: Container(
+              constraints: const BoxConstraints(
+                minWidth: 17,
+                minHeight: 17,
+              ),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+              ),
+              decoration: BoxDecoration(
+                color: colorScheme.error,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: colorScheme.surface,
+                  width: 1.5,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                badgeText,
+                style: TextStyle(
+                  color: colorScheme.onError,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  height: 1,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
