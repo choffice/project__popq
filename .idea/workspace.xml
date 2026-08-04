@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -118,7 +116,7 @@
     "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "ochang",
+    "git-widget-placeholder": "ochang__main",
     "ignore.virus.scanning.warn.message": "true",
     "io.flutter.reload.alreadyRun": "true",
     "kotlin-language-version-configured": "true",
