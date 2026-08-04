@@ -18,6 +18,8 @@ import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
 import '../features/favorites/customer_favorite_store_screen.dart';
 import '../features/home/customer_home_screen.dart';
+import '../features/inquiry/customer_order_chat_screen.dart';
+import '../features/inquiry/customer_order_message_repository.dart';
 import '../features/notifications/customer_notification_repository.dart';
 import '../features/notifications/notification_list_screen.dart';
 import '../features/onboarding/onboarding_controller.dart';
@@ -52,6 +54,10 @@ abstract final class CustomerRoutes {
   static const orders = '/orders';
   static const profile = '/profile';
   static const notifications = '/notifications';
+
+  static String orderMessages(String orderPublicId) {
+    return '$orders/$orderPublicId/messages';
+  }
 }
 
 GoRouter createCustomerRouter({
@@ -60,23 +66,39 @@ GoRouter createCustomerRouter({
   required StoreDiscoveryRepository storeDiscoveryRepository,
   required CatalogRepository catalogRepository,
   required CustomerOrderRepository orderRepository,
+  required CustomerOrderMessageRepository orderMessageRepository,
   required CustomerEngagementRepository engagementRepository,
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
   required String tossClientKey,
-  required Future<void> Function(String email, String password) onSignIn,
+  required Future<void> Function(
+      String email,
+      String password,
+      )
+  onSignIn,
   required Future<void> Function({
-    required String email,
-    required String password,
-    required String name,
-    required String phone,
+  required String email,
+  required String password,
+  required String name,
+  required String phone,
   })
   onSignUp,
-  required Future<String> Function(String name, String phone) onFindId,
-  required Future<void> Function(String email, String phone)
+  required Future<String> Function(
+      String name,
+      String phone,
+      )
+  onFindId,
+  required Future<void> Function(
+      String email,
+      String phone,
+      )
   onVerifyForPasswordReset,
-  required Future<void> Function(String email, String phone, String newPassword)
+  required Future<void> Function(
+      String email,
+      String phone,
+      String newPassword,
+      )
   onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
@@ -162,17 +184,11 @@ GoRouter createCustomerRouter({
               location.startsWith(
                 '${CustomerRoutes.orders}/',
               ) ||
-              location ==
-                  CustomerRoutes.favorites ||
-              location ==
-                  CustomerRoutes.profile ||
+              location == CustomerRoutes.favorites ||
+              location == CustomerRoutes.profile ||
               location ==
                   CustomerRoutes.notifications;
 
-      /*
-       * 주문, 찜, 마이페이지와 알림처럼
-       * 고객 로그인 정보가 필요한 화면을 보호합니다.
-       */
       if (requiresSession &&
           !sessionController.isSignedIn) {
         return Uri(
@@ -183,11 +199,10 @@ GoRouter createCustomerRouter({
         ).toString();
       }
 
-      /*
-       * 로그인에 성공하면 사용자가 원래 접근하려던
-       * 화면으로 돌아갑니다.
-       */
-      if ((isSignIn || isSignUp || isFindId || isFindPassword) &&
+      if ((isSignIn ||
+          isSignUp ||
+          isFindId ||
+          isFindPassword) &&
           sessionController.isSignedIn) {
         return state.uri.queryParameters['from'] ??
             CustomerRoutes.home;
@@ -223,15 +238,13 @@ GoRouter createCustomerRouter({
             body: PopqErrorView(
               message:
               '보안 저장소에서 로그인 정보를 불러오지 못했습니다.',
-              onRetry:
-              sessionController.restore,
+              onRetry: sessionController.restore,
             ),
           );
         },
       ),
       GoRoute(
-        path:
-        CustomerRoutes.onboardingError,
+        path: CustomerRoutes.onboardingError,
         builder: (context, state) {
           return Scaffold(
             body: PopqErrorView(
@@ -280,21 +293,27 @@ GoRouter createCustomerRouter({
       GoRoute(
         path: CustomerRoutes.signUp,
         builder: (context, state) {
-          return CustomerSignUpScreen(onSignUp: onSignUp);
+          return CustomerSignUpScreen(
+            onSignUp: onSignUp,
+          );
         },
       ),
       GoRoute(
         path: CustomerRoutes.findId,
         builder: (context, state) {
-          return CustomerFindIdScreen(onFindId: onFindId);
+          return CustomerFindIdScreen(
+            onFindId: onFindId,
+          );
         },
       ),
       GoRoute(
         path: CustomerRoutes.findPassword,
         builder: (context, state) {
           return CustomerFindPasswordScreen(
-            onVerify: onVerifyForPasswordReset,
-            onResetPassword: onResetPassword,
+            onVerify:
+            onVerifyForPasswordReset,
+            onResetPassword:
+            onResetPassword,
           );
         },
       ),
@@ -308,8 +327,7 @@ GoRouter createCustomerRouter({
           );
 
           final productId = int.tryParse(
-            state.pathParameters[
-            'productId'] ??
+            state.pathParameters['productId'] ??
                 '',
           );
 
@@ -411,12 +429,36 @@ GoRouter createCustomerRouter({
         },
       ),
       GoRoute(
-        path:
-        CustomerRoutes.notifications,
+        path: CustomerRoutes.notifications,
         builder: (context, state) {
           return NotificationListScreen(
             repository:
             notificationRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path:
+        '${CustomerRoutes.orders}/:orderPublicId/messages',
+        builder: (context, state) {
+          final orderPublicId =
+              state.pathParameters[
+              'orderPublicId'] ??
+                  '';
+
+          if (orderPublicId.isEmpty) {
+            return const PopqErrorView(
+              message:
+              '주문 번호가 올바르지 않습니다.',
+            );
+          }
+
+          return CustomerOrderChatScreen(
+            orderPublicId: orderPublicId,
+            orderRepository:
+            orderRepository,
+            messageRepository:
+            orderMessageRepository,
           );
         },
       ),
@@ -445,6 +487,8 @@ GoRouter createCustomerRouter({
                 '',
             repository:
             orderRepository,
+            messageRepository:
+            orderMessageRepository,
           );
         },
       ),
@@ -478,19 +522,13 @@ GoRouter createCustomerRouter({
             },
           ),
           GoRoute(
-            path:
-            CustomerRoutes.discover,
+            path: CustomerRoutes.discover,
             builder: (context, state) {
               return StoreDiscoveryScreen(
                 repository:
                 storeDiscoveryRepository,
                 permissionGateway:
                 permissionGateway,
-
-                /*
-                 * 탐색 화면 하트를 실제 DB 찜 기능과
-                 * 연결하기 위해 전달합니다.
-                 */
                 engagementRepository:
                 engagementRepository,
                 sessionController:
@@ -498,10 +536,6 @@ GoRouter createCustomerRouter({
               );
             },
           ),
-
-          /*
-           * 기존 QR 화면과 라우트는 수정하지 않습니다.
-           */
           GoRoute(
             path:
             CustomerRoutes.qrScanner,
@@ -509,7 +543,6 @@ GoRouter createCustomerRouter({
               return const CustomerQrScannerScreen();
             },
           ),
-
           GoRoute(
             path:
             CustomerRoutes.favorites,
@@ -520,17 +553,14 @@ GoRouter createCustomerRouter({
               );
             },
           ),
-
-          /*
-           * 하단 탭에서는 빠졌지만 주문 목록 경로는
-           * 홈과 마이페이지에서 계속 사용합니다.
-           */
           GoRoute(
             path: CustomerRoutes.orders,
             builder: (context, state) {
               return OrderListScreen(
                 repository:
                 orderRepository,
+                messageRepository:
+                orderMessageRepository,
               );
             },
           ),

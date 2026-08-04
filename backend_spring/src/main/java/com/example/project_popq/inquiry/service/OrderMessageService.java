@@ -4,6 +4,7 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.inquiry.domain.MessageSenderType;
 import com.example.project_popq.inquiry.domain.OrderMessage;
+import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationDetailResponse;
 import com.example.project_popq.inquiry.dto.SellerConversationSummaryResponse;
@@ -114,6 +115,20 @@ public class OrderMessageService {
         storeId,
         MessageSenderType.CUSTOMER
     );
+  }
+
+  @Transactional(readOnly = true)
+  public List<CustomerOrderUnreadMessageResponse>
+  findCustomerUnreadMessageCounts(
+      User customer
+  ) {
+    requireCustomer(customer);
+
+    return orderMessageRepository
+        .findUnreadCountsByCustomerUserId(
+            customer.getId(),
+            MessageSenderType.SELLER
+        );
   }
 
   @Transactional
