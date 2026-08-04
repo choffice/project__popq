@@ -60,6 +60,7 @@ public class SecurityConfig {
                 "/api/v1/auth/password-reset/confirm"
             ).permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/stores/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/public/location/**").permitAll()
             .requestMatchers("/api/v1/qr/**").permitAll()
             .requestMatchers("/ws", "/ws/**").permitAll()
             .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()

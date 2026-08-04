@@ -111,7 +111,7 @@ class _CustomerProfileScreenState
                     subtitle:
                     '관심 있는 이벤트를 모아봤어요',
                     onTap: () {
-                      context.go(
+                      context.push(
                         CustomerRoutes.favorites,
                       );
                     },

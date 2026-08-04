@@ -242,6 +242,22 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
+    /*
+   * 이미 위치 권한을 허용한 사용자에게는
+   * 매번 선택 안내를 다시 묻지 않고 바로 현재 위치로 조회합니다.
+   */
+    final permissionStatus =
+        await widget.permissionGateway.checkLocationPermission();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (permissionStatus == PermissionDecision.granted) {
+      await _useCurrentLocationFromInitialChoice();
+      return;
+    }
+
     setState(() {
       _showInitialLocationChoice = true;
     });

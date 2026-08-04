@@ -225,6 +225,17 @@ class _CustomerRootScreenState
       return;
     }
 
+    // 마이페이지에서 push로 들어온 찜한 이벤트 화면은 홈이 아닌
+    // 이전 화면(마이페이지)으로 돌아갑니다.
+    if (widget.location == CustomerRoutes.favorites &&
+        context.canPop()) {
+      _lastBackPressedAt = null;
+
+      context.pop();
+
+      return;
+    }
+
     // 홈이 아닌 하단 탭에서는 앱을 종료하지 않고 홈으로 이동합니다.
     if (widget.location != CustomerRoutes.home) {
       _lastBackPressedAt = null;

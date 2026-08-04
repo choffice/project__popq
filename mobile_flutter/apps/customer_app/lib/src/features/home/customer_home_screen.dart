@@ -11,6 +11,7 @@ import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
 import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
+import 'customer_location_repository.dart';
 
 
 class CustomerHomeScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.orderRepository,
     required this.sessionController,
     required this.permissionGateway,
+    required this.locationRepository,
     super.key,
   });
 
@@ -26,6 +28,7 @@ class CustomerHomeScreen extends StatefulWidget {
   final CustomerOrderRepository orderRepository;
   final SessionController sessionController;
   final CustomerPermissionGateway permissionGateway;
+  final CustomerLocationRepository locationRepository;
 
   @override
   State<CustomerHomeScreen> createState() =>
@@ -69,6 +72,10 @@ class _CustomerHomeScreenState
             !identical(
               oldWidget.permissionGateway,
               widget.permissionGateway,
+            ) ||
+            !identical(
+              oldWidget.locationRepository,
+              widget.locationRepository,
             );
 
     if (!dependenciesChanged) {
@@ -85,6 +92,7 @@ class _CustomerHomeScreenState
       widget.orderRepository,
       widget.sessionController,
       widget.permissionGateway,
+      widget.locationRepository,
     );
 
     unawaited(_controller.load());
@@ -132,9 +140,8 @@ class _CustomerHomeScreenState
               ],
 
               _LocationHeader(
-                locationLabel: _locationLabel(
-                  snapshot.featuredStore,
-                ),
+                locationLabel:
+                snapshot.currentLocationLabel,
                 onCartPressed: () {
                   context.push(
                     CustomerRoutes.cart,
@@ -2277,27 +2284,6 @@ class _BenefitBanner
       ),
     );
   }
-}
-
-String _locationLabel(
-    CustomerStore? store,
-    ) {
-  final address = store?.address?.trim();
-
-  if (address == null ||
-      address.isEmpty) {
-    return '지역을 선택해 주세요';
-  }
-
-  final parts = address.split(
-    RegExp(r'\s+'),
-  );
-
-  if (parts.length <= 2) {
-    return address;
-  }
-
-  return parts.take(2).join(' ');
 }
 
 String _businessStatusLabel(

@@ -35,6 +35,10 @@ final class LocationRequestResult {
 abstract interface class CustomerPermissionGateway {
   Future<LocationRequestResult> requestLocation();
 
+  /// 시스템 권한 요청 다이얼로그를 띄우지 않고
+  /// 현재 위치 권한 상태만 확인합니다.
+  Future<PermissionDecision> checkLocationPermission();
+
   Future<PermissionDecision> requestNotifications();
 
   Future<bool> openSettings();
@@ -113,6 +117,28 @@ class DeviceCustomerPermissionGateway
 
   @override
   Future<PermissionDecision>
+  checkLocationPermission() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      return PermissionDecision.serviceDisabled;
+    }
+
+    final permission =
+    await Geolocator.checkPermission();
+
+    if (permission ==
+        LocationPermission.deniedForever) {
+      return PermissionDecision.permanentlyDenied;
+    }
+
+    if (permission == LocationPermission.denied) {
+      return PermissionDecision.denied;
+    }
+
+    return PermissionDecision.granted;
+  }
+
+  @override
+  Future<PermissionDecision>
   requestNotifications() async {
     final status =
     await permissions.Permission.notification
@@ -168,6 +194,12 @@ class MemoryCustomerPermissionGateway
           ? location
           : null,
     );
+  }
+
+  @override
+  Future<PermissionDecision>
+  checkLocationPermission() async {
+    return locationDecision;
   }
 
   @override

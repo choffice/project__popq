@@ -58,6 +58,7 @@ public enum ErrorCode {
     INVALID_REFUND_AMOUNT(HttpStatus.BAD_REQUEST, "환불 금액이 올바르지 않습니다."),
     REFUND_FAILED(HttpStatus.CONFLICT, "환불 처리에 실패했습니다."),
     WALKING_ROUTE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "도보 경로를 불러오지 못했습니다."),
+    REVERSE_GEOCODE_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "현재 위치의 주소를 불러오지 못했습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
     private final HttpStatus status;

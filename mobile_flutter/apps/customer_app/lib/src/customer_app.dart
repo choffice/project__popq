@@ -12,6 +12,7 @@ import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
+import 'features/home/customer_location_repository.dart';
 import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
 import 'features/onboarding/onboarding_controller.dart';
@@ -34,6 +35,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.notificationRepository,
     this.cartController,
     this.permissionGateway,
+    this.locationRepository,
     this.themeController,
     this.authRepository,
     super.key,
@@ -50,6 +52,7 @@ class PopqCustomerApp extends StatefulWidget {
   final CustomerNotificationRepository? notificationRepository;
   final CartController? cartController;
   final CustomerPermissionGateway? permissionGateway;
+  final CustomerLocationRepository? locationRepository;
   final PopqThemeController? themeController;
   final CustomerAuthRepository? authRepository;
 
@@ -125,6 +128,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.permissionGateway ??
             DeviceCustomerPermissionGateway();
 
+    final locationRepository =
+        widget.locationRepository ??
+            ApiCustomerLocationRepository(
+              _apiClient,
+            );
+
     final storeDiscoveryRepository =
         widget.storeDiscoveryRepository ??
             ApiStoreDiscoveryRepository(
@@ -193,6 +202,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       _cartController,
       permissionGateway:
       permissionGateway,
+      locationRepository:
+      locationRepository,
       tossClientKey:
       widget.environment.tossClientKey,
       themeController:

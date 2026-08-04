@@ -18,6 +18,7 @@ import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
 import '../features/favorites/customer_favorite_store_screen.dart';
 import '../features/home/customer_home_screen.dart';
+import '../features/home/customer_location_repository.dart';
 import '../features/inquiry/customer_order_chat_screen.dart';
 import '../features/inquiry/customer_order_message_repository.dart';
 import '../features/notifications/customer_notification_repository.dart';
@@ -73,6 +74,7 @@ GoRouter createCustomerRouter({
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerPermissionGateway permissionGateway,
+  required CustomerLocationRepository locationRepository,
   required String tossClientKey,
   required Future<void> Function(
       String email,
@@ -525,6 +527,8 @@ GoRouter createCustomerRouter({
                 sessionController,
                 permissionGateway:
                 permissionGateway,
+                locationRepository:
+                locationRepository,
               );
             },
           ),
