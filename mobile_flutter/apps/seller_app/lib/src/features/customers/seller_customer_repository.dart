@@ -13,8 +13,8 @@ class SellerConversationSummary {
   });
 
   factory SellerConversationSummary.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return SellerConversationSummary(
       orderPublicId: json['orderPublicId'] as String,
       customerUserId: (json['customerUserId'] as num?)?.toInt(),
@@ -22,7 +22,7 @@ class SellerConversationSummary {
       orderStatus: json['orderStatus'] as String,
       lastMessage: json['lastMessage'] as String,
       lastMessageSenderType:
-      json['lastMessageSenderType'] as String,
+          json['lastMessageSenderType'] as String,
       lastMessageAt: DateTime.parse(
         json['lastMessageAt'] as String,
       ),
@@ -41,8 +41,9 @@ class SellerConversationSummary {
 
   bool get hasUnreadMessage => unreadCount > 0;
 
-  bool get lastMessageSentByCustomer =>
-      lastMessageSenderType == 'CUSTOMER';
+  bool get lastMessageSentByCustomer {
+    return lastMessageSenderType == 'CUSTOMER';
+  }
 }
 
 class SellerConversationDetail {
@@ -61,14 +62,13 @@ class SellerConversationDetail {
   });
 
   factory SellerConversationDetail.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return SellerConversationDetail(
       orderPublicId: json['orderPublicId'] as String,
       storeId: (json['storeId'] as num).toInt(),
       storeName: json['storeName'] as String,
-      customerUserId:
-      (json['customerUserId'] as num?)?.toInt(),
+      customerUserId: (json['customerUserId'] as num?)?.toInt(),
       customerName: json['customerName'] as String,
       orderType: json['orderType'] as String,
       orderStatus: json['orderStatus'] as String,
@@ -76,27 +76,23 @@ class SellerConversationDetail {
       orderedAt: DateTime.parse(
         json['orderedAt'] as String,
       ),
-      orderItems:
-      (json['orderItems'] as List<Object?>? ?? const [])
+      orderItems: (json['orderItems'] as List<Object?>? ?? const [])
           .map(
-            (Object? item) =>
-            SellerConversationOrderItem.fromJson(
+            (Object? item) => SellerConversationOrderItem.fromJson(
               Map<String, Object?>.from(
                 item as Map,
               ),
             ),
-      )
+          )
           .toList(),
-      messages:
-      (json['messages'] as List<Object?>? ?? const [])
+      messages: (json['messages'] as List<Object?>? ?? const [])
           .map(
-            (Object? item) =>
-            SellerOrderMessage.fromJson(
+            (Object? item) => SellerOrderMessage.fromJson(
               Map<String, Object?>.from(
                 item as Map,
               ),
             ),
-      )
+          )
           .toList(),
     );
   }
@@ -116,7 +112,7 @@ class SellerConversationDetail {
   int get totalQuantity {
     return orderItems.fold<int>(
       0,
-          (int total, SellerConversationOrderItem item) {
+      (int total, SellerConversationOrderItem item) {
         return total + item.quantity;
       },
     );
@@ -132,14 +128,13 @@ class SellerConversationOrderItem {
   });
 
   factory SellerConversationOrderItem.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return SellerConversationOrderItem(
       orderItemId: (json['orderItemId'] as num).toInt(),
       productName: json['productName'] as String,
       quantity: (json['quantity'] as num).toInt(),
-      itemTotalPrice:
-      (json['itemTotalPrice'] as num).toInt(),
+      itemTotalPrice: (json['itemTotalPrice'] as num).toInt(),
     );
   }
 
@@ -162,13 +157,11 @@ class SellerOrderMessage {
   });
 
   factory SellerOrderMessage.fromJson(
-      Map<String, Object?> json,
-      ) {
+    Map<String, Object?> json,
+  ) {
     return SellerOrderMessage(
-      orderMessageId:
-      (json['orderMessageId'] as num).toInt(),
-      senderUserId:
-      (json['senderUserId'] as num).toInt(),
+      orderMessageId: (json['orderMessageId'] as num).toInt(),
+      senderUserId: (json['senderUserId'] as num).toInt(),
       senderName: json['senderName'] as String,
       senderType: json['senderType'] as String,
       content: json['content'] as String,
@@ -176,8 +169,8 @@ class SellerOrderMessage {
       readAt: json['readAt'] == null
           ? null
           : DateTime.parse(
-        json['readAt'] as String,
-      ),
+              json['readAt'] as String,
+            ),
       createdAt: DateTime.parse(
         json['createdAt'] as String,
       ),
@@ -198,32 +191,75 @@ class SellerOrderMessage {
   bool get sentByCustomer => senderType == 'CUSTOMER';
 }
 
+class SellerOrderMessagePage {
+  const SellerOrderMessagePage({
+    required this.messages,
+    required this.hasMore,
+    required this.nextBeforeMessageId,
+  });
+
+  factory SellerOrderMessagePage.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return SellerOrderMessagePage(
+      messages: (json['messages'] as List<Object?>? ?? const [])
+          .map(
+            (Object? item) => SellerOrderMessage.fromJson(
+              Map<String, Object?>.from(
+                item as Map,
+              ),
+            ),
+          )
+          .toList(),
+      hasMore: json['hasMore'] as bool,
+      nextBeforeMessageId:
+          (json['nextBeforeMessageId'] as num?)?.toInt(),
+    );
+  }
+
+  final List<SellerOrderMessage> messages;
+  final bool hasMore;
+  final int? nextBeforeMessageId;
+}
+
 abstract interface class SellerCustomerRepository {
   Future<List<SellerConversationSummary>> findConversations(
-      int storeId,
-      );
+    int storeId,
+  );
 
   Future<SellerConversationDetail> findConversation(
-      int storeId,
-      String orderPublicId,
-      );
+    int storeId,
+    String orderPublicId,
+  );
+
+  Future<SellerConversationDetail> findConversationMetadata(
+    int storeId,
+    String orderPublicId,
+  );
+
+  Future<SellerOrderMessagePage> findMessagePage(
+    int storeId,
+    String orderPublicId, {
+    int? beforeMessageId,
+    int size = 30,
+  });
 
   Future<SellerOrderMessage> sendMessage(
-      int storeId,
-      String orderPublicId, {
-        required String content,
-      });
+    int storeId,
+    String orderPublicId, {
+    required String content,
+  });
 
   Future<int> countUnreadMessages(
-      int storeId,
-      );
+    int storeId,
+  );
 }
 
 class ApiSellerCustomerRepository
     implements SellerCustomerRepository {
   ApiSellerCustomerRepository(
-      this._apiClient,
-      );
+    this._apiClient,
+  );
 
   final PopqApiClient _apiClient;
 
@@ -233,20 +269,20 @@ class ApiSellerCustomerRepository
 
   @override
   Future<List<SellerConversationSummary>> findConversations(
-      int storeId,
-      ) {
+    int storeId,
+  ) {
     return _apiClient.get(
       '${_basePath(storeId)}/conversations',
       decode: (Object? value) {
         return (value as List<Object?>)
             .map(
               (Object? item) =>
-              SellerConversationSummary.fromJson(
+                  SellerConversationSummary.fromJson(
                 Map<String, Object?>.from(
                   item as Map,
                 ),
               ),
-        )
+            )
             .toList();
       },
     );
@@ -254,12 +290,12 @@ class ApiSellerCustomerRepository
 
   @override
   Future<SellerConversationDetail> findConversation(
-      int storeId,
-      String orderPublicId,
-      ) {
+    int storeId,
+    String orderPublicId,
+  ) {
     return _apiClient.get(
       '${_basePath(storeId)}/orders/'
-          '$orderPublicId/messages',
+      '$orderPublicId/messages',
       decode: (Object? value) {
         return SellerConversationDetail.fromJson(
           Map<String, Object?>.from(
@@ -271,12 +307,55 @@ class ApiSellerCustomerRepository
   }
 
   @override
+  Future<SellerConversationDetail> findConversationMetadata(
+    int storeId,
+    String orderPublicId,
+  ) {
+    return _apiClient.get(
+      '${_basePath(storeId)}/orders/'
+      '$orderPublicId/conversation',
+      decode: (Object? value) {
+        return SellerConversationDetail.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Future<SellerOrderMessagePage> findMessagePage(
+    int storeId,
+    String orderPublicId, {
+    int? beforeMessageId,
+    int size = 30,
+  }) {
+    return _apiClient.get(
+      '${_basePath(storeId)}/orders/'
+      '$orderPublicId/messages/page',
+      query: <String, Object?>{
+        'size': size,
+        if (beforeMessageId != null)
+          'beforeMessageId': beforeMessageId,
+      },
+      decode: (Object? value) {
+        return SellerOrderMessagePage.fromJson(
+          Map<String, Object?>.from(
+            value as Map,
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Future<SellerOrderMessage> sendMessage(
-      int storeId,
-      String orderPublicId, {
-        required String content,
-      }) {
-    final normalizedContent = content.trim();
+    int storeId,
+    String orderPublicId, {
+    required String content,
+  }) {
+    final String normalizedContent = content.trim();
 
     if (normalizedContent.isEmpty) {
       throw ArgumentError.value(
@@ -296,8 +375,8 @@ class ApiSellerCustomerRepository
 
     return _apiClient.post(
       '${_basePath(storeId)}/orders/'
-          '$orderPublicId/messages',
-      body: {
+      '$orderPublicId/messages',
+      body: <String, Object?>{
         'content': normalizedContent,
       },
       decode: (Object? value) {
@@ -312,11 +391,11 @@ class ApiSellerCustomerRepository
 
   @override
   Future<int> countUnreadMessages(
-      int storeId,
-      ) {
+    int storeId,
+  ) {
     return _apiClient.get(
       '${_basePath(storeId)}/'
-          'conversations/unread-count',
+      'conversations/unread-count',
       decode: (Object? value) {
         return (value as num).toInt();
       },
