@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,8 +7,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
+import 'seller_store_location_picker_screen.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
+import 'package:geolocator/geolocator.dart';
 
 enum _ImportedValueChoice {
   current,
@@ -45,6 +48,16 @@ class _SelectedStoreLocation {
 
   /// 카카오 업체, 주소 검색, 지도 직접 선택 등.
   final String sourceLabel;
+}
+
+class _DeviceLocation {
+  const _DeviceLocation({
+    required this.latitude,
+    required this.longitude,
+  });
+
+  final double latitude;
+  final double longitude;
 }
 
 class SellerStoreRegistrationScreen extends StatefulWidget {
@@ -131,6 +144,16 @@ class _SellerStoreRegistrationScreenState
 
   bool _searchingAddressLocation = false;
 
+  bool _searchingKakaoPlace = false;
+
+  bool _reverseGeocodingMapLocation = false;
+
+  _DeviceLocation? _currentDeviceLocation;
+
+  bool _loadingCurrentLocation = false;
+
+  String? _currentLocationMessage;
+
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
 
@@ -152,8 +175,16 @@ class _SellerStoreRegistrationScreenState
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback(
-          (Duration _) {
-        _recoverLostRepresentativeImage();
+          (Duration _) async {
+        await _recoverLostRepresentativeImage();
+
+        if (!mounted) {
+          return;
+        }
+
+        await _loadCurrentDeviceLocation(
+          requestPermission: false,
+        );
       },
     );
   }
@@ -331,14 +362,25 @@ class _SellerStoreRegistrationScreenState
                 key: const Key(
                   'import-kakao-place',
                 ),
-                onPressed: _submitting
+                onPressed:
+                _submitting ||
+                    _searchingKakaoPlace
                     ? null
                     : _openKakaoPlaceImport,
-                icon: const Icon(
+                icon: _searchingKakaoPlace
+                    ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                  ),
+                )
+                    : const Icon(
                   Icons.map_outlined,
                 ),
-                label: const Text(
-                  '카카오맵 업체 정보 불러오기',
+                label: Text(
+                  _searchingKakaoPlace
+                      ? '카카오맵 업체 검색 중...'
+                      : '카카오맵 업체 정보 불러오기',
                 ),
               ),
             ),
@@ -498,6 +540,31 @@ class _SellerStoreRegistrationScreenState
                 }
 
                 return null;
+              },
+              onChanged: (String value) {
+                final _SelectedStoreLocation?
+                selectedLocation =
+                    _selectedStoreLocation;
+
+                if (selectedLocation == null) {
+                  return;
+                }
+
+                final bool stillMatches =
+                    _normalizeComparisonText(
+                      value,
+                    ) ==
+                        _normalizeComparisonText(
+                          selectedLocation.address,
+                        );
+
+                if (stillMatches) {
+                  return;
+                }
+
+                setState(() {
+                  _selectedStoreLocation = null;
+                });
               },
             ),
             const SizedBox(
@@ -968,6 +1035,69 @@ class _SellerStoreRegistrationScreenState
             ),
           ),
         ),
+
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const Key(
+              'load-current-location',
+            ),
+            onPressed:
+            _submitting ||
+                _loadingCurrentLocation
+                ? null
+                : () {
+              _loadCurrentDeviceLocation(
+                requestPermission: true,
+              );
+            },
+            icon: _loadingCurrentLocation
+                ? const SizedBox.square(
+              dimension: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
+                : const Icon(
+              Icons.my_location_rounded,
+            ),
+            label: Text(
+              _loadingCurrentLocation
+                  ? '현재 위치 확인 중...'
+                  : '현재 위치 불러오기',
+            ),
+          ),
+        ),
+
+        if (_currentLocationMessage != null) ...[
+          const SizedBox(
+            height: PopqSpacing.xs,
+          ),
+          Text(
+            _currentLocationMessage!,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall,
+          ),
+        ],
+
+        if (_currentDeviceLocation != null) ...[
+          const SizedBox(
+            height: PopqSpacing.xs,
+          ),
+          Text(
+            '현재 위치: '
+                '${_currentDeviceLocation!.latitude.toStringAsFixed(6)}, '
+                '${_currentDeviceLocation!.longitude.toStringAsFixed(6)}',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall,
+          ),
+        ],
 
         const SizedBox(
           height: PopqSpacing.sm,
@@ -1718,20 +1848,476 @@ class _SellerStoreRegistrationScreenState
   }
 
   Future<void> _openKakaoPlaceImport() async {
-    if (_submitting) {
+    if (_submitting ||
+        _searchingKakaoPlace) {
       return;
     }
 
-    // 다음 카카오 API 단계에서 실제 선택한 장소 정보로 교체한다.
-    const _ImportedStoreInformation sample =
-    _ImportedStoreInformation(
-      sourceLabel: '카카오맵',
-      name: '포포컴퍼니 서면점',
-      address: '부산광역시 부산진구 서면로 45',
-      phone: '051-987-6543',
+    final String? query =
+    await _showKakaoPlaceSearchQueryDialog();
+
+    if (!mounted ||
+        query == null ||
+        query.trim().isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _searchingKakaoPlace = true;
+    });
+
+    try {
+      final List<SellerKakaoPlaceSearchResult>
+      results =
+      await widget.repository.searchPlaces(
+        query,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (results.isEmpty) {
+        _showMessage(
+          '카카오맵에서 업체를 찾지 못했습니다. '
+              '지역명과 업체명을 함께 입력해 다시 검색해 주세요.',
+        );
+        return;
+      }
+
+      final SellerKakaoPlaceSearchResult?
+      selectedPlace =
+      await _showKakaoPlaceSearchResultDialog(
+        results,
+      );
+
+      if (!mounted ||
+          selectedPlace == null) {
+        return;
+      }
+
+      await _applySelectedKakaoPlace(
+        selectedPlace,
+      );
+    } on PopqFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        failure.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '카카오맵 업체를 검색하는 중 오류가 발생했습니다.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _searchingKakaoPlace = false;
+        });
+      }
+    }
+  }
+
+  Future<String?>
+  _showKakaoPlaceSearchQueryDialog() async {
+    final String currentName =
+    _nameController.text.trim();
+
+    final String currentAddress =
+    _addressController.text.trim();
+
+    final String initialQuery =
+    <String>[
+      currentAddress,
+      currentName,
+    ].where(
+          (String value) => value.isNotEmpty,
+    ).join(' ');
+
+    final TextEditingController
+    queryController =
+    TextEditingController(
+      text: initialQuery,
     );
 
-    await _applyImportedInformation(sample);
+    String? errorText;
+
+    final String? query =
+    await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return StatefulBuilder(
+          builder: (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              title: const Text(
+                '카카오맵 업체 검색',
+              ),
+              content: TextField(
+                controller: queryController,
+                autofocus: true,
+                textInputAction:
+                TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: '업체명 또는 검색어',
+                  hintText:
+                  '예: 부산 서면 포포카페',
+                  errorText: errorText,
+                  prefixIcon: const Icon(
+                    Icons.search_rounded,
+                  ),
+                ),
+                onSubmitted: (
+                    String value,
+                    ) {
+                  final String trimmed =
+                  value.trim();
+
+                  if (trimmed.isEmpty) {
+                    setDialogState(() {
+                      errorText =
+                      '검색할 업체명이나 지역을 입력해 주세요.';
+                    });
+                    return;
+                  }
+
+                  Navigator.of(
+                    dialogContext,
+                  ).pop(trimmed);
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop();
+                  },
+                  child: const Text(
+                    '취소',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final String trimmed =
+                    queryController.text.trim();
+
+                    if (trimmed.isEmpty) {
+                      setDialogState(() {
+                        errorText =
+                        '검색할 업체명이나 지역을 입력해 주세요.';
+                      });
+                      return;
+                    }
+
+                    Navigator.of(
+                      dialogContext,
+                    ).pop(trimmed);
+                  },
+                  child: const Text(
+                    '검색',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    queryController.dispose();
+
+    return query;
+  }
+
+  Future<SellerKakaoPlaceSearchResult?>
+  _showKakaoPlaceSearchResultDialog(
+      List<SellerKakaoPlaceSearchResult>
+      results,
+      ) {
+    SellerKakaoPlaceSearchResult
+    selectedPlace = results.first;
+
+    return showDialog<
+        SellerKakaoPlaceSearchResult>(
+      context: context,
+      barrierDismissible: false,
+      builder: (
+          BuildContext dialogContext,
+          ) {
+        return StatefulBuilder(
+          builder: (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              title: const Text(
+                '카카오맵 업체 선택',
+              ),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ConstrainedBox(
+                  constraints:
+                  const BoxConstraints(
+                    maxHeight: 500,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: results.length,
+                    separatorBuilder: (
+                        BuildContext context,
+                        int index,
+                        ) {
+                      return const Divider();
+                    },
+                    itemBuilder: (
+                        BuildContext context,
+                        int index,
+                        ) {
+                      final SellerKakaoPlaceSearchResult
+                      place =
+                      results[index];
+
+                      return RadioListTile<
+                          SellerKakaoPlaceSearchResult>(
+                        contentPadding:
+                        EdgeInsets.zero,
+                        value: place,
+                        groupValue:
+                        selectedPlace,
+                        onChanged: (
+                            SellerKakaoPlaceSearchResult?
+                            value,
+                            ) {
+                          if (value == null) {
+                            return;
+                          }
+
+                          setDialogState(() {
+                            selectedPlace = value;
+                          });
+                        },
+                        title: Text(
+                          place.placeName,
+                        ),
+                        subtitle: Text(
+                          _buildKakaoPlaceSubtitle(
+                            place,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop();
+                  },
+                  child: const Text(
+                    '취소',
+                  ),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(
+                      dialogContext,
+                    ).pop(
+                      selectedPlace,
+                    );
+                  },
+                  child: const Text(
+                    '이 업체 선택',
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _buildKakaoPlaceSubtitle(
+      SellerKakaoPlaceSearchResult place,
+      ) {
+    final List<String> lines =
+    <String>[];
+
+    final String? category =
+        place.categoryName;
+
+    final String? phone =
+        place.phone;
+
+    final String? roadAddress =
+        place.roadAddressName;
+
+    final String? jibunAddress =
+        place.addressName;
+
+    if (category != null &&
+        category.isNotEmpty) {
+      lines.add(category);
+    }
+
+    if (roadAddress != null &&
+        roadAddress.isNotEmpty) {
+      lines.add(
+        '도로명: $roadAddress',
+      );
+    }
+
+    if (jibunAddress != null &&
+        jibunAddress.isNotEmpty &&
+        jibunAddress != roadAddress) {
+      lines.add(
+        '지번: $jibunAddress',
+      );
+    }
+
+    if (phone != null &&
+        phone.isNotEmpty) {
+      lines.add(
+        '전화: $phone',
+      );
+    }
+
+    lines.add(
+      '위도 ${place.latitude.toStringAsFixed(6)} · '
+          '경도 ${place.longitude.toStringAsFixed(6)}',
+    );
+
+    return lines.join('\n');
+  }
+
+  Future<void> _applySelectedKakaoPlace(
+      SellerKakaoPlaceSearchResult place,
+      ) async {
+    final String importedAddress =
+    place.displayAddress.trim();
+
+    final String resolvedName =
+    await _resolveImportedText(
+      fieldLabel: '사업장명',
+      sourceLabel: '카카오맵',
+      currentValue:
+      _nameController.text,
+      importedValue:
+      place.placeName,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final String resolvedAddress =
+    await _resolveImportedText(
+      fieldLabel: '주소',
+      sourceLabel: '카카오맵',
+      currentValue:
+      _addressController.text,
+      importedValue:
+      importedAddress,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final String resolvedPhone =
+    await _resolveImportedText(
+      fieldLabel: '사업장 연락처',
+      sourceLabel: '카카오맵',
+      currentValue:
+      _phoneController.text,
+      importedValue:
+      place.phone,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final String normalizedResolvedAddress =
+    _normalizeComparisonText(
+      resolvedAddress,
+    );
+
+    final Set<String> placeAddresses =
+    <String>{
+      if (place.roadAddressName != null &&
+          place.roadAddressName!
+              .trim()
+              .isNotEmpty)
+        _normalizeComparisonText(
+          place.roadAddressName!,
+        ),
+      if (place.addressName != null &&
+          place.addressName!
+              .trim()
+              .isNotEmpty)
+        _normalizeComparisonText(
+          place.addressName!,
+        ),
+    };
+
+    final bool addressMatchesPlace =
+    placeAddresses.contains(
+      normalizedResolvedAddress,
+    );
+
+    setState(() {
+      _nameController.text =
+          resolvedName;
+
+      _addressController.text =
+          resolvedAddress;
+
+      _phoneController.text =
+          resolvedPhone;
+
+      _selectedStoreLocation =
+      addressMatchesPlace
+          ? _SelectedStoreLocation(
+        latitude:
+        place.latitude,
+        longitude:
+        place.longitude,
+        address:
+        resolvedAddress,
+        sourceLabel:
+        '카카오 업체 검색',
+      )
+          : null;
+    });
+
+    if (!addressMatchesPlace) {
+      _showMessage(
+        '업체 정보는 반영했지만 선택한 주소가 '
+            '카카오 업체 주소와 달라 지도 위치를 저장하지 않았습니다. '
+            '주소 검색이나 지도 직접 선택으로 위치를 확인해 주세요.',
+      );
+      return;
+    }
+
+    _showMessage(
+      '카카오맵 업체 정보와 위치를 입력폼에 반영했습니다.',
+    );
   }
 
   Future<void> _applyImportedInformation(
@@ -2370,13 +2956,385 @@ class _SellerStoreRegistrationScreenState
     return lines.join('\n');
   }
 
-  void _prepareMapLocationSelection() {
+  Future<void> _loadCurrentDeviceLocation({
+    required bool requestPermission,
+  }) async {
+    if (_loadingCurrentLocation) {
+      return;
+    }
+
+    setState(() {
+      _loadingCurrentLocation = true;
+      _currentLocationMessage = null;
+    });
+
+    try {
+      final bool serviceEnabled =
+      await Geolocator.isLocationServiceEnabled();
+
+      if (!serviceEnabled) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _currentLocationMessage =
+          '기기의 위치 서비스가 꺼져 있습니다.';
+        });
+
+        return;
+      }
+
+      LocationPermission permission =
+      await Geolocator.checkPermission();
+
+      if (permission == LocationPermission.denied &&
+          requestPermission) {
+        permission =
+        await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _currentLocationMessage =
+          '현재 위치를 사용하려면 위치 권한을 허용해 주세요.';
+        });
+
+        return;
+      }
+
+      if (permission ==
+          LocationPermission.deniedForever) {
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _currentLocationMessage =
+          '위치 권한이 영구적으로 거부되었습니다. '
+              '앱 설정에서 위치 권한을 허용해 주세요.';
+        });
+
+        return;
+      }
+
+      Position? position =
+      await Geolocator.getLastKnownPosition();
+
+      position ??=
+      await Geolocator.getCurrentPosition(
+        locationSettings:
+        const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(
+            seconds: 12,
+          ),
+        ),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentDeviceLocation =
+            _DeviceLocation(
+              latitude: position!.latitude,
+              longitude: position.longitude,
+            );
+
+        _currentLocationMessage =
+        '현재 위치를 지도 시작점으로 준비했습니다.';
+      });
+    } on TimeoutException {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentLocationMessage =
+        '현재 위치를 확인하는 데 시간이 오래 걸리고 있습니다.';
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currentLocationMessage =
+        '현재 위치를 확인하지 못했습니다.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingCurrentLocation = false;
+        });
+      }
+    }
+  }
+
+  Future<void>
+  _prepareMapLocationSelection() async {
     if (_submitting) {
       return;
     }
 
+    final String address =
+    _addressController.text.trim();
+
+    if (address.isEmpty) {
+      _showMessage(
+        '지도 위치를 선택하기 전에 '
+            '사업장 주소를 먼저 입력해 주세요.',
+      );
+      return;
+    }
+
+    final _SelectedStoreLocation?
+    selectedLocation =
+        _selectedStoreLocation;
+
+    final _DeviceLocation?
+    currentLocation =
+        _currentDeviceLocation;
+
+    const double busanLatitude =
+    35.157746;
+
+    const double busanLongitude =
+    129.059319;
+
+    /*
+   * 시작 중심 우선순위:
+   *
+   * 1. 이전에 선택한 사업장 좌표
+   * 2. 기기 현재 위치
+   * 3. 부산 서면역
+   */
+    final double initialLatitude =
+        selectedLocation?.latitude ??
+            currentLocation?.latitude ??
+            busanLatitude;
+
+    final double initialLongitude =
+        selectedLocation?.longitude ??
+            currentLocation?.longitude ??
+            busanLongitude;
+
+    final SellerMapLocationPickResult?
+    result =
+    await Navigator.of(context).push<
+        SellerMapLocationPickResult>(
+      MaterialPageRoute<
+          SellerMapLocationPickResult>(
+        builder: (
+            BuildContext context,
+            ) {
+          return SellerStoreLocationPickerScreen(
+            initialLatitude:
+            initialLatitude,
+            initialLongitude:
+            initialLongitude,
+            currentLatitude:
+            currentLocation?.latitude,
+            currentLongitude:
+            currentLocation?.longitude,
+            addressLabel: address,
+          );
+        },
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() {
+      _reverseGeocodingMapLocation =
+      true;
+    });
+
+    try {
+      final SellerReverseGeocodeResult
+      reverseResult =
+      await widget.repository
+          .reverseGeocode(
+        latitude: result.latitude,
+        longitude: result.longitude,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      await _applyReverseGeocodedMapLocation(
+        reverseResult,
+      );
+    } on PopqFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        failure.message,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '선택한 지도 위치의 주소를 확인하지 못했습니다.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _reverseGeocodingMapLocation =
+          false;
+        });
+      }
+    }
+  }
+
+  Future<void>
+  _applyReverseGeocodedMapLocation(
+      SellerReverseGeocodeResult result,
+      ) async {
+    final String currentAddress =
+    _addressController.text.trim();
+
+    final String mapAddress =
+    result.displayAddress.trim();
+
+    if (mapAddress.isEmpty) {
+      _showMessage(
+        '지도에서 선택한 위치의 주소를 확인하지 못했습니다.',
+      );
+      return;
+    }
+
+    final Set<String> normalizedCandidates =
+    result.addressCandidates
+        .map(
+      _normalizeComparisonText,
+    )
+        .toSet();
+
+    /*
+   * 기존 주소가 비어 있으면 지도 주소와 좌표를
+   * 그대로 적용한다.
+   */
+    if (currentAddress.isEmpty) {
+      setState(() {
+        _addressController.text =
+            mapAddress;
+
+        _selectedStoreLocation =
+            _SelectedStoreLocation(
+              latitude: result.latitude,
+              longitude: result.longitude,
+              address: mapAddress,
+              sourceLabel: '지도 직접 선택',
+            );
+      });
+
+      _showMessage(
+        '지도에서 선택한 주소와 위치를 적용했습니다.',
+      );
+
+      return;
+    }
+
+    final bool currentAddressMatches =
+    normalizedCandidates.contains(
+      _normalizeComparisonText(
+        currentAddress,
+      ),
+    );
+
+    /*
+   * 도로명 또는 지번 주소가 기존 주소와 같다면
+   * 주소는 유지하고 좌표만 적용한다.
+   */
+    if (currentAddressMatches) {
+      setState(() {
+        _selectedStoreLocation =
+            _SelectedStoreLocation(
+              latitude: result.latitude,
+              longitude: result.longitude,
+              address: currentAddress,
+              sourceLabel: '지도 직접 선택',
+            );
+      });
+
+      _showMessage(
+        '입력한 주소와 지도 위치가 일치합니다.',
+      );
+
+      return;
+    }
+
+    /*
+   * 주소가 다르면 기존에 만든 충돌 모달을 사용한다.
+   */
+    final String resolvedAddress =
+    await _showImportedValueConflictDialog(
+      fieldLabel: '주소',
+      sourceLabel: '지도에서 선택한 위치',
+      currentValue: currentAddress,
+      importedValue: mapAddress,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final bool resolvedMatchesMap =
+    normalizedCandidates.contains(
+      _normalizeComparisonText(
+        resolvedAddress,
+      ),
+    );
+
+    setState(() {
+      _addressController.text =
+          resolvedAddress;
+
+      /*
+     * 지도 주소를 선택했거나 직접 입력값이
+     * 카카오 주소와 같을 때만 좌표를 확정한다.
+     *
+     * 기존의 다른 주소를 유지했다면 좌표는 저장하지 않는다.
+     */
+      _selectedStoreLocation =
+      resolvedMatchesMap
+          ? _SelectedStoreLocation(
+        latitude:
+        result.latitude,
+        longitude:
+        result.longitude,
+        address:
+        resolvedAddress,
+        sourceLabel:
+        '지도 직접 선택',
+      )
+          : null;
+    });
+
+    if (!resolvedMatchesMap) {
+      _showMessage(
+        '입력 주소를 유지했습니다. '
+            '현재 주소에 맞는 지도 위치를 다시 선택해 주세요.',
+      );
+      return;
+    }
+
     _showMessage(
-      '다음 단계에서 지도 위치 선택 화면을 연결합니다.',
+      '지도에서 선택한 주소와 위치를 적용했습니다.',
     );
   }
 

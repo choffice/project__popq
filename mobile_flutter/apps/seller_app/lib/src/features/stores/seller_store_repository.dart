@@ -199,6 +199,213 @@ class SellerAddressSearchResult {
   final double longitude;
 }
 
+class SellerKakaoPlaceSearchResult {
+  const SellerKakaoPlaceSearchResult({
+    required this.placeId,
+    required this.placeName,
+    required this.latitude,
+    required this.longitude,
+    this.categoryName,
+    this.phone,
+    this.addressName,
+    this.roadAddressName,
+    this.placeUrl,
+  });
+
+  factory SellerKakaoPlaceSearchResult.fromJson(
+      Map<String, Object?> json,
+      ) {
+    final String placeId =
+        json['placeId']?.toString().trim() ?? '';
+
+    final String placeName =
+        json['placeName']?.toString().trim() ?? '';
+
+    final Object? latitudeValue =
+    json['latitude'];
+
+    final Object? longitudeValue =
+    json['longitude'];
+
+    if (placeId.isEmpty ||
+        placeName.isEmpty) {
+      throw const InvalidResponseFailure(
+        '카카오 업체 검색 결과에 업체 정보가 없습니다.',
+      );
+    }
+
+    if (latitudeValue is! num ||
+        longitudeValue is! num) {
+      throw const InvalidResponseFailure(
+        '카카오 업체 검색 결과의 좌표가 올바르지 않습니다.',
+      );
+    }
+
+    final SellerKakaoPlaceSearchResult result =
+    SellerKakaoPlaceSearchResult(
+      placeId: placeId,
+      placeName: placeName,
+      categoryName: _readNullableString(
+        json['categoryName'],
+      ),
+      phone: _readNullableString(
+        json['phone'],
+      ),
+      addressName: _readNullableString(
+        json['addressName'],
+      ),
+      roadAddressName: _readNullableString(
+        json['roadAddressName'],
+      ),
+      placeUrl: _readNullableString(
+        json['placeUrl'],
+      ),
+      latitude: latitudeValue.toDouble(),
+      longitude: longitudeValue.toDouble(),
+    );
+
+    if (result.displayAddress.isEmpty) {
+      throw const InvalidResponseFailure(
+        '카카오 업체 검색 결과에 주소가 없습니다.',
+      );
+    }
+
+    return result;
+  }
+
+  final String placeId;
+  final String placeName;
+
+  final String? categoryName;
+  final String? phone;
+
+  /// 지번 주소
+  final String? addressName;
+
+  /// 도로명 주소
+  final String? roadAddressName;
+
+  final String? placeUrl;
+
+  final double latitude;
+  final double longitude;
+
+  String get displayAddress {
+    final String roadAddress =
+        roadAddressName?.trim() ?? '';
+
+    if (roadAddress.isNotEmpty) {
+      return roadAddress;
+    }
+
+    return addressName?.trim() ?? '';
+  }
+}
+
+class SellerReverseGeocodeResult {
+  const SellerReverseGeocodeResult({
+    required this.addressName,
+    required this.latitude,
+    required this.longitude,
+    this.roadAddressName,
+    this.jibunAddressName,
+    this.buildingName,
+    this.zoneNo,
+  });
+
+  factory SellerReverseGeocodeResult.fromJson(
+      Map<String, Object?> json,
+      ) {
+    final String addressName =
+        json['addressName']
+            ?.toString()
+            .trim() ??
+            '';
+
+    final Object? latitudeValue =
+    json['latitude'];
+
+    final Object? longitudeValue =
+    json['longitude'];
+
+    if (addressName.isEmpty) {
+      throw const InvalidResponseFailure(
+        '선택한 좌표의 주소가 없습니다.',
+      );
+    }
+
+    if (latitudeValue is! num ||
+        longitudeValue is! num) {
+      throw const InvalidResponseFailure(
+        '좌표 주소 변환 결과가 올바르지 않습니다.',
+      );
+    }
+
+    return SellerReverseGeocodeResult(
+      addressName: addressName,
+      roadAddressName:
+      _readNullableString(
+        json['roadAddressName'],
+      ),
+      jibunAddressName:
+      _readNullableString(
+        json['jibunAddressName'],
+      ),
+      buildingName:
+      _readNullableString(
+        json['buildingName'],
+      ),
+      zoneNo: _readNullableString(
+        json['zoneNo'],
+      ),
+      latitude:
+      latitudeValue.toDouble(),
+      longitude:
+      longitudeValue.toDouble(),
+    );
+  }
+
+  final String addressName;
+  final String? roadAddressName;
+  final String? jibunAddressName;
+  final String? buildingName;
+  final String? zoneNo;
+
+  final double latitude;
+  final double longitude;
+
+  String get displayAddress {
+    final String roadAddress =
+        roadAddressName?.trim() ?? '';
+
+    if (roadAddress.isNotEmpty) {
+      return roadAddress;
+    }
+
+    final String jibunAddress =
+        jibunAddressName?.trim() ?? '';
+
+    if (jibunAddress.isNotEmpty) {
+      return jibunAddress;
+    }
+
+    return addressName;
+  }
+
+  Set<String> get addressCandidates {
+    return <String>{
+      addressName,
+      if (roadAddressName != null)
+        roadAddressName!,
+      if (jibunAddressName != null)
+        jibunAddressName!,
+    }.where(
+          (String value) =>
+      value.trim().isNotEmpty,
+    ).toSet();
+  }
+}
+
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
 
@@ -206,6 +413,17 @@ abstract interface class SellerStoreRepository {
   searchAddresses(
       String query,
       );
+
+  Future<List<SellerKakaoPlaceSearchResult>>
+  searchPlaces(
+      String query,
+      );
+
+  Future<SellerReverseGeocodeResult>
+  reverseGeocode({
+    required double latitude,
+    required double longitude,
+  });
 
   Future<SellerStore> findOne(
       int storeId,
@@ -331,6 +549,78 @@ class ApiSellerStoreRepository
         )
             .toList(
           growable: false,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<List<SellerKakaoPlaceSearchResult>>
+  searchPlaces(
+      String query,
+      ) {
+    return _apiClient.get<
+        List<SellerKakaoPlaceSearchResult>>(
+      '/api/v1/seller/location/places',
+      query: <String, Object?>{
+        'query': query,
+      },
+      decode: (Object? value) {
+        if (value is! List) {
+          throw const InvalidResponseFailure(
+            '카카오 업체 검색 응답 형식이 올바르지 않습니다.',
+          );
+        }
+
+        return value
+            .map(
+              (Object? item) {
+            if (item is! Map) {
+              throw const InvalidResponseFailure(
+                '카카오 업체 검색 결과 형식이 올바르지 않습니다.',
+              );
+            }
+
+            return SellerKakaoPlaceSearchResult
+                .fromJson(
+              Map<String, Object?>.from(
+                item,
+              ),
+            );
+          },
+        )
+            .toList(
+          growable: false,
+        );
+      },
+    );
+  }
+
+  @override
+  Future<SellerReverseGeocodeResult>
+  reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) {
+    return _apiClient.get<
+        SellerReverseGeocodeResult>(
+      '/api/v1/seller/location/reverse',
+      query: <String, Object?>{
+        'latitude': latitude,
+        'longitude': longitude,
+      },
+      decode: (Object? value) {
+        if (value is! Map) {
+          throw const InvalidResponseFailure(
+            '좌표 주소 변환 응답 형식이 올바르지 않습니다.',
+          );
+        }
+
+        return SellerReverseGeocodeResult
+            .fromJson(
+          Map<String, Object?>.from(
+            value,
+          ),
         );
       },
     );
@@ -590,6 +880,57 @@ class MemorySellerStoreRepository
         longitude: 129.059319,
       ),
     ];
+  }
+
+  @override
+  Future<List<SellerKakaoPlaceSearchResult>>
+  searchPlaces(
+      String query,
+      ) async {
+    final String normalizedQuery =
+    query.trim();
+
+    if (normalizedQuery.isEmpty) {
+      return const <
+          SellerKakaoPlaceSearchResult>[];
+    }
+
+    return const <SellerKakaoPlaceSearchResult>[
+      SellerKakaoPlaceSearchResult(
+        placeId: 'memory-place-1',
+        placeName: '포포컴퍼니 서면점',
+        categoryName: '음식점 > 카페',
+        phone: '051-123-4567',
+        addressName:
+        '부산 부산진구 부전동 573-1',
+        roadAddressName:
+        '부산 부산진구 중앙대로 730',
+        placeUrl:
+        'https://place.map.kakao.com/1',
+        latitude: 35.157746,
+        longitude: 129.059319,
+      ),
+    ];
+  }
+
+  @override
+  Future<SellerReverseGeocodeResult>
+  reverseGeocode({
+    required double latitude,
+    required double longitude,
+  }) async {
+    return SellerReverseGeocodeResult(
+      addressName:
+      '부산 부산진구 중앙대로 730',
+      roadAddressName:
+      '부산 부산진구 중앙대로 730',
+      jibunAddressName:
+      '부산 부산진구 부전동 573-1',
+      buildingName: '서면역',
+      zoneNo: '47291',
+      latitude: latitude,
+      longitude: longitude,
+    );
   }
 
   @override

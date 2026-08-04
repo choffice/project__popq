@@ -3,6 +3,8 @@ package com.example.project_popq.store.service;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.store.dto.KakaoAddressSearchResponse;
+import com.example.project_popq.store.dto.KakaoPlaceSearchResponse;
+import com.example.project_popq.store.dto.KakaoReverseGeocodeResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -120,6 +122,362 @@ public class KakaoLocationService {
           "카카오 주소 검색 중 오류가 발생했습니다."
       );
     }
+  }
+
+  public List<KakaoPlaceSearchResponse>
+  searchPlaces(
+      String query
+  ) {
+    String normalizedQuery =
+        query == null
+            ? ""
+            : query.trim();
+
+    if (normalizedQuery.isEmpty()) {
+      throw new BusinessException(
+          ErrorCode.INVALID_REQUEST,
+          "검색할 업체명이나 키워드를 입력해 주세요."
+      );
+    }
+
+    if (restApiKey.isEmpty()) {
+      throw new BusinessException(
+          ErrorCode.KAKAO_API_NOT_CONFIGURED,
+          "POPQ_KAKAO_REST_API_KEY가 설정되지 않았습니다."
+      );
+    }
+
+    try {
+      Map<?, ?> response =
+          restClient.get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path(
+                              "/v2/local/search/keyword.json"
+                          )
+                          .queryParam(
+                              "query",
+                              normalizedQuery
+                          )
+                          .queryParam(
+                              "size",
+                              15
+                          )
+                          .build()
+              )
+              .header(
+                  HttpHeaders.AUTHORIZATION,
+                  "KakaoAK " + restApiKey
+              )
+              .retrieve()
+              .body(Map.class);
+
+      if (response == null) {
+        return List.of();
+      }
+
+      Object documentsValue =
+          response.get("documents");
+
+      if (!(documentsValue
+          instanceof List<?> documents)) {
+        return List.of();
+      }
+
+      List<KakaoPlaceSearchResponse> results =
+          new ArrayList<>();
+
+      for (Object documentValue : documents) {
+        if (!(documentValue
+            instanceof Map<?, ?> document)) {
+          continue;
+        }
+
+        KakaoPlaceSearchResponse result =
+            parsePlaceDocument(
+                document
+            );
+
+        if (result != null) {
+          results.add(result);
+        }
+      }
+
+      return results;
+    } catch (BusinessException exception) {
+      throw exception;
+    } catch (
+        RestClientException
+        | NumberFormatException exception
+    ) {
+      throw new BusinessException(
+          ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+          "카카오 업체 검색 중 오류가 발생했습니다."
+      );
+    }
+  }
+
+  public KakaoReverseGeocodeResponse reverseGeocode(
+      double latitude,
+      double longitude
+  ) {
+    if (latitude < -90.0
+        || latitude > 90.0
+        || longitude < -180.0
+        || longitude > 180.0) {
+      throw new BusinessException(
+          ErrorCode.INVALID_REQUEST,
+          "위도 또는 경도 범위가 올바르지 않습니다."
+      );
+    }
+
+    if (restApiKey.isEmpty()) {
+      throw new BusinessException(
+          ErrorCode.KAKAO_API_NOT_CONFIGURED,
+          "POPQ_KAKAO_REST_API_KEY가 설정되지 않았습니다."
+      );
+    }
+
+    try {
+      Map<?, ?> response =
+          restClient.get()
+              .uri(
+                  uriBuilder ->
+                      uriBuilder
+                          .path(
+                              "/v2/local/geo/coord2address.json"
+                          )
+                          .queryParam(
+                              "x",
+                              longitude
+                          )
+                          .queryParam(
+                              "y",
+                              latitude
+                          )
+                          .queryParam(
+                              "input_coord",
+                              "WGS84"
+                          )
+                          .build()
+              )
+              .header(
+                  HttpHeaders.AUTHORIZATION,
+                  "KakaoAK " + restApiKey
+              )
+              .retrieve()
+              .body(Map.class);
+
+      if (response == null) {
+        throw new BusinessException(
+            ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+            "선택한 위치의 주소를 찾지 못했습니다."
+        );
+      }
+
+      Object documentsValue =
+          response.get("documents");
+
+      if (!(documentsValue
+          instanceof List<?> documents)
+          || documents.isEmpty()) {
+        throw new BusinessException(
+            ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+            "선택한 위치의 주소를 찾지 못했습니다."
+        );
+      }
+
+      Object firstDocument =
+          documents.get(0);
+
+      if (!(firstDocument
+          instanceof Map<?, ?> document)) {
+        throw new BusinessException(
+            ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+            "카카오 주소 응답 형식이 올바르지 않습니다."
+        );
+      }
+
+      return parseReverseDocument(
+          document,
+          latitude,
+          longitude
+      );
+    } catch (BusinessException exception) {
+      throw exception;
+    } catch (
+        RestClientException
+        | NumberFormatException exception
+    ) {
+      throw new BusinessException(
+          ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+          "선택한 위치의 주소를 확인하지 못했습니다."
+      );
+    }
+  }
+
+  private KakaoReverseGeocodeResponse
+  parseReverseDocument(
+      Map<?, ?> document,
+      double latitude,
+      double longitude
+  ) {
+    Map<?, ?> roadAddress =
+        readMap(
+            document,
+            "road_address"
+        );
+
+    Map<?, ?> jibunAddress =
+        readMap(
+            document,
+            "address"
+        );
+
+    String roadAddressName =
+        readString(
+            roadAddress,
+            "address_name"
+        );
+
+    String jibunAddressName =
+        readString(
+            jibunAddress,
+            "address_name"
+        );
+
+    String addressName =
+        firstNotBlank(
+            roadAddressName,
+            jibunAddressName
+        );
+
+    if (addressName.isEmpty()) {
+      throw new BusinessException(
+          ErrorCode.KAKAO_LOCATION_UNAVAILABLE,
+          "선택한 위치에서 사용할 수 있는 주소를 찾지 못했습니다."
+      );
+    }
+
+    String buildingName =
+        readString(
+            roadAddress,
+            "building_name"
+        );
+
+    String zoneNo =
+        readString(
+            roadAddress,
+            "zone_no"
+        );
+
+    return new KakaoReverseGeocodeResponse(
+        addressName,
+        emptyToNull(roadAddressName),
+        emptyToNull(jibunAddressName),
+        emptyToNull(buildingName),
+        emptyToNull(zoneNo),
+        latitude,
+        longitude
+    );
+  }
+
+  private KakaoPlaceSearchResponse parsePlaceDocument(
+      Map<?, ?> document
+  ) {
+    String placeId =
+        readString(
+            document,
+            "id"
+        );
+
+    String placeName =
+        readString(
+            document,
+            "place_name"
+        );
+
+    String longitudeText =
+        readString(
+            document,
+            "x"
+        );
+
+    String latitudeText =
+        readString(
+            document,
+            "y"
+        );
+
+    if (placeId.isEmpty()
+        || placeName.isEmpty()
+        || longitudeText.isEmpty()
+        || latitudeText.isEmpty()) {
+      return null;
+    }
+
+    double longitude =
+        Double.parseDouble(
+            longitudeText
+        );
+
+    double latitude =
+        Double.parseDouble(
+            latitudeText
+        );
+
+    String categoryName =
+        emptyToNull(
+            readString(
+                document,
+                "category_name"
+            )
+        );
+
+    String phone =
+        emptyToNull(
+            readString(
+                document,
+                "phone"
+            )
+        );
+
+    String jibunAddressName =
+        emptyToNull(
+            readString(
+                document,
+                "address_name"
+            )
+        );
+
+    String roadAddressName =
+        emptyToNull(
+            readString(
+                document,
+                "road_address_name"
+            )
+        );
+
+    String placeUrl =
+        emptyToNull(
+            readString(
+                document,
+                "place_url"
+            )
+        );
+
+    return new KakaoPlaceSearchResponse(
+        placeId,
+        placeName,
+        categoryName,
+        phone,
+        jibunAddressName,
+        roadAddressName,
+        placeUrl,
+        latitude,
+        longitude
+    );
   }
 
   private KakaoAddressSearchResponse parseDocument(

@@ -5,14 +5,18 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerLocationController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoAddressSearchResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/KakaoLocationService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/business_registration_ocr_service.dart" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoPlaceSearchResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoReverseGeocodeResponse.java" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_location_picker_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerLocationController.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerLocationController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/KakaoLocationService.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/KakaoLocationService.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/src/main/AndroidManifest.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -303,7 +307,7 @@
       <workItem from="1785721575904" duration="45000" />
       <workItem from="1785721633737" duration="1352000" />
       <workItem from="1785747424594" duration="1576000" />
-      <workItem from="1785800659608" duration="16751000" />
+      <workItem from="1785800659608" duration="20731000" />
     </task>
     <servers />
   </component>
