@@ -143,6 +143,10 @@ abstract interface class SellerStoreRepository {
 
   Future<SellerStore> createDevelopmentStore();
 
+  Future<String> uploadRepresentativeImage(
+      String filePath,
+      );
+
   Future<SellerStore> create({
     required String storeType,
     required String name,
@@ -242,6 +246,35 @@ class ApiSellerStoreRepository
       storeType: 'LOCAL_STORE',
       name: 'POPQ 개발 스토어',
       description: '판매자 앱 개발용 자동 생성 스토어',
+    );
+  }
+
+  @override
+  Future<String> uploadRepresentativeImage(
+      String filePath,
+      ) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (Object? value) {
+        final Map<String, Object?> json =
+        Map<String, Object?>.from(
+          value as Map,
+        );
+
+        final Object? imageUrl =
+        json['imageUrl'];
+
+        if (imageUrl is! String ||
+            imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure(
+            '업로드된 이미지 URL이 없습니다.',
+          );
+        }
+
+        return imageUrl;
+      },
     );
   }
 
@@ -439,6 +472,13 @@ class MemorySellerStoreRepository
       name: 'POPQ 개발 스토어',
       description: '판매자 앱 개발용 자동 생성 스토어',
     );
+  }
+
+  @override
+  Future<String> uploadRepresentativeImage(
+      String filePath,
+      ) async {
+    return filePath;
   }
 
   @override

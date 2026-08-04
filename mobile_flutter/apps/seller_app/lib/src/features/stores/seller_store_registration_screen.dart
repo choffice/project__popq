@@ -1,9 +1,33 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
+
+enum _ImportedValueChoice {
+  current,
+  imported,
+  manual,
+}
+
+class _ImportedStoreInformation {
+  const _ImportedStoreInformation({
+    required this.sourceLabel,
+    this.name,
+    this.address,
+    this.phone,
+  });
+
+  final String sourceLabel;
+  final String? name;
+  final String? address;
+  final String? phone;
+}
 
 class SellerStoreRegistrationScreen extends StatefulWidget {
   const SellerStoreRegistrationScreen({
@@ -73,6 +97,12 @@ class _SellerStoreRegistrationScreenState
   final TextEditingController _tagController =
   TextEditingController();
 
+  final ImagePicker _imagePicker = ImagePicker();
+
+  XFile? _selectedRepresentativeImage;
+
+  bool _pickingRepresentativeImage = false;
+
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
 
@@ -88,6 +118,17 @@ class _SellerStoreRegistrationScreenState
 
   bool _submitting = false;
   bool _registrationCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback(
+          (Duration _) {
+        _recoverLostRepresentativeImage();
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -137,6 +178,13 @@ class _SellerStoreRegistrationScreenState
               const SizedBox(
                 height: PopqSpacing.lg,
               ),
+
+              _buildInformationImportCard(context),
+
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+
               _buildBasicInformationCard(context),
               const SizedBox(
                 height: PopqSpacing.md,
@@ -181,6 +229,92 @@ class _SellerStoreRegistrationScreenState
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInformationImportCard(
+      BuildContext context,
+      ) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(
+          PopqSpacing.md,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '사업장 정보 자동 입력',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleLarge,
+            ),
+            const SizedBox(
+              height: PopqSpacing.sm,
+            ),
+            Text(
+              '사업자등록증을 촬영하거나 카카오맵에 등록된 업체 정보를 불러올 수 있습니다.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall,
+            ),
+            const SizedBox(
+              height: PopqSpacing.md,
+            ),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key(
+                  'import-business-registration',
+                ),
+                onPressed: _submitting
+                    ? null
+                    : _openBusinessRegistrationImport,
+                icon: const Icon(
+                  Icons.document_scanner_outlined,
+                ),
+                label: const Text(
+                  '사업자등록증으로 자동 입력',
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              height: PopqSpacing.sm,
+            ),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key(
+                  'import-kakao-place',
+                ),
+                onPressed: _submitting
+                    ? null
+                    : _openKakaoPlaceImport,
+                icon: const Icon(
+                  Icons.map_outlined,
+                ),
+                label: const Text(
+                  '카카오맵 업체 정보 불러오기',
+                ),
+              ),
+            ),
+
+            const SizedBox(
+              height: PopqSpacing.sm,
+            ),
+
+            Text(
+              '불러온 정보는 등록 전에 직접 확인하고 수정할 수 있습니다.',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall,
+            ),
+          ],
         ),
       ),
     );
@@ -418,52 +552,228 @@ class _SellerStoreRegistrationScreenState
             const SizedBox(
               height: PopqSpacing.sm,
             ),
-            TextFormField(
-              controller:
-              _imageUrlController,
-              enabled: !_submitting,
-              maxLength: 1000,
-              keyboardType:
-              TextInputType.url,
-              textInputAction:
-              TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: '대표 이미지 URL',
-                hintText:
-                'https://example.com/store.jpg',
-                prefixIcon: Icon(
-                  Icons.image_outlined,
-                ),
-                helperText:
-                '이미지 업로드 API 연결 전까지 URL로 등록합니다.',
-              ),
-              validator: (String? value) {
-                final String imageUrl =
-                    value?.trim() ?? '';
-
-                if (imageUrl.isEmpty) {
-                  return null;
-                }
-
-                final Uri? uri =
-                Uri.tryParse(imageUrl);
-
-                final bool validScheme =
-                    uri?.scheme == 'http' ||
-                        uri?.scheme == 'https';
-
-                if (uri == null ||
-                    !validScheme ||
-                    uri.host.isEmpty) {
-                  return '올바른 이미지 URL을 입력해 주세요.';
-                }
-
-                return null;
-              },
-            ),
+            _buildRepresentativeImageSection(context),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildRepresentativeImageSection(
+      BuildContext context,
+      ) {
+    final XFile? selectedImage =
+        _selectedRepresentativeImage;
+
+    final bool imageActionDisabled =
+        _submitting ||
+            _pickingRepresentativeImage;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '대표 이미지',
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium,
+        ),
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+        Text(
+          '카메라로 촬영하거나 갤러리에서 사업장 대표 사진을 선택해 주세요.',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall,
+        ),
+        const SizedBox(
+          height: PopqSpacing.md,
+        ),
+        AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: selectedImage == null
+                ? DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(context)
+                    .colorScheme
+                    .surfaceContainerHighest,
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_photo_alternate_outlined,
+                      size: 48,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurfaceVariant,
+                    ),
+                    const SizedBox(
+                      height: PopqSpacing.sm,
+                    ),
+                    Text(
+                      '선택된 대표 사진이 없습니다.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            )
+                : Image.file(
+              File(selectedImage.path),
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (
+                  BuildContext context,
+                  Object error,
+                  StackTrace? stackTrace,
+                  ) {
+                return const Center(
+                  child: Text(
+                    '이미지를 표시하지 못했습니다.',
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        const SizedBox(
+          height: PopqSpacing.md,
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key(
+                  'take-representative-image',
+                ),
+                onPressed: imageActionDisabled
+                    ? null
+                    : () {
+                  _pickRepresentativeImage(
+                    ImageSource.camera,
+                  );
+                },
+                icon: const Icon(
+                  Icons.photo_camera_outlined,
+                ),
+                label: const Text(
+                  '카메라 촬영',
+                ),
+              ),
+            ),
+            const SizedBox(
+              width: PopqSpacing.sm,
+            ),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key(
+                  'select-representative-image',
+                ),
+                onPressed: imageActionDisabled
+                    ? null
+                    : () {
+                  _pickRepresentativeImage(
+                    ImageSource.gallery,
+                  );
+                },
+                icon: const Icon(
+                  Icons.photo_library_outlined,
+                ),
+                label: const Text(
+                  '갤러리 선택',
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (_pickingRepresentativeImage) ...[
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          const LinearProgressIndicator(),
+        ],
+        if (selectedImage != null) ...[
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _submitting
+                  ? null
+                  : _removeRepresentativeImage,
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+              ),
+              label: const Text(
+                '선택한 사진 제거',
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+        Text(
+          '선택한 사진은 사업장 등록 시 서버에 업로드됩니다.',
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall,
+        ),
+        const SizedBox(
+          height: PopqSpacing.md,
+        ),
+        const Divider(),
+        const SizedBox(
+          height: PopqSpacing.sm,
+        ),
+        TextFormField(
+          controller: _imageUrlController,
+          enabled: !_submitting,
+          maxLength: 1000,
+          keyboardType: TextInputType.url,
+          textInputAction: TextInputAction.next,
+          decoration: const InputDecoration(
+            labelText: '대표 이미지 URL',
+            hintText: 'https://example.com/store.jpg',
+            prefixIcon: Icon(
+              Icons.link_rounded,
+            ),
+            helperText:
+            '사진을 선택하지 않은 경우에만 이 URL을 사용합니다.',
+          ),
+          validator: (String? value) {
+            final String imageUrl =
+                value?.trim() ?? '';
+
+            if (imageUrl.isEmpty) {
+              return null;
+            }
+
+            final Uri? uri =
+            Uri.tryParse(imageUrl);
+
+            final bool validScheme =
+                uri?.scheme == 'http' ||
+                    uri?.scheme == 'https';
+
+            if (uri == null ||
+                !validScheme ||
+                uri.host.isEmpty) {
+              return '올바른 이미지 URL을 입력해 주세요.';
+            }
+
+            return null;
+          },
+        ),
+      ],
     );
   }
 
@@ -788,6 +1098,410 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
+  Future<void> _openBusinessRegistrationImport() async {
+    if (_submitting) {
+      return;
+    }
+
+    // 다음 OCR 단계에서 실제 인식 결과로 교체한다.
+    const _ImportedStoreInformation sample =
+    _ImportedStoreInformation(
+      sourceLabel: '사업자등록증',
+      name: '포포컴퍼니',
+      address: '부산광역시 부산진구 중앙대로 123',
+      phone: '051-123-4567',
+    );
+
+    await _applyImportedInformation(sample);
+  }
+
+  Future<void> _openKakaoPlaceImport() async {
+    if (_submitting) {
+      return;
+    }
+
+    // 다음 카카오 API 단계에서 실제 선택한 장소 정보로 교체한다.
+    const _ImportedStoreInformation sample =
+    _ImportedStoreInformation(
+      sourceLabel: '카카오맵',
+      name: '포포컴퍼니 서면점',
+      address: '부산광역시 부산진구 서면로 45',
+      phone: '051-987-6543',
+    );
+
+    await _applyImportedInformation(sample);
+  }
+
+  Future<void> _applyImportedInformation(
+      _ImportedStoreInformation information,
+      ) async {
+    if (_submitting) {
+      return;
+    }
+
+    final String resolvedName = await _resolveImportedText(
+      fieldLabel: '사업장명',
+      sourceLabel: information.sourceLabel,
+      currentValue: _nameController.text,
+      importedValue: information.name,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final String resolvedAddress = await _resolveImportedText(
+      fieldLabel: '주소',
+      sourceLabel: information.sourceLabel,
+      currentValue: _addressController.text,
+      importedValue: information.address,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    final String resolvedPhone = await _resolveImportedText(
+      fieldLabel: '사업장 연락처',
+      sourceLabel: information.sourceLabel,
+      currentValue: _phoneController.text,
+      importedValue: information.phone,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _nameController.text = resolvedName;
+      _addressController.text = resolvedAddress;
+      _phoneController.text = resolvedPhone;
+    });
+
+    _showMessage(
+      '${information.sourceLabel} 정보를 입력폼에 반영했습니다.',
+    );
+  }
+
+  Future<String> _resolveImportedText({
+    required String fieldLabel,
+    required String sourceLabel,
+    required String currentValue,
+    required String? importedValue,
+  }) async {
+    final String current = currentValue.trim();
+    final String imported = importedValue?.trim() ?? '';
+
+    // 불러온 값이 없으면 기존 값을 그대로 둔다.
+    if (imported.isEmpty) {
+      return current;
+    }
+
+    // 사용자가 아직 입력하지 않았다면 바로 자동 입력한다.
+    if (current.isEmpty) {
+      return imported;
+    }
+
+    // 공백과 대소문자 차이만 있다면 같은 값으로 처리한다.
+    if (_normalizeComparisonText(current) ==
+        _normalizeComparisonText(imported)) {
+      return current;
+    }
+
+    return _showImportedValueConflictDialog(
+      fieldLabel: fieldLabel,
+      sourceLabel: sourceLabel,
+      currentValue: current,
+      importedValue: imported,
+    );
+  }
+
+  String _normalizeComparisonText(
+      String value,
+      ) {
+    return value
+        .replaceAll(
+      RegExp(r'\s+'),
+      '',
+    )
+        .toLowerCase();
+  }
+
+  Future<String> _showImportedValueConflictDialog({
+    required String fieldLabel,
+    required String sourceLabel,
+    required String currentValue,
+    required String importedValue,
+  }) async {
+    final TextEditingController manualController =
+    TextEditingController(
+      text: currentValue,
+    );
+
+    _ImportedValueChoice selectedChoice =
+        _ImportedValueChoice.current;
+
+    String? manualInputError;
+
+    final String? result = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (
+              BuildContext context,
+              StateSetter setDialogState,
+              ) {
+            return AlertDialog(
+              title: Text(
+                '$fieldLabel 정보 확인',
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$sourceLabel에서 불러온 정보가 현재 입력한 내용과 다릅니다.',
+                    ),
+                    const SizedBox(
+                      height: PopqSpacing.md,
+                    ),
+
+                    RadioListTile<_ImportedValueChoice>(
+                      contentPadding: EdgeInsets.zero,
+                      value:
+                      _ImportedValueChoice.current,
+                      groupValue: selectedChoice,
+                      title: const Text(
+                        '현재 입력 유지',
+                      ),
+                      subtitle: Text(
+                        currentValue,
+                      ),
+                      onChanged: (
+                          _ImportedValueChoice? value,
+                          ) {
+                        if (value == null) {
+                          return;
+                        }
+
+                        setDialogState(() {
+                          selectedChoice = value;
+                          manualInputError = null;
+                        });
+                      },
+                    ),
+
+                    RadioListTile<_ImportedValueChoice>(
+                      contentPadding: EdgeInsets.zero,
+                      value:
+                      _ImportedValueChoice.imported,
+                      groupValue: selectedChoice,
+                      title: Text(
+                        '$sourceLabel 정보 사용',
+                      ),
+                      subtitle: Text(
+                        importedValue,
+                      ),
+                      onChanged: (
+                          _ImportedValueChoice? value,
+                          ) {
+                        if (value == null) {
+                          return;
+                        }
+
+                        setDialogState(() {
+                          selectedChoice = value;
+                          manualInputError = null;
+                        });
+                      },
+                    ),
+
+                    RadioListTile<_ImportedValueChoice>(
+                      contentPadding: EdgeInsets.zero,
+                      value:
+                      _ImportedValueChoice.manual,
+                      groupValue: selectedChoice,
+                      title: const Text(
+                        '직접 입력',
+                      ),
+                      onChanged: (
+                          _ImportedValueChoice? value,
+                          ) {
+                        if (value == null) {
+                          return;
+                        }
+
+                        setDialogState(() {
+                          selectedChoice = value;
+                          manualInputError = null;
+                        });
+                      },
+                    ),
+
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: PopqSpacing.md,
+                      ),
+                      child: TextField(
+                        controller: manualController,
+                        enabled: selectedChoice ==
+                            _ImportedValueChoice.manual,
+                        decoration: InputDecoration(
+                          labelText: '$fieldLabel 직접 입력',
+                          errorText: manualInputError,
+                        ),
+                        onTap: () {
+                          if (selectedChoice !=
+                              _ImportedValueChoice.manual) {
+                            setDialogState(() {
+                              selectedChoice =
+                                  _ImportedValueChoice
+                                      .manual;
+                              manualInputError = null;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(
+                      currentValue,
+                    );
+                  },
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (selectedChoice ==
+                        _ImportedValueChoice.current) {
+                      Navigator.of(dialogContext).pop(
+                        currentValue,
+                      );
+                      return;
+                    }
+
+                    if (selectedChoice ==
+                        _ImportedValueChoice.imported) {
+                      Navigator.of(dialogContext).pop(
+                        importedValue,
+                      );
+                      return;
+                    }
+
+                    final String manualValue =
+                    manualController.text.trim();
+
+                    if (manualValue.isEmpty) {
+                      setDialogState(() {
+                        manualInputError =
+                        '$fieldLabel을 입력해 주세요.';
+                      });
+                      return;
+                    }
+
+                    Navigator.of(dialogContext).pop(
+                      manualValue,
+                    );
+                  },
+                  child: const Text('확인'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    manualController.dispose();
+
+    return result ?? currentValue;
+  }
+
+  Future<void> _pickRepresentativeImage(
+      ImageSource source,
+      ) async {
+    if (_submitting ||
+        _pickingRepresentativeImage) {
+      return;
+    }
+
+    setState(() {
+      _pickingRepresentativeImage = true;
+    });
+
+    try {
+      final XFile? selectedImage =
+      await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (selectedImage == null) {
+        setState(() {
+          _pickingRepresentativeImage = false;
+        });
+
+        return;
+      }
+
+      setState(() {
+        _selectedRepresentativeImage =
+            selectedImage;
+
+        _pickingRepresentativeImage = false;
+      });
+
+      _showMessage(
+        source == ImageSource.camera
+            ? '촬영한 사진을 대표 이미지로 선택했습니다.'
+            : '갤러리 사진을 대표 이미지로 선택했습니다.',
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pickingRepresentativeImage = false;
+      });
+
+      _showMessage(
+        source == ImageSource.camera
+            ? '카메라를 실행하지 못했습니다.'
+            : '갤러리에서 사진을 불러오지 못했습니다.',
+      );
+    }
+  }
+
+  void _removeRepresentativeImage() {
+    if (_submitting) {
+      return;
+    }
+
+    setState(() {
+      _selectedRepresentativeImage = null;
+    });
+
+    _showMessage(
+      '선택한 대표 사진을 제거했습니다.',
+    );
+  }
+
   Future<void> _selectTime({
     required bool isOpenTime,
   }) async {
@@ -916,6 +1630,33 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
+      String? representativeImageUrl =
+      _emptyToNull(
+        _imageUrlController.text,
+      );
+
+      final XFile? selectedImage =
+          _selectedRepresentativeImage;
+
+      if (selectedImage != null) {
+        _showMessage(
+          '대표 사진을 업로드하고 있습니다.',
+        );
+
+        representativeImageUrl =
+        await widget.repository
+            .uploadRepresentativeImage(
+          selectedImage.path,
+        );
+
+        if (!mounted) {
+          return;
+        }
+
+        _imageUrlController.text =
+            representativeImageUrl;
+      }
+
       final SellerStore created =
       await widget.repository.create(
         storeType: _storeType,
@@ -930,9 +1671,7 @@ class _SellerStoreRegistrationScreenState
             .trim(),
         representativeCategory:
         _representativeCategory,
-        imageUrl: _emptyToNull(
-          _imageUrlController.text,
-        ),
+        imageUrl: representativeImageUrl,
         phone:
         _phoneController.text.trim(),
         openTime: _toApiTime(
@@ -983,6 +1722,18 @@ class _SellerStoreRegistrationScreenState
             created,
           );
         },
+      );
+    } on PopqFailure catch (failure) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _submitting = false;
+      });
+
+      _showMessage(
+        failure.message,
       );
     } catch (_) {
       if (!mounted) {
@@ -1045,5 +1796,44 @@ class _SellerStoreRegistrationScreenState
           content: Text(message),
         ),
       );
+  }
+
+  Future<void> _recoverLostRepresentativeImage() async {
+    try {
+      final LostDataResponse response =
+      await _imagePicker.retrieveLostData();
+
+      if (response.isEmpty || !mounted) {
+        return;
+      }
+
+      final List<XFile>? files = response.files;
+
+      if (files != null && files.isNotEmpty) {
+        setState(() {
+          _selectedRepresentativeImage = files.first;
+        });
+
+        _showMessage(
+          '이전에 선택하던 대표 사진을 복구했습니다.',
+        );
+
+        return;
+      }
+
+      if (response.exception != null) {
+        _showMessage(
+          '이전에 선택하던 이미지를 복구하지 못했습니다.',
+        );
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      _showMessage(
+        '이미지 선택 정보를 복구하지 못했습니다.',
+      );
+    }
   }
 }
