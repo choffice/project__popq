@@ -3,8 +3,10 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../announcements/seller_announcement_repository.dart';
 import '../announcements/seller_announcement_screen.dart';
+import '../home/seller_analytics_repository.dart';
 import '../products/seller_product_list_screen.dart';
 import '../products/seller_product_repository.dart';
+import '../sales/seller_sales_screen.dart';
 import '../stores/seller_store_repository.dart';
 import '../stores/seller_store_selection_controller.dart';
 
@@ -13,6 +15,7 @@ class SellerOperationScreen extends StatefulWidget {
     required this.storeRepository,
     required this.announcementRepository,
     required this.productRepository,
+    required this.analyticsRepository,
     required this.selectionController,
     super.key,
   });
@@ -20,6 +23,7 @@ class SellerOperationScreen extends StatefulWidget {
   final SellerStoreRepository storeRepository;
   final SellerAnnouncementRepository announcementRepository;
   final SellerProductRepository productRepository;
+  final SellerAnalyticsRepository analyticsRepository;
   final SellerStoreSelectionController selectionController;
 
   @override
@@ -83,6 +87,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 '메뉴 관리',
                 Icons.restaurant_menu_outlined,
               ),
+              _sectionChip(
+                3,
+                '매출',
+                Icons.query_stats_outlined,
+              ),
             ],
           ),
         ),
@@ -96,8 +105,13 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                   _store!.myRole == 'MANAGER',
               repository: widget.announcementRepository,
             ),
-            _ => SellerProductListScreen(
+            2 => SellerProductListScreen(
               repository: widget.productRepository,
+              selectionController: widget.selectionController,
+            ),
+            _ => SellerSalesScreen(
+              storeRepository: widget.storeRepository,
+              analyticsRepository: widget.analyticsRepository,
               selectionController: widget.selectionController,
             ),
           },

@@ -38,7 +38,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     SellerRoutes.operations,
     SellerRoutes.orders,
     SellerRoutes.customers,
-    SellerRoutes.sales,
+    SellerRoutes.my,
   ];
 
   static const List<String> _titles = [
@@ -46,7 +46,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     '운영',
     '주문 관리',
     '고객',
-    '매출',
+    '마이',
   ];
 
   static const Duration _unreadPollingInterval = Duration(
@@ -240,12 +240,12 @@ class _SellerRootScreenState extends State<SellerRootScreen>
         ),
         const NavigationDestination(
           icon: Icon(
-            Icons.query_stats_outlined,
+            Icons.person_outline_rounded,
           ),
           selectedIcon: Icon(
-            Icons.query_stats_rounded,
+            Icons.person_rounded,
           ),
-          label: '매출',
+          label: '마이',
         ),
       ],
       body: widget.child,
