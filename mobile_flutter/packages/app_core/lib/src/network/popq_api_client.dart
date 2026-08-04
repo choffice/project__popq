@@ -59,6 +59,106 @@ class PopqApiClient {
     return _send(method: 'DELETE', path: path, decode: decode);
   }
 
+  Future<T> postMultipartFile<T>(
+      String path, {
+        required String fieldName,
+        required String filePath,
+        required ApiDataDecoder<T> decode,
+        Duration timeout = const Duration(
+          seconds: 60,
+        ),
+      }) async {
+    final Uri uri = _buildUri(
+      path,
+      const <String, Object?>{},
+    );
+
+    final String? accessToken =
+    await accessTokenReader();
+
+    final http.MultipartRequest request =
+    http.MultipartRequest(
+      'POST',
+      uri,
+    );
+
+    request.headers.addAll(
+      <String, String>{
+        'Accept': 'application/json',
+        if (accessToken != null &&
+            accessToken.isNotEmpty)
+          'Authorization':
+          'Bearer $accessToken',
+      },
+    );
+
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        fieldName,
+        filePath,
+      ),
+    );
+
+    late http.Response response;
+
+    try {
+      final http.StreamedResponse streamedResponse =
+      await _httpClient
+          .send(request)
+          .timeout(timeout);
+
+      response = await http.Response
+          .fromStream(streamedResponse)
+          .timeout(timeout);
+    } on http.ClientException {
+      throw const NetworkFailure();
+    } on TimeoutException {
+      throw const NetworkFailure(
+        '이미지 업로드 응답이 지연되고 있습니다.',
+      );
+    }
+
+    final ApiEnvelope<T> envelope =
+    _decodeEnvelope(
+      response,
+      decode,
+    );
+
+    if (response.statusCode == 401) {
+      throw AuthenticationFailure(
+        envelope.error?.message ??
+            '로그인이 필요합니다.',
+      );
+    }
+
+    final bool isSuccessfulStatus =
+        response.statusCode >= 200 &&
+            response.statusCode < 300;
+
+    if (!isSuccessfulStatus ||
+        !envelope.success) {
+      final error = envelope.error;
+
+      throw ApiRequestFailure(
+        code: error?.code ??
+            'HTTP_${response.statusCode}',
+        statusCode: response.statusCode,
+        message: error?.message ??
+            '이미지를 업로드하지 못했습니다.',
+        details:
+        error?.details ?? const {},
+      );
+    }
+
+    if (envelope.data == null) {
+      throw const InvalidResponseFailure(
+        '이미지 업로드 응답이 비어 있습니다.',
+      );
+    }
+
+    return envelope.data as T;
+  }
+
   Future<T> _send<T>({
     required String method,
     required String path,
