@@ -130,7 +130,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen> {
                           style: const TextStyle(fontWeight: FontWeight.w800),
                         ),
                         subtitle: Text(
-                          '${order.orderPublicId}\n'
+                          '${formatPopqOrderNumber(order.orderPublicId)}\n'
                           '${sellerOrderTypeLabel(order.orderType)} · '
                           '${order.totalQuantity}개',
                         ),

@@ -672,7 +672,10 @@ class _OrderSummaryCard extends StatelessWidget {
             height: PopqSpacing.xs,
           ),
           SelectableText(
-            order.orderPublicId,
+            formatPopqOrderNumber(
+              order.orderPublicId,
+              includeLabel: false,
+            ),
             style:
             theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,

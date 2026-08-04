@@ -518,7 +518,7 @@ class _OrderNumberSection extends StatelessWidget {
             height: PopqSpacing.xs,
           ),
           SelectableText(
-            orderPublicId,
+            formatPopqOrderNumber(orderPublicId),
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: FontWeight.w700,
             ),

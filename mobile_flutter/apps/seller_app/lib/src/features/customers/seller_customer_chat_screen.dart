@@ -697,7 +697,9 @@ class _OrderSummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '#${conversation.orderPublicId}',
+                  formatPopqOrderNumber(
+                    conversation.orderPublicId,
+                  ),
                   style: theme
                       .textTheme
                       .titleSmall
