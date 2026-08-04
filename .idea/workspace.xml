@@ -5,30 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/config/UploadWebConfig.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerLocationController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/controller/SellerStoreImageController.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoAddressSearchResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoPlaceSearchResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/KakaoReverseGeocodeResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/dto/StoreImageUploadResponse.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/KakaoLocationService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/store/service/StoreImageStorageService.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/business_registration_ocr_service.dart" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_location_picker_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/libraries/Dart_Packages.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/auth/config/SecurityConfig.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/auth/config/SecurityConfig.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/ErrorCode.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/GlobalExceptionHandler.java" beforeDir="false" afterPath="$PROJECT_DIR$/backend_spring/src/main/java/com/example/project_popq/common/error/GlobalExceptionHandler.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/customer_app/lib/src/features/discovery/store_discovery_screen.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_registration_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/lib/src/features/stores/seller_store_repository.dart" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/packages/app_core/lib/src/network/popq_api_client.dart" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/packages/app_core/lib/src/network/popq_api_client.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -139,7 +118,7 @@
     "android.gradle.sync.needed": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "Merging ochang__main",
+    "git-widget-placeholder": "ochang",
     "ignore.virus.scanning.warn.message": "true",
     "io.flutter.reload.alreadyRun": "true",
     "kotlin-language-version-configured": "true",
