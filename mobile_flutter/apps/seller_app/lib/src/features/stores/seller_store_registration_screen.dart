@@ -1940,16 +1940,10 @@ class _SellerStoreRegistrationScreenState
           (String value) => value.isNotEmpty,
     ).join(' ');
 
-    final TextEditingController
-    queryController =
-    TextEditingController(
-      text: initialQuery,
-    );
-
+    String queryValue = initialQuery;
     String? errorText;
 
-    final String? query =
-    await showDialog<String>(
+    return showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (
@@ -1960,12 +1954,33 @@ class _SellerStoreRegistrationScreenState
               BuildContext context,
               StateSetter setDialogState,
               ) {
+            void submitSearch() {
+              final String trimmed =
+              queryValue.trim();
+
+              if (trimmed.isEmpty) {
+                setDialogState(() {
+                  errorText =
+                  '검색할 업체명이나 지역을 입력해 주세요.';
+                });
+                return;
+              }
+
+              FocusScope.of(
+                dialogContext,
+              ).unfocus();
+
+              Navigator.of(
+                dialogContext,
+              ).pop(trimmed);
+            }
+
             return AlertDialog(
               title: const Text(
                 '카카오맵 업체 검색',
               ),
-              content: TextField(
-                controller: queryController,
+              content: TextFormField(
+                initialValue: initialQuery,
                 autofocus: true,
                 textInputAction:
                 TextInputAction.search,
@@ -1978,28 +1993,30 @@ class _SellerStoreRegistrationScreenState
                     Icons.search_rounded,
                   ),
                 ),
-                onSubmitted: (
+                onChanged: (String value) {
+                  queryValue = value;
+
+                  if (errorText != null &&
+                      value.trim().isNotEmpty) {
+                    setDialogState(() {
+                      errorText = null;
+                    });
+                  }
+                },
+                onFieldSubmitted: (
                     String value,
                     ) {
-                  final String trimmed =
-                  value.trim();
-
-                  if (trimmed.isEmpty) {
-                    setDialogState(() {
-                      errorText =
-                      '검색할 업체명이나 지역을 입력해 주세요.';
-                    });
-                    return;
-                  }
-
-                  Navigator.of(
-                    dialogContext,
-                  ).pop(trimmed);
+                  queryValue = value;
+                  submitSearch();
                 },
               ),
               actions: [
                 TextButton(
                   onPressed: () {
+                    FocusScope.of(
+                      dialogContext,
+                    ).unfocus();
+
                     Navigator.of(
                       dialogContext,
                     ).pop();
@@ -2009,22 +2026,7 @@ class _SellerStoreRegistrationScreenState
                   ),
                 ),
                 FilledButton(
-                  onPressed: () {
-                    final String trimmed =
-                    queryController.text.trim();
-
-                    if (trimmed.isEmpty) {
-                      setDialogState(() {
-                        errorText =
-                        '검색할 업체명이나 지역을 입력해 주세요.';
-                      });
-                      return;
-                    }
-
-                    Navigator.of(
-                      dialogContext,
-                    ).pop(trimmed);
-                  },
+                  onPressed: submitSearch,
                   child: const Text(
                     '검색',
                   ),
@@ -2035,10 +2037,6 @@ class _SellerStoreRegistrationScreenState
         );
       },
     );
-
-    queryController.dispose();
-
-    return query;
   }
 
   Future<SellerKakaoPlaceSearchResult?>
@@ -2632,8 +2630,6 @@ class _SellerStoreRegistrationScreenState
         );
       },
     );
-
-    manualController.dispose();
 
     return result ?? currentValue;
   }
