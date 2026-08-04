@@ -314,8 +314,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           '(${idToken.length}자)',
     );
 
-    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
-     idToken을 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+    final result = await _authRepository.socialLogIn(
+      provider: 'GOOGLE',
+      providerToken: idToken,
+    );
+
+    await _completeSignIn(result.session);
   }
 
   Future<void> _kakaoSignIn() async {
