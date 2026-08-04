@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="c95c3083-07e6-4bc4-9812-77423ceba196" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/android/app/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/mobile_flutter/apps/seller_app/pubspec.lock" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -96,46 +94,46 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Flutter.customer_main.dart.executor": "Run",
-    "Flutter.main.dart.executor": "Run",
-    "Flutter.seller_main.dart.executor": "Run",
-    "Gradle.Build backend_spring.executor": "Run",
-    "Gradle.backend_spring [:com.example.project_popq.ProjectPopqApplication.main()].executor": "Run",
-    "Gradle.backend_spring [build].executor": "Run",
-    "Gradle.backend_spring [clean].executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RequestMappingsPanelOrder0": "0",
-    "RequestMappingsPanelOrder1": "1",
-    "RequestMappingsPanelWidth0": "75",
-    "RequestMappingsPanelWidth1": "75",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "Spring Boot.ProjectPopqApplication.executor": "Run",
-    "android.gradle.sync.needed": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
-    "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "ochang",
-    "ignore.virus.scanning.warn.message": "true",
-    "io.flutter.reload.alreadyRun": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/akdtp/Desktop/AcademyProject/project__popq/project__popq/mobile_flutter/apps/customer_app/lib/src/features/discovery",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "project.structure.last.edited": "Modules",
-    "project.structure.proportion": "0.15088758",
-    "project.structure.side.proportion": "0.3109756",
-    "settings.editor.selected.configurable": "preferences.externalTools",
-    "show.migrate.to.gradle.popup": "false",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Flutter.customer_main.dart.executor&quot;: &quot;Run&quot;,
+    &quot;Flutter.main.dart.executor&quot;: &quot;Run&quot;,
+    &quot;Flutter.seller_main.dart.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.Build backend_spring.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.backend_spring [:com.example.project_popq.ProjectPopqApplication.main()].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.backend_spring [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.backend_spring [clean].executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RequestMappingsPanelOrder0&quot;: &quot;0&quot;,
+    &quot;RequestMappingsPanelOrder1&quot;: &quot;1&quot;,
+    &quot;RequestMappingsPanelWidth0&quot;: &quot;75&quot;,
+    &quot;RequestMappingsPanelWidth1&quot;: &quot;75&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;Spring Boot.ProjectPopqApplication.executor&quot;: &quot;Run&quot;,
+    &quot;android.gradle.sync.needed&quot;: &quot;true&quot;,
+    &quot;codeWithMe.voiceChat.enabledByDefault&quot;: &quot;false&quot;,
+    &quot;dart.analysis.tool.window.visible&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;ochang&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;io.flutter.reload.alreadyRun&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/akdtp/Desktop/AcademyProject/project__popq/project__popq/mobile_flutter/apps/customer_app/lib/src/features/discovery&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;Modules&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15088758&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.3109756&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.externalTools&quot;,
+    &quot;show.migrate.to.gradle.popup&quot;: &quot;false&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
@@ -144,7 +142,7 @@
       <recent name="C:\Users\akdtp\Desktop\AcademyProject\project__popq\project__popq\mobile_flutter\apps\customer_app\lib\src\features\discovery" />
     </key>
   </component>
-  <component name="RunManager" selected="Flutter.seller_main.dart">
+  <component name="RunManager" selected="Spring Boot.ProjectPopqApplication">
     <configuration name="ProjectPopqApplication" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <envs>
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
@@ -241,6 +239,7 @@
         <env name="POPQ_KAKAO_REST_API_KEY" value="9a02351c3b6c63a80a59a4bb2ef71c6a" />
         <env name="POPQ_SEED_ENABLED" value="true" />
         <env name="SPRING_PROFILES_ACTIVE" value="dev" />
+        <env name="POPQ_GOOGLE_CLIENT_ID" value="977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com" />
       </envs>
       <option name="envFilePaths">
         <option value="$PROJECT_DIR$/.env.intellij" />
