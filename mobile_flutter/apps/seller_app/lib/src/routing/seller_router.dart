@@ -186,11 +186,7 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.bootstrap,
         builder: (context, state) {
-          return const Scaffold(
-            body: PopqLoadingView(
-              message: '판매자 계정과 스토어를 확인하고 있어요.',
-            ),
-          );
+          return const PopqSplashScreen();
         },
       ),
       GoRoute(

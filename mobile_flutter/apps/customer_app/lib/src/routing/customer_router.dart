@@ -230,11 +230,7 @@ GoRouter createCustomerRouter({
       GoRoute(
         path: CustomerRoutes.bootstrap,
         builder: (context, state) {
-          return const Scaffold(
-            body: PopqLoadingView(
-              message: '앱을 준비하고 있어요.',
-            ),
-          );
+          return const PopqSplashScreen();
         },
       ),
       GoRoute(

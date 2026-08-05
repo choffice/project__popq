@@ -21,6 +21,11 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
 
+  assets:
+    - assets/splash/splash_pusky.gif
+    - assets/splash/logo_sub.png
+    - assets/splash/logo_title.png
+
   # To add assets to your package, add an assets section, like this:
   # assets:
   #   - images/a_dot_burr.jpeg
