@@ -38,7 +38,6 @@ class PopqCustomerApp extends StatefulWidget {
     this.locationRepository,
     this.cartController,
     this.permissionGateway,
-    this.locationRepository,
     this.themeController,
     this.authRepository,
     this.splashMinDuration = const Duration(seconds: 3),
@@ -255,8 +254,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       widget.splashMinDuration,
       permissionGateway:
       permissionGateway,
-      locationRepository:
-      locationRepository,
       apiBaseUrl:
       widget.environment.apiBaseUrl,
       tossClientKey:
