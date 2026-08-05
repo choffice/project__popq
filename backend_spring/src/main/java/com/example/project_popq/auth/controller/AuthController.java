@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import com.example.project_popq.user.domain.PlatformRole;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -36,9 +37,18 @@ public class AuthController {
     private final SocialAuthService socialAuthService;
 
     @GetMapping("/me")
-    public ApiResponse<AuthUserResponse> me(@AuthenticationPrincipal Jwt jwt) {
+    public ApiResponse<AuthUserResponse> me(
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        PlatformRole activeRole = PlatformRole.valueOf(
+            jwt.getClaimAsString("role")
+        );
+
         return ApiResponse.success(
-                AuthUserResponse.from(currentUserService.getRequired(jwt))
+            AuthUserResponse.from(
+                currentUserService.getRequired(jwt),
+                activeRole
+            )
         );
     }
 

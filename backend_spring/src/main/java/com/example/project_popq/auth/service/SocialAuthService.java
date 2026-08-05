@@ -48,10 +48,13 @@ public class SocialAuthService {
         request.role()
     );
 
-    validateUser(user, request.role());
-    ensureSellerProfile(user);
+    validateUser(user);
 
-    return issueToken(user);
+    user.addRole(request.role());
+
+    ensureSellerProfile(user, request.role());
+
+    return issueToken(user, request.role());
   }
 
   private GoogleIdentity verifyGoogleToken(String idToken) {
@@ -106,12 +109,6 @@ public class SocialAuthService {
             )
         ));
 
-    if (user.getRole() != requestedRole) {
-      throw new BusinessException(
-          ErrorCode.SOCIAL_ROLE_MISMATCH
-      );
-    }
-
     socialAccountRepository.save(
         SocialAccount.create(
             user,
@@ -123,17 +120,10 @@ public class SocialAuthService {
     return user;
   }
 
-  private void validateUser(
-      User user,
-      PlatformRole requestedRole
-  ) {
+  private void validateUser(User user) {
     if (!user.isActive()) {
-      throw new BusinessException(ErrorCode.USER_INACTIVE);
-    }
-
-    if (user.getRole() != requestedRole) {
       throw new BusinessException(
-          ErrorCode.SOCIAL_ROLE_MISMATCH
+          ErrorCode.USER_INACTIVE
       );
     }
   }
@@ -145,8 +135,8 @@ public class SocialAuthService {
     }
   }
 
-  private void ensureSellerProfile(User user) {
-    if (user.getRole() == PlatformRole.SELLER
+  private void ensureSellerProfile(User user, PlatformRole activeRole) {
+    if (activeRole == PlatformRole.SELLER
         && sellerProfileRepository
         .findByUserId(user.getId())
         .isEmpty()) {
@@ -156,15 +146,18 @@ public class SocialAuthService {
     }
   }
 
-  private AuthTokenResponse issueToken(User user) {
+  private AuthTokenResponse issueToken(User user, PlatformRole activeRole) {
     IssuedAccessToken accessToken =
-        jwtTokenService.issueAccessToken(user);
+        jwtTokenService.issueAccessToken(
+            user,
+            activeRole
+        );
 
     return new AuthTokenResponse(
         accessToken.value(),
         "Bearer",
         accessToken.expiresInSeconds(),
-        AuthUserResponse.from(user)
+        AuthUserResponse.from(user,activeRole)
     );
   }
 }
