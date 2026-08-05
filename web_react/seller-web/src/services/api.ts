@@ -13,6 +13,7 @@ import type {
   SalesSummary,
   SellerCategory,
   SellerConnection,
+  SellerAuthResult,
   SellerOrder,
   SellerPaymentSummary,
   SellerProduct,
@@ -26,6 +27,40 @@ type TransitionAction =
   | 'prepare'
   | 'ready'
   | 'complete'
+
+async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
+  })
+  const envelope = (await response.json()) as ApiEnvelope<T>
+  if (!response.ok || !envelope.success) {
+    throw new Error(envelope.error?.message ?? '요청을 처리하지 못했습니다.')
+  }
+  return envelope.data
+}
+
+export function loginSeller(email: string, password: string) {
+  return publicRequest<SellerAuthResult>('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function signUpSeller(payload: {
+  email: string
+  password: string
+  name: string
+  phone: string
+}) {
+  return publicRequest<SellerAuthResult>('/api/v1/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ ...payload, role: 'SELLER' }),
+  })
+}
 
 async function request<T>(
   path: string,
