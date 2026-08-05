@@ -13,11 +13,24 @@ public record AuthUserResponse(
 ) {
     public static AuthUserResponse from(User user) {
         return new AuthUserResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getName(),
-                user.getRole(),
-                user.getStatus()
+            user.getId(),
+            user.getEmail(),
+            user.getName(),
+            user.getRole(),
+            user.getStatus()
+        );
+    }
+
+    public static AuthUserResponse from(
+        User user,
+        PlatformRole activeRole
+    ) {
+        return new AuthUserResponse(
+            user.getId(),
+            user.getEmail(),
+            user.getName(),
+            activeRole,
+            user.getStatus()
         );
     }
 }

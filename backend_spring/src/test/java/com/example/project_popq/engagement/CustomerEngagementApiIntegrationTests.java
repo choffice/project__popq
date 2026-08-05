@@ -52,7 +52,11 @@ class CustomerEngagementApiIntegrationTests {
         mockMvc.perform(get("/api/v1/customer/store-interests")
                         .header("Authorization", bearer(customerToken)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].storeId").value(storeId));
+                .andExpect(jsonPath("$.data[0].storeId").value(storeId))
+                .andExpect(jsonPath("$.data[0].representativeCategory")
+                        .value("카페"))
+                .andExpect(jsonPath("$.data[0].imageUrl")
+                        .value("https://example.test/engagement-cafe.jpg"));
 
         String orderPublicId = createPaidOrder(
                 customerToken,
@@ -195,7 +199,9 @@ class CustomerEngagementApiIntegrationTests {
                         .content("""
                                 {
                                   "storeType": "LOCAL_STORE",
-                                  "name": "Engagement Cafe"
+                                  "name": "Engagement Cafe",
+                                  "representativeCategory": "카페",
+                                  "imageUrl": "https://example.test/engagement-cafe.jpg"
                                 }
                                 """))
                 .andExpect(status().isCreated())

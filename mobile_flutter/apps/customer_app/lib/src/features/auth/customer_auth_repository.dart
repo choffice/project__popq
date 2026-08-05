@@ -13,6 +13,11 @@ abstract interface class CustomerAuthRepository {
     required String password,
   });
 
+  Future<AuthSession> socialLogIn({
+    required String provider,
+    required String providerToken,
+  });
+
   Future<String> findId({
     required String name,
     required String phone,
@@ -60,6 +65,21 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
       'email': email,
       'password': password,
     });
+  }
+
+  @override
+  Future<AuthSession> socialLogIn({
+    required String provider,
+    required String providerToken,
+  }) {
+    return _submit(
+      '/api/v1/auth/social/login',
+      {
+        'provider': provider,
+        'providerToken': providerToken,
+        'role': 'CUSTOMER',
+      },
+    );
   }
 
   @override
@@ -134,6 +154,14 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
   Future<AuthSession> logIn({
     required String email,
     required String password,
+  }) async {
+    return _session();
+  }
+
+  @override
+  Future<AuthSession> socialLogIn({
+    required String provider,
+    required String providerToken,
   }) async {
     return _session();
   }

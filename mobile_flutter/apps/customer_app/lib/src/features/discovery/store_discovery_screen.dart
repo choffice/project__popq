@@ -42,10 +42,6 @@ class StoreDiscoveryScreen extends StatefulWidget {
 }
 
 class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
-  static const _accentColor = Color(0xFFB7FF00);
-  static const _darkColor = Color(0xFF08110E);
-  static const _greenColor = Color(0xFF17643E);
-
   static const _filters = [
     _StoreFilter(
       type: _StoreFilterType.all,
@@ -1268,9 +1264,6 @@ class _SearchSuggestionPanel extends StatelessWidget {
     required this.onSelected,
   });
 
-  static const _accentColor = Color(0xFFB7FF00);
-  static const _darkColor = Color(0xFF08110E);
-
   final List<CustomerStore> suggestions;
   final ValueChanged<CustomerStore> onSelected;
 
@@ -1304,10 +1297,11 @@ class _SearchSuggestionPanel extends StatelessWidget {
 
                   return ListTile(
                     onTap: () => onSelected(store),
-                    leading: CircleAvatar(
-                      backgroundColor: _accentColor,
-                      foregroundColor: _darkColor,
-                      child: Icon(_storeTypeIcon(store.storeType)),
+                    leading: _SelectedStoreThumbnail(
+                      width: 40,
+                      height: 40,
+                      imageUrl: store.imageUrl,
+                      fallbackIcon: _storeTypeIcon(store.storeType),
                     ),
                     title: Text(
                       store.name,
@@ -1316,8 +1310,10 @@ class _SearchSuggestionPanel extends StatelessWidget {
                     ),
                     subtitle: Text(
                       [
-                        _storeTypeLabel(store.storeType),
-                        if (store.address != null) store.address!,
+                        store.representativeCategory?.trim().isNotEmpty == true
+                            ? store.representativeCategory!
+                            : _storeTypeLabel(store.storeType),
+                        if (store.fullAddress.isNotEmpty) store.fullAddress,
                         if (store.distanceMeters != null)
                           _formatDistance(store.distanceMeters!),
                       ].join(' · '),
@@ -1360,6 +1356,50 @@ class _CurrentLocationButton extends StatelessWidget {
   }
 }
 
+class _SelectedStoreThumbnail extends StatelessWidget {
+  const _SelectedStoreThumbnail({
+    required this.width,
+    required this.height,
+    required this.imageUrl,
+    required this.fallbackIcon,
+  });
+
+  final double width;
+  final double height;
+  final String? imageUrl;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = imageUrl?.trim() ?? '';
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: url.isEmpty
+            ? _fallback()
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _fallback(),
+              ),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return ColoredBox(
+      color: const Color(0xFFB7FF00),
+      child: Icon(
+        fallbackIcon,
+        color: const Color(0xFF08110E),
+        size: 24,
+      ),
+    );
+  }
+}
+
 class _SelectedStoreCard extends StatelessWidget {
   const _SelectedStoreCard({
     required this.store,
@@ -1375,8 +1415,6 @@ class _SelectedStoreCard extends StatelessWidget {
     required this.onClose,
   });
 
-  static const _accentColor = Color(0xFFB7FF00);
-  static const _darkColor = Color(0xFF08110E);
   static const _greenColor = Color(0xFF17643E);
 
   final CustomerStore store;
@@ -1406,18 +1444,11 @@ class _SelectedStoreCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           child: Row(
             children: [
-              Container(
+              _SelectedStoreThumbnail(
                 width: 46,
                 height: 46,
-                decoration: BoxDecoration(
-                  color: _accentColor,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  _storeTypeIcon(store.storeType),
-                  color: _darkColor,
-                  size: 24,
-                ),
+                imageUrl: store.imageUrl,
+                fallbackIcon: _storeTypeIcon(store.storeType),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -1467,6 +1498,20 @@ class _SelectedStoreCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (store.representativeCategory?.trim().isNotEmpty ==
+                        true) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        store.representativeCategory!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 3),
 
                     Row(
@@ -1479,7 +1524,9 @@ class _SelectedStoreCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            store.address ?? '주소 정보 준비 중',
+                            store.fullAddress.isEmpty
+                                ? '주소 정보 준비 중'
+                                : store.fullAddress,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

@@ -34,20 +34,20 @@ public class DevAuthService {
         if (!user.isActive()) {
             throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
-        if (user.getRole() != request.role()) {
-            throw new BusinessException(
-                    ErrorCode.DUPLICATE_USER,
-                    "동일 이메일이 다른 역할로 이미 등록되어 있습니다."
-            );
-        }
+        user.addRole(request.role());
 
-        ensureSellerProfile(user);
-        IssuedAccessToken accessToken = jwtTokenService.issueAccessToken(user);
+        ensureSellerProfile(user, request.role());
+
+        IssuedAccessToken accessToken =
+            jwtTokenService.issueAccessToken(
+                user,
+                request.role()
+            );
         return new DevLoginResponse(
                 accessToken.value(),
                 "Bearer",
                 accessToken.expiresInSeconds(),
-                AuthUserResponse.from(user)
+                AuthUserResponse.from(user,request.role())
         );
     }
 
@@ -60,10 +60,17 @@ public class DevAuthService {
         return userRepository.save(created);
     }
 
-    private void ensureSellerProfile(User user) {
-        if (user.getRole() == PlatformRole.SELLER
-                && sellerProfileRepository.findByUserId(user.getId()).isEmpty()) {
-            sellerProfileRepository.save(SellerProfile.createPending(user));
+    private void ensureSellerProfile(
+        User user,
+        PlatformRole activeRole
+    ) {
+        if (activeRole == PlatformRole.SELLER
+            && sellerProfileRepository
+            .findByUserId(user.getId())
+            .isEmpty()) {
+            sellerProfileRepository.save(
+                SellerProfile.createPending(user)
+            );
         }
     }
 

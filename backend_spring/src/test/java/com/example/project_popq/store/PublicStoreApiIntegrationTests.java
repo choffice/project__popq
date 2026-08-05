@@ -55,6 +55,9 @@ class PublicStoreApiIntegrationTests {
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].storeId").value(openStoreId))
                 .andExpect(jsonPath("$.data[0].name").value("성수 커피 연구소"))
+                .andExpect(jsonPath("$.data[0].representativeCategory").value("카페"))
+                .andExpect(jsonPath("$.data[0].imageUrl")
+                        .value("https://example.test/store.jpg"))
                 .andExpect(jsonPath("$.data[0].tags[0]").value("coffee"))
                 .andExpect(jsonPath("$.data[0].distanceMeters").isNumber());
     }
@@ -80,6 +83,17 @@ class PublicStoreApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.storeId").value(storeId))
                 .andExpect(jsonPath("$.data.address").value("서울 마포구"))
+                .andExpect(jsonPath("$.data.detailAddress").value("2층"))
+                .andExpect(jsonPath("$.data.representativeCategory").value("카페"))
+                .andExpect(jsonPath("$.data.imageUrl")
+                        .value("https://example.test/store.jpg"))
+                .andExpect(jsonPath("$.data.phone").value("02-1234-5678"))
+                .andExpect(jsonPath("$.data.openTime").value("09:00:00"))
+                .andExpect(jsonPath("$.data.closeTime").value("21:00:00"))
+                .andExpect(jsonPath("$.data.closedDays[0]").value("MONDAY"))
+                .andExpect(jsonPath("$.data.takeoutAvailable").value(true))
+                .andExpect(jsonPath("$.data.dineInAvailable").value(false))
+                .andExpect(jsonPath("$.data.orderAcceptingEnabled").value(true))
                 .andExpect(jsonPath("$.data.tags[0]").value("dessert"));
     }
 
@@ -126,8 +140,18 @@ class PublicStoreApiIntegrationTests {
                                   "name": "%s",
                                   "description": "동네에서 만나는 좋은 경험",
                                   "address": "%s",
+                                  "detailAddress": "2층",
+                                  "representativeCategory": "카페",
+                                  "imageUrl": "https://example.test/store.jpg",
+                                  "phone": "02-1234-5678",
                                   "latitude": %s,
                                   "longitude": %s,
+                                  "openTime": "09:00:00",
+                                  "closeTime": "21:00:00",
+                                  "closedDays": ["MONDAY"],
+                                  "takeoutAvailable": true,
+                                  "dineInAvailable": false,
+                                  "orderAcceptingEnabled": true,
                                   "tags": ["%s"]
                                 }
                                 """.formatted(

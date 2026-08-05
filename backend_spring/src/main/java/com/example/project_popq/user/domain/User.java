@@ -12,6 +12,13 @@ import jakarta.persistence.Table;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import java.util.HashSet;
+import java.util.Set;
+
 
 @Getter
 @Entity
@@ -37,6 +44,15 @@ public class User extends BaseTimeEntity {
     @Column(name = "role", nullable = false, length = 30)
     private PlatformRole role;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id")
+    )
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 30)
+    private Set<PlatformRole> roles = new HashSet<>();
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private UserStatus status;
@@ -49,6 +65,7 @@ public class User extends BaseTimeEntity {
         this.name = name;
         this.phone = phone;
         this.role = role;
+        this.roles.add(role);
         this.status = UserStatus.ACTIVE;
         this.passwordHash = passwordHash;
     }
@@ -77,5 +94,12 @@ public class User extends BaseTimeEntity {
 
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+    public boolean hasRole(PlatformRole role) {
+        return roles.contains(role);
+    }
+
+    public void addRole(PlatformRole role) {
+        roles.add(role);
     }
 }

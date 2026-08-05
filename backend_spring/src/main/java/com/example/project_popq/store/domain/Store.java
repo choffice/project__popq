@@ -103,6 +103,10 @@ public class Store extends BaseTimeEntity {
         return new Store(storeType, name, description);
     }
 
+    public void changeStoreType(StoreType storeType) {
+        this.storeType = storeType;
+    }
+
     public void updateDiscoveryProfile(
             String address,
             BigDecimal latitude,

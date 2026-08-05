@@ -11,12 +11,25 @@ class CustomerStore {
     required this.tags,
     this.description,
     this.address,
+    this.detailAddress,
+    this.representativeCategory,
+    this.imageUrl,
+    this.phone,
     this.latitude,
     this.longitude,
+    this.openTime,
+    this.closeTime,
+    this.closedDays = const [],
+    this.takeoutAvailable = true,
+    this.dineInAvailable = true,
+    this.orderAcceptingEnabled = true,
     this.distanceMeters,
   });
 
-  factory CustomerStore.fromJson(Map<String, Object?> json) {
+  factory CustomerStore.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
     return CustomerStore(
       storeId: (json['storeId'] as num).toInt(),
       storeType: json['storeType'] as String,
@@ -24,8 +37,24 @@ class CustomerStore {
       description: json['description'] as String?,
       businessStatus: json['businessStatus'] as String,
       address: json['address'] as String?,
+      detailAddress: json['detailAddress'] as String?,
+      representativeCategory: json['representativeCategory'] as String?,
+      imageUrl: _resolveImageUrl(
+        json['imageUrl'] as String?,
+        imageBaseUrl,
+      ),
+      phone: json['phone'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      openTime: json['openTime'] as String?,
+      closeTime: json['closeTime'] as String?,
+      closedDays: (json['closedDays'] as List<Object?>? ?? const [])
+          .whereType<String>()
+          .toList(growable: false),
+      takeoutAvailable: json['takeoutAvailable'] as bool? ?? true,
+      dineInAvailable: json['dineInAvailable'] as bool? ?? true,
+      orderAcceptingEnabled:
+          json['orderAcceptingEnabled'] as bool? ?? true,
       tags: (json['tags'] as List<Object?>? ?? const [])
           .whereType<String>()
           .toList(),
@@ -39,10 +68,28 @@ class CustomerStore {
   final String? description;
   final String businessStatus;
   final String? address;
+  final String? detailAddress;
+  final String? representativeCategory;
+  final String? imageUrl;
+  final String? phone;
   final double? latitude;
   final double? longitude;
+  final String? openTime;
+  final String? closeTime;
+  final List<String> closedDays;
+  final bool takeoutAvailable;
+  final bool dineInAvailable;
+  final bool orderAcceptingEnabled;
   final List<String> tags;
   final int? distanceMeters;
+
+  String get fullAddress {
+    return <String?>[address, detailAddress]
+        .whereType<String>()
+        .map((String value) => value.trim())
+        .where((String value) => value.isNotEmpty)
+        .join(' ');
+  }
 }
 
 class StoreWalkingRoute {
@@ -125,9 +172,13 @@ abstract interface class StoreDiscoveryRepository {
 }
 
 class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
-  ApiStoreDiscoveryRepository(this._apiClient);
+  ApiStoreDiscoveryRepository(
+    this._apiClient, {
+    required this._imageBaseUrl,
+  });
 
   final PopqApiClient _apiClient;
+  final String _imageBaseUrl;
 
   @override
   Future<List<CustomerStore>> search({
@@ -151,6 +202,7 @@ class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
             .map(
               (item) => CustomerStore.fromJson(
                 Map<String, Object?>.from(item as Map),
+                imageBaseUrl: _imageBaseUrl,
               ),
             )
             .toList();
@@ -162,8 +214,10 @@ class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
   Future<CustomerStore> findDetail(int storeId) {
     return _apiClient.get(
       '/api/v1/public/stores/$storeId',
-      decode: (value) =>
-          CustomerStore.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+        imageBaseUrl: _imageBaseUrl,
+      ),
     );
   }
 
@@ -183,6 +237,25 @@ class ApiStoreDiscoveryRepository implements StoreDiscoveryRepository {
       ),
     );
   }
+}
+
+String? _resolveImageUrl(String? value, String? baseUrl) {
+  final String path = value?.trim() ?? '';
+  if (path.isEmpty) {
+    return null;
+  }
+
+  final Uri? uri = Uri.tryParse(path);
+  if (uri?.hasScheme == true) {
+    return path;
+  }
+
+  final String base = baseUrl?.trim().replaceFirst(RegExp(r'/$'), '') ?? '';
+  if (base.isEmpty) {
+    return path;
+  }
+
+  return path.startsWith('/') ? '$base$path' : '$base/$path';
 }
 
 class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {

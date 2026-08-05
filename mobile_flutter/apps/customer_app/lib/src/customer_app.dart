@@ -146,6 +146,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.storeDiscoveryRepository ??
             ApiStoreDiscoveryRepository(
               _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
             );
 
     final catalogRepository =
@@ -170,6 +171,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.engagementRepository ??
             ApiCustomerEngagementRepository(
               _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
             );
 
     final notificationRepository =
@@ -362,16 +364,19 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
   Future<void> _googleSignIn() async {
     final idToken =
-    await _googleAuthService
-        .signInAndGetIdToken();
+    await _googleAuthService.signInAndGetIdToken();
 
     debugPrint(
-      'Google idToken: $idToken',
+      '고객 Google 로그인 성공: ID Token 수신 '
+          '(${idToken.length}자)',
     );
 
-    // TODO(backend): Spring Security 엔드포인트 확정되면
-    // idToken을 body에 담아 POST 요청 → 응답의 accessToken/refreshToken을
-    // _sessionController.save(AuthSession(...))에 저장하는 코드로 교체
+    final session = await _authRepository.socialLogIn(
+      provider: 'GOOGLE',
+      providerToken: idToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   Future<void> _kakaoSignIn() async {

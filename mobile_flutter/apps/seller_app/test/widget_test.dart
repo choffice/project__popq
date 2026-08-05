@@ -653,7 +653,27 @@ void main() {
   testWidgets(
     'operations dashboard uses the selected store and changes business status',
     (tester) async {
-      final storeRepository = MemorySellerStoreRepository();
+      final storeRepository = MemorySellerStoreRepository(
+        stores: const [
+          SellerStore(
+            storeId: 1,
+            storeType: 'LOCAL_STORE',
+            name: '성수 커피 연구소',
+            description: 'POPQ 메모리 스토어',
+            address: '서울 성동구 성수이로 1',
+            detailAddress: '1층',
+            representativeCategory: '카페',
+            phone: '02-1234-5678',
+            latitude: 37.5445,
+            longitude: 127.056,
+            openTime: '09:00:00',
+            closeTime: '21:00:00',
+            status: 'ACTIVE',
+            businessStatus: 'PRE_OPEN',
+            myRole: 'OWNER',
+          ),
+        ],
+      );
       final analyticsRepository = MemorySellerAnalyticsRepository(
         summaries: {
           1: const SellerSalesSummary(
@@ -725,17 +745,38 @@ void main() {
       await tester.ensureVisible(editButton);
       await tester.tap(editButton);
       await tester.pumpAndSettle();
+      final editScrollable = find.byType(Scrollable).last;
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit-store-name')),
+        200,
+        scrollable: editScrollable,
+      );
       await tester.enterText(
         find.byKey(const Key('edit-store-name')),
         '성수 리뉴얼 사업장',
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit-store-address')),
+        200,
+        scrollable: editScrollable,
       );
       await tester.enterText(
         find.byKey(const Key('edit-store-address')),
         '서울 성동구 연무장길 1',
       );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('edit-store-tags')),
+        300,
+        scrollable: editScrollable,
+      );
       await tester.enterText(
         find.byKey(const Key('edit-store-tags')),
         'Coffee, Dessert, coffee',
+      );
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('submit-store-edit')),
+        200,
+        scrollable: editScrollable,
       );
       await tester.tap(find.byKey(const Key('submit-store-edit')));
       await tester.pumpAndSettle();
