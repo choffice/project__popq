@@ -7,6 +7,7 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.qr.domain.QrCode;
 import com.example.project_popq.qr.dto.IssueQrCodeRequest;
+import com.example.project_popq.qr.dto.QrDetailResponse;
 import com.example.project_popq.qr.dto.QrIssuedResponse;
 import com.example.project_popq.qr.dto.ReissueQrCodeRequest;
 import com.example.project_popq.qr.repository.QrCodeRepository;
@@ -58,7 +59,7 @@ class QrSecurityIntegrationTests {
     private OpaqueTokenService opaqueTokenService;
 
     @Test
-    void issuedQrStoresOnlyHashAndCreatesGuestSession() {
+    void issuedQrStoresHashAndEncryptedRecoveryToken() {
         SellerStore fixture = createOpenSellerStore("qr-hash@popq.test");
 
         QrIssuedResponse issued = sellerQrService.issue(
@@ -72,11 +73,94 @@ class QrSecurityIntegrationTests {
         assertThat(stored.getTokenHash()).isNotEqualTo(issued.token());
         assertThat(stored.getTokenHash())
                 .isEqualTo(opaqueTokenService.hash(issued.token()));
+        assertThat(stored.getTokenCiphertext()).isNotBlank();
+        assertThat(stored.getTokenCiphertext()).doesNotContain(issued.token());
+
+        QrDetailResponse detail = sellerQrService.findDetail(
+                fixture.seller(),
+                fixture.store().getId(),
+                issued.qrCodeId()
+        );
+        assertThat(detail.publicUrl()).isEqualTo(issued.publicUrl());
 
         GuestQrService.OpenedGuestSession opened = guestQrService.open(issued.token());
         assertThat(opened.context().storeId()).isEqualTo(fixture.store().getId());
         assertThat(guestQrService.resolve(opened.rawToken()).storeId())
                 .isEqualTo(fixture.store().getId());
+    }
+
+    @Test
+    void legacyQrWithoutCiphertextRequiresReissue() {
+        SellerStore fixture = createOpenSellerStore("qr-legacy@popq.test");
+        String rawToken = opaqueTokenService.generate();
+        QrCode legacy = qrCodeRepository.save(
+                QrCode.issue(
+                        fixture.store(),
+                        null,
+                        opaqueTokenService.hash(rawToken),
+                        null
+                )
+        );
+
+        assertErrorCode(
+                () -> sellerQrService.findDetail(
+                        fixture.seller(),
+                        fixture.store().getId(),
+                        legacy.getId()
+                ),
+                ErrorCode.QR_ARTIFACT_UNAVAILABLE
+        );
+    }
+
+    @Test
+    void onlyRevokedQrCanBeArchivedAndRestored() {
+        SellerStore fixture = createOpenSellerStore("qr-archive@popq.test");
+        QrIssuedResponse issued = sellerQrService.issue(
+                fixture.seller(),
+                fixture.store().getId(),
+                new IssueQrCodeRequest(null, null)
+        );
+
+        assertErrorCode(
+                () -> sellerQrService.archive(
+                        fixture.seller(),
+                        fixture.store().getId(),
+                        issued.qrCodeId()
+                ),
+                ErrorCode.QR_STATE_INVALID
+        );
+
+        sellerQrService.revoke(
+                fixture.seller(),
+                fixture.store().getId(),
+                issued.qrCodeId()
+        );
+        assertThat(sellerQrService.archive(
+                fixture.seller(),
+                fixture.store().getId(),
+                issued.qrCodeId()
+        ).archived()).isTrue();
+        assertThat(sellerQrService.findAll(
+                fixture.seller(),
+                fixture.store().getId(),
+                false
+        )).isEmpty();
+        assertThat(sellerQrService.findAll(
+                fixture.seller(),
+                fixture.store().getId(),
+                true
+        )).singleElement().satisfies(qr -> assertThat(qr.archived()).isTrue());
+
+        assertThat(sellerQrService.restore(
+                fixture.seller(),
+                fixture.store().getId(),
+                issued.qrCodeId()
+        ).archived()).isFalse();
+        assertThat(sellerQrService.findAll(
+                fixture.seller(),
+                fixture.store().getId(),
+                false
+        )).hasSize(1);
     }
 
     @Test

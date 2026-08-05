@@ -210,6 +210,8 @@ export type QrCodeSummary = {
   status: QrCodeStatus
   expiresAt: string | null
   createdAt: string
+  recoverable: boolean
+  archived: boolean
 }
 
 export type QrIssued = {
@@ -220,6 +222,17 @@ export type QrIssued = {
   publicUrl: string
   status: QrCodeStatus
   expiresAt: string | null
+}
+
+export type QrCodeDetail = {
+  qrCodeId: number
+  storeId: number
+  storeTableId: number | null
+  tableName: string | null
+  status: QrCodeStatus
+  expiresAt: string | null
+  createdAt: string
+  publicUrl: string
 }
 
 export type SalesSummary = {

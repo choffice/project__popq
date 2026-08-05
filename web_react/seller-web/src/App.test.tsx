@@ -17,6 +17,7 @@ describe('판매자 주문 운영', () => {
 
   afterEach(() => {
     cleanup()
+    vi.restoreAllMocks()
   })
 
   it('진행 주문을 상태별 보드와 운영 지표로 보여준다', () => {
@@ -124,6 +125,50 @@ describe('판매자 주문 운영', () => {
     expect(
       screen.getByRole('link', { name: 'QR 이미지 저장' }),
     ).toHaveAttribute('download')
+  })
+
+  it('기존 QR을 보관함에서 다시 확인하고 저장할 수 있다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /QR 관리/ }))
+    await user.click(screen.getAllByRole('button', { name: 'QR 보기' })[0])
+
+    expect(
+      await screen.findByRole('dialog', { name: 'QR 보관함' }),
+    ).toBeVisible()
+    expect(
+      screen.getByRole('link', { name: 'QR 이미지 저장' }),
+    ).toHaveAttribute('download', 'popq-qr-71.png')
+    expect(screen.getByRole('button', { name: 'SVG 저장' })).toBeVisible()
+    expect(screen.getByRole('button', { name: '인쇄' })).toBeVisible()
+    expect(screen.getByRole('link', { name: 'QR 테스트' })).toHaveAttribute(
+      'target',
+      '_blank',
+    )
+  })
+
+  it('폐기된 QR을 현재 목록에서 제거하고 폐기함에서 복원한다', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /QR 관리/ }))
+    await user.click(screen.getAllByRole('button', { name: '폐기' })[0])
+    await user.click(
+      await screen.findByRole('button', { name: '목록에서 제거' }),
+    )
+
+    expect(
+      screen.queryByRole('button', { name: '목록에서 제거' }),
+    ).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /폐기함/ }))
+    expect(
+      screen.getByRole('button', { name: '목록으로 복원' }),
+    ).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '목록으로 복원' }))
+    expect(screen.getByText('폐기함이 비어 있습니다.')).toBeVisible()
   })
 
   it('완료 주문 기반 매출과 인기 상품을 기간별로 조회한다', async () => {

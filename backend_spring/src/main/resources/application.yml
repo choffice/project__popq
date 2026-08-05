@@ -69,6 +69,7 @@ popq:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}
     guest-session-ttl: ${POPQ_GUEST_SESSION_TTL:PT12H}
     cookie-secure: ${POPQ_COOKIE_SECURE:true}
+    token-encryption-key: ${POPQ_QR_TOKEN_ENCRYPTION_KEY:${POPQ_JWT_SECRET}}
 
   order:
     payment-deadline: ${POPQ_ORDER_PAYMENT_DEADLINE:PT15M}
