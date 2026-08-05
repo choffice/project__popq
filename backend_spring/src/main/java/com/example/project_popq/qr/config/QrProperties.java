@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record QrProperties(
         String publicBaseUrl,
         Duration guestSessionTtl,
-        boolean cookieSecure
+        boolean cookieSecure,
+        String tokenEncryptionKey
 ) {
 }
-

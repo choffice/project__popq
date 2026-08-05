@@ -5,12 +5,17 @@ import {
   freshDemoTables,
 } from '../../data/demo'
 import {
+  archiveQrCode,
   changeQrStatus,
+  getQrCodeDetail,
   getQrCodes,
   getStoreTables,
   issueQrCode,
+  reissueQrCode,
+  restoreQrCode,
 } from '../../services/api'
 import type {
+  QrCodeDetail,
   QrCodeSummary,
   QrIssued,
   SellerConnection,
@@ -21,6 +26,19 @@ type Props = {
   connection: SellerConnection | null
   onError: (message: string | null) => void
 }
+
+type QrArtifact = Pick<
+  QrCodeDetail,
+  | 'qrCodeId'
+  | 'storeTableId'
+  | 'tableName'
+  | 'status'
+  | 'expiresAt'
+  | 'publicUrl'
+>
+
+type ArtifactMode = 'issued' | 'stored' | 'reissued'
+type ListMode = 'current' | 'archived'
 
 const STATUS_LABEL = {
   ACTIVE: '사용 중',
@@ -40,8 +58,10 @@ export function QrManagement({ connection, onError }: Props) {
   const [showIssue, setShowIssue] = useState(false)
   const [tableId, setTableId] = useState('7')
   const [expiresOn, setExpiresOn] = useState('')
-  const [issued, setIssued] = useState<QrIssued | null>(null)
+  const [artifact, setArtifact] = useState<QrArtifact | null>(null)
+  const [artifactMode, setArtifactMode] = useState<ArtifactMode>('stored')
   const [qrImage, setQrImage] = useState('')
+  const [listMode, setListMode] = useState<ListMode>('current')
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -52,7 +72,7 @@ export function QrManagement({ connection, onError }: Props) {
         return
       }
       setLoading(true)
-      void Promise.all([getQrCodes(connection), getStoreTables(connection)])
+      void Promise.all([getQrCodes(connection, true), getStoreTables(connection)])
         .then(([codes, storeTables]) => {
           setQrCodes(codes)
           setTables(storeTables)
@@ -72,9 +92,9 @@ export function QrManagement({ connection, onError }: Props) {
   }, [connection, onError])
 
   useEffect(() => {
-    if (!issued) return
+    if (!artifact) return
     let active = true
-    void QRCode.toDataURL(issued.publicUrl, {
+    void QRCode.toDataURL(artifact.publicUrl, {
       width: 280,
       margin: 2,
       color: { dark: '#171711', light: '#faf9f4' },
@@ -85,10 +105,13 @@ export function QrManagement({ connection, onError }: Props) {
     return () => {
       active = false
     }
-  }, [issued])
+  }, [artifact])
 
-  const activeCount = qrCodes.filter((code) => code.status === 'ACTIVE').length
-  const inactiveCount = qrCodes.filter(
+  const currentCodes = qrCodes.filter((code) => !code.archived)
+  const archivedCodes = qrCodes.filter((code) => code.archived)
+  const visibleCodes = listMode === 'current' ? currentCodes : archivedCodes
+  const activeCount = currentCodes.filter((code) => code.status === 'ACTIVE').length
+  const inactiveCount = currentCodes.filter(
     (code) => code.status === 'INACTIVE',
   ).length
   const availableTables = useMemo(
@@ -133,16 +156,235 @@ export function QrManagement({ connection, onError }: Props) {
           status: result.status,
           expiresAt: result.expiresAt,
           createdAt: new Date().toISOString(),
+          recoverable: true,
+          archived: false,
         },
         ...current,
       ])
       setQrImage('')
-      setIssued(result)
+      setArtifact({
+        qrCodeId: result.qrCodeId,
+        storeTableId: result.storeTableId,
+        tableName: table?.name ?? null,
+        status: result.status,
+        expiresAt: result.expiresAt,
+        publicUrl: result.publicUrl,
+      })
+      setArtifactMode('issued')
       setShowIssue(false)
       onError(null)
     } catch (caught) {
       onError(
         caught instanceof Error ? caught.message : 'QR을 발급하지 못했습니다.',
+      )
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function openArtifact(code: QrCodeSummary) {
+    setProcessingId(code.qrCodeId)
+    try {
+      let detail: QrCodeDetail
+      if (isDemo) {
+        detail = {
+          ...code,
+          storeId: 1,
+          publicUrl: `http://127.0.0.1:5173/q/demo-qr-${code.qrCodeId}`,
+        }
+      } else {
+        detail = await getQrCodeDetail(connection, code.qrCodeId)
+      }
+      setQrImage('')
+      setArtifact(detail)
+      setArtifactMode('stored')
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : 'QR을 불러오지 못했습니다.',
+      )
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function reissue(code: QrCodeSummary) {
+    if (
+      !window.confirm(
+        '기존 QR은 즉시 폐기되고 새 QR로 교체됩니다. 계속할까요?',
+      )
+    ) {
+      return
+    }
+    const expiration =
+      code.expiresAt && new Date(code.expiresAt).getTime() > Date.now()
+        ? code.expiresAt
+        : null
+    setProcessingId(code.qrCodeId)
+    try {
+      let result: QrIssued
+      if (isDemo) {
+        const nextId = Math.max(0, ...qrCodes.map((item) => item.qrCodeId)) + 1
+        result = {
+          qrCodeId: nextId,
+          storeId: 1,
+          storeTableId: code.storeTableId,
+          token: `demo-reissued-${nextId}`,
+          publicUrl: `http://127.0.0.1:5173/q/demo-reissued-${nextId}`,
+          status: 'ACTIVE',
+          expiresAt: expiration,
+        }
+      } else {
+        result = await reissueQrCode(
+          connection,
+          code.qrCodeId,
+          expiration,
+        )
+      }
+      setQrCodes((current) => [
+        {
+          qrCodeId: result.qrCodeId,
+          storeTableId: result.storeTableId,
+          tableName: code.tableName,
+          status: result.status,
+          expiresAt: result.expiresAt,
+          createdAt: new Date().toISOString(),
+          recoverable: true,
+          archived: false,
+        },
+        ...current.map((item) =>
+          item.qrCodeId === code.qrCodeId
+            ? { ...item, status: 'REVOKED' as const }
+            : item,
+        ),
+      ])
+      setQrImage('')
+      setArtifact({
+        qrCodeId: result.qrCodeId,
+        storeTableId: result.storeTableId,
+        tableName: code.tableName,
+        status: result.status,
+        expiresAt: result.expiresAt,
+        publicUrl: result.publicUrl,
+      })
+      setArtifactMode('reissued')
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : 'QR을 재발급하지 못했습니다.',
+      )
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function downloadSvg() {
+    if (!artifact) return
+    try {
+      const svg = await QRCode.toString(artifact.publicUrl, {
+        type: 'svg',
+        width: 1024,
+        margin: 2,
+        color: { dark: '#171711', light: '#ffffff' },
+        errorCorrectionLevel: 'M',
+      })
+      const objectUrl = URL.createObjectURL(
+        new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }),
+      )
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = `popq-qr-${artifact.qrCodeId}.svg`
+      anchor.click()
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : 'SVG를 만들지 못했습니다.',
+      )
+    }
+  }
+
+  function printArtifact() {
+    if (!artifact || !qrImage) return
+    const popup = window.open('', '_blank', 'width=680,height=800')
+    if (!popup) {
+      onError('인쇄 창을 열 수 없습니다. 팝업 허용 여부를 확인해 주세요.')
+      return
+    }
+    popup.document.title = `POPQ QR #${artifact.qrCodeId}`
+    const style = popup.document.createElement('style')
+    style.textContent = `
+      body { margin: 0; padding: 48px; font-family: sans-serif; text-align: center; color: #171711; }
+      h1 { margin: 0 0 8px; font-size: 28px; }
+      p { margin: 0 0 28px; color: #69665e; }
+      img { width: 420px; max-width: 100%; }
+      small { display: block; margin-top: 22px; color: #8c887f; word-break: break-all; }
+    `
+    const title = popup.document.createElement('h1')
+    title.textContent = artifact.tableName ?? `QR #${artifact.qrCodeId}`
+    const description = popup.document.createElement('p')
+    description.textContent = 'POPQ 테이블 주문 QR'
+    const image = popup.document.createElement('img')
+    image.alt = 'POPQ 주문 QR 코드'
+    const url = popup.document.createElement('small')
+    url.textContent = artifact.publicUrl
+    image.addEventListener('load', () => {
+      popup.focus()
+      popup.print()
+    })
+    image.src = qrImage
+    popup.document.head.append(style)
+    popup.document.body.append(title, description, image, url)
+  }
+
+  async function archiveCode(code: QrCodeSummary) {
+    if (
+      !window.confirm(
+        '폐기된 QR을 현재 목록에서 제거하고 폐기함으로 이동할까요?',
+      )
+    ) {
+      return
+    }
+    setProcessingId(code.qrCodeId)
+    try {
+      const updated = isDemo
+        ? { ...code, archived: true }
+        : await archiveQrCode(connection, code.qrCodeId)
+      setQrCodes((current) =>
+        current.map((item) =>
+          item.qrCodeId === updated.qrCodeId ? updated : item,
+        ),
+      )
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : '폐기된 QR을 목록에서 제거하지 못했습니다.',
+      )
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  async function restoreCode(code: QrCodeSummary) {
+    setProcessingId(code.qrCodeId)
+    try {
+      const updated = isDemo
+        ? { ...code, archived: false }
+        : await restoreQrCode(connection, code.qrCodeId)
+      setQrCodes((current) =>
+        current.map((item) =>
+          item.qrCodeId === updated.qrCodeId ? updated : item,
+        ),
+      )
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : '폐기된 QR을 목록으로 복원하지 못했습니다.',
       )
     } finally {
       setProcessingId(null)
@@ -209,7 +451,7 @@ export function QrManagement({ connection, onError }: Props) {
         <div className="hero-stat-grid">
           <article>
             <small>전체 QR</small>
-            <strong>{qrCodes.length}</strong>
+            <strong>{currentCodes.length}</strong>
           </article>
           <article>
             <small>사용 중</small>
@@ -225,11 +467,37 @@ export function QrManagement({ connection, onError }: Props) {
         </button>
       </section>
 
+      <nav className="qr-list-tabs" aria-label="QR 목록 구분">
+        <button
+          className={listMode === 'current' ? 'active' : ''}
+          aria-pressed={listMode === 'current'}
+          onClick={() => setListMode('current')}
+        >
+          현재 QR <span>{currentCodes.length}</span>
+        </button>
+        <button
+          className={listMode === 'archived' ? 'active' : ''}
+          aria-pressed={listMode === 'archived'}
+          onClick={() => setListMode('archived')}
+        >
+          폐기함 <span>{archivedCodes.length}</span>
+        </button>
+      </nav>
+
       {loading ? (
         <div className="management-empty">QR 목록을 불러오는 중입니다…</div>
+      ) : visibleCodes.length === 0 ? (
+        <div className="management-empty">
+          {listMode === 'current'
+            ? '현재 관리 중인 QR이 없습니다.'
+            : '폐기함이 비어 있습니다.'}
+        </div>
       ) : (
-        <section className="qr-grid" aria-label="테이블 QR 목록">
-          {qrCodes.map((code) => (
+        <section
+          className="qr-grid"
+          aria-label={listMode === 'current' ? '테이블 QR 목록' : '폐기 QR 목록'}
+        >
+          {visibleCodes.map((code) => (
             <article className="qr-card" key={code.qrCodeId}>
               <div className="qr-visual" aria-hidden="true">
                 <span />
@@ -252,30 +520,78 @@ export function QrManagement({ connection, onError }: Props) {
                 </p>
               </div>
               <div className="qr-actions">
-                {code.status === 'ACTIVE' && (
-                  <button
-                    disabled={processingId === code.qrCodeId}
-                    onClick={() => void changeStatus(code, 'deactivate')}
-                  >
-                    일시 중지
-                  </button>
-                )}
-                {code.status === 'INACTIVE' && (
-                  <button
-                    disabled={processingId === code.qrCodeId}
-                    onClick={() => void changeStatus(code, 'activate')}
-                  >
-                    다시 사용
-                  </button>
-                )}
-                {!['REVOKED', 'EXPIRED'].includes(code.status) && (
-                  <button
-                    className="danger-text"
-                    disabled={processingId === code.qrCodeId}
-                    onClick={() => void changeStatus(code, 'revoke')}
-                  >
-                    폐기
-                  </button>
+                {code.archived ? (
+                  <>
+                    {code.recoverable && (
+                      <button
+                        className="vault-action"
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void openArtifact(code)}
+                      >
+                        QR 보기
+                      </button>
+                    )}
+                    <button
+                      disabled={processingId === code.qrCodeId}
+                      onClick={() => void restoreCode(code)}
+                    >
+                      목록으로 복원
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {code.recoverable ? (
+                      <button
+                        className="vault-action"
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void openArtifact(code)}
+                      >
+                        QR 보기
+                      </button>
+                    ) : (
+                      <button
+                        className="vault-action needs-reissue"
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void reissue(code)}
+                      >
+                        재발급 필요
+                      </button>
+                    )}
+                    {code.status === 'ACTIVE' && (
+                      <button
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void changeStatus(code, 'deactivate')}
+                      >
+                        일시 중지
+                      </button>
+                    )}
+                    {code.status === 'INACTIVE' && (
+                      <button
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void changeStatus(code, 'activate')}
+                      >
+                        다시 사용
+                      </button>
+                    )}
+                    {code.status === 'REVOKED' && (
+                      <button
+                        className="archive-action"
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void archiveCode(code)}
+                      >
+                        목록에서 제거
+                      </button>
+                    )}
+                    {!['REVOKED', 'EXPIRED'].includes(code.status) && (
+                      <button
+                        className="danger-text"
+                        disabled={processingId === code.qrCodeId}
+                        onClick={() => void changeStatus(code, 'revoke')}
+                      >
+                        폐기
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </article>
@@ -334,7 +650,7 @@ export function QrManagement({ connection, onError }: Props) {
         </div>
       )}
 
-      {issued && (
+      {artifact && (
         <div className="modal-backdrop" role="presentation">
           <section
             className="issued-modal"
@@ -345,13 +661,24 @@ export function QrManagement({ connection, onError }: Props) {
             <button
               className="modal-close"
               aria-label="닫기"
-              onClick={() => setIssued(null)}
+              onClick={() => setArtifact(null)}
             >
               ×
             </button>
             <p className="eyebrow">READY TO SCAN</p>
-            <h2 id="issued-title">QR 발급 완료</h2>
-            <p>보안을 위해 원본 토큰과 URL은 발급 직후 한 번만 제공합니다.</p>
+            <h2 id="issued-title">
+              {artifactMode === 'issued'
+                ? 'QR 발급 완료'
+                : artifactMode === 'reissued'
+                  ? 'QR 재발급 완료'
+                  : 'QR 보관함'}
+            </h2>
+            <p>
+              {artifact.tableName ?? '공용 픽업'} · QR #{artifact.qrCodeId}
+              <span className={`qr-status status-${artifact.status.toLowerCase()}`}>
+                {STATUS_LABEL[artifact.status]}
+              </span>
+            </p>
             {qrImage && (
               <img
                 className="issued-qr"
@@ -359,20 +686,37 @@ export function QrManagement({ connection, onError }: Props) {
                 alt="발급된 주문 QR 코드"
               />
             )}
-            <code>{issued.publicUrl}</code>
+            <code>{artifact.publicUrl}</code>
             <div className="issued-actions">
               <button
                 className="secondary-action"
-                onClick={() => void navigator.clipboard.writeText(issued.publicUrl)}
+                onClick={() => void navigator.clipboard.writeText(artifact.publicUrl)}
               >
                 URL 복사
               </button>
               <a
                 className="primary-action"
                 href={qrImage}
-                download={`popq-qr-${issued.qrCodeId}.png`}
+                download={`popq-qr-${artifact.qrCodeId}.png`}
               >
                 QR 이미지 저장
+              </a>
+              <button
+                className="secondary-action"
+                onClick={() => void downloadSvg()}
+              >
+                SVG 저장
+              </button>
+              <button className="secondary-action" onClick={printArtifact}>
+                인쇄
+              </button>
+              <a
+                className="secondary-action"
+                href={artifact.publicUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                QR 테스트
               </a>
             </div>
           </section>

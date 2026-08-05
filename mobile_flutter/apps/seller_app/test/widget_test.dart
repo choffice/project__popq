@@ -20,6 +20,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(),
         storeRepository: MemorySellerStoreRepository(),
@@ -42,6 +43,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(),
         storeRepository: MemorySellerStoreRepository(stores: const []),
@@ -74,6 +76,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(),
         storeRepository: MemorySellerStoreRepository(stores: const []),
@@ -122,6 +125,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(),
         storeRepository: MemorySellerStoreRepository(stores: const []),
@@ -154,6 +158,7 @@ void main() {
       await tester.pumpWidget(
         PopqSellerApp(
           environment: const AppEnvironment.local(),
+          splashMinDuration: Duration.zero,
           sessionStore: MemorySessionStore(),
           storeSelectionStore: MemorySellerStoreSelectionStore(),
           storeRepository: MemorySellerStoreRepository(stores: const []),
@@ -202,6 +207,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: _validSessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(1),
         storeRepository: MemorySellerStoreRepository(),
@@ -229,6 +235,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: sessionStore,
         storeSelectionStore: selectionStore,
         storeRepository: MemorySellerStoreRepository(),
@@ -280,6 +287,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: sessionStore,
         storeSelectionStore: selectionStore,
         storeRepository: repository,
@@ -326,6 +334,7 @@ void main() {
       await tester.pumpWidget(
         PopqSellerApp(
           environment: const AppEnvironment.local(),
+          splashMinDuration: Duration.zero,
           sessionStore: _validSessionStore(),
           storeSelectionStore: MemorySellerStoreSelectionStore(1),
           storeRepository: MemorySellerStoreRepository(),
@@ -409,6 +418,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: _validSessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(1),
         storeRepository: MemorySellerStoreRepository(
@@ -478,6 +488,7 @@ void main() {
       await tester.pumpWidget(
         PopqSellerApp(
           environment: const AppEnvironment.local(),
+          splashMinDuration: Duration.zero,
           sessionStore: _validSessionStore(),
           storeSelectionStore: MemorySellerStoreSelectionStore(1),
           storeRepository: MemorySellerStoreRepository(),
@@ -694,6 +705,7 @@ void main() {
       await tester.pumpWidget(
         PopqSellerApp(
           environment: const AppEnvironment.local(),
+          splashMinDuration: Duration.zero,
           sessionStore: _validSessionStore(),
           storeSelectionStore: MemorySellerStoreSelectionStore(1),
           storeRepository: storeRepository,
@@ -784,6 +796,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: _validSessionStore(),
         storeSelectionStore: MemorySellerStoreSelectionStore(1),
         storeRepository: MemorySellerStoreRepository(),
@@ -880,6 +893,7 @@ void main() {
     await tester.pumpWidget(
       PopqSellerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: _validSessionStore(),
         storeSelectionStore: selectionStore,
         storeRepository: storeRepository,

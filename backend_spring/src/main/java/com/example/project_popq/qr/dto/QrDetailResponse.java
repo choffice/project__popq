@@ -4,19 +4,20 @@ import com.example.project_popq.qr.domain.QrCode;
 import com.example.project_popq.qr.domain.QrCodeStatus;
 import java.time.Instant;
 
-public record QrSummaryResponse(
+public record QrDetailResponse(
         Long qrCodeId,
+        Long storeId,
         Long storeTableId,
         String tableName,
         QrCodeStatus status,
         Instant expiresAt,
         Instant createdAt,
-        boolean recoverable,
-        boolean archived
+        String publicUrl
 ) {
-    public static QrSummaryResponse from(QrCode qrCode) {
-        return new QrSummaryResponse(
+    public static QrDetailResponse of(QrCode qrCode, String publicUrl) {
+        return new QrDetailResponse(
                 qrCode.getId(),
+                qrCode.getStore().getId(),
                 qrCode.getStoreTable() == null
                         ? null
                         : qrCode.getStoreTable().getId(),
@@ -26,8 +27,7 @@ public record QrSummaryResponse(
                 qrCode.getStatus(),
                 qrCode.getExpiresAt(),
                 qrCode.getCreatedAt(),
-                qrCode.isRecoverable(),
-                qrCode.isArchived()
+                publicUrl
         );
     }
 }

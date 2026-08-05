@@ -106,9 +106,26 @@ export type ApiEnvelope<T> = {
   }
 }
 
+export type SellerAuthUser = {
+  userId: number
+  email: string
+  name: string
+  role: 'CUSTOMER' | 'SELLER' | 'ADMIN'
+  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
+}
+
+export type SellerAuthResult = {
+  accessToken: string
+  tokenType: string
+  expiresIn: number
+  user: SellerAuthUser
+}
+
 export type SellerConnection = {
   storeId: number
   accessToken: string
+  storeName?: string
+  user?: SellerAuthUser
 }
 
 export type SellerProduct = {
@@ -193,6 +210,8 @@ export type QrCodeSummary = {
   status: QrCodeStatus
   expiresAt: string | null
   createdAt: string
+  recoverable: boolean
+  archived: boolean
 }
 
 export type QrIssued = {
@@ -203,6 +222,17 @@ export type QrIssued = {
   publicUrl: string
   status: QrCodeStatus
   expiresAt: string | null
+}
+
+export type QrCodeDetail = {
+  qrCodeId: number
+  storeId: number
+  storeTableId: number | null
+  tableName: string | null
+  status: QrCodeStatus
+  expiresAt: string | null
+  createdAt: string
+  publicUrl: string
 }
 
 export type SalesSummary = {

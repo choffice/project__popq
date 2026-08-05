@@ -41,6 +41,7 @@ public enum ErrorCode {
   QR_EXPIRED(HttpStatus.GONE, "만료된 QR입니다."),
   QR_REVOKED(HttpStatus.GONE, "폐기된 QR입니다."),
   QR_STATE_INVALID(HttpStatus.CONFLICT, "허용되지 않는 QR 상태 변경입니다."),
+  QR_ARTIFACT_UNAVAILABLE(HttpStatus.CONFLICT, "이 QR은 다시 확인할 수 없어 재발급이 필요합니다."),
   GUEST_SESSION_INVALID(HttpStatus.UNAUTHORIZED, "비회원 세션이 유효하지 않습니다."),
   GUEST_SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "비회원 세션이 만료되었습니다."),
   ORDER_NOT_FOUND(HttpStatus.NOT_FOUND, "주문을 찾을 수 없습니다."),
