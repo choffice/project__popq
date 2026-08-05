@@ -9,6 +9,7 @@ import 'features/common/theme_mode_toggle.dart';
 import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
 import 'features/notifications/notification_action.dart';
+import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
 class CustomerRootScreen extends StatefulWidget {
@@ -30,12 +31,12 @@ class CustomerRootScreen extends StatefulWidget {
   final PopqThemeController? themeController;
 
   @override
-  State<CustomerRootScreen> createState() =>
-      _CustomerRootScreenState();
+  State<CustomerRootScreen> createState() {
+    return _CustomerRootScreenState();
+  }
 }
 
-class _CustomerRootScreenState
-    extends State<CustomerRootScreen>
+class _CustomerRootScreenState extends State<CustomerRootScreen>
     with WidgetsBindingObserver {
   // 실제 라우트 순서
   //
@@ -44,7 +45,7 @@ class _CustomerRootScreenState
   // 2 찜
   // 3 마이
   // 4 QR
-  static const List<String> _locations = [
+  static const List<String> _locations = <String>[
     CustomerRoutes.home,
     CustomerRoutes.discover,
     CustomerRoutes.favorites,
@@ -52,7 +53,7 @@ class _CustomerRootScreenState
     CustomerRoutes.qrScanner,
   ];
 
-  static const List<String> _titles = [
+  static const List<String> _titles = <String>[
     'POPQ',
     '스토어 찾기',
     '찜한 매장',
@@ -67,7 +68,7 @@ class _CustomerRootScreenState
   // QR   -> 실제 라우트 4
   // 찜   -> 실제 라우트 2
   // 마이 -> 실제 라우트 3
-  static const List<int> _uiToRouteIndex = [
+  static const List<int> _uiToRouteIndex = <int>[
     0,
     1,
     4,
@@ -75,14 +76,19 @@ class _CustomerRootScreenState
     3,
   ];
 
-  static const Duration _unreadPollingInterval =
-  Duration(seconds: 3);
+  static const Duration _unreadPollingInterval = Duration(
+    seconds: 3,
+  );
 
   Timer? _unreadPollingTimer;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _customerChatSubscription;
 
   var _unreadMessageCount = 0;
   var _unreadRequestInProgress = false;
   var _requestGeneration = 0;
+  var _observedConnectionEpoch = 0;
+  var _isAppActive = true;
 
   @override
   void initState() {
@@ -90,30 +96,60 @@ class _CustomerRootScreenState
 
     WidgetsBinding.instance.addObserver(this);
 
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState ==
+            AppLifecycleState.resumed;
+
     widget.sessionController.addListener(
       _handleSessionChanged,
     );
 
-    _startUnreadPolling();
+    _scheduleUnreadRefresh();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = CustomerRealtimeScope.of(context);
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _realtimeClient = nextRealtimeClient;
+    _observedConnectionEpoch = nextRealtimeClient.connectionEpoch;
+
+    nextRealtimeClient.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _ensureCustomerChatSubscription();
+    _syncUnreadPollingWithRealtime();
     _scheduleUnreadRefresh();
   }
 
   @override
   void didUpdateWidget(
-      covariant CustomerRootScreen oldWidget,
-      ) {
+    covariant CustomerRootScreen oldWidget,
+  ) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.location != widget.location) {
-      /*
-       * 주문 채팅에서 하단 화면으로 돌아왔을 때
-       * 읽음 처리 결과를 즉시 반영합니다.
-       */
+      // 주문 채팅에서 하단 화면으로 돌아왔을 때
+      // 읽음 처리 결과를 즉시 반영합니다.
       _scheduleUnreadRefresh();
     }
 
-    if (oldWidget.sessionController !=
-        widget.sessionController) {
+    if (oldWidget.sessionController != widget.sessionController) {
       oldWidget.sessionController.removeListener(
         _handleSessionChanged,
       );
@@ -123,7 +159,11 @@ class _CustomerRootScreenState
       );
 
       _requestGeneration++;
+      _customerChatSubscription?.cancel();
+      _customerChatSubscription = null;
       _resetUnreadMessageCount();
+      _ensureCustomerChatSubscription();
+      _syncUnreadPollingWithRealtime();
       _scheduleUnreadRefresh();
     }
 
@@ -136,25 +176,34 @@ class _CustomerRootScreenState
 
   @override
   void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
+    AppLifecycleState state,
+  ) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.resumed) {
-      _startUnreadPolling();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _ensureCustomerChatSubscription();
+        _syncUnreadPollingWithRealtime();
 
-      unawaited(
-        _refreshUnreadMessageCount(),
-      );
+        unawaited(
+          _refreshUnreadMessageCount(),
+        );
 
-      return;
+        return;
+
+      case AppLifecycleState.inactive:
+        _isAppActive = false;
+        _stopUnreadPolling();
+        return;
+
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopUnreadPolling();
+        return;
     }
-
-    /*
-     * 앱이 백그라운드에 있을 때는
-     * 불필요한 REST 요청을 중지합니다.
-     */
-    _stopUnreadPolling();
   }
 
   @override
@@ -162,6 +211,14 @@ class _CustomerRootScreenState
     _requestGeneration++;
 
     _stopUnreadPolling();
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+    _realtimeClient = null;
 
     WidgetsBinding.instance.removeObserver(this);
 
@@ -184,26 +241,20 @@ class _CustomerRootScreenState
 
     return PopqAppScaffold(
       title: _titles[routeIndex],
-      actions: [
+      actions: <Widget>[
         if (widget.themeController != null)
           ThemeModeToggle(
-            controller:
-            widget.themeController!,
+            controller: widget.themeController!,
           ),
         NotificationAction(
-          repository:
-          widget.notificationRepository,
-          sessionController:
-          widget.sessionController,
+          repository: widget.notificationRepository,
+          sessionController: widget.sessionController,
         ),
       ],
       selectedIndex: selectedIndex,
-      onDestinationSelected: (uiIndex) {
-        final nextRouteIndex =
-        _uiToRouteIndex[uiIndex];
-
-        final nextLocation =
-        _locations[nextRouteIndex];
+      onDestinationSelected: (int uiIndex) {
+        final nextRouteIndex = _uiToRouteIndex[uiIndex];
+        final nextLocation = _locations[nextRouteIndex];
 
         unawaited(
           _refreshUnreadMessageCount(),
@@ -215,7 +266,7 @@ class _CustomerRootScreenState
 
         context.go(nextLocation);
       },
-      destinations: [
+      destinations: <NavigationDestination>[
         const NavigationDestination(
           icon: Icon(
             Icons.home_outlined,
@@ -254,15 +305,12 @@ class _CustomerRootScreenState
         ),
         NavigationDestination(
           icon: _MyNavigationIcon(
-            icon:
-            Icons.person_outline_rounded,
-            unreadCount:
-            _unreadMessageCount,
+            icon: Icons.person_outline_rounded,
+            unreadCount: _unreadMessageCount,
           ),
           selectedIcon: _MyNavigationIcon(
             icon: Icons.person_rounded,
-            unreadCount:
-            _unreadMessageCount,
+            unreadCount: _unreadMessageCount,
           ),
           label: '마이',
         ),
@@ -278,24 +326,58 @@ class _CustomerRootScreenState
 
     _requestGeneration++;
 
-    // 마이페이지에서 push로 들어온 찜한 이벤트 화면은 홈이 아닌
-    // 이전 화면(마이페이지)으로 돌아갑니다.
-    if (widget.location == CustomerRoutes.favorites &&
-        context.canPop()) {
-      context.pop();
-
+    if (!widget.sessionController.isSignedIn) {
+      _customerChatSubscription?.cancel();
+      _customerChatSubscription = null;
+      _stopUnreadPolling();
+      _resetUnreadMessageCount();
       return;
     }
 
-    // 홈이 아닌 하단 탭에서는 앱을 종료하지 않고 홈으로 이동합니다.
-    if (widget.location != CustomerRoutes.home) {
-      context.go(
-        CustomerRoutes.home,
+    _ensureCustomerChatSubscription();
+    _syncUnreadPollingWithRealtime();
+
+    unawaited(
+      _refreshUnreadMessageCount(),
+    );
+  }
+
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      return;
+    }
+
+    if (_observedConnectionEpoch != realtimeClient.connectionEpoch) {
+      _observedConnectionEpoch = realtimeClient.connectionEpoch;
+
+      // 재연결 직후 끊긴 동안 놓친 이벤트를 REST로 한 번 복구합니다.
+      unawaited(
+        _refreshUnreadMessageCount(),
       );
     }
 
-    if (!widget.sessionController.isSignedIn) {
-      _resetUnreadMessageCount();
+    _syncUnreadPollingWithRealtime();
+  }
+
+  void _handleCustomerChatEvent(
+    PopqRealtimeEvent event,
+  ) {
+    if (!mounted) {
+      return;
+    }
+
+    final shouldRefresh =
+        event.isMessageRead ||
+        (event.isMessageCreated &&
+            event.message?.sentBySeller == true);
+
+    if (!shouldRefresh) {
       return;
     }
 
@@ -304,9 +386,36 @@ class _CustomerRootScreenState
     );
   }
 
+  void _handleCustomerChatError(
+    Object error,
+  ) {
+    debugPrint(
+      '구매자 전역 채팅 이벤트를 처리하지 못했습니다: $error',
+    );
+  }
+
+  void _ensureCustomerChatSubscription() {
+    if (!widget.sessionController.isSignedIn ||
+        _customerChatSubscription != null) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      return;
+    }
+
+    _customerChatSubscription =
+        realtimeClient.subscribeToCustomerChat(
+      onEvent: _handleCustomerChatEvent,
+      onError: _handleCustomerChatError,
+    );
+  }
+
   void _scheduleUnreadRefresh() {
     WidgetsBinding.instance.addPostFrameCallback(
-          (_) {
+      (_) {
         if (!mounted) {
           return;
         }
@@ -318,15 +427,32 @@ class _CustomerRootScreenState
     );
   }
 
+  void _syncUnreadPollingWithRealtime() {
+    if (!_isAppActive ||
+        !widget.sessionController.isSignedIn) {
+      _stopUnreadPolling();
+      return;
+    }
+
+    if (_realtimeClient?.isConnected == true) {
+      _stopUnreadPolling();
+      return;
+    }
+
+    _startUnreadPolling();
+  }
+
   void _startUnreadPolling() {
-    if (_unreadPollingTimer?.isActive ??
-        false) {
+    if (!_isAppActive ||
+        !widget.sessionController.isSignedIn ||
+        _realtimeClient?.isConnected == true ||
+        (_unreadPollingTimer?.isActive ?? false)) {
       return;
     }
 
     _unreadPollingTimer = Timer.periodic(
       _unreadPollingInterval,
-          (_) {
+      (_) {
         unawaited(
           _refreshUnreadMessageCount(),
         );
@@ -339,10 +465,8 @@ class _CustomerRootScreenState
     _unreadPollingTimer = null;
   }
 
-  Future<void>
-  _refreshUnreadMessageCount() async {
-    if (!mounted ||
-        _unreadRequestInProgress) {
+  Future<void> _refreshUnreadMessageCount() async {
+    if (!mounted || _unreadRequestInProgress) {
       return;
     }
 
@@ -356,43 +480,32 @@ class _CustomerRootScreenState
     _unreadRequestInProgress = true;
 
     try {
-      final unreadCounts =
-      await widget.orderMessageRepository
+      final unreadCounts = await widget.orderMessageRepository
           .findUnreadMessageCounts();
 
-      final totalUnreadCount =
-      unreadCounts.fold<int>(
+      final totalUnreadCount = unreadCounts.fold<int>(
         0,
-            (
-            total,
-            item,
-            ) {
+        (int total, item) {
           return total + item.unreadCount;
         },
       );
 
-      if (!mounted ||
-          generation != _requestGeneration) {
+      if (!mounted || generation != _requestGeneration) {
         return;
       }
 
-      if (_unreadMessageCount ==
-          totalUnreadCount) {
+      if (_unreadMessageCount == totalUnreadCount) {
         return;
       }
 
       setState(() {
-        _unreadMessageCount =
-            totalUnreadCount;
+        _unreadMessageCount = totalUnreadCount;
       });
     } catch (error, stackTrace) {
-      /*
-       * 자동 조회가 잠시 실패해도
-       * 기존 배지는 유지하고 다음 주기에 재시도합니다.
-       */
+      // 자동 조회가 잠시 실패해도 기존 배지는 유지하고
+      // 다음 실시간 이벤트 또는 폴링 주기에 다시 시도합니다.
       debugPrint(
-        '읽지 않은 판매자 답변 수를 '
-            '불러오지 못했습니다: $error',
+        '읽지 않은 판매자 답변 수를 불러오지 못했습니다: $error',
       );
 
       debugPrintStack(
@@ -404,8 +517,7 @@ class _CustomerRootScreenState
   }
 
   void _resetUnreadMessageCount() {
-    if (!mounted ||
-        _unreadMessageCount == 0) {
+    if (!mounted || _unreadMessageCount == 0) {
       return;
     }
 
@@ -415,19 +527,17 @@ class _CustomerRootScreenState
   }
 
   int _routeIndexForLocation(
-      String value,
-      ) {
+    String value,
+  ) {
     final index = _locations.indexWhere(
-          (candidate) =>
-          value.startsWith(candidate),
+      (String candidate) => value.startsWith(candidate),
     );
 
     return index < 0 ? 0 : index;
   }
 }
 
-class _MyNavigationIcon
-    extends StatelessWidget {
+class _MyNavigationIcon extends StatelessWidget {
   const _MyNavigationIcon({
     required this.icon,
     required this.unreadCount,
@@ -442,8 +552,7 @@ class _MyNavigationIcon
       return Icon(icon);
     }
 
-    final colorScheme =
-        Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
     final badgeText = unreadCount > 99
         ? '99+'
@@ -455,7 +564,7 @@ class _MyNavigationIcon
       child: Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
-        children: [
+        children: <Widget>[
           Icon(icon),
           Positioned(
             top: -5,
@@ -465,15 +574,13 @@ class _MyNavigationIcon
                 minWidth: 18,
                 minHeight: 18,
               ),
-              padding:
-              const EdgeInsets.symmetric(
+              padding: const EdgeInsets.symmetric(
                 horizontal: 5,
               ),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: colorScheme.error,
-                borderRadius:
-                BorderRadius.circular(999),
+                borderRadius: BorderRadius.circular(999),
                 border: Border.all(
                   color: colorScheme.surface,
                   width: 1.5,

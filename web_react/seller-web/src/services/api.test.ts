@@ -1,23 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  archiveQrCode,
   changeQrStatus,
   changeStoreBusinessStatus,
   createSellerCategory,
   createSellerProduct,
+  deleteSellerProduct,
   createStoreTable,
   getSellerPaymentSummary,
   getSellerProductDetail,
   getSalesSummary,
   getSellerOrders,
+  getQrCodeDetail,
+  getQrCodes,
   getAdminOverview,
   getAdminSellers,
   getAdminStores,
   getAdminUsers,
   issueQrCode,
+  reissueQrCode,
+  restoreQrCode,
   replaceProductOptions,
   refundSellerOrder,
   transitionSellerOrder,
   updateProductAvailability,
+  updateSellerProduct,
+  uploadSellerProductImage,
   updateAdminSellerVerification,
   updateAdminStoreStatus,
   updateAdminUserStatus,
@@ -256,6 +264,57 @@ describe('판매자 주문 API 계약', () => {
     )
   })
 
+  it('상품 기본정보 수정·삭제와 이미지 업로드 계약을 사용한다', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async (_path, init) => {
+        const data = init?.body instanceof FormData
+          ? { imageUrl: 'http://localhost:8082/uploads/store-images/menu.jpg' }
+          : true
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+    const payload = {
+      categoryId: 2,
+      name: '흑임자 라떼',
+      description: '수정한 설명',
+      imageUrl: 'https://example.test/latte.jpg',
+      basePrice: 7500,
+    }
+    const image = new File([new Uint8Array([255, 216, 255])], 'latte.jpg', {
+      type: 'image/jpeg',
+    })
+
+    await updateSellerProduct(connection, 101, payload)
+    await deleteSellerProduct(connection, 101)
+    await uploadSellerProductImage(connection, image)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/seller/stores/7/products/101',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/seller/stores/7/products/101',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/seller/store-images',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer seller-access-token' },
+        body: expect.any(FormData),
+      }),
+    )
+  })
+
   it('상품 상세 조회 후 옵션 전체 교체 계약을 사용한다', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
       async () =>
@@ -299,7 +358,7 @@ describe('판매자 주문 API 계약', () => {
     )
   })
 
-  it('QR 발급과 활성 상태 변경 계약을 사용한다', async () => {
+  it('QR 발급·보관함 조회·재발급·상태 변경 계약을 사용한다', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
       async () =>
         new Response(
@@ -312,7 +371,12 @@ describe('판매자 주문 API 계약', () => {
     )
 
     await issueQrCode(connection, 9, null)
+    await getQrCodes(connection, true)
+    await getQrCodeDetail(connection, 71)
+    await reissueQrCode(connection, 71, '2027-01-01T00:00:00Z')
     await changeQrStatus(connection, 71, 'deactivate')
+    await archiveQrCode(connection, 71)
+    await restoreQrCode(connection, 71)
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -324,7 +388,35 @@ describe('판매자 주문 API 계약', () => {
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      '/api/v1/seller/stores/7/qr-codes?includeArchived=true',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/seller/stores/7/qr-codes/71',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/seller/stores/7/qr-codes/71/reissue',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ expiresAt: '2027-01-01T00:00:00Z' }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       '/api/v1/seller/stores/7/qr-codes/71/deactivate',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      '/api/v1/seller/stores/7/qr-codes/71/archive',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
+      '/api/v1/seller/stores/7/qr-codes/71/restore',
       expect.objectContaining({ method: 'POST' }),
     )
   })

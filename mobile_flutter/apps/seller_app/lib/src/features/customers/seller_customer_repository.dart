@@ -150,6 +150,7 @@ class SellerOrderMessage {
     required this.senderUserId,
     required this.senderName,
     required this.senderType,
+    required this.clientMessageId,
     required this.content,
     required this.read,
     required this.readAt,
@@ -164,6 +165,7 @@ class SellerOrderMessage {
       senderUserId: (json['senderUserId'] as num).toInt(),
       senderName: json['senderName'] as String,
       senderType: json['senderType'] as String,
+      clientMessageId: json['clientMessageId'] as String?,
       content: json['content'] as String,
       read: json['read'] as bool,
       readAt: json['readAt'] == null
@@ -181,6 +183,7 @@ class SellerOrderMessage {
   final int senderUserId;
   final String senderName;
   final String senderType;
+  final String? clientMessageId;
   final String content;
   final bool read;
   final DateTime? readAt;
@@ -189,6 +192,39 @@ class SellerOrderMessage {
   bool get sentBySeller => senderType == 'SELLER';
 
   bool get sentByCustomer => senderType == 'CUSTOMER';
+
+  factory SellerOrderMessage.fromRealtime(
+    PopqRealtimeMessage message,
+  ) {
+    return SellerOrderMessage(
+      orderMessageId: message.orderMessageId,
+      senderUserId: message.senderUserId,
+      senderName: message.senderName,
+      senderType: message.senderType.apiValue,
+      clientMessageId: message.clientMessageId,
+      content: message.content,
+      read: message.read,
+      readAt: message.readAt,
+      createdAt: message.createdAt,
+    );
+  }
+
+  SellerOrderMessage copyWith({
+    bool? read,
+    DateTime? readAt,
+  }) {
+    return SellerOrderMessage(
+      orderMessageId: orderMessageId,
+      senderUserId: senderUserId,
+      senderName: senderName,
+      senderType: senderType,
+      clientMessageId: clientMessageId,
+      content: content,
+      read: read ?? this.read,
+      readAt: readAt ?? this.readAt,
+      createdAt: createdAt,
+    );
+  }
 }
 
 class SellerOrderMessagePage {
@@ -248,6 +284,7 @@ abstract interface class SellerCustomerRepository {
     int storeId,
     String orderPublicId, {
     required String content,
+    String? clientMessageId,
   });
 
   Future<int> countUnreadMessages(
@@ -354,6 +391,7 @@ class ApiSellerCustomerRepository
     int storeId,
     String orderPublicId, {
     required String content,
+    String? clientMessageId,
   }) {
     final String normalizedContent = content.trim();
 
@@ -378,6 +416,9 @@ class ApiSellerCustomerRepository
       '$orderPublicId/messages',
       body: <String, Object?>{
         'content': normalizedContent,
+        if (clientMessageId != null &&
+            clientMessageId.trim().isNotEmpty)
+          'clientMessageId': clientMessageId.trim(),
       },
       decode: (Object? value) {
         return SellerOrderMessage.fromJson(

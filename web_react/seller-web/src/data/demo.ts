@@ -249,6 +249,8 @@ export const demoQrCodes: QrCodeSummary[] = [
     status: 'ACTIVE',
     expiresAt: '2027-07-29T14:59:59Z',
     createdAt: '2026-07-01T03:00:00Z',
+    recoverable: true,
+    archived: false,
   },
   {
     qrCodeId: 72,
@@ -257,6 +259,8 @@ export const demoQrCodes: QrCodeSummary[] = [
     status: 'ACTIVE',
     expiresAt: null,
     createdAt: '2026-07-04T03:00:00Z',
+    recoverable: true,
+    archived: false,
   },
   {
     qrCodeId: 73,
@@ -265,6 +269,8 @@ export const demoQrCodes: QrCodeSummary[] = [
     status: 'INACTIVE',
     expiresAt: '2026-12-31T14:59:59Z',
     createdAt: '2026-07-08T03:00:00Z',
+    recoverable: false,
+    archived: false,
   },
 ]
 

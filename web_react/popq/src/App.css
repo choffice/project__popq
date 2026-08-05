@@ -12,7 +12,7 @@
   height: 76px;
   padding: 14px 20px;
   display: grid;
-  grid-template-columns: 48px 1fr 48px;
+  grid-template-columns: 48px 1fr auto;
   align-items: center;
   gap: 12px;
   background: rgba(248, 247, 242, 0.93);
@@ -21,6 +21,109 @@
   top: 0;
   z-index: 20;
   backdrop-filter: blur(18px);
+}
+
+.topbar-tools {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+}
+
+.theme-toggle span {
+  font-size: 20px;
+  line-height: 1;
+}
+
+:root[data-theme='dark'] .app-shell {
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.42);
+}
+
+:root[data-theme='dark'] .topbar {
+  background: rgba(11, 19, 27, 0.9);
+}
+
+:root[data-theme='dark'] .icon-button,
+:root[data-theme='dark'] .cart-item,
+:root[data-theme='dark'] .order-type button.active,
+:root[data-theme='dark'] .tracking-card {
+  background: var(--surface-strong);
+}
+
+:root[data-theme='dark'] .category-tabs,
+:root[data-theme='dark'] .page-content,
+:root[data-theme='dark'] .tracking-page,
+:root[data-theme='dark'] .loading-screen,
+:root[data-theme='dark'] .error-screen {
+  background: var(--paper);
+}
+
+:root[data-theme='dark'] .category-tabs button.active {
+  color: #050a10;
+}
+
+:root[data-theme='dark'] .demo-note {
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+:root[data-theme='dark'] .product-sheet {
+  background: #111c25;
+}
+
+:root[data-theme='dark'] .sheet-close {
+  background: rgba(23, 35, 45, 0.92);
+}
+
+:root[data-theme='dark'] .cart-thumb,
+:root[data-theme='dark'] .option-row,
+:root[data-theme='dark'] .order-number {
+  background: #17232d;
+}
+
+:root[data-theme='dark'] .cancel-button {
+  border-color: #6e403b;
+  background: #281b1d;
+  color: #ffb4ab;
+}
+
+:root[data-theme='dark'] .toast {
+  border-color: #6e403b;
+  background: #281b1d;
+  color: #ffb4ab;
+}
+
+:root[data-theme='dark'] .status-timeline li > span {
+  background: #17232d;
+}
+
+:root[data-theme='dark'] .status-timeline li.active > span {
+  background: var(--ink);
+  color: #050a10;
+}
+
+:root[data-theme='dark'] .primary-button,
+:root[data-theme='dark'] .floating-cart {
+  color: #050a10;
+}
+
+:root[data-theme='dark'] .secondary-button {
+  background: #17232d;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell,
+  .topbar,
+  .icon-button,
+  .product-sheet,
+  .cart-item,
+  .tracking-card {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
 }
 
 .icon-button {

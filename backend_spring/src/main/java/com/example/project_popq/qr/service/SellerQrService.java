@@ -4,7 +4,9 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.qr.config.QrProperties;
 import com.example.project_popq.qr.domain.QrCode;
+import com.example.project_popq.qr.domain.QrCodeStatus;
 import com.example.project_popq.qr.dto.IssueQrCodeRequest;
+import com.example.project_popq.qr.dto.QrDetailResponse;
 import com.example.project_popq.qr.dto.QrIssuedResponse;
 import com.example.project_popq.qr.dto.QrSummaryResponse;
 import com.example.project_popq.qr.dto.ReissueQrCodeRequest;
@@ -31,6 +33,7 @@ public class SellerQrService {
     private final QrCodeRepository qrCodeRepository;
     private final StoreAuthorizationService storeAuthorizationService;
     private final OpaqueTokenService opaqueTokenService;
+    private final QrTokenCipher qrTokenCipher;
     private final QrProperties properties;
 
     @Transactional
@@ -51,6 +54,7 @@ public class SellerQrService {
                         store,
                         table,
                         opaqueTokenService.hash(rawToken),
+                        qrTokenCipher.encrypt(rawToken),
                         request.expiresAt()
                 )
         );
@@ -107,6 +111,7 @@ public class SellerQrService {
                         existing.getStore(),
                         existing.getStoreTable(),
                         opaqueTokenService.hash(rawToken),
+                        qrTokenCipher.encrypt(rawToken),
                         request.expiresAt()
                 )
         );
@@ -118,7 +123,11 @@ public class SellerQrService {
     }
 
     @Transactional(readOnly = true)
-    public List<QrSummaryResponse> findAll(User user, Long storeId) {
+    public List<QrSummaryResponse> findAll(
+            User user,
+            Long storeId,
+            boolean includeArchived
+    ) {
         storeAuthorizationService.requireAnyRole(
                 user.getId(),
                 storeId,
@@ -128,8 +137,42 @@ public class SellerQrService {
         );
         return qrCodeRepository.findAllByStoreIdOrderByIdDesc(storeId)
                 .stream()
+                .filter(qrCode -> includeArchived || !qrCode.isArchived())
                 .map(QrSummaryResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public QrSummaryResponse archive(User user, Long storeId, Long qrCodeId) {
+        QrCode qrCode = getManagedQr(user, storeId, qrCodeId);
+        if (qrCode.getStatus() != QrCodeStatus.REVOKED) {
+            throw new BusinessException(ErrorCode.QR_STATE_INVALID);
+        }
+        qrCode.archive(Instant.now());
+        return QrSummaryResponse.from(qrCode);
+    }
+
+    @Transactional
+    public QrSummaryResponse restore(User user, Long storeId, Long qrCodeId) {
+        QrCode qrCode = getManagedQr(user, storeId, qrCodeId);
+        if (!qrCode.isArchived()) {
+            throw new BusinessException(ErrorCode.QR_STATE_INVALID);
+        }
+        qrCode.restoreFromArchive();
+        return QrSummaryResponse.from(qrCode);
+    }
+
+    @Transactional(readOnly = true)
+    public QrDetailResponse findDetail(User user, Long storeId, Long qrCodeId) {
+        QrCode qrCode = getManagedQr(user, storeId, qrCodeId);
+        if (!qrCode.isRecoverable()) {
+            throw new BusinessException(ErrorCode.QR_ARTIFACT_UNAVAILABLE);
+        }
+        String rawToken = qrTokenCipher.decrypt(qrCode.getTokenCiphertext());
+        if (!opaqueTokenService.hash(rawToken).equals(qrCode.getTokenHash())) {
+            throw new BusinessException(ErrorCode.QR_ARTIFACT_UNAVAILABLE);
+        }
+        return QrDetailResponse.of(qrCode, buildPublicUrl(rawToken));
     }
 
     private StoreTable findTable(Long storeId, Long storeTableId) {

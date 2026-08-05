@@ -5,6 +5,7 @@ import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessagePageResponse;
 import com.example.project_popq.inquiry.dto.OrderMessageResponse;
+import com.example.project_popq.inquiry.dto.ReadOrderMessagesRequest;
 import com.example.project_popq.inquiry.dto.SendOrderMessageRequest;
 import com.example.project_popq.inquiry.service.OrderMessageService;
 import jakarta.validation.Valid;
@@ -90,5 +91,20 @@ public class CustomerOrderMessageController {
     return ResponseEntity
         .status(HttpStatus.CREATED)
         .body(ApiResponse.success(created));
+  }
+
+  @PostMapping("/{orderPublicId}/messages/read")
+  public ApiResponse<Boolean> markMessagesAsRead(
+      @AuthenticationPrincipal Jwt jwt,
+      @PathVariable String orderPublicId,
+      @Valid @RequestBody ReadOrderMessagesRequest request
+  ) {
+    orderMessageService.markRealtimeMessagesAsRead(
+        currentUserService.getRequired(jwt),
+        orderPublicId,
+        request
+    );
+
+    return ApiResponse.success(true);
   }
 }

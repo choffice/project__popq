@@ -44,7 +44,7 @@ describe('order API contract', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await createOrder([item], 'TAKEOUT', 'stable-order-key')
-    await confirmPayment('order-1', 'stable-payment-key')
+    await confirmPayment('order-1', 'stable-payment-key', 'toss-payment-key')
 
     expect(JSON.parse(fetchMock.mock.calls[0][1].body as string)).toMatchObject({
       idempotencyKey: 'stable-order-key',
@@ -53,6 +53,7 @@ describe('order API contract', () => {
     })
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toMatchObject({
       idempotencyKey: 'stable-payment-key',
+      paymentKey: 'toss-payment-key',
     })
   })
 

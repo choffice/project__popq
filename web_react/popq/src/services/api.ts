@@ -79,12 +79,14 @@ export async function createOrder(
 export async function confirmPayment(
   orderPublicId: string,
   idempotencyKey: string,
+  paymentKey: string,
 ): Promise<void> {
   await request(`/api/v1/qr/orders/${orderPublicId}/payments`, {
     method: 'POST',
     body: JSON.stringify({
       idempotencyKey,
       simulateFailure: false,
+      paymentKey,
     }),
   })
 }

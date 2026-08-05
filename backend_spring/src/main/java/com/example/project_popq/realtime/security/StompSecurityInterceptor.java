@@ -7,6 +7,7 @@ import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.messaging.GuestRealtimePrincipal;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.repository.UserRepository;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 
@@ -33,10 +35,12 @@ public class StompSecurityInterceptor
     private static final String BEARER_PREFIX =
         "Bearer ";
 
+    private static final String STOMP_AUTH_ATTRIBUTE =
+        "POPQ_STOMP_AUTHENTICATION";
+
     private final JwtDecoder jwtDecoder;
     private final UserRepository userRepository;
     private final GuestQrService guestQrService;
-
     private final RealtimeSubscriptionAuthorizer
         subscriptionAuthorizer;
 
@@ -55,57 +59,50 @@ public class StompSecurityInterceptor
             return message;
         }
 
-        StompCommand command =
-            accessor.getCommand();
+        StompCommand command = accessor.getCommand();
 
         if (command == null) {
             return message;
         }
 
-        /*
-         * WebSocket 연결 시 JWT 또는 게스트 세션으로
-         * STOMP Principal을 설정합니다.
-         */
         if (command == StompCommand.CONNECT) {
-            accessor.setUser(
-                authenticate(accessor)
+            Authentication authentication =
+                authenticate(accessor);
+
+            accessor.setUser(authentication);
+            saveAuthentication(
+                accessor,
+                authentication
             );
 
             return message;
         }
 
-        /*
-         * 구독 요청은 destination별 권한을 검사합니다.
-         */
+        Principal principal = resolvePrincipal(accessor);
+
         if (command == StompCommand.SUBSCRIBE) {
-            String destination =
-                requireDestination(
-                    accessor,
-                    "구독 경로가 필요합니다."
-                );
+            String destination = requireDestination(
+                accessor,
+                "구독 경로가 필요합니다."
+            );
 
             subscriptionAuthorizer
                 .authorizeSubscription(
-                    accessor.getUser(),
+                    principal,
                     destination
                 );
 
             return message;
         }
 
-        /*
-         * 이전에는 모든 클라이언트 SEND 요청을 차단했지만,
-         * 이제 허용된 주문 채팅 경로만 통과시킵니다.
-         */
         if (command == StompCommand.SEND) {
-            String destination =
-                requireDestination(
-                    accessor,
-                    "전송 경로가 필요합니다."
-                );
+            String destination = requireDestination(
+                accessor,
+                "전송 경로가 필요합니다."
+            );
 
             subscriptionAuthorizer.authorizeSend(
-                accessor.getUser(),
+                principal,
                 destination
             );
 
@@ -118,41 +115,37 @@ public class StompSecurityInterceptor
     private Authentication authenticate(
         StompHeaderAccessor accessor
     ) {
-        String authorization =
-            accessor.getFirstNativeHeader(
-                "Authorization"
-            );
+        String authorization = readAuthorization(accessor);
 
-        /*
-         * 구매자 및 판매자 Flutter 앱은
-         * STOMP CONNECT 헤더로 JWT를 전달합니다.
-         */
         if (
             authorization != null
-                && authorization.startsWith(
-                BEARER_PREFIX
+                && authorization.regionMatches(
+                true,
+                0,
+                BEARER_PREFIX,
+                0,
+                BEARER_PREFIX.length()
             )
         ) {
-            return authenticateJwt(
-                authorization.substring(
-                    BEARER_PREFIX.length()
-                )
-            );
+            String rawToken = authorization
+                .substring(BEARER_PREFIX.length())
+                .trim();
+
+            if (rawToken.isEmpty()) {
+                throw new AccessDeniedException(
+                    "STOMP JWT가 비어 있습니다."
+                );
+            }
+
+            return authenticateJwt(rawToken);
         }
 
-        /*
-         * JWT가 없다면 기존 QR 게스트 세션 인증을
-         * 시도합니다.
-         */
         Map<String, Object> attributes =
             accessor.getSessionAttributes();
 
-        Object rawGuestToken =
-            attributes == null
-                ? null
-                : attributes.get(
-                GUEST_SESSION_ATTRIBUTE
-            );
+        Object rawGuestToken = attributes == null
+            ? null
+            : attributes.get(GUEST_SESSION_ATTRIBUTE);
 
         if (
             !(rawGuestToken instanceof String token)
@@ -183,20 +176,51 @@ public class StompSecurityInterceptor
             );
     }
 
+    private String readAuthorization(
+        StompHeaderAccessor accessor
+    ) {
+        String authorization =
+            accessor.getFirstNativeHeader(
+                "Authorization"
+            );
+
+        if (
+            authorization == null
+                || authorization.isBlank()
+        ) {
+            authorization =
+                accessor.getFirstNativeHeader(
+                    "authorization"
+                );
+        }
+
+        return authorization == null
+            ? null
+            : authorization.trim();
+    }
+
     private Authentication authenticateJwt(
         String rawToken
     ) {
-        Jwt jwt = jwtDecoder.decode(rawToken);
+        final Jwt jwt;
+
+        try {
+            jwt = jwtDecoder.decode(rawToken);
+        } catch (JwtException exception) {
+            throw new AccessDeniedException(
+                "유효하지 않거나 만료된 STOMP JWT입니다.",
+                exception
+            );
+        }
 
         Long userId;
 
         try {
-            userId = Long.valueOf(
-                jwt.getSubject()
-            );
+            userId = Long.valueOf(jwt.getSubject());
         } catch (NumberFormatException exception) {
             throw new AccessDeniedException(
-                "유효하지 않은 JWT subject입니다."
+                "유효하지 않은 JWT subject입니다.",
+                exception
             );
         }
 
@@ -214,13 +238,9 @@ public class StompSecurityInterceptor
             );
         }
 
-        String role =
-            jwt.getClaimAsString("role");
+        String role = jwt.getClaimAsString("role");
 
-        if (
-            role == null
-                || role.isBlank()
-        ) {
+        if (role == null || role.isBlank()) {
             throw new AccessDeniedException(
                 "JWT 역할 정보가 없습니다."
             );
@@ -236,20 +256,61 @@ public class StompSecurityInterceptor
         );
     }
 
+    private void saveAuthentication(
+        StompHeaderAccessor accessor,
+        Authentication authentication
+    ) {
+        Map<String, Object> attributes =
+            accessor.getSessionAttributes();
+
+        if (attributes != null) {
+            attributes.put(
+                STOMP_AUTH_ATTRIBUTE,
+                authentication
+            );
+        }
+    }
+
+    private Principal resolvePrincipal(
+        StompHeaderAccessor accessor
+    ) {
+        Principal principal = accessor.getUser();
+
+        if (principal != null) {
+            return principal;
+        }
+
+        Map<String, Object> attributes =
+            accessor.getSessionAttributes();
+
+        Object storedAuthentication = attributes == null
+            ? null
+            : attributes.get(STOMP_AUTH_ATTRIBUTE);
+
+        if (
+            storedAuthentication
+                instanceof Authentication authentication
+        ) {
+            accessor.setUser(authentication);
+            return authentication;
+        }
+
+        throw new AccessDeniedException(
+            "STOMP 연결 인증 정보가 유지되지 않았습니다."
+        );
+    }
+
     private String requireDestination(
         StompHeaderAccessor accessor,
         String errorMessage
     ) {
-        String destination =
-            accessor.getDestination();
+        String destination = accessor.getDestination();
 
         if (
             destination == null
                 || destination.isBlank()
         ) {
-            throw new AccessDeniedException(
-                errorMessage
-            );
+            throw new AccessDeniedException(errorMessage);
         }
 
         return destination;

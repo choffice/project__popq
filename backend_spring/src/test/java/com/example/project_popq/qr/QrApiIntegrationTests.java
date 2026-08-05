@@ -33,10 +33,21 @@ class QrApiIntegrationTests {
         openStore(accessToken, storeId);
         Long categoryId = createCategory(accessToken, storeId);
         Long productId = createProduct(accessToken, storeId, categoryId);
-        String qrToken = issueQr(accessToken, storeId);
+        QrIssue qr = issueQr(accessToken, storeId);
+
+        mockMvc.perform(get(
+                        "/api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}",
+                        storeId,
+                        qr.qrCodeId()
+                )
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.qrCodeId").value(qr.qrCodeId()))
+                .andExpect(jsonPath("$.data.publicUrl")
+                        .value("http://localhost:5173/q/" + qr.token()));
 
         MvcResult opened = mockMvc.perform(
-                        post("/api/v1/qr/{token}/sessions", qrToken)
+                        post("/api/v1/qr/{token}/sessions", qr.token())
                 )
                 .andExpect(status().isOk())
                 .andExpect(cookie().httpOnly("POPQ_GUEST_SESSION", true))
@@ -45,6 +56,16 @@ class QrApiIntegrationTests {
                 .andReturn();
         Cookie guestCookie = opened.getResponse()
                 .getCookie("POPQ_GUEST_SESSION");
+
+        mockMvc.perform(
+                        post("/api/v1/qr/{token}/sessions", qr.token())
+                                .cookie(guestCookie)
+                )
+                .andExpect(status().isOk())
+                .andExpect(cookie().value(
+                        "POPQ_GUEST_SESSION",
+                        guestCookie.getValue()
+                ));
 
         mockMvc.perform(get("/api/v1/qr/products").cookie(guestCookie))
                 .andExpect(status().isOk())
@@ -58,6 +79,39 @@ class QrApiIntegrationTests {
                 )
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.product.productId").value(productId));
+
+        mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/revoke",
+                        storeId,
+                        qr.qrCodeId()
+                ).header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+        mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/archive",
+                        storeId,
+                        qr.qrCodeId()
+                ).header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.archived").value(true));
+        mockMvc.perform(get(
+                        "/api/v1/seller/stores/{storeId}/qr-codes",
+                        storeId
+                ).header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isEmpty());
+        mockMvc.perform(get(
+                        "/api/v1/seller/stores/{storeId}/qr-codes?includeArchived=true",
+                        storeId
+                ).header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].archived").value(true));
+        mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/restore",
+                        storeId,
+                        qr.qrCodeId()
+                ).header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.archived").value(false));
     }
 
     private String loginSeller() throws Exception {
@@ -152,7 +206,7 @@ class QrApiIntegrationTests {
         )).longValue();
     }
 
-    private String issueQr(String token, Long storeId) throws Exception {
+    private QrIssue issueQr(String token, Long storeId) throws Exception {
         String response = mockMvc.perform(post(
                         "/api/v1/seller/stores/{storeId}/qr-codes",
                         storeId
@@ -164,7 +218,15 @@ class QrApiIntegrationTests {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return JsonPath.read(response, "$.data.token");
+        return new QrIssue(
+                ((Number) JsonPath.read(
+                        response,
+                        "$.data.qrCodeId"
+                )).longValue(),
+                JsonPath.read(response, "$.data.token")
+        );
+    }
+
+    private record QrIssue(Long qrCodeId, String token) {
     }
 }
-

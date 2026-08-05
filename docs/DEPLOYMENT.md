@@ -22,6 +22,13 @@ Copy-Item .env.example .env
 - `POPQ_DB_PASSWORD`
 - `POPQ_DB_ROOT_PASSWORD`
 - `POPQ_JWT_SECRET`: 최소 32바이트 이상의 무작위 값
+- `POPQ_QR_TOKEN_ENCRYPTION_KEY`: JWT 키와 다른 최소 32바이트 이상의 무작위 값
+
+실제 Toss 테스트 결제를 사용할 때는 다음 값도 설정한다. `POPQ_TOSS_CLIENT_KEY`와 `POPQ_TOSS_SECRET_KEY`는 같은 API 개별 연동 키 세트여야 한다.
+
+- `POPQ_PAYMENT_PROVIDER=TOSS_PAYMENTS`
+- `POPQ_TOSS_CLIENT_KEY`: QR 웹 빌드에 포함되는 공개 클라이언트 키
+- `POPQ_TOSS_SECRET_KEY`: Spring Boot에만 전달하는 비밀 키
 
 구성을 확인하고 전체 서비스를 실행한다.
 
@@ -64,11 +71,16 @@ POPQ_SPRING_PROFILES_ACTIVE=prod
 POPQ_DEV_LOGIN_ENABLED=false
 POPQ_COOKIE_SECURE=true
 POPQ_QR_PUBLIC_BASE_URL=https://order.example.com
+POPQ_QR_TOKEN_ENCRYPTION_KEY=replace-with-a-separate-random-secret-at-least-32-bytes
+POPQ_PAYMENT_PROVIDER=TOSS_PAYMENTS
+POPQ_TOSS_CLIENT_KEY=replace-with-live-client-key
+POPQ_TOSS_SECRET_KEY=replace-with-matching-live-secret-key
 POPQ_WEB_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
 POPQ_REALTIME_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
 ```
 
 운영에서는 MySQL 포트와 Spring Boot 포트를 외부에 직접 공개하지 않고 리버스 프록시 또는 내부 네트워크를 통해 접근시키는 구성을 권장한다.
+QR 결제 도메인은 HTTPS로 제공하고 `POPQ_COOKIE_SECURE=true`를 유지한다.
 
 ## 장애 확인
 

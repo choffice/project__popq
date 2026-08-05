@@ -26,8 +26,25 @@ public class GuestQrService {
 
     @Transactional
     public OpenedGuestSession open(String rawQrToken) {
+        return open(rawQrToken, null);
+    }
+
+    @Transactional
+    public OpenedGuestSession open(
+            String rawQrToken,
+            String existingSessionToken
+    ) {
         QrCode qrCode = findAndValidateQr(rawQrToken, Instant.now());
         Instant now = Instant.now();
+        OpenedGuestSession reused = reuseSession(
+                qrCode,
+                existingSessionToken,
+                now
+        );
+        if (reused != null) {
+            return reused;
+        }
+
         Instant expiresAt = now.plus(properties.guestSessionTtl());
         if (qrCode.getExpiresAt() != null && qrCode.getExpiresAt().isBefore(expiresAt)) {
             expiresAt = qrCode.getExpiresAt();
@@ -42,6 +59,31 @@ public class GuestQrService {
                         now
                 )
         );
+        return new OpenedGuestSession(
+                rawSessionToken,
+                session.getExpiresAt(),
+                QrContextResponse.of(qrCode, session.getExpiresAt())
+        );
+    }
+
+    private OpenedGuestSession reuseSession(
+            QrCode qrCode,
+            String rawSessionToken,
+            Instant now
+    ) {
+        if (rawSessionToken == null || rawSessionToken.isBlank()) {
+            return null;
+        }
+        GuestSession session = guestSessionRepository
+                .findBySessionHash(opaqueTokenService.hash(rawSessionToken))
+                .orElse(null);
+        if (session == null
+                || session.isExpired(now)
+                || !session.getQrCode().getId().equals(qrCode.getId())) {
+            return null;
+        }
+
+        session.touch(now);
         return new OpenedGuestSession(
                 rawSessionToken,
                 session.getExpiresAt(),
