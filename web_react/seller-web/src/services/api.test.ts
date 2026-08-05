@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  archiveQrCode,
   changeQrStatus,
   changeStoreBusinessStatus,
   createSellerCategory,
@@ -9,11 +10,15 @@ import {
   getSellerProductDetail,
   getSalesSummary,
   getSellerOrders,
+  getQrCodeDetail,
+  getQrCodes,
   getAdminOverview,
   getAdminSellers,
   getAdminStores,
   getAdminUsers,
   issueQrCode,
+  reissueQrCode,
+  restoreQrCode,
   replaceProductOptions,
   refundSellerOrder,
   transitionSellerOrder,
@@ -299,7 +304,7 @@ describe('판매자 주문 API 계약', () => {
     )
   })
 
-  it('QR 발급과 활성 상태 변경 계약을 사용한다', async () => {
+  it('QR 발급·보관함 조회·재발급·상태 변경 계약을 사용한다', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
       async () =>
         new Response(
@@ -312,7 +317,12 @@ describe('판매자 주문 API 계약', () => {
     )
 
     await issueQrCode(connection, 9, null)
+    await getQrCodes(connection, true)
+    await getQrCodeDetail(connection, 71)
+    await reissueQrCode(connection, 71, '2027-01-01T00:00:00Z')
     await changeQrStatus(connection, 71, 'deactivate')
+    await archiveQrCode(connection, 71)
+    await restoreQrCode(connection, 71)
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
@@ -324,7 +334,35 @@ describe('판매자 주문 API 계약', () => {
     )
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
+      '/api/v1/seller/stores/7/qr-codes?includeArchived=true',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/seller/stores/7/qr-codes/71',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/seller/stores/7/qr-codes/71/reissue',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ expiresAt: '2027-01-01T00:00:00Z' }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
       '/api/v1/seller/stores/7/qr-codes/71/deactivate',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      6,
+      '/api/v1/seller/stores/7/qr-codes/71/archive',
+      expect.objectContaining({ method: 'POST' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      7,
+      '/api/v1/seller/stores/7/qr-codes/71/restore',
       expect.objectContaining({ method: 'POST' }),
     )
   })

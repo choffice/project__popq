@@ -41,6 +41,9 @@ public class QrCode extends BaseTimeEntity {
     @Column(name = "token_hash", nullable = false, length = 64, unique = true)
     private String tokenHash;
 
+    @Column(name = "token_ciphertext", length = 512)
+    private String tokenCiphertext;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private QrCodeStatus status;
@@ -48,15 +51,20 @@ public class QrCode extends BaseTimeEntity {
     @Column(name = "expires_at")
     private Instant expiresAt;
 
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
     private QrCode(
             Store store,
             StoreTable storeTable,
             String tokenHash,
+            String tokenCiphertext,
             Instant expiresAt
     ) {
         this.store = store;
         this.storeTable = storeTable;
         this.tokenHash = tokenHash;
+        this.tokenCiphertext = tokenCiphertext;
         this.expiresAt = expiresAt;
         this.status = QrCodeStatus.ACTIVE;
     }
@@ -65,9 +73,43 @@ public class QrCode extends BaseTimeEntity {
             Store store,
             StoreTable storeTable,
             String tokenHash,
+            String tokenCiphertext,
             Instant expiresAt
     ) {
-        return new QrCode(store, storeTable, tokenHash, expiresAt);
+        return new QrCode(
+                store,
+                storeTable,
+                tokenHash,
+                tokenCiphertext,
+                expiresAt
+        );
+    }
+
+    public static QrCode issue(
+            Store store,
+            StoreTable storeTable,
+            String tokenHash,
+            Instant expiresAt
+    ) {
+        return issue(store, storeTable, tokenHash, null, expiresAt);
+    }
+
+    public boolean isRecoverable() {
+        return tokenCiphertext != null && !tokenCiphertext.isBlank();
+    }
+
+    public boolean isArchived() {
+        return archivedAt != null;
+    }
+
+    public void archive(Instant archivedAt) {
+        if (this.archivedAt == null) {
+            this.archivedAt = archivedAt;
+        }
+    }
+
+    public void restoreFromArchive() {
+        archivedAt = null;
     }
 
     public void revoke() {

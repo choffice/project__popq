@@ -8,6 +8,7 @@ import type {
   OrderStatus,
   ProductDetail,
   ProductOptionGroupInput,
+  QrCodeDetail,
   QrCodeSummary,
   QrIssued,
   SalesSummary,
@@ -335,9 +336,23 @@ export function getStoreTables(connection: SellerConnection) {
   )
 }
 
-export function getQrCodes(connection: SellerConnection) {
+export function getQrCodes(
+  connection: SellerConnection,
+  includeArchived = false,
+) {
+  const query = includeArchived ? '?includeArchived=true' : ''
   return request<QrCodeSummary[]>(
-    `${storePath(connection)}/qr-codes`,
+    `${storePath(connection)}/qr-codes${query}`,
+    connection,
+  )
+}
+
+export function getQrCodeDetail(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeDetail>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}`,
     connection,
   )
 }
@@ -364,6 +379,43 @@ export function changeQrStatus(
 ) {
   return request<QrCodeSummary>(
     `${storePath(connection)}/qr-codes/${qrCodeId}/${action}`,
+    connection,
+    { method: 'POST' },
+  )
+}
+
+export function reissueQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+  expiresAt: string | null,
+) {
+  return request<QrIssued>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/reissue`,
+    connection,
+    {
+      method: 'POST',
+      body: JSON.stringify({ expiresAt }),
+    },
+  )
+}
+
+export function archiveQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeSummary>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/archive`,
+    connection,
+    { method: 'POST' },
+  )
+}
+
+export function restoreQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeSummary>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/restore`,
     connection,
     { method: 'POST' },
   )

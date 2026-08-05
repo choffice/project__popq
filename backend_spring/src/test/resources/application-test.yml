@@ -24,4 +24,4 @@ popq:
     public-base-url: http://localhost:5173
     guest-session-ttl: PT1H
     cookie-secure: false
-
+    token-encryption-key: popq-test-qr-token-encryption-key-at-least-32-bytes
