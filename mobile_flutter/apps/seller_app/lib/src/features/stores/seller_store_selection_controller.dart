@@ -12,6 +12,7 @@ class SellerStoreSelectionController extends ChangeNotifier {
   SellerStoreSelectionStatus status = SellerStoreSelectionStatus.restoring;
   int? selectedStoreId;
   Object? restoreError;
+  String? _dashboardNotice;
 
   bool get hasSelection => selectedStoreId != null;
 
@@ -38,9 +39,18 @@ class SellerStoreSelectionController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> clear() async {
+  String? takeDashboardNotice() {
+    final String? notice = _dashboardNotice;
+    _dashboardNotice = null;
+    return notice;
+  }
+
+  Future<void> clear({
+    String? dashboardNotice,
+  }) async {
     await _store.clear();
     selectedStoreId = null;
+    _dashboardNotice = dashboardNotice;
     status = SellerStoreSelectionStatus.ready;
     restoreError = null;
     notifyListeners();
