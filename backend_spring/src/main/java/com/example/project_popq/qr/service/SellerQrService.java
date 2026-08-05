@@ -207,7 +207,6 @@ public class SellerQrService {
     }
 
     private String buildPublicUrl(String rawToken) {
-        String baseUrl = properties.publicBaseUrl().replaceAll("/+$", "");
-        return baseUrl + "/q/" + rawToken;
+        return properties.publicUrlForToken(rawToken);
     }
 }
