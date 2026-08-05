@@ -71,4 +71,48 @@ class AppEnvironment {
   bool get isProduction => flavor == AppFlavor.production;
 
   bool get hasTossClientKey => tossClientKey.trim().isNotEmpty;
+
+  /**
+   * 기존 POPQ_API_BASE_URL을 기준으로 WebSocket 주소를 만듭니다.
+   *
+   * http://192.168.0.10:8082
+   * → ws://192.168.0.10:8082/ws
+   *
+   * https://api.example.com
+   * → wss://api.example.com/ws
+   */
+  Uri get realtimeWebSocketUri {
+    final normalizedBaseUrl = apiBaseUrl.trim();
+
+    if (normalizedBaseUrl.isEmpty) {
+      throw const FormatException(
+        'POPQ_API_BASE_URL이 비어 있습니다.',
+      );
+    }
+
+    final baseUri = Uri.parse(normalizedBaseUrl);
+
+    if (!baseUri.hasScheme || baseUri.host.isEmpty) {
+      throw FormatException(
+        '올바르지 않은 POPQ_API_BASE_URL입니다: $apiBaseUrl',
+      );
+    }
+
+    final webSocketScheme = switch (baseUri.scheme.toLowerCase()) {
+      'http' => 'ws',
+      'https' => 'wss',
+      'ws' => 'ws',
+      'wss' => 'wss',
+      _ => throw FormatException(
+        '지원하지 않는 API URL scheme입니다: ${baseUri.scheme}',
+      ),
+    };
+
+    return baseUri.replace(
+      scheme: webSocketScheme,
+      path: '/ws',
+      query: '',
+      fragment: '',
+    );
+  }
 }
