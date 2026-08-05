@@ -1,5 +1,6 @@
 package com.example.project_popq.store.dto;
 
+import com.example.project_popq.store.domain.StoreType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
@@ -13,6 +14,8 @@ import java.time.LocalTime;
 import java.util.List;
 
 public record UpdateStoreRequest(
+        StoreType storeType,
+
         @NotBlank
         @Size(max = 150)
         String name,

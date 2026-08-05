@@ -42,6 +42,9 @@ public class OrderMessage extends BaseTimeEntity {
   @Column(name = "sender_type", nullable = false, length = 30)
   private MessageSenderType senderType;
 
+  @Column(name = "client_message_id", length = 64)
+  private String clientMessageId;
+
   @Column(name = "content", nullable = false, length = 2000)
   private String content;
 
@@ -52,14 +55,44 @@ public class OrderMessage extends BaseTimeEntity {
       Order order,
       User sender,
       MessageSenderType senderType,
+      String clientMessageId,
       String content
   ) {
     this.order = order;
     this.sender = sender;
     this.senderType = senderType;
+    this.clientMessageId = normalizeClientMessageId(clientMessageId);
     this.content = content;
   }
 
+  /**
+   * clientMessageId를 사용하는 새로운 메시지 생성 방식입니다.
+   *
+   * WebSocket 또는 REST 재전송 시 동일한 clientMessageId를 전달하면
+   * 서버에서 중복 저장 여부를 확인할 수 있습니다.
+   */
+  public static OrderMessage create(
+      Order order,
+      User sender,
+      MessageSenderType senderType,
+      String clientMessageId,
+      String content
+  ) {
+    return new OrderMessage(
+        order,
+        sender,
+        senderType,
+        clientMessageId,
+        content
+    );
+  }
+
+  /**
+   * 기존 REST 메시지 전송 코드와의 호환성을 위한 생성 메서드입니다.
+   *
+   * 다음 단계에서 메시지 전송 요청 DTO와 서비스를 변경한 뒤에도
+   * 기존 호출 코드가 갑자기 깨지지 않도록 유지합니다.
+   */
   public static OrderMessage create(
       Order order,
       User sender,
@@ -70,6 +103,7 @@ public class OrderMessage extends BaseTimeEntity {
         order,
         sender,
         senderType,
+        null,
         content
     );
   }
@@ -86,5 +120,25 @@ public class OrderMessage extends BaseTimeEntity {
 
   public boolean isSentBy(MessageSenderType senderType) {
     return this.senderType == senderType;
+  }
+
+  public boolean hasClientMessageId() {
+    return clientMessageId != null;
+  }
+
+  private static String normalizeClientMessageId(
+      String clientMessageId
+  ) {
+    if (clientMessageId == null) {
+      return null;
+    }
+
+    String normalized = clientMessageId.trim();
+
+    if (normalized.isEmpty()) {
+      return null;
+    }
+
+    return normalized;
   }
 }

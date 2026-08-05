@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -17,6 +19,7 @@ import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
 import '../features/favorites/customer_favorite_store_screen.dart';
+import '../features/home/customer_home_controller.dart';
 import '../features/home/customer_home_screen.dart';
 import '../features/home/customer_location_repository.dart';
 import '../features/inquiry/customer_order_chat_screen.dart';
@@ -73,6 +76,7 @@ GoRouter createCustomerRouter({
   required CustomerEngagementRepository engagementRepository,
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
+  required CustomerHomeController homeController,
   required CustomerPermissionGateway permissionGateway,
   required CustomerLocationRepository locationRepository,
   required String apiBaseUrl,
@@ -110,12 +114,17 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Duration minSplashDuration = const Duration(seconds: 3),
 }) {
-  return GoRouter(
+  final splashStartedAt = DateTime.now();
+
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: CustomerRoutes.home,
     refreshListenable: Listenable.merge([
       sessionController,
       onboardingController,
+      homeController,
     ]),
     redirect: (context, state) {
       final location = state.matchedLocation;
@@ -150,7 +159,11 @@ GoRouter createCustomerRouter({
               onboardingController.status ==
                   OnboardingStatus.restoring;
 
-      if (isRestoring) {
+      final hasMinSplashElapsed =
+          DateTime.now().difference(splashStartedAt) >=
+              minSplashDuration;
+
+      if (isRestoring || !hasMinSplashElapsed) {
         return isBootstrap
             ? null
             : CustomerRoutes.bootstrap;
@@ -176,10 +189,20 @@ GoRouter createCustomerRouter({
             : CustomerRoutes.onboarding;
       }
 
-      if (isBootstrap ||
-          isSessionError ||
-          isOnboardingError ||
-          isOnboarding) {
+      final isEnteringHome =
+          isBootstrap ||
+              isSessionError ||
+              isOnboardingError ||
+              isOnboarding;
+
+      if (isEnteringHome &&
+          !homeController.hasCompletedInitialLoad) {
+        return isBootstrap
+            ? null
+            : CustomerRoutes.bootstrap;
+      }
+
+      if (isEnteringHome) {
         return CustomerRoutes.home;
       }
 
@@ -231,11 +254,7 @@ GoRouter createCustomerRouter({
       GoRoute(
         path: CustomerRoutes.bootstrap,
         builder: (context, state) {
-          return const Scaffold(
-            body: PopqLoadingView(
-              message: '앱을 준비하고 있어요.',
-            ),
-          );
+          return const PopqSplashScreen();
         },
       ),
       GoRoute(
@@ -532,6 +551,8 @@ GoRouter createCustomerRouter({
                 permissionGateway,
                 locationRepository:
                 locationRepository,
+                preloadedController:
+                homeController,
               );
             },
           ),
@@ -606,4 +627,8 @@ GoRouter createCustomerRouter({
       ),
     ],
   );
+
+  Timer(minSplashDuration, router.refresh);
+
+  return router;
 }

@@ -21,6 +21,7 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.sessionController,
     required this.permissionGateway,
     required this.locationRepository,
+    this.preloadedController,
     super.key,
   });
 
@@ -30,6 +31,12 @@ class CustomerHomeScreen extends StatefulWidget {
   final CustomerPermissionGateway permissionGateway;
   final CustomerLocationRepository locationRepository;
 
+  /// 앱 부팅 시 스플래시 화면과 함께 미리 로딩을 시작한 컨트롤러입니다.
+  ///
+  /// 전달되면 이 화면은 새 컨트롤러를 만들지 않고 그대로 사용하며,
+  /// 소유권(dispose 책임)도 이 화면이 아니라 앱 상위에 남습니다.
+  final CustomerHomeController? preloadedController;
+
   @override
   State<CustomerHomeScreen> createState() =>
       _CustomerHomeScreenState();
@@ -38,6 +45,7 @@ class CustomerHomeScreen extends StatefulWidget {
 class _CustomerHomeScreenState
     extends State<CustomerHomeScreen> {
   late CustomerHomeController _controller;
+  bool _ownsController = true;
 
   /// 현재 선택된 카테고리 필터입니다.
   ///
@@ -76,17 +84,32 @@ class _CustomerHomeScreenState
             !identical(
               oldWidget.locationRepository,
               widget.locationRepository,
+            ) ||
+            !identical(
+              oldWidget.preloadedController,
+              widget.preloadedController,
             );
 
     if (!dependenciesChanged) {
       return;
     }
 
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
+
     _createController();
   }
 
   void _createController() {
+    final preloadedController = widget.preloadedController;
+
+    if (preloadedController != null) {
+      _controller = preloadedController;
+      _ownsController = false;
+      return;
+    }
+
     _controller = CustomerHomeController(
       widget.storeDiscoveryRepository,
       widget.orderRepository,
@@ -94,13 +117,16 @@ class _CustomerHomeScreenState
       widget.permissionGateway,
       widget.locationRepository,
     );
+    _ownsController = true;
 
     unawaited(_controller.load());
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
     super.dispose();
   }
 
@@ -928,6 +954,30 @@ class _FeaturedStoreCard
           ),
           child: Stack(
             children: [
+              if (store.imageUrl?.trim().isNotEmpty == true) ...[
+                Positioned.fill(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.network(
+                      store.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.black26, Colors.black87],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
               Positioned(
                 right: -22,
                 bottom: -26,
@@ -1550,6 +1600,60 @@ class _FeatureBannerSlide
   }
 }
 
+class _HomeStoreThumbnail extends StatelessWidget {
+  const _HomeStoreThumbnail({
+    required this.height,
+    required this.width,
+    required this.imageUrl,
+    required this.fallbackColor,
+    required this.fallbackIcon,
+    required this.fallbackIconColor,
+    this.borderRadius = 0,
+    this.fallbackIconSize = 30,
+  });
+
+  final double height;
+  final double width;
+  final String? imageUrl;
+  final Color fallbackColor;
+  final IconData fallbackIcon;
+  final Color fallbackIconColor;
+  final double borderRadius;
+  final double fallbackIconSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = imageUrl?.trim() ?? '';
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(borderRadius),
+        child: url.isEmpty
+            ? _fallback()
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _fallback(),
+              ),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return ColoredBox(
+      color: fallbackColor,
+      child: Center(
+        child: Icon(
+          fallbackIcon,
+          color: fallbackIconColor,
+          size: fallbackIconSize,
+        ),
+      ),
+    );
+  }
+}
+
 class _RankBadge extends StatelessWidget {
   const _RankBadge({
     required this.rank,
@@ -1619,32 +1723,18 @@ class _RankingStoreCard
               children: [
                 Stack(
                   children: [
-                    Container(
+                    _HomeStoreThumbnail(
                       height: 110,
                       width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? PopqPalette.purple
-                            .withValues(
-                          alpha: 0.2,
-                        )
-                            : PopqPalette.lime
-                            .withValues(
-                          alpha: 0.45,
-                        ),
-                        borderRadius:
-                        BorderRadius.circular(
-                          16,
-                        ),
-                      ),
-                      child: Icon(
-                        _storeIcon(store),
-                        color: isDark
-                            ? PopqPalette.lime
-                            : PopqPalette
-                            .forest,
-                        size: 30,
-                      ),
+                      imageUrl: store.imageUrl,
+                      borderRadius: 16,
+                      fallbackColor: isDark
+                          ? PopqPalette.purple.withValues(alpha: 0.2)
+                          : PopqPalette.lime.withValues(alpha: 0.45),
+                      fallbackIcon: _storeIcon(store),
+                      fallbackIconColor: isDark
+                          ? PopqPalette.lime
+                          : PopqPalette.forest,
                     ),
                     Positioned(
                       left: 6,
@@ -1880,29 +1970,16 @@ class _OngoingEventStoreCard
             children: [
               Stack(
                 children: [
-                  Container(
+                  _HomeStoreThumbnail(
                     height: 110,
                     width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: isDark
-                            ? const [
-                          PopqPalette.purple,
-                          PopqPalette
-                              .nightElevated,
-                        ]
-                            : const [
-                          PopqPalette.coral,
-                          Color(0xFFFFB26B),
-                        ],
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons
-                          .local_activity_rounded,
-                      size: 52,
-                      color: Colors.white,
-                    ),
+                    imageUrl: store.imageUrl,
+                    fallbackColor: isDark
+                        ? PopqPalette.purple
+                        : PopqPalette.coral,
+                    fallbackIcon: Icons.local_activity_rounded,
+                    fallbackIconColor: Colors.white,
+                    fallbackIconSize: 52,
                   ),
                   const Positioned(
                     left: PopqSpacing.sm,
@@ -2300,6 +2377,13 @@ String _businessStatusLabel(
 String _storeCategoryLabel(
     CustomerStore store,
     ) {
+  final String category =
+      store.representativeCategory?.trim() ?? '';
+
+  if (category.isNotEmpty) {
+    return category;
+  }
+
   if (store.tags.isNotEmpty) {
     return store.tags
         .take(3)

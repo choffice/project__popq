@@ -53,8 +53,8 @@ public class StoreApplicationService {
         User currentUser,
         CreateStoreRequest request
     ) {
-        if (currentUser.getRole() != PlatformRole.SELLER
-            && currentUser.getRole() != PlatformRole.ADMIN) {
+        if (!currentUser.hasRole(PlatformRole.SELLER)
+            && !currentUser.hasRole(PlatformRole.ADMIN)) {
             throw new BusinessException(
                 ErrorCode.ACCESS_DENIED
             );
@@ -136,6 +136,7 @@ public class StoreApplicationService {
         return StoreSummaryResponse.of(
             store,
             owner.getRole()
+
         );
     }
 
@@ -198,6 +199,10 @@ public class StoreApplicationService {
         );
 
         Store store = member.getStore();
+
+        if (request.storeType() != null) {
+            store.changeStoreType(request.storeType());
+        }
 
         LocalTime openTime =
             request.openTime() == null

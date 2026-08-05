@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -90,8 +92,12 @@ GoRouter createSellerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Duration minSplashDuration = const Duration(seconds: 3),
 }) {
-  return GoRouter(
+  final splashStartedAt = DateTime.now();
+
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: SellerRoutes.dashboard,
     refreshListenable: Listenable.merge([
       bootstrapController,
@@ -128,8 +134,13 @@ GoRouter createSellerRouter({
       final isStoreRegistration =
           location == SellerRoutes.storeRegistration;
 
+      final hasMinSplashElapsed =
+          DateTime.now().difference(splashStartedAt) >=
+              minSplashDuration;
+
       if (bootstrapController.status ==
-          SellerBootstrapStatus.restoring) {
+          SellerBootstrapStatus.restoring ||
+          !hasMinSplashElapsed) {
         return isBootstrap
             ? null
             : SellerRoutes.bootstrap;
@@ -186,11 +197,7 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.bootstrap,
         builder: (context, state) {
-          return const Scaffold(
-            body: PopqLoadingView(
-              message: '판매자 계정과 스토어를 확인하고 있어요.',
-            ),
-          );
+          return const PopqSplashScreen();
         },
       ),
       GoRoute(
@@ -384,4 +391,8 @@ GoRouter createSellerRouter({
       ),
     ],
   );
+
+  Timer(minSplashDuration, router.refresh);
+
+  return router;
 }

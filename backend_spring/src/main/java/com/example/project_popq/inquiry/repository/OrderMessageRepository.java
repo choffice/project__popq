@@ -2,11 +2,9 @@ package com.example.project_popq.inquiry.repository;
 
 import com.example.project_popq.inquiry.domain.MessageSenderType;
 import com.example.project_popq.inquiry.domain.OrderMessage;
-
+import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
 import java.util.List;
 import java.util.Optional;
-
-import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -39,6 +37,26 @@ public interface OrderMessageRepository
   findAllByOrderIdAndSenderTypeAndReadAtIsNullOrderByCreatedAtAscIdAsc(
       Long orderId,
       MessageSenderType senderType
+  );
+
+  /**
+   * 같은 주문에서 같은 사용자가 같은 clientMessageId로
+   * 이미 저장한 메시지가 있는지 확인합니다.
+   *
+   * WebSocket 전송 후 응답을 받지 못해 REST로 재전송하거나,
+   * 사용자가 재전송 버튼을 여러 번 누르는 상황에서 사용합니다.
+   */
+  @EntityGraph(
+      attributePaths = {
+          "order",
+          "sender"
+      }
+  )
+  Optional<OrderMessage>
+  findByOrderIdAndSenderIdAndClientMessageId(
+      Long orderId,
+      Long senderUserId,
+      String clientMessageId
   );
 
   Optional<OrderMessage> findFirstByOrderIdOrderByCreatedAtDescIdDesc(

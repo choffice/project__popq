@@ -36,6 +36,7 @@ class PopqSellerApp extends StatefulWidget {
     this.customerRepository,
     this.themeController,
     this.authRepository,
+    this.splashMinDuration = const Duration(seconds: 3),
     super.key,
   });
 
@@ -51,6 +52,11 @@ class PopqSellerApp extends StatefulWidget {
   final SellerCustomerRepository? customerRepository;
   final PopqThemeController? themeController;
   final SellerAuthRepository? authRepository;
+
+  /// 스플래시 화면(부트스트랩)을 최소 이 시간만큼 보여줍니다.
+  ///
+  /// 위젯 테스트에서는 [Duration.zero]로 넘겨서 스플래시를 건너뛸 수 있습니다.
+  final Duration splashMinDuration;
 
   @override
   State<PopqSellerApp> createState() {
@@ -226,6 +232,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       onGoogleSignIn: _googleSignIn,
       onKakaoSignIn: _kakaoSignIn,
       onNaverSignIn: _naverSignIn,
+      minSplashDuration: widget.splashMinDuration,
 
     );
 

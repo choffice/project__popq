@@ -16,6 +16,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -47,6 +48,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -69,7 +71,7 @@ void main() {
 
     await tester.tap(find.text('성수 커피 연구소'));
     await tester.pumpAndSettle();
-    expect(find.text('스토어 상세'), findsOneWidget);
+    expect(find.text('매장 상세'), findsOneWidget);
     expect(find.text('서울 성동구 연무장길'), findsOneWidget);
   });
 
@@ -79,6 +81,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -107,6 +110,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: sessionStore,
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -139,6 +143,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: sessionStore,
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -183,6 +188,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: const _FailingSessionStore(),
         onboardingStore: MemoryOnboardingStore.complete(),
         storeDiscoveryRepository: MemoryStoreDiscoveryRepository(),
@@ -234,6 +240,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(
           AuthSession(
             accessToken: 'access',
@@ -300,6 +307,7 @@ void main() {
     await tester.pumpWidget(
       PopqCustomerApp(
         environment: const AppEnvironment.local(),
+        splashMinDuration: Duration.zero,
         sessionStore: MemorySessionStore(
           AuthSession(
             accessToken: 'access',
