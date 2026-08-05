@@ -16,6 +16,7 @@ import {
   syncOrder,
 } from './services/api'
 import { connectOrderRealtime } from './services/realtime'
+import { useThemePreference } from './theme'
 import type {
   CartItem,
   OrderRealtimeEvent,
@@ -117,6 +118,7 @@ function persistStored(storage: Storage, key: string, value: unknown) {
 }
 
 function App() {
+  const { theme, toggleTheme } = useThemePreference()
   const qrToken = findQrToken()
   const initialScope = qrToken ?? 'demo'
   const [isDemo, setIsDemo] = useState(!qrToken)
@@ -524,7 +526,17 @@ function App() {
             {context.tableName ?? 'Pickup'} · {isDemo ? 'Demo' : 'Live'}
           </span>
         </div>
-        <button
+        <div className="topbar-tools">
+          <button
+            className="icon-button theme-toggle"
+            type="button"
+            aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
+            aria-pressed={theme === 'dark'}
+            onClick={toggleTheme}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+          </button>
+          <button
           className="icon-button bag-button"
           aria-label={
             hasOrderShortcut
@@ -535,7 +547,8 @@ function App() {
         >
           {hasOrderShortcut ? '◎' : '◒'}
           {cartCount > 0 && <span>{cartCount}</span>}
-        </button>
+          </button>
+        </div>
       </header>
 
       {error && (
