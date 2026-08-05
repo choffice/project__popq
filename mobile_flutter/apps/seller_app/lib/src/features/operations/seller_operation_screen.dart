@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../routing/seller_router.dart';
 import '../announcements/seller_announcement_repository.dart';
 import '../announcements/seller_announcement_screen.dart';
 import '../home/seller_analytics_repository.dart';
@@ -74,6 +76,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   var _changingStatus = false;
   var _savingQuickEdit = false;
   var _pickingHeaderImage = false;
+  var _endingOperation = false;
 
   int get _storeId => widget.selectionController.selectedStoreId!;
 
@@ -469,7 +472,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
 
         FilledButton.icon(
           key: const Key('edit-store'),
-          onPressed: canManage && !_savingQuickEdit ? _editStore : null,
+          onPressed: canManage && !_savingQuickEdit && !_endingOperation
+              ? _editStore
+              : null,
           icon: const Icon(
             Icons.edit_outlined,
           ),
@@ -477,6 +482,19 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             '전체 정보 수정',
           ),
         ),
+        if (store.myRole == 'OWNER') ...<Widget>[
+          const SizedBox(height: PopqSpacing.lg),
+          const Divider(),
+          TextButton.icon(
+            key: const Key('end-store-operation'),
+            onPressed: _endingOperation ? null : _confirmEndOperation,
+            style: TextButton.styleFrom(
+              foregroundColor: theme.colorScheme.onSurfaceVariant,
+            ),
+            icon: const Icon(Icons.block_outlined),
+            label: const Text('사업장 운영 종료'),
+          ),
+        ],
       ],
     );
   }
@@ -1775,6 +1793,135 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           ),
         ),
       );
+  }
+
+  Future<void> _confirmEndOperation() async {
+    final SellerStore? store = _store;
+    if (store == null || store.myRole != 'OWNER' || _endingOperation) {
+      return;
+    }
+
+    final bool? ended = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        bool confirmed = false;
+        bool submitting = false;
+        String? errorMessage;
+
+        return StatefulBuilder(
+          builder: (
+            BuildContext context,
+            void Function(void Function()) setDialogState,
+          ) {
+            return AlertDialog(
+              title: const Text('사업장 운영을 종료할까요?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '${store.name}의 운영을 종료하면 판매자 사업장 목록에서 사라지고 '
+                    '주문 접수가 중지됩니다.\n\n'
+                    '기존 주문과 결제 기록은 보존됩니다.\n'
+                    '현재 앱에서는 운영 종료 후 직접 복구할 수 없습니다.',
+                  ),
+                  const SizedBox(height: PopqSpacing.md),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: const Text('위 내용을 확인했습니다.'),
+                    value: confirmed,
+                    onChanged: submitting
+                        ? null
+                        : (bool? value) {
+                            setDialogState(() {
+                              confirmed = value ?? false;
+                              errorMessage = null;
+                            });
+                          },
+                  ),
+                  if (errorMessage != null)
+                    Text(
+                      errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: submitting
+                      ? null
+                      : () {
+                          Navigator.of(dialogContext).pop(false);
+                        },
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.error,
+                    foregroundColor: Theme.of(context).colorScheme.onError,
+                  ),
+                  onPressed: !confirmed || submitting
+                      ? null
+                      : () async {
+                          setDialogState(() {
+                            submitting = true;
+                            errorMessage = null;
+                          });
+                          if (mounted) {
+                            setState(() {
+                              _endingOperation = true;
+                            });
+                          }
+
+                          try {
+                            await widget.storeRepository.delete(store.storeId);
+                            if (dialogContext.mounted) {
+                              Navigator.of(dialogContext).pop(true);
+                            }
+                          } catch (_) {
+                            if (mounted) {
+                              setState(() {
+                                _endingOperation = false;
+                              });
+                            }
+                            if (dialogContext.mounted) {
+                              setDialogState(() {
+                                submitting = false;
+                                errorMessage =
+                                    '사업장 운영을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                              });
+                            }
+                          }
+                        },
+                  child: submitting
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('운영 종료'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (ended != true || !mounted) {
+      return;
+    }
+
+    await widget.selectionController.clear(
+      dashboardNotice: '사업장 운영을 종료했습니다.',
+    );
+
+    if (mounted) {
+      context.go(SellerRoutes.dashboard);
+    }
   }
 }
 

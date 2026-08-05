@@ -17,71 +17,47 @@ class StoreSelectionScreen extends StatefulWidget {
   final SellerStoreSelectionController controller;
 
   @override
-  State<StoreSelectionScreen> createState() {
-    return _StoreSelectionScreenState();
-  }
+  State<StoreSelectionScreen> createState() =>
+      _StoreSelectionScreenState();
 }
 
 class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   late Future<List<SellerStore>> _stores;
+  final TextEditingController _searchController = TextEditingController();
 
   bool _selecting = false;
   bool _creating = false;
-
-  int? _deletingStoreId;
   int? _observedSelectedStoreId;
+  String _searchQuery = '';
 
-  bool get _busy {
-    return _selecting ||
-        _creating ||
-        _deletingStoreId != null;
-  }
+  bool get _busy => _selecting || _creating;
 
   @override
   void initState() {
     super.initState();
-
-    _observedSelectedStoreId =
-        widget.controller.selectedStoreId;
-
-    widget.controller.addListener(
-      _handleSelectionChanged,
-    );
-
+    _observedSelectedStoreId = widget.controller.selectedStoreId;
+    widget.controller.addListener(_handleSelectionChanged);
     _stores = _load();
   }
 
   @override
-  void didUpdateWidget(
-      covariant StoreSelectionScreen oldWidget,
-      ) {
+  void didUpdateWidget(covariant StoreSelectionScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.controller ==
-        widget.controller) {
+    if (oldWidget.controller == widget.controller) {
       return;
     }
 
-    oldWidget.controller.removeListener(
-      _handleSelectionChanged,
-    );
-
-    _observedSelectedStoreId =
-        widget.controller.selectedStoreId;
-
-    widget.controller.addListener(
-      _handleSelectionChanged,
-    );
-
+    oldWidget.controller.removeListener(_handleSelectionChanged);
+    _observedSelectedStoreId = widget.controller.selectedStoreId;
+    widget.controller.addListener(_handleSelectionChanged);
     _stores = _load();
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(
-      _handleSelectionChanged,
-    );
-
+    widget.controller.removeListener(_handleSelectionChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -89,85 +65,98 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   Widget build(BuildContext context) {
     return FutureBuilder<List<SellerStore>>(
       future: _stores,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState !=
-            ConnectionState.done) {
+      builder: (
+        BuildContext context,
+        AsyncSnapshot<List<SellerStore>> snapshot,
+      ) {
+        if (snapshot.connectionState != ConnectionState.done) {
           return const PopqLoadingView(
-            message: '내 스토어를 불러오고 있어요.',
+            message: '사업장을 불러오고 있어요.',
           );
         }
 
-        if (snapshot.hasError ||
-            !snapshot.hasData) {
+        if (snapshot.hasError || !snapshot.hasData) {
           return PopqErrorView(
-            message: '내 스토어를 불러오지 못했어요.',
+            message: '사업장을 불러오지 못했어요.',
             onRetry: _reload,
           );
         }
 
-        final List<SellerStore> stores =
-            snapshot.requireData;
+        final List<SellerStore> stores = snapshot.requireData;
+        final List<SellerStore> visibleStores = _search(stores);
+        _showDashboardNoticeAfterFrame();
 
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
-            physics:
-            const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(
-              PopqSpacing.lg,
-            ),
-            children: [
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(PopqSpacing.lg),
+            children: <Widget>[
               Text(
                 '사업장 대시보드',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
+              const SizedBox(height: PopqSpacing.sm),
               const Text(
-                '운영 중인 전체 사업장을 확인하고 새 사업장을 등록할 수 있습니다.',
+                '운영 중인 사업장을 확인하고 관리할 사업장을 선택하세요.',
               ),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
+              const SizedBox(height: PopqSpacing.md),
               FilledButton.icon(
                 key: const Key('add-store'),
-                onPressed: _busy
-                    ? null
-                    : _openRegistrationScreen,
+                onPressed: _busy ? null : _openRegistrationScreen,
                 icon: _creating
                     ? const SizedBox.square(
-                  dimension: 20,
-                  child:
-                  CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Icon(
-                  Icons.add_business_rounded,
-                ),
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_business_rounded),
                 label: Text(
-                  _creating
-                      ? '등록 화면 여는 중...'
-                      : '새 사업장 등록',
+                  _creating ? '등록 화면 여는 중...' : '새 사업장 등록',
                 ),
               ),
-              const SizedBox(
-                height: PopqSpacing.lg,
+              const SizedBox(height: PopqSpacing.lg),
+              TextField(
+                controller: _searchController,
+                enabled: !_busy,
+                decoration: InputDecoration(
+                  labelText: '사업장 검색',
+                  hintText: '사업장명, 주소, 상세주소, 대표 카테고리',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: '검색어 지우기',
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                            });
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                ),
+                onChanged: (String value) {
+                  setState(() {
+                    _searchQuery = value;
+                  });
+                },
               ),
+              const SizedBox(height: PopqSpacing.lg),
               if (stores.isEmpty)
                 const PopqEmptyView(
-                  icon:
-                  Icons.storefront_outlined,
+                  icon: Icons.storefront_outlined,
                   title: '등록된 사업장이 없어요.',
-                  description:
-                  '새 사업장 등록을 눌러 첫 운영 공간을 만들어 주세요.',
-                ),
-              for (final SellerStore store
-              in stores)
-                _buildStoreCard(store),
+                  description: '새 사업장 등록을 눌러 첫 운영 공간을 만들어 주세요.',
+                )
+              else if (visibleStores.isEmpty)
+                const PopqEmptyView(
+                  icon: Icons.search_off_rounded,
+                  title: '조건에 맞는 사업장이 없습니다.',
+                  description: '검색어를 지우고 다시 확인해 주세요.',
+                )
+              else
+                for (final SellerStore store in visibleStores)
+                  _buildStoreCard(store),
             ],
           ),
         );
@@ -175,26 +164,16 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     );
   }
 
-  Widget _buildStoreCard(
-      SellerStore store,
-      ) {
+  Widget _buildStoreCard(SellerStore store) {
     final bool selected =
-        widget.controller.selectedStoreId ==
-            store.storeId;
-
-    final bool deleting =
-        _deletingStoreId == store.storeId;
-
-    final bool canDelete =
-        store.myRole == 'OWNER';
+        widget.controller.selectedStoreId == store.storeId;
 
     return Card(
       child: ListTile(
         enabled: !_busy,
         leading: CircleAvatar(
           child: Icon(
-            store.storeType ==
-                'EVENT_COMMERCE'
+            store.storeType == 'EVENT_COMMERCE'
                 ? Icons.celebration_rounded
                 : Icons.storefront_rounded,
           ),
@@ -202,73 +181,49 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
         title: Text(store.name),
         subtitle: Text(
           '${_typeLabel(store.storeType)} · '
-              '${_roleLabel(store.myRole)} · '
-              '${_statusLabel(store.businessStatus)}',
+          '${_roleLabel(store.myRole)} · '
+          '${_statusLabel(store.businessStatus)}',
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (selected)
-              const Icon(
-                Icons.check_circle_rounded,
-              )
-            else
-              const Icon(
-                Icons.chevron_right_rounded,
-              ),
-            if (canDelete) ...[
-              const SizedBox(width: 4),
-              if (deleting)
-                const SizedBox.square(
-                  dimension: 24,
-                  child:
-                  CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
-              else
-                IconButton(
-                  tooltip: '사업장 삭제',
-                  onPressed: _busy
-                      ? null
-                      : () {
-                    _confirmDelete(store);
-                  },
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                  ),
-                ),
-            ],
-          ],
+        trailing: Icon(
+          selected
+              ? Icons.check_circle_rounded
+              : Icons.chevron_right_rounded,
         ),
         onTap: _busy
             ? null
             : () {
-          _select(store);
-        },
+                _select(store);
+              },
       ),
     );
   }
 
+  List<SellerStore> _search(List<SellerStore> stores) {
+    final String query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      return stores;
+    }
+
+    return stores.where((SellerStore store) {
+      return <String?>[
+        store.name,
+        store.address,
+        store.detailAddress,
+        store.representativeCategory,
+      ].any(
+        (String? value) => value?.toLowerCase().contains(query) ?? false,
+      );
+    }).toList(growable: false);
+  }
+
   Future<List<SellerStore>> _load() async {
-    final List<SellerStore> stores =
-    await widget.repository.findAll();
-
-    final int? selectedId =
-        widget.controller.selectedStoreId;
-
-    final bool selectedStoreExists =
-        selectedId == null ||
-            stores.any(
-                  (SellerStore store) {
-                return store.storeId ==
-                    selectedId;
-              },
-            );
+    final List<SellerStore> stores = await widget.repository.findAll();
+    final int? selectedId = widget.controller.selectedStoreId;
+    final bool selectedStoreExists = selectedId == null ||
+        stores.any((SellerStore store) => store.storeId == selectedId);
 
     if (!selectedStoreExists) {
       _observedSelectedStoreId = null;
-
       await widget.controller.clear();
     }
 
@@ -276,17 +231,12 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   }
 
   void _handleSelectionChanged() {
-    final int? selectedStoreId =
-        widget.controller.selectedStoreId;
-
-    if (_observedSelectedStoreId ==
-        selectedStoreId) {
+    final int? selectedStoreId = widget.controller.selectedStoreId;
+    if (_observedSelectedStoreId == selectedStoreId) {
       return;
     }
 
-    _observedSelectedStoreId =
-        selectedStoreId;
-
+    _observedSelectedStoreId = selectedStoreId;
     if (!mounted) {
       return;
     }
@@ -296,9 +246,20 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     });
   }
 
-  Future<void> _select(
-      SellerStore store,
-      ) async {
+  void _showDashboardNoticeAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final String? notice = widget.controller.takeDashboardNotice();
+      if (notice != null) {
+        _showMessage(notice);
+      }
+    });
+  }
+
+  Future<void> _select(SellerStore store) async {
     if (_busy) {
       return;
     }
@@ -308,16 +269,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     });
 
     try {
-      /*
-       * 기존 사업장을 선택할 때는 목록을 다시 조회할
-       * 필요가 없으므로 리스너의 중복 갱신을 막습니다.
-       */
-      _observedSelectedStoreId =
-          store.storeId;
-
-      await widget.controller.select(
-        store.storeId,
-      );
+      _observedSelectedStoreId = store.storeId;
+      await widget.controller.select(store.storeId);
 
       if (!mounted) {
         return;
@@ -326,30 +279,21 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       setState(() {
         _selecting = false;
       });
-
-      context.go(
-        SellerRoutes.operations,
-      );
+      context.go(SellerRoutes.operations);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _observedSelectedStoreId =
-          widget.controller.selectedStoreId;
-
+      _observedSelectedStoreId = widget.controller.selectedStoreId;
       setState(() {
         _selecting = false;
       });
-
-      _showMessage(
-        '스토어 선택을 저장하지 못했어요.',
-      );
+      _showMessage('사업장 선택을 저장하지 못했어요.');
     }
   }
 
-  Future<void>
-  _openRegistrationScreen() async {
+  Future<void> _openRegistrationScreen() async {
     if (_busy) {
       return;
     }
@@ -359,156 +303,33 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     });
 
     final Future<SellerStore?> routeFuture =
-    context.push<SellerStore>(
-      SellerRoutes.storeRegistration,
-    );
+        context.push<SellerStore>(SellerRoutes.storeRegistration);
 
-    /*
-     * 화면 전환이 시작되면 대시보드 버튼의 로딩은
-     * 바로 해제합니다.
-     *
-     * 등록 요청 중복 방지는 등록 화면의
-     * _submitting 상태가 담당합니다.
-     */
     if (mounted) {
       setState(() {
         _creating = false;
       });
     }
 
-    final SellerStore? created =
-    await routeFuture;
-
+    final SellerStore? created = await routeFuture;
     if (!mounted) {
       return;
     }
 
-    /*
-     * 결과 전달 여부와 관계없이 등록 화면에서 돌아오면
-     * 서버 목록을 다시 조회합니다.
-     */
     setState(() {
       _stores = _load();
     });
 
     if (created != null) {
-      _showMessage(
-        '${created.name} 사업장을 등록했습니다.',
-      );
-    }
-  }
-
-  Future<void> _confirmDelete(
-      SellerStore store,
-      ) async {
-    if (_busy ||
-        store.myRole != 'OWNER') {
-      return;
-    }
-
-    final bool? confirmed =
-    await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('사업장 삭제'),
-          content: Text(
-            '${store.name} 사업장을 삭제할까요?\n\n'
-                '판매자 목록에서는 사라지지만 기존 주문과 결제 기록은 보존됩니다.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext)
-                    .pop(false);
-              },
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(dialogContext)
-                    .pop(true);
-              },
-              child: const Text('삭제'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true ||
-        !mounted) {
-      return;
-    }
-
-    await _deleteStore(store);
-  }
-
-  Future<void> _deleteStore(
-      SellerStore store,
-      ) async {
-    if (_busy) {
-      return;
-    }
-
-    setState(() {
-      _deletingStoreId = store.storeId;
-    });
-
-    try {
-      await widget.repository.delete(
-        store.storeId,
-      );
-
-      final bool deletedSelectedStore =
-          widget.controller.selectedStoreId ==
-              store.storeId;
-
-      if (deletedSelectedStore) {
-        /*
-         * clear() 알림으로 동일한 목록 조회가 한 번 더
-         * 실행되지 않도록 관찰 값을 먼저 맞춥니다.
-         */
-        _observedSelectedStoreId = null;
-
-        await widget.controller.clear();
-      }
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _deletingStoreId = null;
-        _stores = _load();
-      });
-
-      _showMessage(
-        '${store.name} 사업장을 삭제했습니다.',
-      );
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _deletingStoreId = null;
-      });
-
-      _showMessage(
-        '사업장을 삭제하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      );
+      _showMessage('${created.name} 사업장을 등록했습니다.');
     }
   }
 
   Future<void> _refresh() async {
-    final Future<List<SellerStore>>
-    refreshFuture = _load();
-
+    final Future<List<SellerStore>> refreshFuture = _load();
     setState(() {
       _stores = refreshFuture;
     });
-
     await refreshFuture;
   }
 
@@ -518,16 +339,10 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     });
   }
 
-  void _showMessage(
-      String message,
-      ) {
+  void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -543,14 +358,12 @@ String _roleLabel(String role) {
 String _statusLabel(String status) {
   return switch (status) {
     'OPEN' => '영업 중',
-    'CLOSED' => '영업 종료',
+    'CLOSED' => '운영 종료',
     'PRE_OPEN' => '영업 준비',
     _ => status,
   };
 }
 
 String _typeLabel(String type) {
-  return type == 'EVENT_COMMERCE'
-      ? '행사·팝업'
-      : '일반 매장';
+  return type == 'EVENT_COMMERCE' ? '행사·이벤트' : '로컬마켓';
 }
