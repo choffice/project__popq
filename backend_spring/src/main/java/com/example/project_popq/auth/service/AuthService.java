@@ -71,7 +71,32 @@ public class AuthService {
             throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
 
-        return issueToken(user);
+        PlatformRole activeRole = request.role() != null ? request.role() : user.getRole();
+        if (!user.hasRole(activeRole)) {
+            throw new BusinessException(ErrorCode.SOCIAL_ROLE_MISMATCH);
+        }
+
+        return issueToken(user, activeRole);
+    }
+
+    /**
+     * 이미 다른 role로 가입된 계정에 SELLER 접근 권한을 추가합니다.
+     * (마이페이지의 "팝큐 비즈 연결하기")
+     *
+     * user는 이 트랜잭션 안에서 직접 조회해야 합니다. 컨트롤러에서 미리 조회해 온
+     * User를 넘기면 detached 상태라 roles 변경이 커밋되지 않습니다.
+     */
+    @Transactional
+    public AckResponse connectSellerAccess(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!user.isActive()) {
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
+        }
+
+        user.addRole(PlatformRole.SELLER);
+        ensureSellerProfile(user, PlatformRole.SELLER);
+        return AckResponse.ok();
     }
 
     @Transactional(readOnly = true)
@@ -117,17 +142,25 @@ public class AuthService {
     }
 
     private AuthTokenResponse issueToken(User user) {
-        IssuedAccessToken accessToken = jwtTokenService.issueAccessToken(user);
+        return issueToken(user, user.getRole());
+    }
+
+    private AuthTokenResponse issueToken(User user, PlatformRole activeRole) {
+        IssuedAccessToken accessToken = jwtTokenService.issueAccessToken(user, activeRole);
         return new AuthTokenResponse(
                 accessToken.value(),
                 "Bearer",
                 accessToken.expiresInSeconds(),
-                AuthUserResponse.from(user)
+                AuthUserResponse.from(user, activeRole)
         );
     }
 
     private void ensureSellerProfile(User user) {
-        if (user.getRole() == PlatformRole.SELLER
+        ensureSellerProfile(user, user.getRole());
+    }
+
+    private void ensureSellerProfile(User user, PlatformRole activeRole) {
+        if (activeRole == PlatformRole.SELLER
                 && sellerProfileRepository.findByUserId(user.getId()).isEmpty()) {
             sellerProfileRepository.save(SellerProfile.createPending(user));
         }

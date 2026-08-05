@@ -33,6 +33,9 @@ abstract interface class CustomerAuthRepository {
     required String phone,
     required String newPassword,
   });
+
+  /// 이미 CUSTOMER로 가입된 계정에 SELLER(판매자) 접근 권한을 추가로 연결합니다.
+  Future<void> connectSellerAccess();
 }
 
 class ApiCustomerAuthRepository implements CustomerAuthRepository {
@@ -64,6 +67,7 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     return _submit('/api/v1/auth/login', {
       'email': email,
       'password': password,
+      'role': 'CUSTOMER',
     });
   }
 
@@ -116,6 +120,14 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/password-reset/confirm',
       body: {'email': email, 'phone': phone, 'newPassword': newPassword},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<void> connectSellerAccess() async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/connect-seller',
       decode: (value) => Map<String, Object?>.from(value as Map),
     );
   }
@@ -193,6 +205,9 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
     required String phone,
     required String newPassword,
   }) async {}
+
+  @override
+  Future<void> connectSellerAccess() async {}
 
   AuthSession _session() {
     return AuthSession(
