@@ -130,6 +130,13 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
       decode: (value) => Map<String, Object?>.from(value as Map),
     );
 
+    final role = Map<String, Object?>.from(
+      response['user'] as Map,
+    )['role'];
+    if (role != 'CUSTOMER') {
+      throw StateError('customer role is required');
+    }
+
     final expiresIn = (response['expiresIn'] as num).toInt();
     return AuthSession(
       accessToken: response['accessToken'] as String,
