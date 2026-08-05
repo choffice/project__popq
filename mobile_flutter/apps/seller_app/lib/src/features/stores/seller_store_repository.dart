@@ -82,6 +82,7 @@ class SellerStore {
   final String myRole;
 
   SellerStore copyWith({
+    String? storeType,
     String? name,
     String? description,
     String? address,
@@ -102,7 +103,7 @@ class SellerStore {
   }) {
     return SellerStore(
       storeId: storeId,
-      storeType: storeType,
+      storeType: storeType ?? this.storeType,
       name: name ?? this.name,
       description: description ?? this.description,
       address: address ?? this.address,
@@ -462,6 +463,7 @@ abstract interface class SellerStoreRepository {
 
   Future<SellerStore> update(
       int storeId, {
+        String? storeType,
         required String name,
         String? description,
         String? address,
@@ -757,6 +759,7 @@ class ApiSellerStoreRepository
   @override
   Future<SellerStore> update(
       int storeId, {
+        String? storeType,
         required String name,
         String? description,
         String? address,
@@ -777,6 +780,7 @@ class ApiSellerStoreRepository
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
       body: {
+        'storeType': ?storeType,
         'name': name,
         'description': description,
         'address': address,
@@ -1068,6 +1072,7 @@ class MemorySellerStoreRepository
   @override
   Future<SellerStore> update(
       int storeId, {
+        String? storeType,
         required String name,
         String? description,
         String? address,
@@ -1108,7 +1113,7 @@ class MemorySellerStoreRepository
 
     final SellerStore updated = SellerStore(
       storeId: store.storeId,
-      storeType: store.storeType,
+      storeType: storeType ?? store.storeType,
       name: name,
       description: description,
       address: address,

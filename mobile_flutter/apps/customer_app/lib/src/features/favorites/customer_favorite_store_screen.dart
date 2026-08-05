@@ -585,6 +585,54 @@ class _FavoriteEmptyView
   }
 }
 
+class _FavoriteStoreThumbnail extends StatelessWidget {
+  const _FavoriteStoreThumbnail({
+    required this.width,
+    required this.height,
+    required this.imageUrl,
+    required this.isDark,
+  });
+
+  final double width;
+  final double height;
+  final String? imageUrl;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = imageUrl?.trim() ?? '';
+    return SizedBox(
+      width: width,
+      height: height,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: url.isEmpty
+            ? _fallback()
+            : Image.network(
+                url,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => _fallback(),
+              ),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return ColoredBox(
+      color: isDark
+          ? PopqPalette.purple.withValues(alpha: 0.2)
+          : PopqPalette.lime.withValues(alpha: 0.42),
+      child: Center(
+        child: Icon(
+          Icons.storefront_rounded,
+          size: 34,
+          color: isDark ? PopqPalette.lime : PopqPalette.forest,
+        ),
+      ),
+    );
+  }
+}
+
 class _FavoriteStoreCard
     extends StatelessWidget {
   const _FavoriteStoreCard({
@@ -616,29 +664,11 @@ class _FavoriteStoreCard
           ),
           child: Row(
             children: [
-              Container(
+              _FavoriteStoreThumbnail(
                 width: 76,
                 height: 76,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? PopqPalette.purple.withValues(
-                    alpha: 0.2,
-                  )
-                      : PopqPalette.lime.withValues(
-                    alpha: 0.42,
-                  ),
-                  borderRadius:
-                  BorderRadius.circular(
-                    20,
-                  ),
-                ),
-                child: Icon(
-                  Icons.storefront_rounded,
-                  size: 34,
-                  color: isDark
-                      ? PopqPalette.lime
-                      : PopqPalette.forest,
-                ),
+                imageUrl: store.imageUrl,
+                isDark: isDark,
               ),
               const SizedBox(
                 width: PopqSpacing.md,
@@ -676,6 +706,14 @@ class _FavoriteStoreCard
                         ),
                       ],
                     ),
+                    if (store.representativeCategory?.trim().isNotEmpty ==
+                        true) ...[
+                      const SizedBox(height: PopqSpacing.xs),
+                      Text(
+                        store.representativeCategory!,
+                        style: theme.textTheme.labelMedium,
+                      ),
+                    ],
                     const SizedBox(
                       height: PopqSpacing.sm,
                     ),
@@ -717,8 +755,9 @@ class _FavoriteStoreCard
                         ),
                         Expanded(
                           child: Text(
-                            store.address ??
-                                '주소 정보 없음',
+                            store.fullAddress.isEmpty
+                                ? '주소 정보 없음'
+                                : store.fullAddress,
                             maxLines: 1,
                             overflow:
                             TextOverflow
