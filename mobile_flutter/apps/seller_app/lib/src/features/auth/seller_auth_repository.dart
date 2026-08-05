@@ -144,6 +144,7 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
     return _submit('/api/v1/auth/login', {
       'email': email,
       'password': password,
+      'role': 'SELLER',
     });
   }
 

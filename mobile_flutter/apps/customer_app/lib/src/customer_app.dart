@@ -210,6 +210,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       _verifyForPasswordReset,
       onResetPassword:
       _resetPassword,
+      onConnectSellerAccess:
+      _connectSellerAccess,
       sessionController:
       _sessionController,
       onboardingController:
@@ -387,6 +389,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       phone: phone,
       newPassword: newPassword,
     );
+  }
+
+  Future<void> _connectSellerAccess() {
+    return _authRepository.connectSellerAccess();
   }
 
   Future<void> _googleSignIn() async {
