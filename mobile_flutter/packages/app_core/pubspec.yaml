@@ -1,5 +1,5 @@
 name: popq_app_core
-description: "Shared environment, API, authentication, and app settings contracts for POPQ apps."
+description: "Shared environment, API, authentication, realtime, and app settings contracts for POPQ apps."
 version: 0.0.1
 
 environment:
@@ -15,6 +15,8 @@ dependencies:
   google_sign_in: ^7.2.0
   http: ^1.6.0
   shared_preferences: ^2.5.5
+  stomp_dart_client: ^3.0.1
+  uuid: ^4.6.0
 
 dev_dependencies:
   flutter_test:

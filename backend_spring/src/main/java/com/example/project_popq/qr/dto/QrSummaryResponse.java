@@ -10,7 +10,9 @@ public record QrSummaryResponse(
         String tableName,
         QrCodeStatus status,
         Instant expiresAt,
-        Instant createdAt
+        Instant createdAt,
+        boolean recoverable,
+        boolean archived
 ) {
     public static QrSummaryResponse from(QrCode qrCode) {
         return new QrSummaryResponse(
@@ -23,8 +25,9 @@ public record QrSummaryResponse(
                         : qrCode.getStoreTable().getName(),
                 qrCode.getStatus(),
                 qrCode.getExpiresAt(),
-                qrCode.getCreatedAt()
+                qrCode.getCreatedAt(),
+                qrCode.isRecoverable(),
+                qrCode.isArchived()
         );
     }
 }
-

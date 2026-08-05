@@ -1,6 +1,8 @@
 FROM node:22-alpine AS build
 
 WORKDIR /app
+ARG VITE_POPQ_TOSS_CLIENT_KEY
+ENV VITE_POPQ_TOSS_CLIENT_KEY=${VITE_POPQ_TOSS_CLIENT_KEY}
 COPY web_react/popq/package.json web_react/popq/package-lock.json ./
 RUN npm ci
 COPY web_react/popq/ ./

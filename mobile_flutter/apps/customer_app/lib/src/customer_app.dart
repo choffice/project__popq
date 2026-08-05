@@ -22,6 +22,7 @@ import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_engagement_repository.dart';
+import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
 class PopqCustomerApp extends StatefulWidget {
@@ -35,9 +36,9 @@ class PopqCustomerApp extends StatefulWidget {
     this.orderMessageRepository,
     this.engagementRepository,
     this.notificationRepository,
+    this.locationRepository,
     this.cartController,
     this.permissionGateway,
-    this.locationRepository,
     this.themeController,
     this.authRepository,
     this.identityRepository,
@@ -54,9 +55,9 @@ class PopqCustomerApp extends StatefulWidget {
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
   final CustomerNotificationRepository? notificationRepository;
+  final CustomerLocationRepository? locationRepository;
   final CartController? cartController;
   final CustomerPermissionGateway? permissionGateway;
-  final CustomerLocationRepository? locationRepository;
   final PopqThemeController? themeController;
   final CustomerAuthRepository? authRepository;
   final CustomerIdentityRepository? identityRepository;
@@ -67,11 +68,13 @@ class PopqCustomerApp extends StatefulWidget {
   final Duration splashMinDuration;
 
   @override
-  State<PopqCustomerApp> createState() =>
-      _PopqCustomerAppState();
+  State<PopqCustomerApp> createState() {
+    return _PopqCustomerAppState();
+  }
 }
 
-class _PopqCustomerAppState extends State<PopqCustomerApp> {
+class _PopqCustomerAppState extends State<PopqCustomerApp>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
   GlobalKey<ScaffoldMessengerState>();
 
@@ -79,6 +82,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final OnboardingController _onboardingController;
   late final SessionStore _sessionStore;
   late final PopqApiClient _apiClient;
+  late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
   late final CustomerHomeController _homeController;
   late final PopqThemeController _themeController;
@@ -91,12 +95,22 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final KakaoAuthService _kakaoAuthService;
   late final NaverAuthService _naverAuthService;
 
+  bool _isAppActive = true;
+
   @override
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
+
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
+
     _sessionStore =
-        widget.sessionStore ?? SecureSessionStore();
+        widget.sessionStore ??
+            SecureSessionStore();
 
     _sessionController = SessionController(
       sessionStore: _sessionStore,
@@ -122,6 +136,20 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       },
     );
 
+    _realtimeClient = PopqRealtimeClient(
+      webSocketUri:
+      widget.environment.realtimeWebSocketUri,
+      accessTokenReader: () async {
+        return _sessionController.accessToken;
+      },
+      enableLogs:
+      widget.environment.enableNetworkLogs,
+    );
+
+    _sessionController.addListener(
+      _handleSessionChanged,
+    );
+
     _googleAuthService = GoogleAuthService(
       webClientId:
       '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
@@ -145,12 +173,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     final permissionGateway =
         widget.permissionGateway ??
             DeviceCustomerPermissionGateway();
-
-    final locationRepository =
-        widget.locationRepository ??
-            ApiCustomerLocationRepository(
-              _apiClient,
-            );
 
     final storeDiscoveryRepository =
         widget.storeDiscoveryRepository ??
@@ -187,6 +209,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     final notificationRepository =
         widget.notificationRepository ??
             ApiCustomerNotificationRepository(
+              _apiClient,
+            );
+
+    final locationRepository =
+        widget.locationRepository ??
+            ApiCustomerLocationRepository(
               _apiClient,
             );
 
@@ -228,6 +256,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       engagementRepository,
       notificationRepository:
       notificationRepository,
+      locationRepository:
+      locationRepository,
       cartController:
       _cartController,
       homeController:
@@ -236,8 +266,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       widget.splashMinDuration,
       permissionGateway:
       permissionGateway,
-      locationRepository:
-      locationRepository,
       apiBaseUrl:
       widget.environment.apiBaseUrl,
       tossClientKey:
@@ -397,11 +425,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
   Future<void> _googleSignIn() async {
     final idToken =
-    await _googleAuthService.signInAndGetIdToken();
+    await _googleAuthService
+        .signInAndGetIdToken();
 
     debugPrint(
-      '고객 Google 로그인 성공: ID Token 수신 '
-          '(${idToken.length}자)',
+      'Google idToken: $idToken',
     );
 
     final session = await _authRepository.socialLogIn(
@@ -413,8 +441,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   }
 
   Future<void> _kakaoSignIn() async {
-    final accessToken =
-    await _kakaoAuthService
+    final accessToken = await _kakaoAuthService
         .signInAndGetAccessToken();
 
     debugPrint(
@@ -422,8 +449,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           '(${accessToken.length}자)',
     );
 
-    // TODO(backend): 카카오 Access Token을 Spring 로그인 API로 전송하고,
-    // 응답으로 받은 POPQ accessToken/refreshToken을 AuthSession에 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   Future<void> _naverSignIn() async {
@@ -436,12 +467,74 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           '(${accessToken.length}자)',
     );
 
-    // TODO(backend): 네이버 Access Token을 Spring 로그인 API로 전송하고,
-    // 응답으로 받은 POPQ accessToken/refreshToken을 AuthSession에 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
+
+    await _sessionController.save(session);
+  }
+
+  void _handleSessionChanged() {
+    if (_sessionController.status ==
+        SessionStatus.restoring) {
+      return;
+    }
+
+    if (!_sessionController.isSignedIn) {
+      _realtimeClient.disconnect(
+        clearSubscriptions: true,
+      );
+      return;
+    }
+
+    if (_isAppActive) {
+      unawaited(
+        _realtimeClient.connect(),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+      AppLifecycleState state,
+      ) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+
+        if (_sessionController.isSignedIn) {
+          unawaited(
+            _realtimeClient.connect(),
+          );
+        }
+
+        return;
+
+      case AppLifecycleState.inactive:
+        _isAppActive = false;
+        return;
+
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _realtimeClient.suspend();
+        return;
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    _sessionController.removeListener(
+      _handleSessionChanged,
+    );
+
+    _realtimeClient.dispose();
     _router.dispose();
     _apiClient.close();
     _cartController.dispose();
@@ -458,41 +551,36 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _themeController,
-      builder: (context, child) {
-        return MaterialApp.router(
-          title: 'POPQ',
-          debugShowCheckedModeBanner:
-          !widget.environment.isProduction,
-          scaffoldMessengerKey:
-          _scaffoldMessengerKey,
-          theme:
-          PopqTheme.light(),
-          darkTheme:
-          PopqTheme.dark(),
-          themeMode:
-          _themeController.themeMode,
-
-          /*
-           * routerConfig를 그대로 넘기지 않고
-           * Router 구성 요소를 각각 전달합니다.
-           *
-           * 이렇게 해야 최상위 Android 뒤로가기를 처리할
-           * BackButtonDispatcher를 직접 지정할 수 있습니다.
-           */
-          routeInformationProvider:
-          _router
-              .routeInformationProvider,
-          routeInformationParser:
-          _router
-              .routeInformationParser,
-          routerDelegate:
-          _router.routerDelegate,
-          backButtonDispatcher:
-          _backButtonDispatcher,
-        );
-      },
+    return CustomerRealtimeScope(
+      client: _realtimeClient,
+      child: AnimatedBuilder(
+        animation: _themeController,
+        builder: (context, child) {
+          return MaterialApp.router(
+            title: 'POPQ',
+            debugShowCheckedModeBanner:
+            !widget.environment.isProduction,
+            scaffoldMessengerKey:
+            _scaffoldMessengerKey,
+            theme:
+            PopqTheme.light(),
+            darkTheme:
+            PopqTheme.dark(),
+            themeMode:
+            _themeController.themeMode,
+            routeInformationProvider:
+            _router
+                .routeInformationProvider,
+            routeInformationParser:
+            _router
+                .routeInformationParser,
+            routerDelegate:
+            _router.routerDelegate,
+            backButtonDispatcher:
+            _backButtonDispatcher,
+          );
+        },
+      ),
     );
   }
 }
@@ -531,10 +619,6 @@ class _CustomerBackButtonDispatcher
   Future<bool> invokeCallback(
       Future<bool> defaultValue,
       ) async {
-    /*
-     * 주문 상세, 매장 상세, 장바구니, 결제 등의 화면에서는
-     * 기존 Navigator와 PopScope가 먼저 뒤로가기를 처리합니다.
-     */
     final handledByRouter =
     await super.invokeCallback(
       defaultValue,
@@ -554,10 +638,6 @@ class _CustomerBackButtonDispatcher
           .path,
     );
 
-    /*
-     * 하단 탭 루트가 아닌 화면에서 기존 라우터가
-     * 처리하지 못했다면 Android 기본 동작을 허용합니다.
-     */
     if (!_rootTabLocations.contains(
       location,
     )) {
@@ -565,10 +645,6 @@ class _CustomerBackButtonDispatcher
       return false;
     }
 
-    /*
-     * 홈이 아닌 하단 탭에서는 앱을 종료하지 않고
-     * 홈으로 이동합니다.
-     */
     if (location !=
         CustomerRoutes.home) {
       _lastBackPressedAt = null;
@@ -592,9 +668,6 @@ class _CustomerBackButtonDispatcher
             ) <=
                 _exitConfirmDuration;
 
-    /*
-     * 홈에서 2초 이내에 두 번째로 누른 경우에만 종료합니다.
-     */
     if (shouldExit) {
       _lastBackPressedAt = null;
 
@@ -603,9 +676,6 @@ class _CustomerBackButtonDispatcher
       return true;
     }
 
-    /*
-     * 홈에서 첫 번째로 누른 경우입니다.
-     */
     _lastBackPressedAt = now;
 
     final messenger =

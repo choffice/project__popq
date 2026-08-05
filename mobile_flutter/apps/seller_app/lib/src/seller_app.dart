@@ -19,6 +19,7 @@ import 'features/products/seller_product_repository.dart';
 import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
+import 'realtime/seller_realtime_scope.dart';
 import 'routing/seller_router.dart';
 import 'theme/seller_theme.dart';
 
@@ -64,7 +65,8 @@ class PopqSellerApp extends StatefulWidget {
   }
 }
 
-class _PopqSellerAppState extends State<PopqSellerApp> {
+class _PopqSellerAppState extends State<PopqSellerApp>
+    with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
   GlobalKey<ScaffoldMessengerState>();
 
@@ -100,13 +102,23 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
   late final bool _ownsThemeController;
 
   late final PopqApiClient _apiClient;
+  late final PopqRealtimeClient _realtimeClient;
   late final GoRouter _router;
 
   late final _SellerBackButtonDispatcher _backButtonDispatcher;
 
+  bool _isAppActive = true;
+
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
+
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
 
     final useMemoryStorage =
         kIsWeb &&
@@ -146,6 +158,18 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
         return session?.accessToken;
       },
+    );
+
+    _realtimeClient = PopqRealtimeClient(
+      webSocketUri: widget.environment.realtimeWebSocketUri,
+      accessTokenReader: () async {
+        return _sessionController.accessToken;
+      },
+      enableLogs: widget.environment.enableNetworkLogs,
+    );
+
+    _sessionController.addListener(
+      _handleSessionChanged,
     );
 
     _googleAuthService = GoogleAuthService(webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
@@ -338,8 +362,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           '(${accessToken.length}자)',
     );
 
-    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
-     accessToken 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+    final result = await _authRepository.socialLogIn(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+
+    await _completeSignIn(result.session);
   }
 
   Future<void> _naverSignIn() async {
@@ -351,8 +379,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           '(${accessToken.length}자)',
     );
 
-    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
-     accessToken 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+    final result = await _authRepository.socialLogIn(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
+
+    await _completeSignIn(result.session);
   }
 
   Future<void> _developmentSignIn() async {
@@ -416,8 +448,66 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
     }
   }
 
+  void _handleSessionChanged() {
+    if (_sessionController.status ==
+        SessionStatus.restoring) {
+      return;
+    }
+
+    if (!_sessionController.isSignedIn) {
+      _realtimeClient.disconnect(
+        clearSubscriptions: true,
+      );
+      return;
+    }
+
+    if (_isAppActive) {
+      unawaited(
+        _realtimeClient.connect(),
+      );
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+    AppLifecycleState state,
+  ) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+
+        if (_sessionController.isSignedIn) {
+          unawaited(
+            _realtimeClient.connect(),
+          );
+        }
+
+        return;
+
+      case AppLifecycleState.inactive:
+        _isAppActive = false;
+        return;
+
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _realtimeClient.suspend();
+        return;
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+
+    _sessionController.removeListener(
+      _handleSessionChanged,
+    );
+
+    _realtimeClient.dispose();
     _router.dispose();
     _apiClient.close();
     _bootstrapController.dispose();
@@ -433,25 +523,28 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _themeController,
-      builder: (context, child) {
-        return MaterialApp.router(
-          title: 'POPQ Seller',
-          debugShowCheckedModeBanner:
-          !widget.environment.isProduction,
-          scaffoldMessengerKey: _scaffoldMessengerKey,
-          theme: SellerTheme.light(),
-          darkTheme: SellerTheme.dark(),
-          themeMode: _themeController.themeMode,
-          routeInformationProvider:
-          _router.routeInformationProvider,
-          routeInformationParser:
-          _router.routeInformationParser,
-          routerDelegate: _router.routerDelegate,
-          backButtonDispatcher: _backButtonDispatcher,
-        );
-      },
+    return SellerRealtimeScope(
+      client: _realtimeClient,
+      child: AnimatedBuilder(
+        animation: _themeController,
+        builder: (context, child) {
+          return MaterialApp.router(
+            title: 'POPQ Seller',
+            debugShowCheckedModeBanner:
+            !widget.environment.isProduction,
+            scaffoldMessengerKey: _scaffoldMessengerKey,
+            theme: SellerTheme.light(),
+            darkTheme: SellerTheme.dark(),
+            themeMode: _themeController.themeMode,
+            routeInformationProvider:
+            _router.routeInformationProvider,
+            routeInformationParser:
+            _router.routeInformationParser,
+            routerDelegate: _router.routerDelegate,
+            backButtonDispatcher: _backButtonDispatcher,
+          );
+        },
+      ),
     );
   }
 }

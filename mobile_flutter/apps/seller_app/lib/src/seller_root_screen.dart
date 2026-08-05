@@ -8,6 +8,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'features/common/theme_mode_toggle.dart';
 import 'features/customers/seller_customer_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
+import 'realtime/seller_realtime_scope.dart';
 import 'routing/seller_router.dart';
 
 class SellerRootScreen extends StatefulWidget {
@@ -57,18 +58,33 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     seconds: 3,
   );
 
+  static const int _maximumRememberedEventIds = 200;
+
   int _customerUnreadCount = 0;
   int _unreadRequestSerial = 0;
+  int _lastConnectionEpoch = 0;
 
   Timer? _unreadPollingTimer;
 
   bool _unreadRequestInProgress = false;
+  bool _isAppActive = true;
+
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _storeChatSubscription;
+
+  final Set<String> _rememberedEventIds = <String>{};
+  final List<String> _rememberedEventIdOrder = <String>[];
 
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
+
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
 
     widget.storeSelectionController?.addListener(
       _handleStoreSelectionChanged,
@@ -79,9 +95,40 @@ class _SellerRootScreenState extends State<SellerRootScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = SellerRealtimeScope.maybeOf(
+      context,
+    );
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    _realtimeClient = nextRealtimeClient;
+    _lastConnectionEpoch =
+        nextRealtimeClient?.connectionEpoch ?? 0;
+
+    nextRealtimeClient?.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _subscribeToSelectedStore();
+    _updateUnreadPollingForConnection();
+  }
+
+  @override
   void didUpdateWidget(
-      covariant SellerRootScreen oldWidget,
-      ) {
+    covariant SellerRootScreen oldWidget,
+  ) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.storeSelectionController !=
@@ -95,6 +142,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       );
 
       _resetUnreadCount();
+      _subscribeToSelectedStore();
     }
 
     if (oldWidget.customerRepository !=
@@ -102,34 +150,35 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       _resetUnreadCount();
     }
 
-    /*
-     * 채팅 상세에서 목록으로 돌아왔을 때처럼
-     * 경로 문자열이 같더라도 읽지 않은 수를 다시 확인합니다.
-     */
     _scheduleUnreadRefresh();
   }
 
   @override
   void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
+    AppLifecycleState state,
+  ) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.resumed) {
-      _startUnreadPolling();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _subscribeToSelectedStore();
+        _updateUnreadPollingForConnection();
 
-      unawaited(
-        _refreshCustomerUnreadCount(),
-      );
+        unawaited(
+          _refreshCustomerUnreadCount(),
+        );
 
-      return;
+        return;
+
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopUnreadPolling();
+        return;
     }
-
-    /*
-     * 앱이 백그라운드로 이동하면
-     * 불필요한 API 요청을 중지합니다.
-     */
-    _stopUnreadPolling();
   }
 
   @override
@@ -137,6 +186,13 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     _unreadRequestSerial++;
 
     _stopUnreadPolling();
+
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
 
     WidgetsBinding.instance.removeObserver(this);
 
@@ -262,10 +318,98 @@ class _SellerRootScreenState extends State<SellerRootScreen>
 
   void _handleStoreSelectionChanged() {
     _resetUnreadCount();
+    _subscribeToSelectedStore();
 
     unawaited(
       _refreshCustomerUnreadCount(),
     );
+  }
+
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      _updateUnreadPollingForConnection();
+      return;
+    }
+
+    final connectionEpoch = realtimeClient.connectionEpoch;
+
+    if (realtimeClient.isConnected &&
+        connectionEpoch != _lastConnectionEpoch) {
+      _lastConnectionEpoch = connectionEpoch;
+
+      unawaited(
+        _refreshCustomerUnreadCount(),
+      );
+    }
+
+    _updateUnreadPollingForConnection();
+  }
+
+  void _subscribeToSelectedStore() {
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    final realtimeClient = _realtimeClient;
+    final storeId =
+        widget.storeSelectionController?.selectedStoreId;
+
+    if (realtimeClient == null || storeId == null) {
+      return;
+    }
+
+    _storeChatSubscription = realtimeClient.subscribeToStoreChat(
+      storeId: storeId,
+      onEvent: _handleStoreChatEvent,
+      onError: (error) {
+        debugPrint(
+          '판매자 사업장 채팅 구독 오류: $error',
+        );
+      },
+    );
+  }
+
+  void _handleStoreChatEvent(
+    PopqRealtimeEvent event,
+  ) {
+    if (!mounted || !_rememberEvent(event.eventId)) {
+      return;
+    }
+
+    final selectedStoreId =
+        widget.storeSelectionController?.selectedStoreId;
+
+    if (selectedStoreId == null ||
+        event.storeId != selectedStoreId) {
+      return;
+    }
+
+    unawaited(
+      _refreshCustomerUnreadCount(),
+    );
+  }
+
+  bool _rememberEvent(String eventId) {
+    if (!_rememberedEventIds.add(eventId)) {
+      return false;
+    }
+
+    _rememberedEventIdOrder.add(eventId);
+
+    if (_rememberedEventIdOrder.length >
+        _maximumRememberedEventIds) {
+      final removedEventId =
+          _rememberedEventIdOrder.removeAt(0);
+
+      _rememberedEventIds.remove(removedEventId);
+    }
+
+    return true;
   }
 
   void _scheduleUnreadRefresh() {
@@ -280,14 +424,28 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     });
   }
 
+  void _updateUnreadPollingForConnection() {
+    final shouldUseRestFallback =
+        _realtimeClient?.shouldUseRestFallback ?? true;
+
+    if (_isAppActive && shouldUseRestFallback) {
+      _startUnreadPolling();
+      return;
+    }
+
+    _stopUnreadPolling();
+  }
+
   void _startUnreadPolling() {
-    if (_unreadPollingTimer?.isActive ?? false) {
+    if (!_isAppActive ||
+        !(_realtimeClient?.shouldUseRestFallback ?? true) ||
+        (_unreadPollingTimer?.isActive ?? false)) {
       return;
     }
 
     _unreadPollingTimer = Timer.periodic(
       _unreadPollingInterval,
-          (_) {
+      (_) {
         unawaited(
           _refreshCustomerUnreadCount(),
         );
@@ -329,7 +487,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
 
     try {
       final unreadCount =
-      await repository.countUnreadMessages(
+          await repository.countUnreadMessages(
         storeId,
       );
 
@@ -348,13 +506,9 @@ class _SellerRootScreenState extends State<SellerRootScreen>
         _customerUnreadCount = unreadCount;
       });
     } catch (error, stackTrace) {
-      /*
-       * 자동 조회가 한 번 실패해도 기존 배지는 유지합니다.
-       * 다음 폴링 주기에 다시 조회합니다.
-       */
       debugPrint(
         '고객 문의 읽지 않은 메시지 수를 '
-            '불러오지 못했습니다: $error',
+        '불러오지 못했습니다: $error',
       );
 
       debugPrintStack(
@@ -379,15 +533,15 @@ class _SellerRootScreenState extends State<SellerRootScreen>
 
   int _indexForLocation(String value) {
     final index = _locations.indexWhere(
-          (candidate) => value.startsWith(candidate),
+      (candidate) => value.startsWith(candidate),
     );
 
     return index < 0 ? 0 : index;
   }
 
   Future<void> _signOut(
-      BuildContext context,
-      ) async {
+    BuildContext context,
+  ) async {
     await widget.onSignOut();
 
     if (context.mounted) {

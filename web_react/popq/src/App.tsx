@@ -16,6 +16,13 @@ import {
   syncOrder,
 } from './services/api'
 import { connectOrderRealtime } from './services/realtime'
+import {
+  clearTossPaymentReturn,
+  readTossPaymentReturn,
+  requestTossPayment,
+} from './services/tossPayment'
+import { useThemePreference } from './theme'
+import { createClientId } from './utils/clientId'
 import type {
   CartItem,
   OrderRealtimeEvent,
@@ -29,7 +36,11 @@ import type {
 } from './types'
 
 type Screen = 'menu' | 'cart' | 'tracking'
-type CheckoutAttempt = { orderKey: string; paymentKey: string }
+type CheckoutAttempt = {
+  orderKey: string
+  paymentKey: string
+  order?: OrderResponse
+}
 
 const STATUS_SEQUENCE: OrderStatus[] = [
   'PLACED',
@@ -98,6 +109,11 @@ function itemPrice(item: CartItem) {
   return (item.product.basePrice + optionPrice) * item.quantity
 }
 
+function orderName(order: OrderResponse) {
+  const first = order.items[0]?.productName ?? 'POPQ 주문'
+  return order.items.length > 1 ? `${first} 외 ${order.items.length - 1}건` : first
+}
+
 function readStored<T>(storage: Storage, key: string, fallback: T): T {
   try {
     const value = storage.getItem(key)
@@ -117,6 +133,7 @@ function persistStored(storage: Storage, key: string, value: unknown) {
 }
 
 function App() {
+  const { theme, toggleTheme } = useThemePreference()
   const qrToken = findQrToken()
   const initialScope = qrToken ?? 'demo'
   const [isDemo, setIsDemo] = useState(!qrToken)
@@ -168,6 +185,10 @@ function App() {
   const [processing, setProcessing] = useState(false)
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentReturn] = useState(() =>
+    readTossPaymentReturn(window.location.search),
+  )
+  const paymentReturnHandled = useRef(false)
   const trackedOrderPublicId = order?.orderPublicId
   const storageScope = isDemo ? 'demo' : (qrToken ?? 'demo')
   const cartStorageKey = `popq:cart:${storageScope}`
@@ -193,6 +214,65 @@ function App() {
       checkoutAttempt,
     )
   }, [checkoutAttempt, checkoutStorageKey])
+
+  useEffect(() => {
+    if (
+      !paymentReturn ||
+      !qrToken ||
+      isDemo ||
+      paymentReturnHandled.current
+    ) {
+      return
+    }
+    const paymentResult = paymentReturn
+    paymentReturnHandled.current = true
+    setProcessing(true)
+    setScreen('cart')
+    setError(null)
+
+    async function finishPayment() {
+      if (paymentResult.status === 'fail') {
+        clearTossPaymentReturn()
+        throw new Error(paymentResult.message)
+      }
+
+      const pendingOrder = checkoutAttempt?.order
+      if (!pendingOrder || !checkoutAttempt) {
+        clearTossPaymentReturn()
+        throw new Error('진행 중인 주문 정보를 찾지 못했습니다. 다시 주문해 주세요.')
+      }
+      if (
+        paymentResult.orderId !== pendingOrder.orderPublicId ||
+        paymentResult.amount !== pendingOrder.totalAmount
+      ) {
+        clearTossPaymentReturn()
+        throw new Error('결제 인증 정보가 주문 정보와 일치하지 않습니다.')
+      }
+
+      await confirmPayment(
+        pendingOrder.orderPublicId,
+        checkoutAttempt.paymentKey,
+        paymentResult.paymentKey,
+      )
+      const synced = await syncOrder(
+        pendingOrder.orderPublicId,
+        pendingOrder.version,
+      )
+      setOrder(synced.order ?? pendingOrder)
+      setCart([])
+      setCheckoutAttempt(null)
+      setScreen('tracking')
+      clearTossPaymentReturn()
+    }
+
+    void finishPayment()
+      .catch((caught) => {
+        setError(
+          caught instanceof Error ? caught.message : '결제를 완료하지 못했습니다.',
+        )
+      })
+      .finally(() => setProcessing(false))
+  }, [checkoutAttempt, isDemo, paymentReturn, qrToken])
 
   useEffect(() => {
     if (!selectedDetail) return
@@ -356,7 +436,7 @@ function App() {
     setCart((current) => [
       ...current,
       {
-        cartId: crypto.randomUUID(),
+        cartId: createClientId(),
         product: selectedDetail.product,
         quantity,
         options,
@@ -383,8 +463,8 @@ function App() {
     setProcessing(true)
     setError(null)
     const attempt = checkoutAttempt ?? {
-      orderKey: `order_${crypto.randomUUID()}`,
-      paymentKey: `payment_${crypto.randomUUID()}`,
+      orderKey: `order_${createClientId()}`,
+      paymentKey: `payment_${createClientId()}`,
     }
     if (!checkoutAttempt) setCheckoutAttempt(attempt)
     try {
@@ -392,14 +472,27 @@ function App() {
         await new Promise((resolve) => window.setTimeout(resolve, 650))
         setOrder(createDemoOrder(cartTotal, orderType))
       } else {
-        const created = await createOrder(
-          cart,
-          orderType,
-          attempt.orderKey,
+        const created =
+          attempt.order ??
+          (await createOrder(
+            cart,
+            orderType,
+            attempt.orderKey,
+          ))
+        const preparedAttempt = { ...attempt, order: created }
+        setCheckoutAttempt(preparedAttempt)
+        persistStored(
+          window.sessionStorage,
+          checkoutStorageKey,
+          preparedAttempt,
         )
-        await confirmPayment(created.orderPublicId, attempt.paymentKey)
-        const synced = await syncOrder(created.orderPublicId, created.version)
-        setOrder(synced.order ?? created)
+        await requestTossPayment({
+          clientKey: import.meta.env.VITE_POPQ_TOSS_CLIENT_KEY ?? '',
+          orderId: created.orderPublicId,
+          orderName: orderName(created),
+          amount: created.totalAmount,
+        })
+        return
       }
       setCart([])
       setCheckoutAttempt(null)
@@ -524,7 +617,17 @@ function App() {
             {context.tableName ?? 'Pickup'} · {isDemo ? 'Demo' : 'Live'}
           </span>
         </div>
-        <button
+        <div className="topbar-tools">
+          <button
+            className="icon-button theme-toggle"
+            type="button"
+            aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
+            aria-pressed={theme === 'dark'}
+            onClick={toggleTheme}
+          >
+            <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+          </button>
+          <button
           className="icon-button bag-button"
           aria-label={
             hasOrderShortcut
@@ -535,7 +638,8 @@ function App() {
         >
           {hasOrderShortcut ? '◎' : '◒'}
           {cartCount > 0 && <span>{cartCount}</span>}
-        </button>
+          </button>
+        </div>
       </header>
 
       {error && (

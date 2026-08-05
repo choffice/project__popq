@@ -30,6 +30,11 @@ public class TossPaymentProvider implements PaymentProvider {
       TossPaymentProperties properties
   ) {
     this.properties = properties;
+    if (isBlank(properties.secretKey())) {
+      throw new IllegalStateException(
+          "POPQ_TOSS_SECRET_KEY must be configured when TOSS_PAYMENTS is enabled."
+      );
+    }
 
     String authorizationValue = createAuthorizationValue(
         properties.secretKey()
@@ -84,6 +89,7 @@ public class TossPaymentProvider implements PaymentProvider {
       Map<String, Object> response = restClient
           .post()
           .uri("/v1/payments/confirm")
+          .header("Idempotency-Key", command.idempotencyKey())
           .body(requestBody)
           .retrieve()
           .body(

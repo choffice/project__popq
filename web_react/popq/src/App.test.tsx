@@ -1,17 +1,24 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { createDemoOrder } from './data/demo'
+
+vi.mock('./services/realtime', () => ({
+  connectOrderRealtime: () => () => undefined,
+}))
 
 describe('POPQ QR order demo', () => {
   beforeEach(() => {
     window.localStorage.clear()
     window.sessionStorage.clear()
     window.history.replaceState({}, '', '/')
+    vi.restoreAllMocks()
   })
 
   afterEach(() => {
     cleanup()
+    vi.unstubAllGlobals()
   })
 
   it('adds a configured product and completes a demo payment', async () => {
@@ -42,6 +49,23 @@ describe('POPQ QR order demo', () => {
       expect(
         screen.getByRole('heading', { name: '주문이 전달됐어요' }),
       ).toBeInTheDocument(),
+    )
+  })
+
+  it('switches to dark mode and restores the preference', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '다크 모드로 전환' }))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(window.localStorage.getItem('popq.customer.web.theme.preference.v1')).toBe('dark')
+
+    firstRender.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: '기본 모드로 전환' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
     )
   })
 
@@ -102,4 +126,78 @@ describe('POPQ QR order demo', () => {
       screen.queryByRole('button', { name: /성수 블렌드 아메리카노/ }),
     ).not.toBeInTheDocument()
   })
+
+  it('confirms a Toss return with the stored guest order', async () => {
+    const created = {
+      ...createDemoOrder(5000, 'TAKEOUT'),
+      orderPublicId: 'order-123456',
+      status: 'CREATED' as const,
+      version: 0,
+    }
+    const placed = {
+      ...created,
+      status: 'PLACED' as const,
+      version: 1,
+    }
+    window.sessionStorage.setItem(
+      'popq:checkout:qr-token',
+      JSON.stringify({
+        orderKey: 'order-idempotency-key',
+        paymentKey: 'payment-idempotency-key',
+        order: created,
+      }),
+    )
+    window.history.replaceState(
+      {},
+      '',
+      '/q/qr-token?payment=success&paymentKey=toss-payment-key'
+        + '&orderId=order-123456&amount=5000',
+    )
+    const fetchMock = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.endsWith('/sessions')) {
+        return response({
+          storeId: 1,
+          storeName: '성수 커피 연구소',
+          storeType: 'LOCAL_STORE',
+          businessStatus: 'OPEN',
+          storeTableId: null,
+          tableName: null,
+          sessionExpiresAt: '2026-08-05T12:00:00Z',
+        })
+      }
+      if (path === '/api/v1/qr/products') return response([])
+      if (path.includes('/payments')) {
+        expect(JSON.parse(init?.body as string)).toMatchObject({
+          idempotencyKey: 'payment-idempotency-key',
+          paymentKey: 'toss-payment-key',
+        })
+        return response({ status: 'PAID' })
+      }
+      if (path.includes('/sync')) {
+        return response({
+          refreshRequired: true,
+          serverVersion: 1,
+          order: placed,
+        })
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: '주문이 전달됐어요' }),
+    ).toBeInTheDocument()
+    expect(window.location.pathname).toBe('/q/qr-token')
+    expect(window.location.search).toBe('')
+    expect(window.sessionStorage.getItem('popq:checkout:qr-token')).toBeNull()
+  })
 })
+
+function response(data: unknown) {
+  return {
+    ok: true,
+    json: async () => ({ success: true, data, error: null }),
+  }
+}

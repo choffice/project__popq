@@ -73,7 +73,7 @@ public class PaymentService {
             Long userId
     ) {
         Payment replay = paymentRepository
-                .findByIdempotencyKey(request.idempotencyKey())
+                .findForUpdateByIdempotencyKey(request.idempotencyKey())
                 .orElse(null);
         if (replay != null) {
             validateReplay(
@@ -82,21 +82,21 @@ public class PaymentService {
                     guestSessionId,
                     userId
             );
-            if (replay.getStatus() == PaymentStatus.FAILED) {
-                throw new PaymentProcessingException(
-                        ErrorCode.PAYMENT_FAILED,
-                        replay.getFailureMessage()
-                );
-            }
-            return PaymentResponse.from(replay);
+            return replayOrResume(replay, request);
         }
 
         Order order = orderRepository.findForUpdateByOrderPublicId(orderPublicId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
         requireOwnership(order, guestSessionId, userId);
 
-        if (paymentRepository.findByOrderId(order.getId()).isPresent()) {
-            throw new BusinessException(ErrorCode.IDEMPOTENCY_CONFLICT);
+        Payment orderPayment = paymentRepository
+                .findByOrderId(order.getId())
+                .orElse(null);
+        if (orderPayment != null) {
+            if (!orderPayment.getIdempotencyKey().equals(request.idempotencyKey())) {
+                throw new BusinessException(ErrorCode.IDEMPOTENCY_CONFLICT);
+            }
+            return replayOrResume(orderPayment, request);
         }
 
         Instant now = Instant.now();
@@ -134,22 +134,56 @@ public class PaymentService {
             order.getTotalAmount(),
             request.idempotencyKey()
         );
-        payment.markInProgress();
+        payment.markInProgress(request.paymentKey());
         paymentRepository.save(payment);
 
+        return approve(payment, order, request);
+    }
+
+    private PaymentResponse replayOrResume(
+            Payment payment,
+            ConfirmPaymentRequest request
+    ) {
+        if (payment.getStatus() == PaymentStatus.FAILED) {
+            throw new PaymentProcessingException(
+                    ErrorCode.PAYMENT_FAILED,
+                    payment.getFailureMessage()
+            );
+        }
+        if (payment.getStatus() != PaymentStatus.IN_PROGRESS) {
+            return PaymentResponse.from(payment);
+        }
+        if (!java.util.Objects.equals(
+                payment.getProviderPaymentKey(),
+                request.paymentKey()
+        )) {
+            throw new BusinessException(ErrorCode.IDEMPOTENCY_CONFLICT);
+        }
+        return approve(payment, payment.getOrder(), request);
+    }
+
+    private PaymentResponse approve(
+            Payment payment,
+            Order order,
+            ConfirmPaymentRequest request
+    ) {
+
         PaymentApprovalCommand command = new PaymentApprovalCommand(
-            orderPublicId,
+            order.getOrderPublicId(),
             order.getTotalAmount(),
             request.paymentKey(),
+            request.idempotencyKey(),
             request.simulateFailure()
         );
         PaymentApprovalResult result = paymentProvider.approve(command);
         Instant processedAt = Instant.now();
-        String requestPayload = "{\"orderPublicId\":\"" + orderPublicId
+        String requestPayload = "{\"orderPublicId\":\"" + order.getOrderPublicId()
                 + "\",\"amount\":" + order.getTotalAmount() + "}";
 
         if (!result.success()) {
-            payment.markFailed(result.failureCode(), result.failureMessage());
+            if (!"TOSS_COMMUNICATION_ERROR".equals(result.failureCode())) {
+                payment.markFailed(result.failureCode(), result.failureMessage());
+            }
             payment.addTransaction(PaymentTransaction.failed(
                     payment,
                     PaymentTransactionType.APPROVE,

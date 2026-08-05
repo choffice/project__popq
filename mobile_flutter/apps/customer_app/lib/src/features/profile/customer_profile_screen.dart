@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/customer_realtime_scope.dart';
 import '../../routing/customer_router.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
@@ -52,11 +54,15 @@ class _CustomerProfileScreenState
   late Future<CustomerProfile> _profile;
 
   Timer? _unreadPollingTimer;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _customerChatSubscription;
 
   int _unreadMessageCount = 0;
   int _requestGeneration = 0;
+  int _observedConnectionEpoch = 0;
 
   bool _unreadRequestInProgress = false;
+  bool _isAppActive = true;
 
   @override
   void initState() {
@@ -64,13 +70,51 @@ class _CustomerProfileScreenState
 
     WidgetsBinding.instance.addObserver(this);
 
-    _profile = widget.repository.getProfile();
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState ==
+            AppLifecycleState.resumed;
 
-    _startUnreadPolling();
+    _profile = widget.repository.getProfile();
 
     unawaited(
       _refreshUnreadMessageCount(),
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient =
+        CustomerRealtimeScope.of(context);
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _realtimeClient = nextRealtimeClient;
+    _observedConnectionEpoch =
+        nextRealtimeClient.connectionEpoch;
+
+    nextRealtimeClient.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _customerChatSubscription =
+        nextRealtimeClient.subscribeToCustomerChat(
+      onEvent: _handleCustomerChatEvent,
+      onError: _handleCustomerChatError,
+    );
+
+    _syncUnreadPollingWithRealtime();
   }
 
   @override
@@ -93,6 +137,8 @@ class _CustomerProfileScreenState
         _refreshUnreadMessageCount(),
       );
     }
+
+    _syncUnreadPollingWithRealtime();
   }
 
   @override
@@ -102,7 +148,8 @@ class _CustomerProfileScreenState
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      _startUnreadPolling();
+      _isAppActive = true;
+      _syncUnreadPollingWithRealtime();
 
       unawaited(
         _refreshUnreadMessageCount(),
@@ -111,6 +158,7 @@ class _CustomerProfileScreenState
       return;
     }
 
+    _isAppActive = false;
     _stopUnreadPolling();
   }
 
@@ -119,6 +167,14 @@ class _CustomerProfileScreenState
     _requestGeneration++;
 
     _stopUnreadPolling();
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+    _realtimeClient = null;
 
     WidgetsBinding.instance.removeObserver(this);
 
@@ -194,7 +250,7 @@ class _CustomerProfileScreenState
                     subtitle:
                     '관심 있는 이벤트를 모아봤어요',
                     onTap: () {
-                      context.push(
+                      context.go(
                         CustomerRoutes.favorites,
                       );
                     },
@@ -300,14 +356,80 @@ class _CustomerProfileScreenState
     ]);
   }
 
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      return;
+    }
+
+    if (_observedConnectionEpoch !=
+        realtimeClient.connectionEpoch) {
+      _observedConnectionEpoch =
+          realtimeClient.connectionEpoch;
+
+      // 재연결 직후 놓친 unread 변화를 REST로 한 번 복구합니다.
+      unawaited(
+        _refreshUnreadMessageCount(),
+      );
+    }
+
+    _syncUnreadPollingWithRealtime();
+  }
+
+  void _handleCustomerChatEvent(
+    PopqRealtimeEvent event,
+  ) {
+    final shouldRefresh =
+        event.isMessageRead ||
+        (event.isMessageCreated &&
+            event.message?.sentBySeller == true);
+
+    if (!shouldRefresh) {
+      return;
+    }
+
+    unawaited(
+      _refreshUnreadMessageCount(),
+    );
+  }
+
+  void _handleCustomerChatError(
+    Object error,
+  ) {
+    debugPrint(
+      '마이 화면 실시간 채팅 이벤트를 처리하지 못했습니다: $error',
+    );
+  }
+
+  void _syncUnreadPollingWithRealtime() {
+    if (!_isAppActive) {
+      _stopUnreadPolling();
+      return;
+    }
+
+    if (_realtimeClient?.isConnected == true) {
+      _stopUnreadPolling();
+      return;
+    }
+
+    _startUnreadPolling();
+  }
+
   void _startUnreadPolling() {
-    if (_unreadPollingTimer?.isActive ?? false) {
+    if (!_isAppActive ||
+        _realtimeClient?.isConnected == true ||
+        (_unreadPollingTimer?.isActive ?? false)) {
       return;
     }
 
     _unreadPollingTimer = Timer.periodic(
       _unreadPollingInterval,
-          (_) {
+      (_) {
         unawaited(
           _refreshUnreadMessageCount(),
         );

@@ -47,11 +47,14 @@ CREATED ──결제 승인──> PLACED ──판매자 접수──> ACCEPTED
 ```json
 {
   "idempotencyKey": "payment_550e8400-e29b-41d4-a716-446655440000",
-  "simulateFailure": false
+  "simulateFailure": false,
+  "paymentKey": "토스 결제 인증 성공 결과의 paymentKey"
 }
 ```
 
-개발용 `TEST` 공급자만 연결되어 있다. `simulateFailure=true`는 실패 이력과 `402 PAYMENT_FAILED` 응답을 검증하는 테스트 전용 입력이다.
+`POPQ_PAYMENT_PROVIDER=TEST`에서는 개발용 공급자를 사용하고 `paymentKey`를 생략할 수 있다. `TOSS_PAYMENTS`에서는 QR 웹 또는 customer 앱이 Toss 결제 인증 성공 결과의 `paymentKey`를 전달해야 하며, Spring 서버가 저장된 주문번호와 금액으로 최종 승인을 요청한다. `simulateFailure=true`는 TEST 공급자의 실패 이력과 `402 PAYMENT_FAILED` 응답을 검증하는 테스트 전용 입력이다.
+
+Spring은 POPQ 결제 `idempotencyKey`를 Toss 승인 API의 `Idempotency-Key` 헤더에도 전달한다. Toss 응답 유실처럼 승인 결과가 불확실한 통신 오류는 결제를 `IN_PROGRESS`로 유지하며, 클라이언트가 같은 `idempotencyKey`와 `paymentKey`로 재요청하면 같은 Toss 승인 요청을 복구한다.
 
 ## 게스트 주문 조회·취소
 

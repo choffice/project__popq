@@ -8,11 +8,13 @@ import type {
   OrderStatus,
   ProductDetail,
   ProductOptionGroupInput,
+  QrCodeDetail,
   QrCodeSummary,
   QrIssued,
   SalesSummary,
   SellerCategory,
   SellerConnection,
+  SellerAuthResult,
   SellerOrder,
   SellerPaymentSummary,
   SellerProduct,
@@ -26,6 +28,40 @@ type TransitionAction =
   | 'prepare'
   | 'ready'
   | 'complete'
+
+async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...init.headers,
+    },
+  })
+  const envelope = (await response.json()) as ApiEnvelope<T>
+  if (!response.ok || !envelope.success) {
+    throw new Error(envelope.error?.message ?? '요청을 처리하지 못했습니다.')
+  }
+  return envelope.data
+}
+
+export function loginSeller(email: string, password: string) {
+  return publicRequest<SellerAuthResult>('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  })
+}
+
+export function signUpSeller(payload: {
+  email: string
+  password: string
+  name: string
+  phone: string
+}) {
+  return publicRequest<SellerAuthResult>('/api/v1/auth/signup', {
+    method: 'POST',
+    body: JSON.stringify({ ...payload, role: 'SELLER' }),
+  })
+}
 
 async function request<T>(
   path: string,
@@ -237,6 +273,59 @@ export function createSellerProduct(
   )
 }
 
+export function updateSellerProduct(
+  connection: SellerConnection,
+  productId: number,
+  payload: {
+    categoryId: number
+    name: string
+    description: string | null
+    imageUrl: string | null
+    basePrice: number
+  },
+) {
+  return request<ProductDetail>(
+    `${storePath(connection)}/products/${productId}`,
+    connection,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function deleteSellerProduct(
+  connection: SellerConnection,
+  productId: number,
+) {
+  return request<boolean>(
+    `${storePath(connection)}/products/${productId}`,
+    connection,
+    { method: 'DELETE' },
+  )
+}
+
+export async function uploadSellerProductImage(
+  connection: SellerConnection,
+  file: File,
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch('/api/v1/seller/store-images', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${connection.accessToken}`,
+    },
+    body: formData,
+  })
+  const envelope = (await response.json()) as ApiEnvelope<{ imageUrl: string }>
+  if (!response.ok || !envelope.success) {
+    throw new Error(envelope.error?.message ?? '이미지를 업로드하지 못했습니다.')
+  }
+  return envelope.data.imageUrl
+}
+
 export function getSellerProductDetail(
   connection: SellerConnection,
   productId: number,
@@ -300,9 +389,23 @@ export function getStoreTables(connection: SellerConnection) {
   )
 }
 
-export function getQrCodes(connection: SellerConnection) {
+export function getQrCodes(
+  connection: SellerConnection,
+  includeArchived = false,
+) {
+  const query = includeArchived ? '?includeArchived=true' : ''
   return request<QrCodeSummary[]>(
-    `${storePath(connection)}/qr-codes`,
+    `${storePath(connection)}/qr-codes${query}`,
+    connection,
+  )
+}
+
+export function getQrCodeDetail(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeDetail>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}`,
     connection,
   )
 }
@@ -329,6 +432,43 @@ export function changeQrStatus(
 ) {
   return request<QrCodeSummary>(
     `${storePath(connection)}/qr-codes/${qrCodeId}/${action}`,
+    connection,
+    { method: 'POST' },
+  )
+}
+
+export function reissueQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+  expiresAt: string | null,
+) {
+  return request<QrIssued>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/reissue`,
+    connection,
+    {
+      method: 'POST',
+      body: JSON.stringify({ expiresAt }),
+    },
+  )
+}
+
+export function archiveQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeSummary>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/archive`,
+    connection,
+    { method: 'POST' },
+  )
+}
+
+export function restoreQrCode(
+  connection: SellerConnection,
+  qrCodeId: number,
+) {
+  return request<QrCodeSummary>(
+    `${storePath(connection)}/qr-codes/${qrCodeId}/restore`,
     connection,
     { method: 'POST' },
   )
