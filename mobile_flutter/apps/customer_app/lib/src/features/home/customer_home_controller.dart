@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -8,6 +7,7 @@ import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
 import 'customer_home_content.dart';
+import 'customer_location_repository.dart';
 
 enum CustomerHomeStatus {
   initial,
@@ -26,6 +26,7 @@ class CustomerHomeSnapshot {
     required this.benefitBanners,
     required this.region,
     required this.regionLabel,
+    required this.currentLocationLabel,
     required this.storeLoadFailed,
     required this.orderLoadFailed,
     this.activeOrder,
@@ -61,12 +62,17 @@ class CustomerHomeSnapshot {
 
   /// 인기 랭킹·진행 중인 이벤트가 기준으로 삼는 권역입니다.
   ///
-  /// 위치 권한을 허용한 경우 현재 위치와 가장 가까운 권역,
-  /// 허용하지 않은 경우 기본값인 수도권입니다.
+  /// 현재 서비스는 부산 지역만 지원합니다.
   final CustomerHomeRegion region;
 
   /// [region]을 화면에 보여줄 한글 이름입니다.
   final String regionLabel;
+
+  /// 홈 상단에 보여줄 현재 위치 라벨입니다.
+  ///
+  /// 위치 권한을 허용하고 역지오코딩까지 성공하면 "부산 해운대구"처럼
+  /// 상세 주소를, 그렇지 않으면 [regionLabel]을 사용합니다.
+  final String currentLocationLabel;
 
   /// Store API 조회 실패 여부입니다.
   final bool storeLoadFailed;
@@ -81,6 +87,7 @@ class CustomerHomeController extends ChangeNotifier {
       this._orderRepository,
       this._sessionController,
       this._permissionGateway,
+      this._locationRepository,
       ) : _lastSignedIn = _sessionController.isSignedIn {
     _sessionController.addListener(
       _handleSessionChanged,
@@ -99,19 +106,6 @@ class CustomerHomeController extends ChangeNotifier {
     'READY',
   };
 
-  /// 권역을 나누는 기준 좌표입니다.
-  ///
-  /// 실제 시/도 경계 대신 대표 좌표와의 거리로 가장 가까운
-  /// 권역을 고르는 간단한 방식입니다.
-  static const _regionAnchors = <(
-  CustomerHomeRegion region,
-  double lat,
-  double lng,
-  )>[
-    (CustomerHomeRegion.metro, 37.4138, 127.1219),
-    (CustomerHomeRegion.busan, 35.1796, 129.0756),
-  ];
-
   final StoreDiscoveryRepository
   _storeDiscoveryRepository;
 
@@ -121,7 +115,11 @@ class CustomerHomeController extends ChangeNotifier {
 
   final CustomerPermissionGateway _permissionGateway;
 
-  CustomerHomeRegion? _cachedRegion;
+  final CustomerLocationRepository _locationRepository;
+
+  bool _locationResolved = false;
+
+  String? _cachedLocationLabel;
 
   CustomerHomeStatus status =
       CustomerHomeStatus.initial;
@@ -152,11 +150,12 @@ class CustomerHomeController extends ChangeNotifier {
       signedIn: signedIn,
     );
 
-    final regionFuture = _resolveRegion();
+    final locationLabelFuture =
+        _resolveLocationLabel();
 
     final storeResult = await storeFuture;
     final orderResult = await orderFuture;
-    final region = await regionFuture;
+    final locationLabel = await locationLabelFuture;
 
     if (_disposed ||
         requestVersion != _requestVersion) {
@@ -171,7 +170,8 @@ class CustomerHomeController extends ChangeNotifier {
     snapshot = _createSnapshot(
       stores: stores,
       orders: orders,
-      region: region,
+      region: CustomerHomeRegion.busan,
+      currentLocationLabel: locationLabel,
       storeLoadFailed:
       storeResult.error != null,
       orderLoadFailed:
@@ -196,6 +196,7 @@ class CustomerHomeController extends ChangeNotifier {
     required List<CustomerStore> stores,
     required List<CustomerOrder> orders,
     required CustomerHomeRegion region,
+    required String? currentLocationLabel,
     required bool storeLoadFailed,
     required bool orderLoadFailed,
   }) {
@@ -213,7 +214,7 @@ class CustomerHomeController extends ChangeNotifier {
           (store) =>
       store.storeType ==
           'EVENT_COMMERCE' &&
-          _matchesRegion(store, region),
+          _matchesRegion(store),
     )
         .toList(
       growable: false,
@@ -226,7 +227,7 @@ class CustomerHomeController extends ChangeNotifier {
           'LOCAL_STORE' &&
           store.storeId !=
               featuredStore?.storeId &&
-          _matchesRegion(store, region),
+          _matchesRegion(store),
     )
         .take(5)
         .toList(
@@ -260,26 +261,27 @@ class CustomerHomeController extends ChangeNotifier {
       regionLabel:
       CustomerHomeTemporaryContent
           .regionLabel(region),
+      currentLocationLabel:
+      currentLocationLabel ??
+          CustomerHomeTemporaryContent
+              .regionLabel(region),
 
       storeLoadFailed: storeLoadFailed,
       orderLoadFailed: orderLoadFailed,
     );
   }
 
-  /// 위치 권한 상태에 따라 인기 랭킹·진행 중인 이벤트의 기준 권역을 정합니다.
+  /// 위치 권한을 허용하고 역지오코딩까지 성공하면 상세 주소 라벨을 가져옵니다.
   ///
-  /// 위치 권한을 허용했다면 현재 위치와 가장 가까운 권역을,
-  /// 허용하지 않았거나 위치를 가져오지 못했다면 수도권을 기본값으로 씁니다.
-  /// 한 번 확인한 권역은 세션 동안 다시 위치 권한을 묻지 않도록 캐시합니다.
-  Future<CustomerHomeRegion> _resolveRegion() async {
-    final cachedRegion = _cachedRegion;
-
-    if (cachedRegion != null) {
-      return cachedRegion;
+  /// 허용하지 않았거나 위치를 가져오지 못하면 null을 반환해
+  /// 상위에서 [CustomerHomeRegion]의 기본 라벨로 대체하도록 합니다.
+  /// 한 번 확인한 값은 세션 동안 다시 위치 권한을 묻지 않도록 캐시합니다.
+  Future<String?> _resolveLocationLabel() async {
+    if (_locationResolved) {
+      return _cachedLocationLabel;
     }
 
-    CustomerHomeRegion region =
-        CustomerHomeRegion.metro;
+    String? locationLabel;
 
     try {
       final result =
@@ -291,77 +293,28 @@ class CustomerHomeController extends ChangeNotifier {
       if (result.decision ==
           PermissionDecision.granted &&
           location != null) {
-        region = _nearestRegion(
-          location.latitude,
-          location.longitude,
-        );
+        locationLabel = await _locationRepository
+            .reverseGeocode(location);
       }
     } catch (_) {
-      // 위치 조회에 실패하면 기본값인 수도권을 유지합니다.
+      // 위치 조회에 실패하면 지역 기본 라벨을 그대로 사용합니다.
     }
 
-    _cachedRegion = region;
+    _locationResolved = true;
+    _cachedLocationLabel = locationLabel;
 
-    return region;
+    return locationLabel;
   }
 
-  CustomerHomeRegion _nearestRegion(
-      double latitude,
-      double longitude,
-      ) {
-    var nearest = _regionAnchors.first.$1;
-    var nearestDistance = double.infinity;
-
-    for (final anchor in _regionAnchors) {
-      final distance = _roughDistance(
-        latitude,
-        longitude,
-        anchor.$2,
-        anchor.$3,
-      );
-
-      if (distance < nearestDistance) {
-        nearestDistance = distance;
-        nearest = anchor.$1;
-      }
-    }
-
-    return nearest;
-  }
-
-  /// 두 좌표 사이의 대략적인 거리입니다.
-  ///
-  /// 권역을 고르는 용도로만 쓰이므로 정밀한 하버사인 공식
-  /// 대신 단순한 평면 거리로 충분합니다.
-  double _roughDistance(
-      double lat1,
-      double lng1,
-      double lat2,
-      double lng2,
-      ) {
-    final dLat = lat1 - lat2;
-    final dLng = lng1 - lng2;
-
-    return math.sqrt(
-      dLat * dLat + dLng * dLng,
-    );
-  }
-
-  /// 실제 매장의 주소가 선택된 권역과 맞는지 확인합니다.
+  /// 실제 매장의 주소가 부산 지역인지 확인합니다.
   ///
   /// 매장에 시/도 구분 필드가 없어 주소 문자열로 대략 판단합니다.
   bool _matchesRegion(
       CustomerStore store,
-      CustomerHomeRegion region,
       ) {
     final address = store.address ?? '';
-    final isBusanAddress = address.contains(
-      '부산',
-    );
 
-    return region == CustomerHomeRegion.busan
-        ? isBusanAddress
-        : !isBusanAddress;
+    return address.contains('부산');
   }
 
   Future<_HomeLoadResult<List<CustomerStore>>>
@@ -468,6 +421,8 @@ class CustomerHomeController extends ChangeNotifier {
         stores: _stores,
         orders: orders,
         region: currentSnapshot.region,
+        currentLocationLabel:
+        currentSnapshot.currentLocationLabel,
         storeLoadFailed:
         currentSnapshot.storeLoadFailed,
         orderLoadFailed: false,
@@ -507,6 +462,8 @@ class CustomerHomeController extends ChangeNotifier {
         region: currentSnapshot.region,
         regionLabel:
         currentSnapshot.regionLabel,
+        currentLocationLabel:
+        currentSnapshot.currentLocationLabel,
         storeLoadFailed:
         currentSnapshot.storeLoadFailed,
         orderLoadFailed: true,
