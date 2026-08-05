@@ -64,6 +64,10 @@ popq:
   social:
     google:
       client-id: ${POPQ_GOOGLE_CLIENT_ID}
+    kakao:
+      api-base-url: ${POPQ_KAKAO_API_BASE_URL:https://kapi.kakao.com}
+      customer-app-id: ${POPQ_KAKAO_CUSTOMER_APP_ID}
+      seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID}
 
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}

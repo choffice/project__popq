@@ -347,8 +347,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   }
 
   Future<void> _kakaoSignIn() async {
-    final accessToken =
-    await _kakaoAuthService
+    final accessToken = await _kakaoAuthService
         .signInAndGetAccessToken();
 
     debugPrint(
@@ -356,8 +355,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
           '(${accessToken.length}자)',
     );
 
-    // TODO(backend): 카카오 Access Token을 Spring 로그인 API로 전송하고,
-    // 응답으로 받은 POPQ accessToken/refreshToken을 AuthSession에 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   Future<void> _naverSignIn() async {
