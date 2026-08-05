@@ -121,7 +121,8 @@ public class Payment extends BaseTimeEntity {
         );
     }
 
-    public void markInProgress() {
+    public void markInProgress(String providerPaymentKey) {
+        this.providerPaymentKey = providerPaymentKey;
         status = PaymentStatus.IN_PROGRESS;
     }
 
