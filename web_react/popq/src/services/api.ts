@@ -26,7 +26,15 @@ async function request<T>(
     },
     ...init,
   })
-  const envelope = (await response.json()) as ApiEnvelope<T>
+  let envelope: ApiEnvelope<T>
+  try {
+    envelope = (await response.json()) as ApiEnvelope<T>
+  } catch {
+    if (!response.ok) {
+      throw new Error(`서버 요청이 거부되었습니다. (${response.status})`)
+    }
+    throw new Error('서버 응답 형식이 올바르지 않습니다.')
+  }
   if (!response.ok || !envelope.success) {
     throw new Error(envelope.error?.message ?? '요청을 처리하지 못했습니다.')
   }
