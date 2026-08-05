@@ -5,6 +5,7 @@ import {
   changeStoreBusinessStatus,
   createSellerCategory,
   createSellerProduct,
+  deleteSellerProduct,
   createStoreTable,
   getSellerPaymentSummary,
   getSellerProductDetail,
@@ -23,6 +24,8 @@ import {
   refundSellerOrder,
   transitionSellerOrder,
   updateProductAvailability,
+  updateSellerProduct,
+  uploadSellerProductImage,
   updateAdminSellerVerification,
   updateAdminStoreStatus,
   updateAdminUserStatus,
@@ -257,6 +260,57 @@ describe('판매자 주문 API 계약', () => {
           imageUrl: null,
           basePrice: 7200,
         }),
+      }),
+    )
+  })
+
+  it('상품 기본정보 수정·삭제와 이미지 업로드 계약을 사용한다', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async (_path, init) => {
+        const data = init?.body instanceof FormData
+          ? { imageUrl: 'http://localhost:8082/uploads/store-images/menu.jpg' }
+          : true
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+    const payload = {
+      categoryId: 2,
+      name: '흑임자 라떼',
+      description: '수정한 설명',
+      imageUrl: 'https://example.test/latte.jpg',
+      basePrice: 7500,
+    }
+    const image = new File([new Uint8Array([255, 216, 255])], 'latte.jpg', {
+      type: 'image/jpeg',
+    })
+
+    await updateSellerProduct(connection, 101, payload)
+    await deleteSellerProduct(connection, 101)
+    await uploadSellerProductImage(connection, image)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/seller/stores/7/products/101',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/seller/stores/7/products/101',
+      expect.objectContaining({ method: 'DELETE' }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/seller/store-images',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { Authorization: 'Bearer seller-access-token' },
+        body: expect.any(FormData),
       }),
     )
   })

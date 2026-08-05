@@ -20,6 +20,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.project_popq.auth.social.KakaoAccessTokenVerifier;
+import com.example.project_popq.auth.social.KakaoIdentity;
+import com.example.project_popq.auth.social.NaverAccessTokenVerifier;
+import com.example.project_popq.auth.social.NaverIdentity;
 
 @Service
 @RequiredArgsConstructor
@@ -29,21 +33,78 @@ public class SocialAuthService {
   private final SocialAccountRepository socialAccountRepository;
   private final SellerProfileRepository sellerProfileRepository;
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
+  private final KakaoAccessTokenVerifier kakaoAccessTokenVerifier;
+  private final NaverAccessTokenVerifier naverAccessTokenVerifier;
   private final JwtTokenService jwtTokenService;
+
 
   @Transactional
   public AuthTokenResponse login(SocialLoginRequest request) {
     validateRole(request.role());
 
+    if (request.provider() == SocialProvider.KAKAO) {
+      return loginWithKakao(request);
+    }
+
+    if (request.provider() == SocialProvider.NAVER) {
+      return loginWithNaver(request);
+    }
+
     if (request.provider() != SocialProvider.GOOGLE) {
       throw new BusinessException(ErrorCode.INVALID_REQUEST);
     }
+
+
+
 
     GoogleIdentity identity = verifyGoogleToken(
         request.providerToken()
     );
 
     User user = findOrCreateGoogleUser(
+        identity,
+        request.role()
+    );
+
+    validateUser(user);
+
+    user.addRole(request.role());
+
+    ensureSellerProfile(user, request.role());
+
+    return issueToken(user, request.role());
+  }
+
+  private AuthTokenResponse loginWithKakao(
+      SocialLoginRequest request
+  ) {
+    KakaoIdentity identity = verifyKakaoToken(
+        request.providerToken(),
+        request.role()
+    );
+
+    User user = findOrCreateKakaoUser(
+        identity,
+        request.role()
+    );
+
+    validateUser(user);
+
+    user.addRole(request.role());
+
+    ensureSellerProfile(user, request.role());
+
+    return issueToken(user, request.role());
+  }
+
+  private AuthTokenResponse loginWithNaver(
+      SocialLoginRequest request
+  ) {
+    NaverIdentity identity = verifyNaverToken(
+        request.providerToken()
+    );
+
+    User user = findOrCreateNaverUser(
         identity,
         request.role()
     );
@@ -70,6 +131,42 @@ public class SocialAuthService {
 
       return identity;
     } catch (JwtException | IllegalArgumentException exception) {
+      System.err.println(
+          "Google token verification failed: "
+              + exception.getMessage()
+      );
+      exception.printStackTrace();
+
+      throw new BusinessException(
+          ErrorCode.INVALID_SOCIAL_TOKEN
+      );
+    }
+  }
+
+  private KakaoIdentity verifyKakaoToken(
+      String accessToken,
+      PlatformRole requestedRole
+  ) {
+    try {
+      return kakaoAccessTokenVerifier.verify(
+          accessToken,
+          requestedRole
+      );
+    } catch (IllegalArgumentException exception) {
+      throw new BusinessException(
+          ErrorCode.INVALID_SOCIAL_TOKEN
+      );
+    }
+  }
+
+  private NaverIdentity verifyNaverToken(
+      String accessToken
+  ) {
+    try {
+      return naverAccessTokenVerifier.verify(
+          accessToken
+      );
+    } catch (IllegalArgumentException exception) {
       throw new BusinessException(
           ErrorCode.INVALID_SOCIAL_TOKEN
       );
@@ -92,6 +189,23 @@ public class SocialAuthService {
         ));
   }
 
+  private User findOrCreateKakaoUser(
+      KakaoIdentity identity,
+      PlatformRole requestedRole
+  ) {
+    return socialAccountRepository
+        .findByProviderAndProviderUserId(
+            SocialProvider.KAKAO,
+            identity.providerUserId()
+        )
+        .map(SocialAccount::getUser)
+        .orElseGet(() -> linkOrCreateKakaoUser(
+            identity,
+            requestedRole
+        ));
+  }
+
+
   private User linkOrCreateGoogleUser(
       GoogleIdentity identity,
       PlatformRole requestedRole
@@ -113,6 +227,131 @@ public class SocialAuthService {
         SocialAccount.create(
             user,
             SocialProvider.GOOGLE,
+            identity.providerUserId()
+        )
+    );
+
+    return user;
+  }
+
+  private User findOrCreateNaverUser(
+      NaverIdentity identity,
+      PlatformRole requestedRole
+  ) {
+    return socialAccountRepository
+        .findByProviderAndProviderUserId(
+            SocialProvider.NAVER,
+            identity.providerUserId()
+        )
+        .map(SocialAccount::getUser)
+        .orElseGet(() -> linkOrCreateNaverUser(
+            identity,
+            requestedRole
+        ));
+  }
+
+  private User linkOrCreateKakaoUser(
+      KakaoIdentity identity,
+      PlatformRole requestedRole
+  ) {
+    String normalizedEmail = identity.email();
+
+    if (normalizedEmail == null
+        || normalizedEmail.isBlank()) {
+      normalizedEmail = (
+          "kakao_"
+              + identity.providerUserId()
+              .replace(":", "_")
+              + "@social.popq.local"
+      ).toLowerCase();
+    } else {
+      normalizedEmail =
+          normalizedEmail.trim().toLowerCase();
+    }
+
+
+    String name = identity.name();
+
+    if (name == null || name.isBlank()) {
+      name = "카카오 사용자";
+    } else {
+      name = name.trim();
+    }
+
+    String finalEmail = normalizedEmail;
+    String finalName = name;
+
+    User user = userRepository
+        .findByEmailIgnoreCase(finalEmail)
+        .orElseGet(() -> userRepository.save(
+            User.create(
+                finalEmail,
+                finalName,
+                requestedRole
+            )
+        ));
+
+    socialAccountRepository.save(
+        SocialAccount.create(
+            user,
+            SocialProvider.KAKAO,
+            identity.providerUserId()
+        )
+    );
+
+    return user;
+  }
+
+  private User linkOrCreateNaverUser(
+      NaverIdentity identity,
+      PlatformRole requestedRole
+  ) {
+    String normalizedEmail = identity.email();
+
+    if (normalizedEmail == null
+        || normalizedEmail.isBlank()) {
+      String safeProviderUserId =
+          identity.providerUserId()
+              .replaceAll(
+                  "[^A-Za-z0-9]",
+                  "_"
+              );
+
+      normalizedEmail = (
+          "naver_"
+              + safeProviderUserId
+              + "@social.popq.local"
+      ).toLowerCase();
+    } else {
+      normalizedEmail =
+          normalizedEmail.trim().toLowerCase();
+    }
+
+    String name = identity.name();
+
+    if (name == null || name.isBlank()) {
+      name = "네이버 사용자";
+    } else {
+      name = name.trim();
+    }
+
+    String finalEmail = normalizedEmail;
+    String finalName = name;
+
+    User user = userRepository
+        .findByEmailIgnoreCase(finalEmail)
+        .orElseGet(() -> userRepository.save(
+            User.create(
+                finalEmail,
+                finalName,
+                requestedRole
+            )
+        ));
+
+    socialAccountRepository.save(
+        SocialAccount.create(
+            user,
+            SocialProvider.NAVER,
             identity.providerUserId()
         )
     );

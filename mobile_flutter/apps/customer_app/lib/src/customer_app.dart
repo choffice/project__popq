@@ -401,13 +401,16 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       'Google idToken: $idToken',
     );
 
-    // TODO(backend): Spring Security 엔드포인트 확정 후
-    // idToken을 백엔드로 전달하고 POPQ 세션을 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'GOOGLE',
+      providerToken: idToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   Future<void> _kakaoSignIn() async {
-    final accessToken =
-    await _kakaoAuthService
+    final accessToken = await _kakaoAuthService
         .signInAndGetAccessToken();
 
     debugPrint(
@@ -415,8 +418,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
           '(${accessToken.length}자)',
     );
 
-    // TODO(backend): 카카오 Access Token을 백엔드로 전달하고
-    // POPQ 세션을 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   Future<void> _naverSignIn() async {
@@ -429,8 +436,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
           '(${accessToken.length}자)',
     );
 
-    // TODO(backend): 네이버 Access Token을 백엔드로 전달하고
-    // POPQ 세션을 저장합니다.
+    final session = await _authRepository.socialLogIn(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
+
+    await _sessionController.save(session);
   }
 
   void _handleSessionChanged() {
