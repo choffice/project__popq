@@ -44,7 +44,7 @@ class QrApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.qrCodeId").value(qr.qrCodeId()))
                 .andExpect(jsonPath("$.data.publicUrl")
-                        .value("http://localhost:5173/q/" + qr.token()));
+                        .value("https://order.popq.test/q/" + qr.token()));
 
         MvcResult opened = mockMvc.perform(
                         post("/api/v1/qr/{token}/sessions", qr.token())

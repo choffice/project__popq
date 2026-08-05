@@ -2,8 +2,10 @@ package com.example.project_popq.auth.config;
 
 import com.example.project_popq.auth.security.RestAccessDeniedHandler;
 import com.example.project_popq.auth.security.RestAuthenticationEntryPoint;
+import com.example.project_popq.qr.config.QrProperties;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -83,10 +85,16 @@ public class SecurityConfig {
 
   @Bean
   public CorsConfigurationSource corsConfigurationSource(
-      @Value("${popq.web.allowed-origin-patterns}") List<String> allowedOrigins
+      @Value("${popq.web.allowed-origin-patterns}") List<String> allowedOrigins,
+      QrProperties qrProperties
   ) {
+    LinkedHashSet<String> allowedOriginPatterns =
+        new LinkedHashSet<>(allowedOrigins);
+    allowedOriginPatterns.add(qrProperties.publicOrigin());
     CorsConfiguration configuration = new CorsConfiguration();
-    configuration.setAllowedOriginPatterns(allowedOrigins);
+    configuration.setAllowedOriginPatterns(
+        List.copyOf(allowedOriginPatterns)
+    );
     configuration.setAllowedMethods(List.of(
         HttpMethod.GET.name(),
         HttpMethod.POST.name(),
