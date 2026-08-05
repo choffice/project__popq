@@ -312,7 +312,7 @@ public class OrderMessageService {
       String orderPublicId,
       SendOrderMessageRequest request
   ) {
-    if (sender.getRole() == PlatformRole.CUSTOMER) {
+    if (sender.hasRole(PlatformRole.CUSTOMER)) {
       Order order = findCustomerOrder(
           sender.getId(),
           orderPublicId
@@ -327,8 +327,8 @@ public class OrderMessageService {
     }
 
     if (
-        sender.getRole() == PlatformRole.SELLER
-            || sender.getRole() == PlatformRole.ADMIN
+        sender.hasRole(PlatformRole.SELLER)
+            || sender.hasRole(PlatformRole.ADMIN)
     ) {
       Order order = findOrder(orderPublicId);
 
@@ -364,7 +364,7 @@ public class OrderMessageService {
       String orderPublicId,
       ReadOrderMessagesRequest request
   ) {
-    if (reader.getRole() == PlatformRole.CUSTOMER) {
+    if (reader.hasRole(PlatformRole.CUSTOMER)) {
       Order order = findCustomerOrder(
           reader.getId(),
           orderPublicId
@@ -381,8 +381,8 @@ public class OrderMessageService {
     }
 
     if (
-        reader.getRole() == PlatformRole.SELLER
-            || reader.getRole() == PlatformRole.ADMIN
+        reader.hasRole(PlatformRole.SELLER)
+            || reader.hasRole(PlatformRole.ADMIN)
     ) {
       Order order = findOrder(orderPublicId);
 
@@ -670,10 +670,7 @@ public class OrderMessageService {
   private void requireCustomer(
       User customer
   ) {
-    if (
-        customer.getRole()
-            != PlatformRole.CUSTOMER
-    ) {
+    if (!customer.hasRole(PlatformRole.CUSTOMER)) {
       throw new BusinessException(
           ErrorCode.ACCESS_DENIED
       );
