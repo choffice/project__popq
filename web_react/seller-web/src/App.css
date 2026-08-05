@@ -10,6 +10,170 @@
   --cream: #fff3c4;
 }
 
+:root[data-theme='dark'] {
+  --ink: #f4f7fa;
+  --muted: #98a5b3;
+  --paper: #0b131b;
+  --line: #24303b;
+  --dark: #050a10;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+}
+
+.theme-toggle span {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.auth-theme-toggle {
+  width: 46px;
+  height: 46px;
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 20;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(23, 23, 17, 0.14);
+}
+
+:root[data-theme='dark'] .auth-page {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(140, 118, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 90% 85%, rgba(216, 255, 105, 0.1), transparent 30%),
+    var(--dark);
+}
+
+:root[data-theme='dark'] .auth-card,
+:root[data-theme='dark'] .store-choice-card,
+:root[data-theme='dark'] .seller-shell,
+:root[data-theme='dark'] .workspace {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .auth-tabs,
+:root[data-theme='dark'] .auth-store-list > button,
+:root[data-theme='dark'] .order-card,
+:root[data-theme='dark'] .detail-panel,
+:root[data-theme='dark'] .connection-modal,
+:root[data-theme='dark'] .option-modal,
+:root[data-theme='dark'] .product-table,
+:root[data-theme='dark'] .admin-table,
+:root[data-theme='dark'] .qr-card,
+:root[data-theme='dark'] .sales-chart-card,
+:root[data-theme='dark'] .channel-card,
+:root[data-theme='dark'] .top-products-card,
+:root[data-theme='dark'] .business-status-card,
+:root[data-theme='dark'] .store-info-card,
+:root[data-theme='dark'] .tables-card {
+  background: #111c25;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .auth-tabs button.active,
+:root[data-theme='dark'] .auth-form input:not([type='checkbox']),
+:root[data-theme='dark'] .connection-modal input,
+:root[data-theme='dark'] .connection-modal textarea,
+:root[data-theme='dark'] .connection-modal select,
+:root[data-theme='dark'] .refund-form textarea,
+:root[data-theme='dark'] .option-group-editor,
+:root[data-theme='dark'] .option-group-fields input:not([type='checkbox']),
+:root[data-theme='dark'] .draft-options input,
+:root[data-theme='dark'] .product-table > article,
+:root[data-theme='dark'] .admin-table > article,
+:root[data-theme='dark'] .table-list > div {
+  background: #17232d;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .topbar {
+  background: rgba(11, 19, 27, 0.84);
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .icon-button,
+:root[data-theme='dark'] .store-toggle,
+:root[data-theme='dark'] .filters,
+:root[data-theme='dark'] .lane,
+:root[data-theme='dark'] .pulse-strip,
+:root[data-theme='dark'] .category-pills,
+:root[data-theme='dark'] .search-field,
+:root[data-theme='dark'] .status-options button,
+:root[data-theme='dark'] .range-control,
+:root[data-theme='dark'] .qr-list-tabs {
+  background: #111c25;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .lane > header,
+:root[data-theme='dark'] .product-table > header,
+:root[data-theme='dark'] .admin-table > header,
+:root[data-theme='dark'] .detail-status,
+:root[data-theme='dark'] .detail-meta > div,
+:root[data-theme='dark'] .detail-items article,
+:root[data-theme='dark'] .payment-refund,
+:root[data-theme='dark'] .refund-history article,
+:root[data-theme='dark'] .history > div,
+:root[data-theme='dark'] .security-note {
+  background: #0f1922;
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme='dark'] .alert,
+:root[data-theme='dark'] .auth-error {
+  border-color: #6e403b;
+  background: #281b1d;
+  color: #ffb4ab;
+}
+
+:root[data-theme='dark'] .auth-notice,
+:root[data-theme='dark'] .terminal-note {
+  background: #16231c;
+  color: #b8dca9;
+}
+
+:root[data-theme='dark'] .primary-action,
+:root[data-theme='dark'] .auth-submit,
+:root[data-theme='dark'] .hero-action {
+  background: var(--lime);
+  color: #050a10;
+}
+
+:root[data-theme='dark'] .payment-amounts p,
+:root[data-theme='dark'] .detail-head button,
+:root[data-theme='dark'] .modal-close {
+  background: #17232d;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-page,
+  .auth-card,
+  .seller-shell,
+  .workspace,
+  .topbar,
+  .order-card,
+  .lane,
+  .detail-panel,
+  .connection-modal,
+  .management-page > section {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+}
+
 button {
   border: 0;
   cursor: pointer;
