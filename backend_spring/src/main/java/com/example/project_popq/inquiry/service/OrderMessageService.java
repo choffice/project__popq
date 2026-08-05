@@ -390,7 +390,7 @@ public class OrderMessageService {
   }
 
   private void requireCustomer(User customer) {
-    if (customer.getRole() != PlatformRole.CUSTOMER) {
+    if (!customer.hasRole(PlatformRole.CUSTOMER)) {
       throw new BusinessException(
           ErrorCode.ACCESS_DENIED
       );

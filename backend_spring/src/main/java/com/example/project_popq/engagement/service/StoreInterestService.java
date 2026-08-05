@@ -71,7 +71,7 @@ public class StoreInterestService {
     }
 
     private void requireCustomer(User user) {
-        if (user.getRole() != PlatformRole.CUSTOMER) {
+        if (!user.hasRole(PlatformRole.CUSTOMER)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
     }

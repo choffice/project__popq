@@ -24,7 +24,7 @@ public class CustomerProfileService {
 
     @Transactional(readOnly = true)
     public CustomerProfileResponse get(User user) {
-        if (user.getRole() != PlatformRole.CUSTOMER) {
+        if (!user.hasRole(PlatformRole.CUSTOMER)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
         return new CustomerProfileResponse(
