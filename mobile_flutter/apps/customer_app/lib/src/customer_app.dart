@@ -204,6 +204,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       permissionGateway,
       locationRepository:
       locationRepository,
+      apiBaseUrl:
+      widget.environment.apiBaseUrl,
       tossClientKey:
       widget.environment.tossClientKey,
       themeController:
