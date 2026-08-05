@@ -4,6 +4,7 @@ import type {
   ProductSummary,
   QrContext,
 } from '../types'
+import { createClientId } from '../utils/clientId'
 
 export const demoContext: QrContext = {
   storeId: 1,
@@ -162,7 +163,7 @@ export function createDemoOrder(
   orderType: OrderResponse['orderType'],
 ): OrderResponse {
   return {
-    orderPublicId: `demo-${crypto.randomUUID()}`,
+    orderPublicId: `demo-${createClientId()}`,
     storeId: demoContext.storeId,
     storeName: demoContext.storeName,
     orderType,

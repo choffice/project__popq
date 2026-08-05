@@ -86,14 +86,18 @@ class RealtimeSecurityTests {
     }
 
     @Test
-    void clientSendAndUnknownSubscriptionsAreDenied() {
+    void clientSendIsDelegatedAndUnknownSubscriptionsAreDenied() {
         Dependencies dependencies = dependencies();
         StompHeaderAccessor send = accessor(StompCommand.SEND);
         send.setDestination("/app/orders");
-        assertThatThrownBy(() -> dependencies.interceptor().preSend(
+        dependencies.interceptor().preSend(
                 message(send),
                 mock(MessageChannel.class)
-        )).isInstanceOf(AccessDeniedException.class);
+        );
+        verify(dependencies.subscriptionAuthorizer()).authorizeSend(
+                null,
+                "/app/orders"
+        );
 
         RealtimeSubscriptionAuthorizer authorizer =
                 new RealtimeSubscriptionAuthorizer(
@@ -101,7 +105,7 @@ class RealtimeSecurityTests {
                         mock(OrderRepository.class)
                 );
         Authentication guest = guestAuthentication(42L);
-        assertThatThrownBy(() -> authorizer.authorize(
+        assertThatThrownBy(() -> authorizer.authorizeSubscription(
                 guest,
                 "/topic/anything"
         )).isInstanceOf(AccessDeniedException.class);
@@ -119,7 +123,7 @@ class RealtimeSecurityTests {
                         orderRepository
                 );
 
-        authorizer.authorize(
+        authorizer.authorizeSubscription(
                 new JwtAuthenticationToken(
                         sellerJwt(),
                         List.of(new SimpleGrantedAuthority("ROLE_SELLER"))
@@ -138,13 +142,13 @@ class RealtimeSecurityTests {
         when(ownedOrder.belongsToGuestSession(42L)).thenReturn(true);
         when(orderRepository.findByOrderPublicId("owned-order"))
                 .thenReturn(Optional.of(ownedOrder));
-        authorizer.authorize(
+        authorizer.authorizeSubscription(
                 guestAuthentication(42L),
                 "/user/queue/orders/owned-order"
         );
 
         when(ownedOrder.belongsToGuestSession(99L)).thenReturn(false);
-        assertThatThrownBy(() -> authorizer.authorize(
+        assertThatThrownBy(() -> authorizer.authorizeSubscription(
                 guestAuthentication(99L),
                 "/user/queue/orders/owned-order"
         )).isInstanceOf(AccessDeniedException.class);
