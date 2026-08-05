@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/seller_realtime_scope.dart';
 import '../stores/seller_store_selection_controller.dart';
 import 'seller_customer_repository.dart';
 
@@ -28,7 +30,11 @@ class _SellerCustomerChatScreenState
     extends State<SellerCustomerChatScreen>
     with WidgetsBindingObserver {
   static const Duration _pollingInterval = Duration(seconds: 3);
+  static const Duration _serverConfirmationTimeout = Duration(
+    seconds: 8,
+  );
   static const int _pageSize = 30;
+  static const int _maximumRememberedEventIds = 200;
   static const double _olderMessageTriggerOffset = 80;
 
   final TextEditingController _messageController =
@@ -41,11 +47,19 @@ class _SellerCustomerChatScreenState
 
   int _nextDraftId = 0;
   int _requestSerial = 0;
+  int _lastConnectionEpoch = 0;
   int? _loadedStoreId;
   int? _nextBeforeMessageId;
 
   Object? _error;
   Timer? _pollingTimer;
+
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _orderChatSubscription;
+
+  final Set<String> _rememberedEventIds = <String>{};
+  final List<String> _rememberedEventIdOrder = <String>[];
+  final Map<String, Timer> _confirmationTimers = <String, Timer>{};
 
   bool _loading = true;
   bool _sending = false;
@@ -54,6 +68,7 @@ class _SellerCustomerChatScreenState
   bool _loadingOlder = false;
   bool _hasMoreOlder = false;
   bool _hasLoadedOlderPages = false;
+  bool _isAppActive = true;
 
   int? get _selectedStoreId {
     return widget.selectionController.selectedStoreId;
@@ -64,6 +79,12 @@ class _SellerCustomerChatScreenState
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
+
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
+
     _scrollController.addListener(_handleScroll);
     widget.selectionController.addListener(
       _handleStoreSelectionChanged,
@@ -71,6 +92,37 @@ class _SellerCustomerChatScreenState
 
     _loadConversation();
     _startPolling();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = SellerRealtimeScope.maybeOf(
+      context,
+    );
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _orderChatSubscription?.cancel();
+    _orderChatSubscription = null;
+
+    _realtimeClient = nextRealtimeClient;
+    _lastConnectionEpoch =
+        nextRealtimeClient?.connectionEpoch ?? 0;
+
+    nextRealtimeClient?.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _subscribeToOrderChat();
+    _updatePollingForConnection();
   }
 
   @override
@@ -100,8 +152,9 @@ class _SellerCustomerChatScreenState
     if (shouldReload) {
       _requestSerial++;
       _resetConversationState();
+      _subscribeToOrderChat();
       _loadConversation();
-      _restartPolling();
+      _updatePollingForConnection();
     }
   }
 
@@ -109,19 +162,39 @@ class _SellerCustomerChatScreenState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.resumed) {
-      _startPolling();
-      unawaited(_pollConversation());
-      return;
-    }
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _subscribeToOrderChat();
+        _updatePollingForConnection();
+        unawaited(
+          _pollConversation(force: true),
+        );
+        _markLatestCustomerMessageAsRead();
+        return;
 
-    _stopPolling();
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopPolling();
+        return;
+    }
   }
 
   @override
   void dispose() {
     _requestSerial++;
     _stopPolling();
+    _cancelAllConfirmationTimers();
+
+    _orderChatSubscription?.cancel();
+    _orderChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
 
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_handleScroll);
@@ -287,6 +360,246 @@ class _SellerCustomerChatScreenState
     );
   }
 
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final client = _realtimeClient;
+    if (client == null) {
+      _updatePollingForConnection();
+      return;
+    }
+
+    final nextConnectionEpoch = client.connectionEpoch;
+
+    if (nextConnectionEpoch != _lastConnectionEpoch) {
+      _lastConnectionEpoch = nextConnectionEpoch;
+      _subscribeToOrderChat();
+
+      if (nextConnectionEpoch > 0 && _isAppActive) {
+        unawaited(
+          _pollConversation(force: true),
+        );
+      }
+    }
+
+    _updatePollingForConnection();
+  }
+
+  void _subscribeToOrderChat() {
+    _orderChatSubscription?.cancel();
+    _orderChatSubscription = null;
+
+    final client = _realtimeClient;
+    final storeId = _selectedStoreId;
+
+    if (client == null || storeId == null || !_isAppActive) {
+      return;
+    }
+
+    _orderChatSubscription = client.subscribeToOrderChat(
+      orderPublicId: widget.orderPublicId,
+      onEvent: _handleRealtimeEvent,
+      onError: (Object error) {
+        debugPrint(
+          '판매자 주문 채팅 구독 오류: $error',
+        );
+      },
+    );
+  }
+
+  void _handleRealtimeEvent(PopqRealtimeEvent event) {
+    if (!mounted ||
+        event.orderPublicId != widget.orderPublicId ||
+        event.storeId != _selectedStoreId ||
+        !_rememberEventId(event.eventId)) {
+      return;
+    }
+
+    switch (event.eventType) {
+      case PopqRealtimeEventType.messageCreated:
+        final realtimeMessage = event.message;
+
+        if (realtimeMessage == null) {
+          return;
+        }
+
+        final conversation = _conversation;
+        if (conversation == null) {
+          unawaited(
+            _pollConversation(force: true),
+          );
+          return;
+        }
+
+        final message = SellerOrderMessage.fromRealtime(
+          realtimeMessage,
+        );
+        final shouldStickToBottom = _isNearBottom();
+
+        setState(() {
+          _removeConfirmedDraftForMessage(message);
+          _conversation = _withMessages(
+            conversation,
+            _mergeMessages(
+              conversation.messages,
+              <SellerOrderMessage>[message],
+            ),
+          );
+          _sending = _outgoingDrafts.any(
+            (draft) =>
+                draft.status == _OutgoingMessageStatus.sending,
+          );
+          _error = null;
+        });
+
+        if (shouldStickToBottom) {
+          _scrollToLatestMessage();
+        }
+
+        if (message.sentByCustomer) {
+          _markLatestCustomerMessageAsRead();
+        }
+
+        return;
+
+      case PopqRealtimeEventType.messageRead:
+        if (event.readerType !=
+                PopqRealtimeMessageSenderType.customer ||
+            event.readMessageIds.isEmpty) {
+          return;
+        }
+
+        final conversation = _conversation;
+        if (conversation == null) {
+          return;
+        }
+
+        final readIds = event.readMessageIds.toSet();
+        var changed = false;
+
+        final nextMessages = conversation.messages.map(
+          (message) {
+            if (!message.sentBySeller ||
+                !readIds.contains(message.orderMessageId) ||
+                message.read) {
+              return message;
+            }
+
+            changed = true;
+            return message.copyWith(
+              read: true,
+              readAt: event.occurredAt,
+            );
+          },
+        ).toList(growable: false);
+
+        if (!changed) {
+          return;
+        }
+
+        setState(() {
+          _conversation = _withMessages(
+            conversation,
+            nextMessages,
+          );
+        });
+
+        return;
+    }
+  }
+
+  bool _rememberEventId(String eventId) {
+    if (_rememberedEventIds.contains(eventId)) {
+      return false;
+    }
+
+    _rememberedEventIds.add(eventId);
+    _rememberedEventIdOrder.add(eventId);
+
+    while (_rememberedEventIdOrder.length >
+        _maximumRememberedEventIds) {
+      final removed = _rememberedEventIdOrder.removeAt(0);
+      _rememberedEventIds.remove(removed);
+    }
+
+    return true;
+  }
+
+  void _markLatestCustomerMessageAsRead() {
+    if (!mounted ||
+        !_isAppActive ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+
+    final conversation = _conversation;
+    if (conversation == null) {
+      return;
+    }
+
+    SellerOrderMessage? latestUnreadCustomerMessage;
+
+    for (final message in conversation.messages.reversed) {
+      if (message.sentByCustomer && !message.read) {
+        latestUnreadCustomerMessage = message;
+        break;
+      }
+    }
+
+    if (latestUnreadCustomerMessage == null) {
+      return;
+    }
+
+    final sent = _realtimeClient?.markChatMessagesAsRead(
+          orderPublicId: widget.orderPublicId,
+          lastReadMessageId:
+              latestUnreadCustomerMessage.orderMessageId,
+        ) ??
+        false;
+
+    if (!sent) {
+      unawaited(
+        _markMessagesAsReadByRest(),
+      );
+    }
+  }
+
+  Future<void> _markMessagesAsReadByRest() async {
+    final storeId = _selectedStoreId;
+
+    if (storeId == null || !_isAppActive) {
+      return;
+    }
+
+    try {
+      await widget.repository.findMessagePage(
+        storeId,
+        widget.orderPublicId,
+        size: 1,
+      );
+    } catch (error) {
+      debugPrint(
+        '판매자 메시지 읽음 REST fallback 실패: $error',
+      );
+    }
+  }
+
+  void _updatePollingForConnection() {
+    if (!_isAppActive) {
+      _stopPolling();
+      return;
+    }
+
+    if (_realtimeClient?.shouldUseRestFallback ?? true) {
+      _startPolling();
+      return;
+    }
+
+    _stopPolling();
+  }
+
   void _handleScroll() {
     if (!_scrollController.hasClients ||
         _scrollController.position.pixels >
@@ -310,11 +623,13 @@ class _SellerCustomerChatScreenState
 
     _requestSerial++;
     _resetConversationState();
+    _subscribeToOrderChat();
     _loadConversation();
-    _restartPolling();
+    _updatePollingForConnection();
   }
 
   void _resetConversationState() {
+    _cancelAllConfirmationTimers();
     _conversation = null;
     _outgoingDrafts.clear();
     _sending = false;
@@ -372,6 +687,7 @@ class _SellerCustomerChatScreenState
 
       setState(() {
         _loadedStoreId = storeId;
+        _removeConfirmedDrafts(page.messages);
         _conversation = _withMessages(metadata, page.messages);
         _hasMoreOlder = page.hasMore;
         _nextBeforeMessageId = page.nextBeforeMessageId;
@@ -381,6 +697,7 @@ class _SellerCustomerChatScreenState
       });
 
       _scrollToLatestMessage(animate: false);
+      _markLatestCustomerMessageAsRead();
     } catch (error) {
       if (!mounted || requestSerial != _requestSerial) {
         return;
@@ -539,6 +856,7 @@ class _SellerCustomerChatScreenState
           : page.messages;
 
       setState(() {
+        _removeConfirmedDrafts(nextMessages);
         _loadedStoreId = storeId;
         _conversation = _withMessages(metadata, nextMessages);
         if (!_hasLoadedOlderPages) {
@@ -573,7 +891,9 @@ class _SellerCustomerChatScreenState
   }
 
   void _startPolling() {
-    if (_pollingTimer?.isActive ?? false) {
+    if (!_isAppActive ||
+        !(_realtimeClient?.shouldUseRestFallback ?? true) ||
+        (_pollingTimer?.isActive ?? false)) {
       return;
     }
 
@@ -590,11 +910,16 @@ class _SellerCustomerChatScreenState
 
   void _restartPolling() {
     _stopPolling();
-    _startPolling();
+    _updatePollingForConnection();
   }
 
-  Future<void> _pollConversation() async {
+  Future<void> _pollConversation({
+    bool force = false,
+  }) async {
     if (!mounted ||
+        (!_isAppActive) ||
+        (!force &&
+            !(_realtimeClient?.shouldUseRestFallback ?? true)) ||
         _loading ||
         _sending ||
         _refreshing ||
@@ -651,6 +976,7 @@ class _SellerCustomerChatScreenState
       }
 
       setState(() {
+        _removeConfirmedDrafts(nextMessages);
         _loadedStoreId = storeId;
         _conversation = nextConversation;
         if (!_hasLoadedOlderPages) {
@@ -690,6 +1016,7 @@ class _SellerCustomerChatScreenState
 
     final draft = _OutgoingMessageDraft(
       localId: ++_nextDraftId,
+      clientMessageId: PopqClientMessageId.generate(),
       content: content,
       createdAt: DateTime.now(),
       status: _OutgoingMessageStatus.sending,
@@ -740,6 +1067,7 @@ class _SellerCustomerChatScreenState
   Future<void> _deliverDraft({
     required int localId,
     required int storeId,
+    bool forceRest = false,
   }) async {
     final draftIndex = _outgoingDrafts.indexWhere(
       (draft) => draft.localId == localId,
@@ -748,7 +1076,10 @@ class _SellerCustomerChatScreenState
     if (draftIndex < 0) {
       if (mounted) {
         setState(() {
-          _sending = false;
+          _sending = _outgoingDrafts.any(
+            (draft) =>
+                draft.status == _OutgoingMessageStatus.sending,
+          );
         });
       }
       return;
@@ -757,11 +1088,35 @@ class _SellerCustomerChatScreenState
     final draft = _outgoingDrafts[draftIndex];
     final orderPublicId = widget.orderPublicId;
 
+    if (!forceRest && (_realtimeClient?.isConnected ?? false)) {
+      final sent = _realtimeClient!.sendChatMessage(
+        orderPublicId: orderPublicId,
+        content: draft.content,
+        clientMessageId: draft.clientMessageId,
+      );
+
+      if (sent) {
+        if (_outgoingDrafts.any(
+          (item) => item.localId == localId,
+        )) {
+          _scheduleRestFallback(
+            localId: localId,
+            storeId: storeId,
+            clientMessageId: draft.clientMessageId,
+          );
+        }
+        return;
+      }
+    }
+
+    _cancelConfirmationTimer(draft.clientMessageId);
+
     try {
       final sentMessage = await widget.repository.sendMessage(
         storeId,
         orderPublicId,
         content: draft.content,
+        clientMessageId: draft.clientMessageId,
       );
 
       if (!mounted ||
@@ -771,9 +1126,7 @@ class _SellerCustomerChatScreenState
       }
 
       setState(() {
-        _outgoingDrafts.removeWhere(
-          (item) => item.localId == localId,
-        );
+        _removeConfirmedDraftForMessage(sentMessage);
 
         final conversation = _conversation;
         if (conversation != null) {
@@ -781,15 +1134,20 @@ class _SellerCustomerChatScreenState
             conversation,
             _mergeMessages(
               conversation.messages,
-              [sentMessage],
+              <SellerOrderMessage>[sentMessage],
             ),
           );
         }
+
+        _sending = _outgoingDrafts.any(
+          (item) =>
+              item.status == _OutgoingMessageStatus.sending,
+        );
       });
 
       _scrollToLatestMessage();
       _messageFocusNode.requestFocus();
-    } catch (_) {
+    } catch (error) {
       if (!mounted ||
           _selectedStoreId != storeId ||
           widget.orderPublicId != orderPublicId) {
@@ -800,14 +1158,19 @@ class _SellerCustomerChatScreenState
         (item) => item.localId == localId,
       );
 
-      if (failedIndex >= 0) {
-        setState(() {
-          _outgoingDrafts[failedIndex] =
-              _outgoingDrafts[failedIndex].copyWith(
-            status: _OutgoingMessageStatus.failed,
-          );
-        });
+      if (failedIndex < 0) {
+        return;
       }
+
+      setState(() {
+        _outgoingDrafts[failedIndex] =
+            _outgoingDrafts[failedIndex].copyWith(
+          status: _OutgoingMessageStatus.failed,
+        );
+        _sending = false;
+      });
+
+      debugPrint('판매자 메시지 전송 실패: $error');
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -816,15 +1179,100 @@ class _SellerCustomerChatScreenState
           ),
         ),
       );
-    } finally {
-      if (mounted &&
-          _selectedStoreId == storeId &&
-          widget.orderPublicId == orderPublicId) {
-        setState(() {
-          _sending = false;
-        });
-      }
     }
+  }
+
+  void _scheduleRestFallback({
+    required int localId,
+    required int storeId,
+    required String clientMessageId,
+  }) {
+    _cancelConfirmationTimer(clientMessageId);
+
+    _confirmationTimers[clientMessageId] = Timer(
+      _serverConfirmationTimeout,
+      () {
+        _confirmationTimers.remove(clientMessageId);
+
+        if (!mounted ||
+            !_outgoingDrafts.any(
+              (draft) =>
+                  draft.localId == localId &&
+                  draft.clientMessageId == clientMessageId,
+            )) {
+          return;
+        }
+
+        unawaited(
+          _deliverDraft(
+            localId: localId,
+            storeId: storeId,
+            forceRest: true,
+          ),
+        );
+      },
+    );
+  }
+
+  void _cancelConfirmationTimer(String clientMessageId) {
+    _confirmationTimers.remove(clientMessageId)?.cancel();
+  }
+
+  void _cancelAllConfirmationTimers() {
+    for (final timer in _confirmationTimers.values) {
+      timer.cancel();
+    }
+    _confirmationTimers.clear();
+  }
+
+  void _removeConfirmedDrafts(
+    Iterable<SellerOrderMessage> messages,
+  ) {
+    for (final message in messages) {
+      _removeConfirmedDraftForMessage(message);
+    }
+
+    _sending = _outgoingDrafts.any(
+      (draft) =>
+          draft.status == _OutgoingMessageStatus.sending,
+    );
+  }
+
+  void _removeConfirmedDraftForMessage(
+    SellerOrderMessage message,
+  ) {
+    if (!message.sentBySeller || _outgoingDrafts.isEmpty) {
+      return;
+    }
+
+    int draftIndex = -1;
+    final clientMessageId = message.clientMessageId?.trim();
+
+    if (clientMessageId != null && clientMessageId.isNotEmpty) {
+      draftIndex = _outgoingDrafts.indexWhere(
+        (draft) => draft.clientMessageId == clientMessageId,
+      );
+    }
+
+    if (draftIndex < 0) {
+      draftIndex = _outgoingDrafts.indexWhere(
+        (draft) {
+          final timeDifference = message.createdAt
+              .difference(draft.createdAt)
+              .abs();
+
+          return draft.content == message.content &&
+              timeDifference <= const Duration(minutes: 2);
+        },
+      );
+    }
+
+    if (draftIndex < 0) {
+      return;
+    }
+
+    final removed = _outgoingDrafts.removeAt(draftIndex);
+    _cancelConfirmationTimer(removed.clientMessageId);
   }
 
   SellerConversationDetail _withMessages(
@@ -921,6 +1369,8 @@ class _SellerCustomerChatScreenState
               nextMessage.senderUserId ||
           previousMessage.senderName != nextMessage.senderName ||
           previousMessage.senderType != nextMessage.senderType ||
+          previousMessage.clientMessageId !=
+              nextMessage.clientMessageId ||
           previousMessage.content != nextMessage.content ||
           previousMessage.read != nextMessage.read ||
           previousMessage.readAt != nextMessage.readAt ||
@@ -1188,12 +1638,14 @@ enum _OutgoingMessageStatus {
 class _OutgoingMessageDraft {
   const _OutgoingMessageDraft({
     required this.localId,
+    required this.clientMessageId,
     required this.content,
     required this.createdAt,
     required this.status,
   });
 
   final int localId;
+  final String clientMessageId;
   final String content;
   final DateTime createdAt;
   final _OutgoingMessageStatus status;
@@ -1203,6 +1655,7 @@ class _OutgoingMessageDraft {
   }) {
     return _OutgoingMessageDraft(
       localId: localId,
+      clientMessageId: clientMessageId,
       content: content,
       createdAt: createdAt,
       status: status ?? this.status,

@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/seller_realtime_scope.dart';
 import '../../routing/seller_router.dart';
 import '../stores/seller_store_selection_controller.dart';
 import 'seller_customer_repository.dart';
@@ -27,18 +29,29 @@ class SellerCustomerScreen extends StatefulWidget {
 class _SellerCustomerScreenState
     extends State<SellerCustomerScreen>
     with WidgetsBindingObserver {
-  static const Duration _pollingInterval =
-  Duration(seconds: 3);
+  static const Duration _pollingInterval = Duration(
+    seconds: 3,
+  );
+
+  static const int _maximumRememberedEventIds = 200;
 
   int? _loadedStoreId;
+  int _requestSerial = 0;
+  int _lastConnectionEpoch = 0;
 
-  Future<List<SellerConversationSummary>>? _conversations;
+  List<SellerConversationSummary>? _items;
+  Object? _loadError;
 
   Timer? _pollingTimer;
 
-  bool _pollRequestInProgress = false;
+  bool _requestInProgress = false;
+  bool _isAppActive = true;
 
-  int _requestSerial = 0;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _storeChatSubscription;
+
+  final Set<String> _rememberedEventIds = <String>{};
+  final List<String> _rememberedEventIdOrder = <String>[];
 
   @override
   void initState() {
@@ -46,18 +59,59 @@ class _SellerCustomerScreenState
 
     WidgetsBinding.instance.addObserver(this);
 
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
+
     widget.selectionController.addListener(
       _handleStoreSelectionChanged,
     );
 
-    _loadForCurrentStore();
+    unawaited(
+      _loadForCurrentStore(
+        showLoading: true,
+      ),
+    );
+
     _startPolling();
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = SellerRealtimeScope.maybeOf(
+      context,
+    );
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    _realtimeClient = nextRealtimeClient;
+    _lastConnectionEpoch =
+        nextRealtimeClient?.connectionEpoch ?? 0;
+
+    nextRealtimeClient?.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _subscribeToSelectedStore();
+    _updatePollingForConnection();
+  }
+
+  @override
   void didUpdateWidget(
-      covariant SellerCustomerScreen oldWidget,
-      ) {
+    covariant SellerCustomerScreen oldWidget,
+  ) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.selectionController !=
@@ -72,39 +126,63 @@ class _SellerCustomerScreenState
 
       _requestSerial++;
       _loadedStoreId = null;
+      _items = null;
+      _loadError = null;
 
-      _loadForCurrentStore();
-      _restartPolling();
+      _subscribeToSelectedStore();
 
+      unawaited(
+        _loadForCurrentStore(
+          showLoading: true,
+        ),
+      );
+
+      _updatePollingForConnection();
       return;
     }
 
     if (oldWidget.repository != widget.repository) {
       _requestSerial++;
       _loadedStoreId = null;
+      _items = null;
+      _loadError = null;
 
-      _loadForCurrentStore();
-      _restartPolling();
+      unawaited(
+        _loadForCurrentStore(
+          showLoading: true,
+        ),
+      );
+
+      _updatePollingForConnection();
     }
   }
 
   @override
   void didChangeAppLifecycleState(
-      AppLifecycleState state,
-      ) {
+    AppLifecycleState state,
+  ) {
     super.didChangeAppLifecycleState(state);
 
-    if (state == AppLifecycleState.resumed) {
-      _startPolling();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _subscribeToSelectedStore();
+        _updatePollingForConnection();
 
-      unawaited(
-        _pollConversations(),
-      );
+        unawaited(
+          _refreshConversations(),
+        );
 
-      return;
+        return;
+
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopPolling();
+        return;
     }
-
-    _stopPolling();
   }
 
   @override
@@ -112,6 +190,13 @@ class _SellerCustomerScreenState
     _requestSerial++;
 
     _stopPolling();
+
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
 
     WidgetsBinding.instance.removeObserver(this);
 
@@ -131,13 +216,23 @@ class _SellerCustomerScreenState
       return const _NoSelectedStoreView();
     }
 
-    final conversations = _conversations;
+    final items = _items;
 
-    if (conversations == null) {
+    if (items == null && _loadError == null) {
       return const PopqLoadingView(
         message: '고객 문의를 불러오고 있어요.',
       );
     }
+
+    if (items == null && _loadError != null) {
+      return PopqErrorView(
+        message: '고객 문의 목록을 불러오지 못했어요.',
+        onRetry: _reload,
+      );
+    }
+
+    final conversations =
+        items ?? const <SellerConversationSummary>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,86 +253,55 @@ class _SellerCustomerScreenState
           ),
         ),
         Expanded(
-          child:
-          FutureBuilder<List<SellerConversationSummary>>(
-            future: conversations,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState !=
-                  ConnectionState.done &&
-                  !snapshot.hasData) {
-                return const PopqLoadingView(
-                  message: '고객 문의를 불러오고 있어요.',
-                );
-              }
-
-              if (snapshot.hasError) {
-                return PopqErrorView(
-                  message:
-                  '고객 문의 목록을 불러오지 못했어요.',
-                  onRetry: _reload,
-                );
-              }
-
-              final items =
-                  snapshot.data ??
-                      const <SellerConversationSummary>[];
-
-              if (items.isEmpty) {
-                return RefreshIndicator(
+          child: conversations.isEmpty
+              ? RefreshIndicator(
                   onRefresh: _reload,
                   child: const CustomScrollView(
-                    physics:
-                    AlwaysScrollableScrollPhysics(),
+                    physics: AlwaysScrollableScrollPhysics(),
                     slivers: [
                       SliverFillRemaining(
                         hasScrollBody: false,
                         child: PopqEmptyView(
                           icon: Icons.forum_outlined,
-                          title:
-                          '도착한 고객 문의가 없어요.',
+                          title: '도착한 고객 문의가 없어요.',
                           description:
-                          '고객이 주문 문의를 보내면 '
+                              '고객이 주문 문의를 보내면 '
                               '이곳에서 확인하고 답변할 수 있어요.',
                         ),
                       ),
                     ],
                   ),
-                );
-              }
+                )
+              : RefreshIndicator(
+                  onRefresh: _reload,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      PopqSpacing.lg,
+                      PopqSpacing.sm,
+                      PopqSpacing.lg,
+                      PopqSpacing.xl,
+                    ),
+                    itemCount: conversations.length,
+                    separatorBuilder: (_, _) {
+                      return const SizedBox(
+                        height: PopqSpacing.sm,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final conversation = conversations[index];
 
-              return RefreshIndicator(
-                onRefresh: _reload,
-                child: ListView.separated(
-                  physics:
-                  const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(
-                    PopqSpacing.lg,
-                    PopqSpacing.sm,
-                    PopqSpacing.lg,
-                    PopqSpacing.xl,
+                      return _ConversationCard(
+                        conversation: conversation,
+                        onTap: () {
+                          _openConversation(
+                            conversation,
+                          );
+                        },
+                      );
+                    },
                   ),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) {
-                    return const SizedBox(
-                      height: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder: (context, index) {
-                    final conversation = items[index];
-
-                    return _ConversationCard(
-                      conversation: conversation,
-                      onTap: () {
-                        _openConversation(
-                          conversation,
-                        );
-                      },
-                    );
-                  },
                 ),
-              );
-            },
-          ),
         ),
       ],
     );
@@ -259,40 +323,132 @@ class _SellerCustomerScreenState
 
     setState(() {
       _loadedStoreId = selectedStoreId;
-
-      _conversations = selectedStoreId == null
-          ? null
-          : widget.repository.findConversations(
-        selectedStoreId,
-      );
+      _items = null;
+      _loadError = null;
     });
 
-    _restartPolling();
+    _subscribeToSelectedStore();
+
+    unawaited(
+      _loadForCurrentStore(
+        showLoading: true,
+      ),
+    );
+
+    _updatePollingForConnection();
   }
 
-  void _loadForCurrentStore() {
-    final selectedStoreId =
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      _updatePollingForConnection();
+      return;
+    }
+
+    final connectionEpoch = realtimeClient.connectionEpoch;
+
+    if (realtimeClient.isConnected &&
+        connectionEpoch != _lastConnectionEpoch) {
+      _lastConnectionEpoch = connectionEpoch;
+
+      unawaited(
+        _refreshConversations(),
+      );
+    }
+
+    _updatePollingForConnection();
+  }
+
+  void _subscribeToSelectedStore() {
+    _storeChatSubscription?.cancel();
+    _storeChatSubscription = null;
+
+    final realtimeClient = _realtimeClient;
+    final storeId =
         widget.selectionController.selectedStoreId;
 
-    _loadedStoreId = selectedStoreId;
+    if (realtimeClient == null || storeId == null) {
+      return;
+    }
 
-    _conversations = selectedStoreId == null
-        ? null
-        : widget.repository.findConversations(
-      selectedStoreId,
+    _storeChatSubscription = realtimeClient.subscribeToStoreChat(
+      storeId: storeId,
+      onEvent: _handleStoreChatEvent,
+      onError: (error) {
+        debugPrint(
+          '판매자 고객 문의 목록 구독 오류: $error',
+        );
+      },
     );
   }
 
+  void _handleStoreChatEvent(
+    PopqRealtimeEvent event,
+  ) {
+    if (!mounted || !_rememberEvent(event.eventId)) {
+      return;
+    }
+
+    final selectedStoreId =
+        widget.selectionController.selectedStoreId;
+
+    if (selectedStoreId == null ||
+        event.storeId != selectedStoreId) {
+      return;
+    }
+
+    unawaited(
+      _refreshConversations(),
+    );
+  }
+
+  bool _rememberEvent(String eventId) {
+    if (!_rememberedEventIds.add(eventId)) {
+      return false;
+    }
+
+    _rememberedEventIdOrder.add(eventId);
+
+    if (_rememberedEventIdOrder.length >
+        _maximumRememberedEventIds) {
+      final removedEventId =
+          _rememberedEventIdOrder.removeAt(0);
+
+      _rememberedEventIds.remove(removedEventId);
+    }
+
+    return true;
+  }
+
+  void _updatePollingForConnection() {
+    final shouldUseRestFallback =
+        _realtimeClient?.shouldUseRestFallback ?? true;
+
+    if (_isAppActive && shouldUseRestFallback) {
+      _startPolling();
+      return;
+    }
+
+    _stopPolling();
+  }
+
   void _startPolling() {
-    if (_pollingTimer?.isActive ?? false) {
+    if (!_isAppActive ||
+        !(_realtimeClient?.shouldUseRestFallback ?? true) ||
+        (_pollingTimer?.isActive ?? false)) {
       return;
     }
 
     _pollingTimer = Timer.periodic(
       _pollingInterval,
-          (_) {
+      (_) {
         unawaited(
-          _pollConversations(),
+          _refreshConversations(),
         );
       },
     );
@@ -303,16 +459,9 @@ class _SellerCustomerScreenState
     _pollingTimer = null;
   }
 
-  void _restartPolling() {
-    _stopPolling();
-    _startPolling();
-  }
-
-  Future<void> _pollConversations() async {
-    if (!mounted || _pollRequestInProgress) {
-      return;
-    }
-
+  Future<void> _loadForCurrentStore({
+    required bool showLoading,
+  }) async {
     final selectedStoreId =
         widget.selectionController.selectedStoreId;
 
@@ -320,94 +469,143 @@ class _SellerCustomerScreenState
       return;
     }
 
-    _pollRequestInProgress = true;
+    _loadedStoreId = selectedStoreId;
 
+    await _fetchConversations(
+      selectedStoreId,
+      showLoading: showLoading,
+    );
+  }
+
+  Future<void> _refreshConversations() async {
+    final selectedStoreId =
+        widget.selectionController.selectedStoreId;
+
+    if (selectedStoreId == null) {
+      return;
+    }
+
+    await _fetchConversations(
+      selectedStoreId,
+      showLoading: false,
+    );
+  }
+
+  Future<void> _fetchConversations(
+    int storeId, {
+    required bool showLoading,
+  }) async {
+    if (_requestInProgress) {
+      return;
+    }
+
+    _requestInProgress = true;
     final requestSerial = ++_requestSerial;
+
+    if (showLoading && mounted && _items == null) {
+      setState(() {
+        _loadError = null;
+      });
+    }
 
     try {
       final conversations =
-      await widget.repository.findConversations(
-        selectedStoreId,
+          await widget.repository.findConversations(
+        storeId,
       );
 
       if (!mounted ||
           requestSerial != _requestSerial ||
-          widget.selectionController.selectedStoreId !=
-              selectedStoreId) {
+          widget.selectionController.selectedStoreId != storeId) {
+        return;
+      }
+
+      final changed = !_sameConversationList(
+        _items,
+        conversations,
+      );
+
+      if (!changed && _loadError == null) {
         return;
       }
 
       setState(() {
-        _loadedStoreId = selectedStoreId;
-        _conversations = Future.value(
-          conversations,
-        );
+        _loadedStoreId = storeId;
+        _items = conversations;
+        _loadError = null;
       });
     } catch (error, stackTrace) {
-      /*
-       * 자동 갱신 실패 시 기존 목록은 그대로 유지합니다.
-       * 일시적인 네트워크 오류 때문에 오류 화면으로
-       * 전환되지 않도록 합니다.
-       */
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.selectionController.selectedStoreId != storeId) {
+        return;
+      }
+
+      if (_items == null) {
+        setState(() {
+          _loadError = error;
+        });
+      }
+
       debugPrint(
-        '고객 문의 목록 자동 갱신 실패: $error',
+        '고객 문의 목록 갱신 실패: $error',
       );
 
       debugPrintStack(
         stackTrace: stackTrace,
       );
     } finally {
-      _pollRequestInProgress = false;
+      _requestInProgress = false;
     }
+  }
+
+  bool _sameConversationList(
+    List<SellerConversationSummary>? previous,
+    List<SellerConversationSummary> next,
+  ) {
+    if (previous == null || previous.length != next.length) {
+      return false;
+    }
+
+    for (var index = 0; index < previous.length; index++) {
+      final left = previous[index];
+      final right = next[index];
+
+      if (left.orderPublicId != right.orderPublicId ||
+          left.customerUserId != right.customerUserId ||
+          left.customerName != right.customerName ||
+          left.orderStatus != right.orderStatus ||
+          left.lastMessage != right.lastMessage ||
+          left.lastMessageSenderType != right.lastMessageSenderType ||
+          left.lastMessageAt != right.lastMessageAt ||
+          left.unreadCount != right.unreadCount) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   Future<void> _reload() async {
-    final selectedStoreId =
-        widget.selectionController.selectedStoreId;
-
-    if (selectedStoreId == null) {
-      return;
-    }
-
-    final requestSerial = ++_requestSerial;
-
-    final nextFuture =
-    widget.repository.findConversations(
-      selectedStoreId,
-    );
-
-    setState(() {
-      _loadedStoreId = selectedStoreId;
-      _conversations = nextFuture;
-    });
-
-    try {
-      await nextFuture;
-    } finally {
-      if (requestSerial != _requestSerial) {
-        return;
-      }
-    }
+    await _refreshConversations();
   }
 
   Future<void> _openConversation(
-      SellerConversationSummary conversation,
-      ) async {
-    final encodedOrderPublicId =
-    Uri.encodeComponent(
+    SellerConversationSummary conversation,
+  ) async {
+    final encodedOrderPublicId = Uri.encodeComponent(
       conversation.orderPublicId,
     );
 
     await context.push(
-      '${SellerRoutes.customers}/'
-          '$encodedOrderPublicId',
+      '${SellerRoutes.customers}/$encodedOrderPublicId',
     );
 
     if (!mounted) {
       return;
     }
 
-    await _reload();
+    await _refreshConversations();
   }
 }
 
@@ -425,8 +623,7 @@ class _ConversationCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final hasUnreadMessage =
-        conversation.hasUnreadMessage;
+    final hasUnreadMessage = conversation.hasUnreadMessage;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -439,15 +636,12 @@ class _ConversationCard extends StatelessWidget {
             PopqSpacing.md,
           ),
           child: Row(
-            crossAxisAlignment:
-            CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               CircleAvatar(
                 radius: 23,
-                backgroundColor:
-                colorScheme.primaryContainer,
-                foregroundColor:
-                colorScheme.onPrimaryContainer,
+                backgroundColor: colorScheme.primaryContainer,
+                foregroundColor: colorScheme.onPrimaryContainer,
                 child: Text(
                   _firstCharacter(
                     conversation.customerName,
@@ -463,8 +657,7 @@ class _ConversationCard extends StatelessWidget {
               ),
               Expanded(
                 child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
@@ -472,14 +665,9 @@ class _ConversationCard extends StatelessWidget {
                           child: Text(
                             conversation.customerName,
                             maxLines: 1,
-                            overflow:
-                            TextOverflow.ellipsis,
-                            style: theme
-                                .textTheme
-                                .titleSmall
-                                ?.copyWith(
-                              fontWeight:
-                              FontWeight.w800,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
@@ -493,14 +681,9 @@ class _ConversationCard extends StatelessWidget {
                               includeLabel: false,
                             ),
                             maxLines: 1,
-                            overflow:
-                            TextOverflow.ellipsis,
-                            style: theme
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                              color: colorScheme
-                                  .onSurfaceVariant,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -512,14 +695,11 @@ class _ConversationCard extends StatelessWidget {
                     Text(
                       conversation.lastMessage,
                       maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         color: hasUnreadMessage
                             ? colorScheme.onSurface
-                            : colorScheme
-                            .onSurfaceVariant,
+                            : colorScheme.onSurfaceVariant,
                         fontWeight: hasUnreadMessage
                             ? FontWeight.w700
                             : FontWeight.w400,
@@ -532,19 +712,16 @@ class _ConversationCard extends StatelessWidget {
                 width: PopqSpacing.sm,
               ),
               Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     _relativeTime(
                       conversation.lastMessageAt,
                     ),
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(
+                    style: theme.textTheme.bodySmall?.copyWith(
                       color: hasUnreadMessage
                           ? colorScheme.primary
-                          : colorScheme
-                          .onSurfaceVariant,
+                          : colorScheme.onSurfaceVariant,
                       fontWeight: hasUnreadMessage
                           ? FontWeight.w700
                           : FontWeight.w400,
@@ -557,10 +734,8 @@ class _ConversationCard extends StatelessWidget {
                     duration: const Duration(
                       milliseconds: 180,
                     ),
-                    width:
-                    hasUnreadMessage ? 8 : 0,
-                    height:
-                    hasUnreadMessage ? 8 : 0,
+                    width: hasUnreadMessage ? 8 : 0,
+                    height: hasUnreadMessage ? 8 : 0,
                     decoration: BoxDecoration(
                       color: colorScheme.error,
                       shape: BoxShape.circle,
@@ -576,8 +751,8 @@ class _ConversationCard extends StatelessWidget {
   }
 
   static String _firstCharacter(
-      String value,
-      ) {
+    String value,
+  ) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
@@ -590,16 +765,14 @@ class _ConversationCard extends StatelessWidget {
   }
 
   static String _relativeTime(
-      DateTime value,
-      ) {
+    DateTime value,
+  ) {
     final localValue = value.toLocal();
     final now = DateTime.now();
 
-    final difference =
-    now.difference(localValue);
+    final difference = now.difference(localValue);
 
-    if (difference.isNegative ||
-        difference.inMinutes < 1) {
+    if (difference.isNegative || difference.inMinutes < 1) {
       return '방금 전';
     }
 
@@ -630,8 +803,7 @@ class _ConversationCard extends StatelessWidget {
     }
 
     if (now.year == localValue.year) {
-      return '${localValue.month}월 '
-          '${localValue.day}일';
+      return '${localValue.month}월 ${localValue.day}일';
     }
 
     return '${localValue.year}.'
@@ -640,17 +812,17 @@ class _ConversationCard extends StatelessWidget {
   }
 
   static bool _isSameDay(
-      DateTime left,
-      DateTime right,
-      ) {
+    DateTime left,
+    DateTime right,
+  ) {
     return left.year == right.year &&
         left.month == right.month &&
         left.day == right.day;
   }
 
   static String _twoDigits(
-      int value,
-      ) {
+    int value,
+  ) {
     return value.toString().padLeft(2, '0');
   }
 }
@@ -664,7 +836,7 @@ class _NoSelectedStoreView extends StatelessWidget {
       icon: Icons.storefront_outlined,
       title: '선택된 사업장이 없어요.',
       description:
-      '대시보드에서 고객 문의를 확인할 사업장을 먼저 선택해 주세요.',
+          '대시보드에서 고객 문의를 확인할 사업장을 먼저 선택해 주세요.',
     );
   }
 }

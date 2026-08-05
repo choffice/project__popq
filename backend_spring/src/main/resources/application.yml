@@ -85,3 +85,4 @@ popq:
 
   web:
     allowed-origin-patterns: ${POPQ_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
+
