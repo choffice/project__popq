@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -110,7 +112,11 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
 }) {
-  return GoRouter(
+  final splashStartedAt = DateTime.now();
+  const minSplashDuration = Duration(seconds: 2);
+
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: CustomerRoutes.home,
     refreshListenable: Listenable.merge([
       sessionController,
@@ -149,7 +155,11 @@ GoRouter createCustomerRouter({
               onboardingController.status ==
                   OnboardingStatus.restoring;
 
-      if (isRestoring) {
+      final hasMinSplashElapsed =
+          DateTime.now().difference(splashStartedAt) >=
+              minSplashDuration;
+
+      if (isRestoring || !hasMinSplashElapsed) {
         return isBootstrap
             ? null
             : CustomerRoutes.bootstrap;
@@ -599,4 +609,8 @@ GoRouter createCustomerRouter({
       ),
     ],
   );
+
+  Timer(minSplashDuration, router.refresh);
+
+  return router;
 }

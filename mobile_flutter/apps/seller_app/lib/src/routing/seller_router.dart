@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -91,7 +93,11 @@ GoRouter createSellerRouter({
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
 }) {
-  return GoRouter(
+  final splashStartedAt = DateTime.now();
+  const minSplashDuration = Duration(seconds: 2);
+
+  late final GoRouter router;
+  router = GoRouter(
     initialLocation: SellerRoutes.dashboard,
     refreshListenable: Listenable.merge([
       bootstrapController,
@@ -128,8 +134,13 @@ GoRouter createSellerRouter({
       final isStoreRegistration =
           location == SellerRoutes.storeRegistration;
 
+      final hasMinSplashElapsed =
+          DateTime.now().difference(splashStartedAt) >=
+              minSplashDuration;
+
       if (bootstrapController.status ==
-          SellerBootstrapStatus.restoring) {
+          SellerBootstrapStatus.restoring ||
+          !hasMinSplashElapsed) {
         return isBootstrap
             ? null
             : SellerRoutes.bootstrap;
@@ -380,4 +391,8 @@ GoRouter createSellerRouter({
       ),
     ],
   );
+
+  Timer(minSplashDuration, router.refresh);
+
+  return router;
 }
