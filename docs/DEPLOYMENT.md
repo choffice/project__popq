@@ -11,6 +11,25 @@
 
 두 React 컨테이너는 Nginx로 정적 파일을 제공하고 같은 Origin의 `/api`와 `/ws`를 `backend:8082`로 프록시한다. 브라우저에서 백엔드를 직접 호출할 때는 환경변수의 Origin 허용 목록을 사용한다.
 
+## QR 공개 주소
+
+QR 코드에는 고객 앱 전용 주소가 아니라 일반 카메라와 모든 모바일 브라우저가 열 수 있는 공개 주문 주소가 들어간다.
+
+```text
+https://order.example.com/q/<opaque-token>
+```
+
+`POPQ_QR_PUBLIC_BASE_URL`은 이 주소의 기준값이다. 신규 발급·재발급 QR과 기존 QR 상세 재조회 모두 같은 기준값으로 `publicUrl`을 생성한다. 이 값의 Origin은 REST CORS와 WebSocket 허용 목록에 자동으로 포함되므로 별도 허용 환경변수에 주문 도메인을 중복 기재하지 않아도 된다. 판매자 웹처럼 별도 Origin에서 백엔드를 직접 호출하는 클라이언트만 허용 목록에 추가한다.
+
+이미 파일로 내려받거나 인쇄한 QR 이미지는 설정 변경으로 내용이 바뀌지 않는다. 기존 토큰을 유지하려면 QR 상세 화면에서 새 공개 주소로 이미지를 다시 내려받아 교체하고, 토큰도 교체하려면 재발급한다.
+
+운영 `prod` 프로파일은 다음 조건을 만족하지 않으면 백엔드 시작을 거부한다.
+
+- 공개 QR 주소가 `https`이고 loopback 호스트가 아닐 것
+- `POPQ_COOKIE_SECURE=true`일 것
+
+QR 주문 페이지는 토큰 URL이 검색엔진에 수집되지 않도록 HTML 메타 태그와 Nginx `X-Robots-Tag` 응답 헤더를 함께 사용한다.
+
 ## 최초 실행
 
 ```powershell
@@ -75,12 +94,13 @@ POPQ_QR_TOKEN_ENCRYPTION_KEY=replace-with-a-separate-random-secret-at-least-32-b
 POPQ_PAYMENT_PROVIDER=TOSS_PAYMENTS
 POPQ_TOSS_CLIENT_KEY=replace-with-live-client-key
 POPQ_TOSS_SECRET_KEY=replace-with-matching-live-secret-key
-POPQ_WEB_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
-POPQ_REALTIME_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
+POPQ_WEB_ALLOWED_ORIGINS=https://seller.example.com
+POPQ_REALTIME_ALLOWED_ORIGINS=https://seller.example.com
 ```
 
 운영에서는 MySQL 포트와 Spring Boot 포트를 외부에 직접 공개하지 않고 리버스 프록시 또는 내부 네트워크를 통해 접근시키는 구성을 권장한다.
 QR 결제 도메인은 HTTPS로 제공하고 `POPQ_COOKIE_SECURE=true`를 유지한다.
+DNS와 TLS 인증서는 `POPQ_QR_PUBLIC_BASE_URL`의 호스트와 일치해야 하며, 이 도메인의 `/api`와 `/ws`는 동일 배포의 백엔드로 프록시해야 한다.
 
 ## 장애 확인
 
