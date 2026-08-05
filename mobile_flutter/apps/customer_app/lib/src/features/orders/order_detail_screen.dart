@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/customer_realtime_scope.dart';
 import '../../routing/customer_router.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_order_repository.dart';
@@ -24,20 +28,74 @@ class OrderDetailScreen extends StatefulWidget {
   }
 }
 
-class _OrderDetailScreenState extends State<OrderDetailScreen> {
+class _OrderDetailScreenState extends State<OrderDetailScreen>
+    with WidgetsBindingObserver {
+  static const Duration _fallbackPollingInterval = Duration(
+    seconds: 3,
+  );
+
   CustomerOrder? _order;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _customerChatSubscription;
+  Timer? _fallbackPollingTimer;
 
   Object? _error;
 
   var _unreadCount = 0;
   var _loading = true;
   var _syncing = false;
+  var _unreadRequestInProgress = false;
+  var _requestGeneration = 0;
+  var _observedConnectionEpoch = 0;
+  var _isAppActive = true;
 
   @override
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addObserver(this);
+
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState ==
+            AppLifecycleState.resumed;
+
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient =
+        CustomerRealtimeScope.of(context);
+
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _realtimeClient = nextRealtimeClient;
+    _observedConnectionEpoch =
+        nextRealtimeClient.connectionEpoch;
+
+    nextRealtimeClient.addListener(
+      _handleRealtimeClientChanged,
+    );
+
+    _customerChatSubscription =
+        nextRealtimeClient.subscribeToCustomerChat(
+      onEvent: _handleCustomerChatEvent,
+      onError: _handleCustomerChatError,
+    );
+
+    _syncFallbackPollingWithRealtime();
   }
 
   @override
@@ -50,8 +108,59 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
         oldWidget.repository != widget.repository ||
         oldWidget.messageRepository !=
             widget.messageRepository) {
+      _requestGeneration++;
       _load();
     }
+  }
+
+  @override
+  void didChangeAppLifecycleState(
+    AppLifecycleState state,
+  ) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _syncFallbackPollingWithRealtime();
+
+        unawaited(
+          _refreshUnreadCount(),
+        );
+
+        return;
+
+      case AppLifecycleState.inactive:
+        _isAppActive = false;
+        _stopFallbackPolling();
+        return;
+
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopFallbackPolling();
+        return;
+    }
+  }
+
+  @override
+  void dispose() {
+    _requestGeneration++;
+
+    WidgetsBinding.instance.removeObserver(this);
+
+    _stopFallbackPolling();
+
+    _customerChatSubscription?.cancel();
+    _customerChatSubscription = null;
+
+    _realtimeClient?.removeListener(
+      _handleRealtimeClientChanged,
+    );
+    _realtimeClient = null;
+
+    super.dispose();
   }
 
   @override
@@ -478,6 +587,129 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> _refreshUnreadCount() async {
+    if (!mounted || _unreadRequestInProgress) {
+      return;
+    }
+
+    final generation = _requestGeneration;
+    _unreadRequestInProgress = true;
+
+    try {
+      final unreadCount = await _findUnreadCount();
+
+      if (!mounted ||
+          generation != _requestGeneration ||
+          unreadCount == null ||
+          unreadCount == _unreadCount) {
+        return;
+      }
+
+      setState(() {
+        _unreadCount = unreadCount;
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '주문 상세의 읽지 않은 답변 수를 갱신하지 못했습니다: $error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _unreadRequestInProgress = false;
+    }
+  }
+
+  void _handleRealtimeClientChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final realtimeClient = _realtimeClient;
+
+    if (realtimeClient == null) {
+      return;
+    }
+
+    if (_observedConnectionEpoch !=
+        realtimeClient.connectionEpoch) {
+      _observedConnectionEpoch =
+          realtimeClient.connectionEpoch;
+
+      // 재연결 직후 끊긴 동안 놓친 배지 변화를 REST로 복구합니다.
+      unawaited(
+        _refreshUnreadCount(),
+      );
+    }
+
+    _syncFallbackPollingWithRealtime();
+  }
+
+  void _handleCustomerChatEvent(
+    PopqRealtimeEvent event,
+  ) {
+    if (event.orderPublicId != widget.orderPublicId) {
+      return;
+    }
+
+    final shouldRefresh =
+        event.isMessageRead ||
+        (event.isMessageCreated &&
+            event.message?.sentBySeller == true);
+
+    if (!shouldRefresh) {
+      return;
+    }
+
+    unawaited(
+      _refreshUnreadCount(),
+    );
+  }
+
+  void _handleCustomerChatError(
+    Object error,
+  ) {
+    debugPrint(
+      '주문 상세 실시간 채팅 이벤트를 처리하지 못했습니다: $error',
+    );
+  }
+
+  void _syncFallbackPollingWithRealtime() {
+    if (!_isAppActive) {
+      _stopFallbackPolling();
+      return;
+    }
+
+    if (_realtimeClient?.isConnected == true) {
+      _stopFallbackPolling();
+      return;
+    }
+
+    _startFallbackPolling();
+  }
+
+  void _startFallbackPolling() {
+    if (!_isAppActive ||
+        _realtimeClient?.isConnected == true ||
+        (_fallbackPollingTimer?.isActive ?? false)) {
+      return;
+    }
+
+    _fallbackPollingTimer = Timer.periodic(
+      _fallbackPollingInterval,
+      (_) {
+        unawaited(
+          _refreshUnreadCount(),
+        );
+      },
+    );
+  }
+
+  void _stopFallbackPolling() {
+    _fallbackPollingTimer?.cancel();
+    _fallbackPollingTimer = null;
   }
 }
 
