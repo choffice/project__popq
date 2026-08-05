@@ -1,7 +1,0 @@
-<component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flutter Android Emulator - Customer" type="FlutterRunConfigurationType" factoryName="Flutter">
-    <option name="additionalArgs" value="--dart-define=POPQ_FLAVOR=development --dart-define=POPQ_API_BASE_URL=http://10.100.105.19:8082 --dart-define=KAKAO_MAP_JS_KEY=db33f4768d159414b638e684c26de69e --dart-define=POPQ_TOSS_CLIENT_KEY=test_ck_QbgMGZzorzqqZ7MqB5nNVl5E1em4 --dart-define=NAVER_CLIENT_ID=GxL8Qnbr3tbzqhIvXYir --dart-define=NAVER_CLIENT_SECRET=6Jtg3b6WVX" />
-    <option name="filePath" value="$PROJECT_DIR$/apps/customer_app/lib/main.dart" />
-    <method v="2" />
-  </configuration>
-</component>
