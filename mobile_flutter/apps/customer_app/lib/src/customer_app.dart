@@ -39,7 +39,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.locationRepository,
     this.themeController,
     this.authRepository,
-    this.splashMinDuration = const Duration(seconds: 2),
+    this.splashMinDuration = const Duration(seconds: 3),
     super.key,
   });
 

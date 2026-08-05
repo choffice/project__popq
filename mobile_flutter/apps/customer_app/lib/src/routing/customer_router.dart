@@ -113,7 +113,7 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
-  Duration minSplashDuration = const Duration(seconds: 2),
+  Duration minSplashDuration = const Duration(seconds: 3),
 }) {
   final splashStartedAt = DateTime.now();
 
