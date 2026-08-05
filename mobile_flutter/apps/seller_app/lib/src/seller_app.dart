@@ -148,7 +148,7 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
       },
     );
 
-    _googleAuthService = GoogleAuthService(webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
+    _googleAuthService = GoogleAuthService(webClientId:'977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
 
     _kakaoAuthService = KakaoAuthService();
 
@@ -338,8 +338,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           '(${accessToken.length}자)',
     );
 
-    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
-     accessToken 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+    final result = await _authRepository.socialLogIn(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+
+    await _completeSignIn(result.session);
   }
 
   Future<void> _naverSignIn() async {
@@ -351,8 +355,12 @@ class _PopqSellerAppState extends State<PopqSellerApp> {
           '(${accessToken.length}자)',
     );
 
-    /*TODO(backend): Spring 판매자 Google 로그인 API가 완성되면
-     accessToken 서버에 전송하고, 응답으로 받은 POPQ 토큰을 저장합니다.*/
+    final result = await _authRepository.socialLogIn(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
+
+    await _completeSignIn(result.session);
   }
 
   Future<void> _developmentSignIn() async {
