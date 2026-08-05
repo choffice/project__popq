@@ -32,11 +32,19 @@ flutter run
 
 Android 에뮬레이터의 기본 백엔드 주소는 `http://10.0.2.2:8082`다. Flutter Web은 `http://localhost:8082`를 기본으로 사용한다. 다른 환경은 Dart define으로 주입한다.
 
+판매자 웹이 로컬에서 발급한 QR의 `localhost`/`127.0.0.1` 주소는 고객 앱이 API 주소의 호스트로 변환한다. 따라서 Android 에뮬레이터에서는 별도 설정 없이 `10.0.2.2`를 사용한다. 실기기에서는 PC와 같은 네트워크에 연결한 뒤 `POPQ_API_BASE_URL`에 PC의 LAN IP를 지정하고, 백엔드의 `POPQ_WEB_ALLOWED_ORIGINS`와 `POPQ_REALTIME_ALLOWED_ORIGINS`에도 `http://<PC_LAN_IP>:5173`을 추가한다.
+
 ```powershell
 flutter run `
   --dart-define=POPQ_FLAVOR=staging `
   --dart-define=POPQ_API_BASE_URL=https://api.example.com `
   --dart-define=POPQ_ENABLE_NETWORK_LOGS=false
+```
+
+로컬 실기기 예시:
+
+```powershell
+flutter run --dart-define=POPQ_API_BASE_URL=http://192.168.0.25:8082
 ```
 
 ### Chrome 통합 실행

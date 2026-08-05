@@ -79,6 +79,7 @@ GoRouter createCustomerRouter({
   required CustomerHomeController homeController,
   required CustomerPermissionGateway permissionGateway,
   required CustomerLocationRepository locationRepository,
+  required String apiBaseUrl,
   required String tossClientKey,
   required Future<void> Function(
       String email,
@@ -574,7 +575,9 @@ GoRouter createCustomerRouter({
             path:
             CustomerRoutes.qrScanner,
             builder: (context, state) {
-              return const CustomerQrScannerScreen();
+              return CustomerQrScannerScreen(
+                apiBaseUrl: apiBaseUrl,
+              );
             },
           ),
           GoRoute(
