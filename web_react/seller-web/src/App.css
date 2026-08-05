@@ -10,6 +10,170 @@
   --cream: #fff3c4;
 }
 
+:root[data-theme='dark'] {
+  --ink: #f4f7fa;
+  --muted: #98a5b3;
+  --paper: #0b131b;
+  --line: #24303b;
+  --dark: #050a10;
+}
+
+.theme-toggle {
+  display: grid;
+  place-items: center;
+}
+
+.theme-toggle span {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.auth-theme-toggle {
+  width: 46px;
+  height: 46px;
+  position: fixed;
+  top: 22px;
+  right: 22px;
+  z-index: 20;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(23, 23, 17, 0.14);
+}
+
+:root[data-theme='dark'] .auth-page {
+  background:
+    radial-gradient(circle at 15% 20%, rgba(140, 118, 255, 0.16), transparent 30%),
+    radial-gradient(circle at 90% 85%, rgba(216, 255, 105, 0.1), transparent 30%),
+    var(--dark);
+}
+
+:root[data-theme='dark'] .auth-card,
+:root[data-theme='dark'] .store-choice-card,
+:root[data-theme='dark'] .seller-shell,
+:root[data-theme='dark'] .workspace {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .auth-tabs,
+:root[data-theme='dark'] .auth-store-list > button,
+:root[data-theme='dark'] .order-card,
+:root[data-theme='dark'] .detail-panel,
+:root[data-theme='dark'] .connection-modal,
+:root[data-theme='dark'] .option-modal,
+:root[data-theme='dark'] .product-table,
+:root[data-theme='dark'] .admin-table,
+:root[data-theme='dark'] .qr-card,
+:root[data-theme='dark'] .sales-chart-card,
+:root[data-theme='dark'] .channel-card,
+:root[data-theme='dark'] .top-products-card,
+:root[data-theme='dark'] .business-status-card,
+:root[data-theme='dark'] .store-info-card,
+:root[data-theme='dark'] .tables-card {
+  background: #111c25;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .auth-tabs button.active,
+:root[data-theme='dark'] .auth-form input:not([type='checkbox']),
+:root[data-theme='dark'] .connection-modal input,
+:root[data-theme='dark'] .connection-modal textarea,
+:root[data-theme='dark'] .connection-modal select,
+:root[data-theme='dark'] .refund-form textarea,
+:root[data-theme='dark'] .option-group-editor,
+:root[data-theme='dark'] .option-group-fields input:not([type='checkbox']),
+:root[data-theme='dark'] .draft-options input,
+:root[data-theme='dark'] .product-table > article,
+:root[data-theme='dark'] .admin-table > article,
+:root[data-theme='dark'] .table-list > div {
+  background: #17232d;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .topbar {
+  background: rgba(11, 19, 27, 0.84);
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .icon-button,
+:root[data-theme='dark'] .store-toggle,
+:root[data-theme='dark'] .filters,
+:root[data-theme='dark'] .lane,
+:root[data-theme='dark'] .pulse-strip,
+:root[data-theme='dark'] .category-pills,
+:root[data-theme='dark'] .search-field,
+:root[data-theme='dark'] .status-options button,
+:root[data-theme='dark'] .range-control,
+:root[data-theme='dark'] .qr-list-tabs {
+  background: #111c25;
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .lane > header,
+:root[data-theme='dark'] .product-table > header,
+:root[data-theme='dark'] .admin-table > header,
+:root[data-theme='dark'] .detail-status,
+:root[data-theme='dark'] .detail-meta > div,
+:root[data-theme='dark'] .detail-items article,
+:root[data-theme='dark'] .payment-refund,
+:root[data-theme='dark'] .refund-history article,
+:root[data-theme='dark'] .history > div,
+:root[data-theme='dark'] .security-note {
+  background: #0f1922;
+  border-color: var(--line);
+}
+
+:root[data-theme='dark'] .modal-backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+:root[data-theme='dark'] .alert,
+:root[data-theme='dark'] .auth-error {
+  border-color: #6e403b;
+  background: #281b1d;
+  color: #ffb4ab;
+}
+
+:root[data-theme='dark'] .auth-notice,
+:root[data-theme='dark'] .terminal-note {
+  background: #16231c;
+  color: #b8dca9;
+}
+
+:root[data-theme='dark'] .primary-action,
+:root[data-theme='dark'] .auth-submit,
+:root[data-theme='dark'] .hero-action {
+  background: var(--lime);
+  color: #050a10;
+}
+
+:root[data-theme='dark'] .payment-amounts p,
+:root[data-theme='dark'] .detail-head button,
+:root[data-theme='dark'] .modal-close {
+  background: #17232d;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-page,
+  .auth-card,
+  .seller-shell,
+  .workspace,
+  .topbar,
+  .order-card,
+  .lane,
+  .detail-panel,
+  .connection-modal,
+  .management-page > section {
+    transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease;
+  }
+}
+
 button {
   border: 0;
   cursor: pointer;
@@ -1687,7 +1851,7 @@ main {
 
 .product-table.editable > header,
 .product-table.editable > article {
-  grid-template-columns: minmax(240px, 2fr) 0.72fr 0.86fr 0.52fr 0.52fr 0.68fr;
+  grid-template-columns: minmax(240px, 2fr) 0.72fr 0.86fr 0.52fr 0.52fr minmax(150px, 1.2fr);
 }
 
 .product-identity {
@@ -1723,6 +1887,15 @@ main {
 .product-swatch.tone-3 {
   background: #eadcc1;
   color: #795c38;
+}
+
+.product-thumbnail {
+  width: 45px;
+  height: 45px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  object-fit: cover;
+  background: #ece9df;
 }
 
 .product-identity div {
@@ -1804,7 +1977,14 @@ main {
   transform: translateX(15px);
 }
 
-.option-edit-button {
+.product-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.option-edit-button,
+.product-edit-button {
   width: fit-content;
   min-height: 30px;
   padding: 0 11px;
@@ -1815,14 +1995,137 @@ main {
   font-weight: 800;
 }
 
-.option-edit-button:hover {
+.option-edit-button:hover,
+.product-edit-button:hover {
   border-color: #798f5c;
+  color: #58703c;
+}
+
+.product-edit-button {
+  border-color: #aaba92;
+  background: #f2f6eb;
   color: #58703c;
 }
 
 .product-form-modal {
   max-height: calc(100vh - 40px);
   overflow-y: auto;
+}
+
+.product-image-field {
+  display: grid;
+  gap: 8px;
+  color: #716d64;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.product-image-input {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.product-image-input > img,
+.product-image-placeholder {
+  width: 92px;
+  height: 92px;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  object-fit: cover;
+  background: #efede5;
+}
+
+.product-image-placeholder {
+  display: grid;
+  place-items: center;
+  border: 1px dashed #c9c5b8;
+  color: #aaa69d;
+  font-size: 9px;
+}
+
+.product-image-input > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.product-image-input small {
+  width: 100%;
+  color: #99958b;
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.connection-modal .image-file-button,
+.remove-image-button {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #b9b5a9;
+  border-radius: 9px;
+  cursor: pointer;
+  color: #555149;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.image-file-button input {
+  width: 1px;
+  height: 1px;
+  position: absolute;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.remove-image-button {
+  background: transparent;
+  color: #9b4b3d;
+}
+
+.product-delete-zone {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.delete-product-button,
+.danger-action {
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  background: #fbebe7;
+  color: #a04435;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.product-delete-zone > div {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  border-radius: 11px;
+  background: #fbebe7;
+}
+
+.product-delete-zone p {
+  margin: 0 auto 0 0;
+  color: #8e4336;
+  font-size: 9px;
+}
+
+.product-delete-zone .secondary-action,
+.product-delete-zone .danger-action {
+  min-height: 32px;
+  padding: 0 12px;
+}
+
+.product-delete-zone .secondary-action {
+  background: var(--paper);
 }
 
 .option-backdrop {
