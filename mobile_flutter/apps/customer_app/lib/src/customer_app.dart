@@ -12,6 +12,7 @@ import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
+import 'features/home/customer_home_controller.dart';
 import 'features/home/customer_location_repository.dart';
 import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
@@ -38,6 +39,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.locationRepository,
     this.themeController,
     this.authRepository,
+    this.splashMinDuration = const Duration(seconds: 3),
     super.key,
   });
 
@@ -56,6 +58,11 @@ class PopqCustomerApp extends StatefulWidget {
   final PopqThemeController? themeController;
   final CustomerAuthRepository? authRepository;
 
+  /// 스플래시 화면(부트스트랩)을 최소 이 시간만큼 보여줍니다.
+  ///
+  /// 위젯 테스트에서는 [Duration.zero]로 넘겨서 스플래시를 건너뛸 수 있습니다.
+  final Duration splashMinDuration;
+
   @override
   State<PopqCustomerApp> createState() =>
       _PopqCustomerAppState();
@@ -70,6 +77,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final SessionStore _sessionStore;
   late final PopqApiClient _apiClient;
   late final CartController _cartController;
+  late final CustomerHomeController _homeController;
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
   late final GoRouter _router;
@@ -176,6 +184,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.cartController ??
             CartController();
 
+    _homeController = CustomerHomeController(
+      storeDiscoveryRepository,
+      orderRepository,
+      _sessionController,
+      permissionGateway,
+      locationRepository,
+    );
+
     _router = createCustomerRouter(
       onSignIn: _signIn,
       onSignUp: _signUp,
@@ -202,6 +218,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
       notificationRepository,
       cartController:
       _cartController,
+      homeController:
+      _homeController,
+      minSplashDuration:
+      widget.splashMinDuration,
       permissionGateway:
       permissionGateway,
       locationRepository:
@@ -237,7 +257,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         _sessionController.restore(),
         _onboardingController.restore(),
         _themeController.restore(),
-      ]),
+      ]).then((_) => _homeController.load()),
     );
   }
 
@@ -394,6 +414,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     _router.dispose();
     _apiClient.close();
     _cartController.dispose();
+    _homeController.dispose();
     _onboardingController.dispose();
     _sessionController.dispose();
 

@@ -21,6 +21,7 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.sessionController,
     required this.permissionGateway,
     required this.locationRepository,
+    this.preloadedController,
     super.key,
   });
 
@@ -30,6 +31,12 @@ class CustomerHomeScreen extends StatefulWidget {
   final CustomerPermissionGateway permissionGateway;
   final CustomerLocationRepository locationRepository;
 
+  /// 앱 부팅 시 스플래시 화면과 함께 미리 로딩을 시작한 컨트롤러입니다.
+  ///
+  /// 전달되면 이 화면은 새 컨트롤러를 만들지 않고 그대로 사용하며,
+  /// 소유권(dispose 책임)도 이 화면이 아니라 앱 상위에 남습니다.
+  final CustomerHomeController? preloadedController;
+
   @override
   State<CustomerHomeScreen> createState() =>
       _CustomerHomeScreenState();
@@ -38,6 +45,7 @@ class CustomerHomeScreen extends StatefulWidget {
 class _CustomerHomeScreenState
     extends State<CustomerHomeScreen> {
   late CustomerHomeController _controller;
+  bool _ownsController = true;
 
   /// 현재 선택된 카테고리 필터입니다.
   ///
@@ -76,17 +84,32 @@ class _CustomerHomeScreenState
             !identical(
               oldWidget.locationRepository,
               widget.locationRepository,
+            ) ||
+            !identical(
+              oldWidget.preloadedController,
+              widget.preloadedController,
             );
 
     if (!dependenciesChanged) {
       return;
     }
 
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
+
     _createController();
   }
 
   void _createController() {
+    final preloadedController = widget.preloadedController;
+
+    if (preloadedController != null) {
+      _controller = preloadedController;
+      _ownsController = false;
+      return;
+    }
+
     _controller = CustomerHomeController(
       widget.storeDiscoveryRepository,
       widget.orderRepository,
@@ -94,13 +117,16 @@ class _CustomerHomeScreenState
       widget.permissionGateway,
       widget.locationRepository,
     );
+    _ownsController = true;
 
     unawaited(_controller.load());
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) {
+      _controller.dispose();
+    }
     super.dispose();
   }
 
