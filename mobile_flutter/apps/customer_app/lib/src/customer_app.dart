@@ -7,6 +7,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/auth/customer_auth_repository.dart';
+import 'features/auth/customer_identity_repository.dart';
 import 'features/auth/kakao_auth_service.dart';
 import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
@@ -39,6 +40,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.locationRepository,
     this.themeController,
     this.authRepository,
+    this.identityRepository,
     this.splashMinDuration = const Duration(seconds: 3),
     super.key,
   });
@@ -57,6 +59,7 @@ class PopqCustomerApp extends StatefulWidget {
   final CustomerLocationRepository? locationRepository;
   final PopqThemeController? themeController;
   final CustomerAuthRepository? authRepository;
+  final CustomerIdentityRepository? identityRepository;
 
   /// 스플래시 화면(부트스트랩)을 최소 이 시간만큼 보여줍니다.
   ///
@@ -83,6 +86,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
   late final GoRouter _router;
   late final GoogleAuthService _googleAuthService;
   late final CustomerAuthRepository _authRepository;
+  late final CustomerIdentityRepository _identityRepository;
   late final _CustomerBackButtonDispatcher _backButtonDispatcher;
   late final KakaoAuthService _kakaoAuthService;
   late final NaverAuthService _naverAuthService;
@@ -126,6 +130,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
     _authRepository =
         widget.authRepository ??
             ApiCustomerAuthRepository(
+              _apiClient,
+            );
+
+    _identityRepository =
+        widget.identityRepository ??
+            ApiCustomerIdentityRepository(
               _apiClient,
             );
 
@@ -254,11 +264,26 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
 
     unawaited(
       Future.wait([
-        _sessionController.restore(),
+        _sessionController.restore().then((_) => _verifyCustomerSession()),
         _onboardingController.restore(),
         _themeController.restore(),
       ]).then((_) => _homeController.load()),
     );
+  }
+
+  Future<void> _verifyCustomerSession() async {
+    if (!_sessionController.isSignedIn) return;
+
+    try {
+      final identity = await _identityRepository.getCurrent();
+      if (!identity.isCustomer) {
+        await _sessionController.signOut();
+      }
+    } on AuthenticationFailure {
+      await _sessionController.signOut();
+    } catch (_) {
+      // 일시적인 네트워크 오류 등은 세션을 로그아웃시키지 않고 그대로 둡니다.
+    }
   }
 
   Future<void> _developmentSignIn() async {
