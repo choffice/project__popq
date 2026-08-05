@@ -173,7 +173,6 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     );
 
     _googleAuthService = GoogleAuthService(webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
-    _googleAuthService = GoogleAuthService(webClientId:'977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
 
     _kakaoAuthService = KakaoAuthService();
 

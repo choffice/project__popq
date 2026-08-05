@@ -53,7 +53,10 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   int _requestGeneration = 0;
   int _lastHandledConnectionEpoch = 0;
   int _lastReadRequestMessageId = 0;
+  int _pendingReadMessageId = 0;
   int? _nextBeforeMessageId;
+
+  Future<void>? _readReceiptFuture;
 
   Object? _error;
   Timer? _pollingTimer;
@@ -67,6 +70,8 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   bool _hasMoreOlder = false;
   bool _hasLoadedOlderPages = false;
   bool _pendingRealtimeSync = false;
+  bool _allowPop = false;
+  bool _popInProgress = false;
 
   @override
   void initState() {
@@ -121,6 +126,10 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       _pendingRealtimeSync = false;
       _lastHandledConnectionEpoch = 0;
       _lastReadRequestMessageId = 0;
+      _pendingReadMessageId = 0;
+      _readReceiptFuture = null;
+      _allowPop = false;
+      _popInProgress = false;
       _nextBeforeMessageId = null;
 
       _subscribeToCurrentOrder();
@@ -137,6 +146,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       case AppLifecycleState.resumed:
         _isAppActive = true;
         _applyRealtimeState(forcePoll: true);
+        _markLatestSellerMessageAsRead();
         return;
 
       case AppLifecycleState.inactive:
@@ -171,25 +181,35 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_order?.storeName ?? '주문 문의'),
-        actions: [
-          IconButton(
-            tooltip: '새로고침',
-            onPressed: _loading || _sending || _refreshing || _loadingOlder
-                ? null
-                : _refreshConversation,
-            icon: _refreshing
-                ? const SizedBox.square(
-                    dimension: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh_rounded),
-          ),
-        ],
+    return PopScope<Object?>(
+      canPop: _allowPop,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop || _allowPop) {
+          return;
+        }
+
+        unawaited(_handleBack(result));
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_order?.storeName ?? '주문 문의'),
+          actions: [
+            IconButton(
+              tooltip: '새로고침',
+              onPressed: _loading || _sending || _refreshing || _loadingOlder
+                  ? null
+                  : _refreshConversation,
+              icon: _refreshing
+                  ? const SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh_rounded),
+            ),
+          ],
+        ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
@@ -474,14 +494,76 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       return;
     }
 
-    final sent = _realtimeClient?.markChatMessagesAsRead(
-          orderPublicId: widget.orderPublicId,
-          lastReadMessageId: orderMessageId,
-        ) ??
-        false;
+    if (orderMessageId > _pendingReadMessageId) {
+      _pendingReadMessageId = orderMessageId;
+    }
 
-    if (sent) {
-      _lastReadRequestMessageId = orderMessageId;
+    _readReceiptFuture ??= _flushReadReceipts().whenComplete(() {
+      _readReceiptFuture = null;
+
+      if (_pendingReadMessageId > _lastReadRequestMessageId) {
+        _markSellerMessageAsRead(_pendingReadMessageId);
+      }
+    });
+  }
+
+  Future<void> _flushReadReceipts() async {
+    while (_pendingReadMessageId > _lastReadRequestMessageId) {
+      final targetMessageId = _pendingReadMessageId;
+
+      try {
+        await widget.messageRepository.markMessagesAsRead(
+          orderPublicId: widget.orderPublicId,
+          lastReadMessageId: targetMessageId,
+        );
+
+        _lastReadRequestMessageId = targetMessageId;
+      } catch (error, stackTrace) {
+        _pendingReadMessageId = _lastReadRequestMessageId;
+        debugPrint('구매자 문의 읽음 처리 실패: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        return;
+      }
+    }
+  }
+
+  void _markLatestSellerMessageAsRead() {
+    if (!_isChatActuallyVisible) {
+      return;
+    }
+
+    for (final message in _messages.reversed) {
+      if (message.sentBySeller) {
+        _markSellerMessageAsRead(message.orderMessageId);
+        return;
+      }
+    }
+  }
+
+  Future<void> _handleBack(Object? result) async {
+    if (_popInProgress) {
+      return;
+    }
+
+    _popInProgress = true;
+    _markLatestSellerMessageAsRead();
+
+    try {
+      await _readReceiptFuture;
+    } finally {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _allowPop = true;
+      });
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          Navigator.of(context).pop(result);
+        }
+      });
     }
   }
 
@@ -543,6 +625,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       }
 
       _scrollToLatestMessage(animate: false);
+      _markLatestSellerMessageAsRead();
 
       if (shouldSynchronizeAgain &&
           (realtimeClient?.isConnected ?? false)) {
@@ -690,6 +773,8 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
         _error = null;
       });
 
+      _markLatestSellerMessageAsRead();
+
       if (hasNewMessage && shouldStickToBottom) {
         _scrollToLatestMessage();
       }
@@ -781,6 +866,8 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
         }
         _error = null;
       });
+
+      _markLatestSellerMessageAsRead();
 
       if (hasNewMessage && shouldStickToBottom) {
         _scrollToLatestMessage();

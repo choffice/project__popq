@@ -4,14 +4,14 @@ import 'customer_order_message.dart';
 
 abstract interface class CustomerOrderMessageRepository {
   Future<List<CustomerOrderMessage>> findMessages(
-      String orderPublicId,
-      );
+    String orderPublicId,
+  );
 
   Future<CustomerOrderMessagePage> findMessagePage(
-      String orderPublicId, {
-        int? beforeMessageId,
-        int size = 30,
-      });
+    String orderPublicId, {
+    int? beforeMessageId,
+    int size = 30,
+  });
 
   Future<CustomerOrderMessage> sendMessage({
     required String orderPublicId,
@@ -19,35 +19,39 @@ abstract interface class CustomerOrderMessageRepository {
     String? clientMessageId,
   });
 
+  Future<void> markMessagesAsRead({
+    required String orderPublicId,
+    required int lastReadMessageId,
+  });
+
   Future<List<CustomerOrderUnreadMessageCount>>
-  findUnreadMessageCounts();
+      findUnreadMessageCounts();
 }
 
 class ApiCustomerOrderMessageRepository
     implements CustomerOrderMessageRepository {
   ApiCustomerOrderMessageRepository(
-      this._apiClient,
-      );
+    this._apiClient,
+  );
 
   final PopqApiClient _apiClient;
 
   @override
   Future<List<CustomerOrderMessage>> findMessages(
-      String orderPublicId,
-      ) {
+    String orderPublicId,
+  ) {
     return _apiClient.get(
       '/api/v1/customer/orders/'
-          '$orderPublicId/messages',
+      '$orderPublicId/messages',
       decode: (Object? value) {
         return (value as List<Object?>)
             .map(
-              (Object? item) =>
-              CustomerOrderMessage.fromJson(
+              (Object? item) => CustomerOrderMessage.fromJson(
                 Map<String, Object?>.from(
                   item as Map,
                 ),
               ),
-        )
+            )
             .toList(growable: false);
       },
     );
@@ -55,10 +59,10 @@ class ApiCustomerOrderMessageRepository
 
   @override
   Future<CustomerOrderMessagePage> findMessagePage(
-      String orderPublicId, {
-        int? beforeMessageId,
-        int size = 30,
-      }) {
+    String orderPublicId, {
+    int? beforeMessageId,
+    int size = 30,
+  }) {
     if (size < 1 || size > 100) {
       throw ArgumentError.value(
         size,
@@ -67,8 +71,7 @@ class ApiCustomerOrderMessageRepository
       );
     }
 
-    if (beforeMessageId != null &&
-        beforeMessageId <= 0) {
+    if (beforeMessageId != null && beforeMessageId <= 0) {
       throw ArgumentError.value(
         beforeMessageId,
         'beforeMessageId',
@@ -78,7 +81,7 @@ class ApiCustomerOrderMessageRepository
 
     return _apiClient.get(
       '/api/v1/customer/orders/'
-          '$orderPublicId/messages/page',
+      '$orderPublicId/messages/page',
       query: <String, Object?>{
         'size': size,
         if (beforeMessageId != null)
@@ -118,8 +121,7 @@ class ApiCustomerOrderMessageRepository
       );
     }
 
-    final normalizedClientMessageId =
-    clientMessageId?.trim();
+    final normalizedClientMessageId = clientMessageId?.trim();
 
     if (normalizedClientMessageId != null &&
         normalizedClientMessageId.isEmpty) {
@@ -141,12 +143,11 @@ class ApiCustomerOrderMessageRepository
 
     return _apiClient.post(
       '/api/v1/customer/orders/'
-          '$orderPublicId/messages',
+      '$orderPublicId/messages',
       body: <String, Object?>{
         'content': normalizedContent,
         if (normalizedClientMessageId != null)
-          'clientMessageId':
-          normalizedClientMessageId,
+          'clientMessageId': normalizedClientMessageId,
       },
       decode: (Object? value) {
         return CustomerOrderMessage.fromJson(
@@ -159,22 +160,44 @@ class ApiCustomerOrderMessageRepository
   }
 
   @override
+  Future<void> markMessagesAsRead({
+    required String orderPublicId,
+    required int lastReadMessageId,
+  }) async {
+    if (lastReadMessageId <= 0) {
+      throw ArgumentError.value(
+        lastReadMessageId,
+        'lastReadMessageId',
+        'lastReadMessageId는 1 이상이어야 합니다.',
+      );
+    }
+
+    await _apiClient.post<bool>(
+      '/api/v1/customer/orders/'
+      '$orderPublicId/messages/read',
+      body: <String, Object?>{
+        'lastReadMessageId': lastReadMessageId,
+      },
+      decode: (Object? value) => value as bool,
+    );
+  }
+
+  @override
   Future<List<CustomerOrderUnreadMessageCount>>
-  findUnreadMessageCounts() {
+      findUnreadMessageCounts() {
     return _apiClient.get(
       '/api/v1/customer/orders/messages/'
-          'unread-counts',
+      'unread-counts',
       decode: (Object? value) {
         return (value as List<Object?>)
             .map(
               (Object? item) =>
-              CustomerOrderUnreadMessageCount
-                  .fromJson(
+                  CustomerOrderUnreadMessageCount.fromJson(
                 Map<String, Object?>.from(
                   item as Map,
                 ),
               ),
-        )
+            )
             .toList(growable: false);
       },
     );
