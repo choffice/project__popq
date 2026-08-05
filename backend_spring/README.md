@@ -39,6 +39,7 @@ Spring Boot 프로세스에는 비밀값을 환경변수로 전달한다.
 ```powershell
 $env:POPQ_DB_PASSWORD = "로컬 DB 비밀번호"
 $env:POPQ_JWT_SECRET = "32바이트 이상의 로컬 개발용 무작위 문자열"
+$env:POPQ_QR_TOKEN_ENCRYPTION_KEY = "32바이트 이상의 별도 QR 암호화 키"
 .\gradlew.bat bootRun --args="--spring.profiles.active=dev"
 ```
 
@@ -84,7 +85,7 @@ Invoke-RestMethod `
 - 다른 스토어 사용자 접근 거부
 - 카테고리·상품·옵션·품절 상태
 - 다른 스토어 상품 수정 거부
-- QR 원문·GuestSession 원문 미저장
+- QR 원문 평문 미저장·암호문 복원과 GuestSession 원문 미저장
 - 비활성·폐기·만료 QR 접근 거부
 - QR 재발급 후 기존 토큰 차단
 - 비회원 세션 기반 상품 목록·상세 조회
@@ -110,10 +111,13 @@ Invoke-RestMethod `
 - `PUT /api/v1/seller/stores/{storeId}/products/{productId}/options`
 - `PATCH /api/v1/seller/stores/{storeId}/products/{productId}/availability`
 - `GET/POST /api/v1/seller/stores/{storeId}/qr-codes`
+- `GET /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}`
 - `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/activate`
 - `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/deactivate`
 - `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/revoke`
 - `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/reissue`
+- `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/archive`
+- `POST /api/v1/seller/stores/{storeId}/qr-codes/{qrCodeId}/restore`
 - `GET /api/v1/seller/stores/{storeId}/orders?status={status}`
 - `GET /api/v1/seller/stores/{storeId}/orders/{orderPublicId}`
 - `GET /api/v1/seller/stores/{storeId}/orders/{orderPublicId}/sync?knownVersion={version}`
@@ -135,7 +139,8 @@ Invoke-RestMethod `
 - `POST /api/v1/qr/orders/{orderPublicId}/payments`
 - `POST /api/v1/qr/orders/{orderPublicId}/cancel`
 
-QR과 비회원 세션의 원문 토큰은 발급 응답과 HttpOnly 쿠키로만 전달하며 데이터베이스에는 SHA-256 해시만 저장한다.
+QR 원문 토큰은 고객 조회용 SHA-256 해시와 판매자 보관함 복원용 AES-GCM 암호문으로 저장한다. 암호화 키는 `POPQ_QR_TOKEN_ENCRYPTION_KEY`로 주입하며, 운영에서는 JWT 키와 다른 값을 사용한다. 비회원 세션 원문 토큰은 HttpOnly 쿠키로만 전달하고 데이터베이스에는 SHA-256 해시만 저장한다.
+폐기된 QR의 목록 제거는 주문·게스트 세션 이력을 보존하도록 `archived_at` 기반 소프트 삭제로 처리한다.
 주문 및 결제 요청의 `idempotencyKey`는 8~100자의 영문·숫자·`_`·`-` 조합이며, 클라이언트에서 요청 단위 UUID를 생성해 재시도 동안 동일하게 사용한다.
 
 주문·결제 상세 계약은 [`../docs/api/ORDER_PAYMENT_API.md`](../docs/api/ORDER_PAYMENT_API.md)를 참고한다.
@@ -157,4 +162,5 @@ QR과 비회원 세션의 원문 토큰은 발급 응답과 HttpOnly 쿠키로�
 - 실제 비밀값은 저장소에 커밋하지 않는다.
 - `.env.example`에는 예시 키만 둔다.
 - JWT secret은 최소 32바이트 이상을 사용한다.
+- QR 토큰 암호화 키는 최소 32바이트 이상이며 JWT secret과 다른 값을 사용한다.
 - 운영에서는 HTTPS, 허용 Origin CORS, 쿠키 기반 요청의 CSRF 정책을 적용한다.

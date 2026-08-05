@@ -2310,8 +2310,55 @@ main {
   grid-column: 1 / -1;
   padding-top: 13px;
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   border-top: 1px solid #e6e3da;
+}
+
+.qr-list-tabs {
+  margin-top: 22px;
+  padding: 4px;
+  display: inline-flex;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #e9e6dc;
+}
+
+.qr-list-tabs button {
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 9px;
+  color: #77736a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.qr-list-tabs button.active {
+  background: var(--paper);
+  color: var(--dark);
+  box-shadow: 0 4px 12px rgba(23, 23, 17, 0.08);
+}
+
+.qr-list-tabs span {
+  margin-left: 4px;
+  color: var(--violet);
+}
+
+.qr-actions .vault-action {
+  background: var(--dark);
+  color: #fff;
+}
+
+.qr-actions .vault-action.needs-reissue {
+  background: #fff0ce;
+  color: #7d5b15;
+}
+
+.qr-actions .archive-action {
+  margin-left: auto;
+  background: #ece9e2;
+  color: #6f6b62;
 }
 
 .qr-actions button {
@@ -2358,6 +2405,11 @@ main {
   font-size: 10px;
 }
 
+.issued-modal > p .qr-status {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
 .issued-qr {
   width: 230px;
   height: 230px;
@@ -2381,7 +2433,7 @@ main {
   width: 100%;
   margin-top: 13px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -2389,6 +2441,12 @@ main {
   display: grid;
   place-items: center;
   text-decoration: none;
+}
+
+@media (max-width: 520px) {
+  .issued-actions {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 .analytics-hero {
