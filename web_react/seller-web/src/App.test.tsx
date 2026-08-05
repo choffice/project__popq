@@ -12,6 +12,7 @@ vi.mock('qrcode', () => ({
 describe('판매자 주문 운영', () => {
   beforeEach(() => {
     window.sessionStorage.clear()
+    window.sessionStorage.setItem('popq:seller:demo', 'true')
   })
 
   afterEach(() => {
@@ -72,18 +73,15 @@ describe('판매자 주문 운영', () => {
     expect(screen.getByText('고객 요청 환불')).toBeVisible()
   })
 
-  it('연결 설정에서 데모와 실제 백엔드 모드를 안내한다', async () => {
+  it('계정 설정에서 데모 세션을 종료할 수 있다', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: '연결 설정' }))
+    await user.click(screen.getByRole('button', { name: '계정 설정' }))
 
-    expect(screen.getByRole('dialog', { name: '백엔드 연결' })).toBeVisible()
+    expect(screen.getByRole('dialog', { name: '판매자 계정' })).toBeVisible()
     expect(
-      screen.getByRole('button', { name: '실제 백엔드 연결' }),
-    ).toBeVisible()
-    expect(
-      screen.getByRole('button', { name: '데모 데이터 사용' }),
+      screen.getByRole('button', { name: '로그인 화면으로 이동' }),
     ).toBeVisible()
   })
 

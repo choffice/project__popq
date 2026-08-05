@@ -106,9 +106,26 @@ export type ApiEnvelope<T> = {
   }
 }
 
+export type SellerAuthUser = {
+  userId: number
+  email: string
+  name: string
+  role: 'CUSTOMER' | 'SELLER' | 'ADMIN'
+  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
+}
+
+export type SellerAuthResult = {
+  accessToken: string
+  tokenType: string
+  expiresIn: number
+  user: SellerAuthUser
+}
+
 export type SellerConnection = {
   storeId: number
   accessToken: string
+  storeName?: string
+  user?: SellerAuthUser
 }
 
 export type SellerProduct = {

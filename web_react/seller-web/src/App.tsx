@@ -13,6 +13,7 @@ import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
+import { SellerAuth } from './features/auth/SellerAuth'
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -38,6 +39,7 @@ type TransitionAction =
   | 'complete'
 
 const CONNECTION_KEY = 'popq:seller:connection'
+const DEMO_KEY = 'popq:seller:demo'
 
 const STATUS_COPY: Record<
   OrderStatus,
@@ -141,6 +143,10 @@ function readConnection(): SellerConnection | null {
   }
 }
 
+function readDemoMode() {
+  return window.sessionStorage.getItem(DEMO_KEY) === 'true'
+}
+
 function lastChangedAt(order: SellerOrder) {
   const last = order.statusHistory.at(-1)?.changedAt
   return last ? new Date(last) : new Date()
@@ -191,6 +197,9 @@ function App() {
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
   )
+  const [authenticated, setAuthenticated] = useState(
+    () => Boolean(readConnection()) || readDemoMode(),
+  )
   const [orders, setOrders] = useState<SellerOrder[]>(() =>
     readConnection() ? [] : freshDemoOrders(),
   )
@@ -209,12 +218,8 @@ function App() {
     useState<SellerPaymentSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showConnection, setShowConnection] = useState(false)
-  const [draftStoreId, setDraftStoreId] = useState(
-    String(readConnection()?.storeId ?? 1),
-  )
-  const [draftToken, setDraftToken] = useState('')
   const seenEvents = useRef(new Set<string>())
-  const isDemo = !connection
+  const isDemo = authenticated && !connection
 
   const loadOrders = useCallback(async () => {
     if (!connection) return
@@ -351,7 +356,7 @@ function App() {
         }
       } else {
         updated = await transitionSellerOrder(
-          connection,
+          connection!,
           order.orderPublicId,
           action,
         )
@@ -406,7 +411,7 @@ function App() {
         }
       } else {
         updated = await refundSellerOrder(
-          connection,
+          connection!,
           order.orderPublicId,
           paymentSummary.refundableAmount,
           reason,
@@ -425,35 +430,53 @@ function App() {
     }
   }
 
-  function connectLive() {
-    const storeId = Number(draftStoreId)
-    if (!Number.isInteger(storeId) || storeId <= 0 || !draftToken.trim()) {
-      setError('스토어 ID와 판매자 Access Token을 확인해 주세요.')
-      return
-    }
-    const nextConnection = {
-      storeId,
-      accessToken: draftToken.trim(),
-    }
+  function authenticate(nextConnection: SellerConnection) {
     window.sessionStorage.setItem(
       CONNECTION_KEY,
       JSON.stringify(nextConnection),
     )
+    window.sessionStorage.removeItem(DEMO_KEY)
     setConnection(nextConnection)
+    setAuthenticated(true)
     setOrders([])
     setSelectedId(null)
+    setConnected(false)
+    setError(null)
     setShowConnection(false)
   }
 
   function useDemo() {
     window.sessionStorage.removeItem(CONNECTION_KEY)
+    window.sessionStorage.setItem(DEMO_KEY, 'true')
     setConnection(null)
+    setAuthenticated(true)
     const demo = freshDemoOrders()
     setOrders(demo)
     setSelectedId(demo[0]?.orderPublicId ?? null)
     setConnected(false)
     setError(null)
     setShowConnection(false)
+  }
+
+  function signOut() {
+    window.sessionStorage.removeItem(CONNECTION_KEY)
+    window.sessionStorage.removeItem(DEMO_KEY)
+    setConnection(null)
+    setAuthenticated(false)
+    setOrders([])
+    setSelectedId(null)
+    setConnected(false)
+    setError(null)
+    setShowConnection(false)
+  }
+
+  if (!authenticated) {
+    return (
+      <SellerAuth
+        onAuthenticated={authenticate}
+        onUseDemo={useDemo}
+      />
+    )
   }
 
   return (
@@ -515,8 +538,8 @@ function App() {
           <button className="profile-button" onClick={() => setShowConnection(true)}>
             <span>SL</span>
             <div>
-              <strong>성수 라운지</strong>
-              <small>{isDemo ? '데모 운영자' : `스토어 ${connection.storeId}`}</small>
+              <strong>{isDemo ? '데모 운영자' : connection?.user?.name ?? '판매자'}</strong>
+              <small>{isDemo ? '데모 스토어' : connection?.storeName ?? `스토어 ${connection?.storeId}`}</small>
             </div>
             <b>···</b>
           </button>
@@ -550,7 +573,7 @@ function App() {
             </button>
             <button
               className="icon-button"
-              aria-label="연결 설정"
+              aria-label="계정 설정"
               onClick={() => setShowConnection(true)}
             >
               ⚙
@@ -756,34 +779,15 @@ function App() {
             >
               ×
             </button>
-            <p className="eyebrow">CONNECTION</p>
-            <h2 id="connection-title">백엔드 연결</h2>
+            <p className="eyebrow">ACCOUNT</p>
+            <h2 id="connection-title">판매자 계정</h2>
             <p>
-              발급받은 판매자 Access Token은 이 브라우저 탭이 열려 있는 동안만
-              보관됩니다.
+              {isDemo
+                ? '현재 데모 데이터로 판매자 웹을 체험하고 있습니다.'
+                : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
             </p>
-            <label>
-              스토어 ID
-              <input
-                inputMode="numeric"
-                value={draftStoreId}
-                onChange={(event) => setDraftStoreId(event.target.value)}
-              />
-            </label>
-            <label>
-              Access Token
-              <textarea
-                rows={4}
-                placeholder="Bearer 접두사 없이 입력"
-                value={draftToken}
-                onChange={(event) => setDraftToken(event.target.value)}
-              />
-            </label>
-            <button className="primary-action" onClick={connectLive}>
-              실제 백엔드 연결
-            </button>
-            <button className="secondary-action" onClick={useDemo}>
-              데모 데이터 사용
+            <button className="primary-action" onClick={signOut}>
+              {isDemo ? '로그인 화면으로 이동' : '로그아웃'}
             </button>
           </section>
         </div>
