@@ -126,7 +126,7 @@ public class AdminOperationsService {
     }
 
     private void requireAdmin(User currentUser) {
-        if (currentUser.getRole() != PlatformRole.ADMIN) {
+        if (!currentUser.hasRole(PlatformRole.ADMIN)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
     }

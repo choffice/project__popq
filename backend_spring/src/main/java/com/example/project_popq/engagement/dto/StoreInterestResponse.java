@@ -11,6 +11,9 @@ public record StoreInterestResponse(
         String name,
         String description,
         String address,
+        String detailAddress,
+        String representativeCategory,
+        String imageUrl,
         BusinessStatus businessStatus,
         Instant interestedAt
 ) {
@@ -21,6 +24,9 @@ public record StoreInterestResponse(
                 interest.getStore().getName(),
                 interest.getStore().getDescription(),
                 interest.getStore().getAddress(),
+                interest.getStore().getDetailAddress(),
+                interest.getStore().getRepresentativeCategory(),
+                interest.getStore().getImageUrl(),
                 interest.getStore().getBusinessStatus(),
                 interest.getCreatedAt()
         );

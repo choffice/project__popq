@@ -50,25 +50,51 @@ class InterestedStore {
     required this.storeId,
     required this.name,
     required this.businessStatus,
+    this.storeType = 'LOCAL_STORE',
     this.description,
     this.address,
+    this.detailAddress,
+    this.representativeCategory,
+    this.imageUrl,
   });
 
-  factory InterestedStore.fromJson(Map<String, Object?> json) {
+  factory InterestedStore.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
     return InterestedStore(
       storeId: (json['storeId'] as num).toInt(),
+      storeType: json['storeType'] as String? ?? 'LOCAL_STORE',
       name: json['name'] as String,
       businessStatus: json['businessStatus'] as String,
       description: json['description'] as String?,
       address: json['address'] as String?,
+      detailAddress: json['detailAddress'] as String?,
+      representativeCategory: json['representativeCategory'] as String?,
+      imageUrl: _resolveImageUrl(
+        json['imageUrl'] as String?,
+        imageBaseUrl,
+      ),
     );
   }
 
   final int storeId;
+  final String storeType;
   final String name;
   final String businessStatus;
   final String? description;
   final String? address;
+  final String? detailAddress;
+  final String? representativeCategory;
+  final String? imageUrl;
+
+  String get fullAddress {
+    return <String?>[address, detailAddress]
+        .whereType<String>()
+        .map((String value) => value.trim())
+        .where((String value) => value.isNotEmpty)
+        .join(' ');
+  }
 }
 
 class CustomerReview {
@@ -156,9 +182,13 @@ abstract interface class CustomerEngagementRepository {
 }
 
 class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
-  ApiCustomerEngagementRepository(this._apiClient);
+  ApiCustomerEngagementRepository(
+    this._apiClient, {
+    required this._imageBaseUrl,
+  });
 
   final PopqApiClient _apiClient;
+  final String _imageBaseUrl;
 
   @override
   Future<CustomerProfile> getProfile() {
@@ -177,6 +207,7 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
           .map(
             (item) => InterestedStore.fromJson(
               Map<String, Object?>.from(item as Map),
+              imageBaseUrl: _imageBaseUrl,
             ),
           )
           .toList(),
@@ -271,6 +302,25 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
         )
         .toList();
   }
+}
+
+String? _resolveImageUrl(String? value, String? baseUrl) {
+  final String path = value?.trim() ?? '';
+  if (path.isEmpty) {
+    return null;
+  }
+
+  final Uri? uri = Uri.tryParse(path);
+  if (uri?.hasScheme == true) {
+    return path;
+  }
+
+  final String base = baseUrl?.trim().replaceFirst(RegExp(r'/$'), '') ?? '';
+  if (base.isEmpty) {
+    return path;
+  }
+
+  return path.startsWith('/') ? '$base$path' : '$base/$path';
 }
 
 class MemoryCustomerEngagementRepository
