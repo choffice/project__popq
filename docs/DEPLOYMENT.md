@@ -22,6 +22,7 @@ Copy-Item .env.example .env
 - `POPQ_DB_PASSWORD`
 - `POPQ_DB_ROOT_PASSWORD`
 - `POPQ_JWT_SECRET`: 최소 32바이트 이상의 무작위 값
+- `POPQ_QR_TOKEN_ENCRYPTION_KEY`: JWT 키와 다른 최소 32바이트 이상의 무작위 값
 
 구성을 확인하고 전체 서비스를 실행한다.
 
@@ -64,6 +65,7 @@ POPQ_SPRING_PROFILES_ACTIVE=prod
 POPQ_DEV_LOGIN_ENABLED=false
 POPQ_COOKIE_SECURE=true
 POPQ_QR_PUBLIC_BASE_URL=https://order.example.com
+POPQ_QR_TOKEN_ENCRYPTION_KEY=replace-with-a-separate-random-secret-at-least-32-bytes
 POPQ_WEB_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
 POPQ_REALTIME_ALLOWED_ORIGINS=https://order.example.com,https://seller.example.com
 ```

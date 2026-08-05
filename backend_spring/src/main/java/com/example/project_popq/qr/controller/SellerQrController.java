@@ -3,6 +3,7 @@ package com.example.project_popq.qr.controller;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.qr.dto.IssueQrCodeRequest;
+import com.example.project_popq.qr.dto.QrDetailResponse;
 import com.example.project_popq.qr.dto.QrIssuedResponse;
 import com.example.project_popq.qr.dto.QrSummaryResponse;
 import com.example.project_popq.qr.dto.ReissueQrCodeRequest;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -33,12 +35,44 @@ public class SellerQrController {
     @GetMapping
     public ApiResponse<List<QrSummaryResponse>> findAll(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId
+            @PathVariable Long storeId,
+            @RequestParam(defaultValue = "false") boolean includeArchived
     ) {
         return ApiResponse.success(
                 sellerQrService.findAll(
                         currentUserService.getRequired(jwt),
-                        storeId
+                        storeId,
+                        includeArchived
+                )
+        );
+    }
+
+    @PostMapping("/{qrCodeId}/archive")
+    public ApiResponse<QrSummaryResponse> archive(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long qrCodeId
+    ) {
+        return ApiResponse.success(
+                sellerQrService.archive(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        qrCodeId
+                )
+        );
+    }
+
+    @PostMapping("/{qrCodeId}/restore")
+    public ApiResponse<QrSummaryResponse> restore(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long qrCodeId
+    ) {
+        return ApiResponse.success(
+                sellerQrService.restore(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        qrCodeId
                 )
         );
     }
@@ -56,6 +90,21 @@ public class SellerQrController {
         );
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(issued));
+    }
+
+    @GetMapping("/{qrCodeId}")
+    public ApiResponse<QrDetailResponse> findDetail(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long qrCodeId
+    ) {
+        return ApiResponse.success(
+                sellerQrService.findDetail(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        qrCodeId
+                )
+        );
     }
 
     @PostMapping("/{qrCodeId}/revoke")
