@@ -69,7 +69,7 @@ void main() {
 
     await tester.tap(find.text('성수 커피 연구소'));
     await tester.pumpAndSettle();
-    expect(find.text('스토어 상세'), findsOneWidget);
+    expect(find.text('매장 상세'), findsOneWidget);
     expect(find.text('서울 성동구 연무장길'), findsOneWidget);
   });
 

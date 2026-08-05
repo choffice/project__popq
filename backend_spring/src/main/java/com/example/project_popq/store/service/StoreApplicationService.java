@@ -199,6 +199,10 @@ public class StoreApplicationService {
 
         Store store = member.getStore();
 
+        if (request.storeType() != null) {
+            store.changeStoreType(request.storeType());
+        }
+
         LocalTime openTime =
             request.openTime() == null
                 ? store.getOpenTime()

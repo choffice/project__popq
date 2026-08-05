@@ -138,6 +138,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.storeDiscoveryRepository ??
             ApiStoreDiscoveryRepository(
               _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
             );
 
     final catalogRepository =
@@ -162,6 +163,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp> {
         widget.engagementRepository ??
             ApiCustomerEngagementRepository(
               _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
             );
 
     final notificationRepository =

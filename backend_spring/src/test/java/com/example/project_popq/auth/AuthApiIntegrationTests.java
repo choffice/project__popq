@@ -111,6 +111,7 @@ class AuthApiIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
+                                  "storeType": "EVENT_COMMERCE",
                                   "name": "수정된 성수 사업장",
                                   "description": "운영정보 수정 완료",
                                   "address": "서울 성동구 연무장길 1",
@@ -120,6 +121,7 @@ class AuthApiIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
                 .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
                 .andExpect(jsonPath("$.data.address")
                         .value("서울 성동구 연무장길 1"))
@@ -133,8 +135,22 @@ class AuthApiIntegrationTests {
         mockMvc.perform(get("/api/v1/seller/stores/{storeId}", storeId)
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
                 .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
                 .andExpect(jsonPath("$.data.tags.length()").value(2));
+
+        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "유형 유지 사업장",
+                                  "tags": ["coffee", "dessert"]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
+                .andExpect(jsonPath("$.data.name").value("유형 유지 사업장"));
 
         String otherToken = login(
                 "store-detail-other@popq.test",
