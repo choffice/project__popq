@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'qr_webview_screen.dart';
+import 'qr_url_resolver.dart';
 
 class CustomerQrScannerScreen extends StatefulWidget {
-  const CustomerQrScannerScreen({super.key});
+  const CustomerQrScannerScreen({
+    required this.apiBaseUrl,
+    super.key,
+  });
+
+  final String apiBaseUrl;
 
   @override
   State<CustomerQrScannerScreen> createState() =>
@@ -38,8 +44,6 @@ class _CustomerQrScannerScreenState
       return;
     }
 
-    debugPrint('스캔된 QR 값: $rawValue');
-
     final uri = Uri.tryParse(rawValue);
 
     final isValidUrl =
@@ -71,11 +75,16 @@ class _CustomerQrScannerScreenState
         return;
       }
 
+      final resolvedUrl = resolveQrWebUrl(
+        scannedUrl: uri,
+        apiBaseUrl: widget.apiBaseUrl,
+      );
+
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (context) {
             return QrWebViewScreen(
-              url: uri,
+              url: resolvedUrl,
             );
           },
         ),

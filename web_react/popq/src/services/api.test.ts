@@ -3,6 +3,7 @@ import {
   cancelOrder,
   confirmPayment,
   createOrder,
+  openQrSession,
 } from './api'
 import type { CartItem } from '../types'
 
@@ -69,6 +70,20 @@ describe('order API contract', () => {
         method: 'POST',
         body: JSON.stringify({ reason: '고객 변심' }),
       }),
+    )
+  })
+
+  it('reports a rejected non-JSON response without exposing a parser error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => {
+        throw new SyntaxError('Unexpected token')
+      },
+    }))
+
+    await expect(openQrSession('qr-token')).rejects.toThrow(
+      '서버 요청이 거부되었습니다. (403)',
     )
   })
 })
