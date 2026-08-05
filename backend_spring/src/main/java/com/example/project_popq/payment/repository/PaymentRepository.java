@@ -15,6 +15,17 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     Optional<Payment> findByIdempotencyKey(String idempotencyKey);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @EntityGraph(attributePaths = "order")
+    @Query("""
+            select p
+            from Payment p
+            where p.idempotencyKey = :idempotencyKey
+            """)
+    Optional<Payment> findForUpdateByIdempotencyKey(
+            @Param("idempotencyKey") String idempotencyKey
+    );
+
     @EntityGraph(attributePaths = "order")
     Optional<Payment> findDetailedByOrderOrderPublicId(String orderPublicId);
 

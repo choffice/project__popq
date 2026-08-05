@@ -57,6 +57,16 @@ class QrApiIntegrationTests {
         Cookie guestCookie = opened.getResponse()
                 .getCookie("POPQ_GUEST_SESSION");
 
+        mockMvc.perform(
+                        post("/api/v1/qr/{token}/sessions", qr.token())
+                                .cookie(guestCookie)
+                )
+                .andExpect(status().isOk())
+                .andExpect(cookie().value(
+                        "POPQ_GUEST_SESSION",
+                        guestCookie.getValue()
+                ));
+
         mockMvc.perform(get("/api/v1/qr/products").cookie(guestCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].productId").value(productId))

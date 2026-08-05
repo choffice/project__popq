@@ -34,9 +34,16 @@ public class PublicQrController {
 
     @PostMapping("/{token}/sessions")
     public ResponseEntity<ApiResponse<QrContextResponse>> open(
-            @PathVariable String token
+            @PathVariable String token,
+            @CookieValue(
+                    name = GUEST_SESSION_COOKIE,
+                    required = false
+            ) String existingSessionToken
     ) {
-        OpenedGuestSession opened = guestQrService.open(token);
+        OpenedGuestSession opened = guestQrService.open(
+                token,
+                existingSessionToken
+        );
         ResponseCookie cookie = ResponseCookie
                 .from(GUEST_SESSION_COOKIE, opened.rawToken())
                 .httpOnly(true)
@@ -87,4 +94,3 @@ public class PublicQrController {
         );
     }
 }
-

@@ -8,6 +8,8 @@ public record PaymentApprovalCommand(
 
     String paymentKey,
 
+    String idempotencyKey,
+
     boolean simulateFailure
 
 ) {
