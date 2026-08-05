@@ -8,6 +8,7 @@ import {
   transitionSellerOrder,
 } from './services/api'
 import { connectSellerRealtime } from './services/realtime'
+import { useThemePreference } from './theme'
 import { ProductManagement } from './features/catalog/ProductManagement'
 import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
@@ -193,6 +194,7 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
 }
 
 function App() {
+  const { theme, toggleTheme } = useThemePreference()
   const [activeView, setActiveView] = useState<SellerView>('orders')
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
@@ -472,10 +474,21 @@ function App() {
 
   if (!authenticated) {
     return (
-      <SellerAuth
-        onAuthenticated={authenticate}
-        onUseDemo={useDemo}
-      />
+      <>
+        <SellerAuth
+          onAuthenticated={authenticate}
+          onUseDemo={useDemo}
+        />
+        <button
+          className="theme-toggle auth-theme-toggle"
+          type="button"
+          aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
+          aria-pressed={theme === 'dark'}
+          onClick={toggleTheme}
+        >
+          <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+        </button>
+      </>
     )
   }
 
@@ -553,6 +566,15 @@ function App() {
             <h1>{VIEW_COPY[activeView].title}</h1>
           </div>
           <div className="topbar-actions">
+            <button
+              className="icon-button theme-toggle"
+              type="button"
+              aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
+              aria-pressed={theme === 'dark'}
+              onClick={toggleTheme}
+            >
+              <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+            </button>
             <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
               <i />
               {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}

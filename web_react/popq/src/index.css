@@ -15,6 +15,20 @@
   --lime-dark: #bada37;
   --orange: #ff7043;
   --black: #171713;
+  --page: #e9e7df;
+  --surface-strong: #fff;
+}
+
+:root[data-theme='dark'] {
+  color: #f4f7fa;
+  background: #050a10;
+  --ink: #f4f7fa;
+  --muted: #98a5b3;
+  --paper: #0b131b;
+  --line: #24303b;
+  --black: #050a10;
+  --page: #050a10;
+  --surface-strong: #111c25;
 }
 
 * {
@@ -22,13 +36,14 @@
 }
 
 html {
-  background: #e9e7df;
+  background: var(--page);
 }
 
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background: var(--page);
 }
 
 button,

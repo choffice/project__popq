@@ -11,6 +11,7 @@ vi.mock('qrcode', () => ({
 
 describe('판매자 주문 운영', () => {
   beforeEach(() => {
+    window.localStorage.clear()
     window.sessionStorage.clear()
     window.sessionStorage.setItem('popq:seller:demo', 'true')
   })
@@ -217,5 +218,21 @@ describe('판매자 주문 운영', () => {
     ).toBeVisible()
     expect(screen.getByRole('tab', { name: '판매자 인증' })).toBeVisible()
     expect(screen.getByRole('tab', { name: '스토어' })).toBeVisible()
+  })
+  it('switches to dark mode and restores the preference', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '다크 모드로 전환' }))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(window.localStorage.getItem('popq.seller.web.theme.preference.v1')).toBe('dark')
+
+    firstRender.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: '기본 모드로 전환' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
   })
 })

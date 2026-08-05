@@ -45,6 +45,23 @@ describe('POPQ QR order demo', () => {
     )
   })
 
+  it('switches to dark mode and restores the preference', async () => {
+    const user = userEvent.setup()
+    const firstRender = render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '다크 모드로 전환' }))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(window.localStorage.getItem('popq.customer.web.theme.preference.v1')).toBe('dark')
+
+    firstRender.unmount()
+    render(<App />)
+
+    expect(screen.getByRole('button', { name: '기본 모드로 전환' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
   it('restores the cart after remounting', async () => {
     const user = userEvent.setup()
     const firstRender = render(<App />)
