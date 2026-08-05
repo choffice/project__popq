@@ -18,7 +18,7 @@ import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
-import '../features/sales/seller_sales_screen.dart';
+import '../features/profile/seller_my_screen.dart';
 import '../features/settings/seller_settings_screen.dart';
 import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
@@ -38,7 +38,11 @@ abstract final class SellerRoutes {
   static const operations = '/operations';
   static const orders = '/orders';
   static const customers = '/customers';
-  static const sales = '/sales';
+  static const my = '/my';
+
+  @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
+  static const sales = my;
+
   static const settings = '/settings';
 }
 
@@ -160,6 +164,7 @@ GoRouter createSellerRouter({
       if (!storeSelectionController.hasSelection &&
           location != SellerRoutes.dashboard &&
           location != SellerRoutes.customers &&
+          location != SellerRoutes.my &&
           location != SellerRoutes.settings &&
           !isStoreRegistration) {
         return SellerRoutes.dashboard;
@@ -334,6 +339,8 @@ GoRouter createSellerRouter({
                 announcementRepository,
                 productRepository:
                 productRepository,
+                analyticsRepository:
+                analyticsRepository,
                 selectionController:
                 storeSelectionController,
               );
@@ -361,15 +368,14 @@ GoRouter createSellerRouter({
             },
           ),
           GoRoute(
-            path: SellerRoutes.sales,
+            path: SellerRoutes.my,
             builder: (context, state) {
-              return SellerSalesScreen(
+              return SellerMyScreen(
                 storeRepository:
                 storeRepository,
-                analyticsRepository:
-                analyticsRepository,
                 selectionController:
                 storeSelectionController,
+                onSignOut: onSignOut,
               );
             },
           ),

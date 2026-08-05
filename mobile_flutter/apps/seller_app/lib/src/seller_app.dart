@@ -464,7 +464,7 @@ class _SellerBackButtonDispatcher
     SellerRoutes.operations,
     SellerRoutes.orders,
     SellerRoutes.customers,
-    SellerRoutes.sales,
+    SellerRoutes.my,
   };
 
   final GoRouter _router;

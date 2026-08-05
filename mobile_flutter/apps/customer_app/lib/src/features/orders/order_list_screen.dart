@@ -214,6 +214,11 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final itemSummary = formatPopqOrderItemSummary(
+      order.items.map(
+        (item) => '${item.productName} ${item.quantity}개',
+      ),
+    );
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -252,11 +257,23 @@ class _OrderCard extends StatelessWidget {
               padding: const EdgeInsets.only(
                 top: PopqSpacing.xs,
               ),
-              child: Text(
-                '${_statusLabel(order.status)} · '
-                    '${order.items.length}개 항목',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_statusLabel(order.status)),
+                  const SizedBox(height: 2),
+                  Text(
+                    itemSummary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
+            isThreeLine: true,
             trailing: Text(
               _won(order.totalAmount),
               style: theme.textTheme.titleSmall

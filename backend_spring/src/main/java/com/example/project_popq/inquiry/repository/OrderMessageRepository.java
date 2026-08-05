@@ -2,9 +2,12 @@ package com.example.project_popq.inquiry.repository;
 
 import com.example.project_popq.inquiry.domain.MessageSenderType;
 import com.example.project_popq.inquiry.domain.OrderMessage;
-import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
+
 import java.util.List;
 import java.util.Optional;
+
+import com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -16,6 +19,19 @@ public interface OrderMessageRepository
   @EntityGraph(attributePaths = "sender")
   List<OrderMessage> findAllByOrderIdOrderByCreatedAtAscIdAsc(
       Long orderId
+  );
+
+  @EntityGraph(attributePaths = "sender")
+  List<OrderMessage> findAllByOrderIdOrderByIdDesc(
+      Long orderId,
+      Pageable pageable
+  );
+
+  @EntityGraph(attributePaths = "sender")
+  List<OrderMessage> findAllByOrderIdAndIdLessThanOrderByIdDesc(
+      Long orderId,
+      Long beforeMessageId,
+      Pageable pageable
   );
 
   @EntityGraph(attributePaths = "sender")

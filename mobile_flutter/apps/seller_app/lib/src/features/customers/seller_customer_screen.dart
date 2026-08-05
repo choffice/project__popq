@@ -488,7 +488,10 @@ class _ConversationCard extends StatelessWidget {
                         ),
                         Flexible(
                           child: Text(
-                            '#${conversation.orderPublicId}',
+                            formatPopqOrderNumber(
+                              conversation.orderPublicId,
+                              includeLabel: false,
+                            ),
                             maxLines: 1,
                             overflow:
                             TextOverflow.ellipsis,
