@@ -131,6 +131,12 @@ public class SocialAuthService {
 
       return identity;
     } catch (JwtException | IllegalArgumentException exception) {
+      System.err.println(
+          "Google token verification failed: "
+              + exception.getMessage()
+      );
+      exception.printStackTrace();
+
       throw new BusinessException(
           ErrorCode.INVALID_SOCIAL_TOKEN
       );
