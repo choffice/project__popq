@@ -136,6 +136,13 @@ class CustomerHomeController extends ChangeNotifier {
 
   int _requestVersion = 0;
 
+  /// 앱을 켠 뒤 첫 [load] 호출이 끝났는지 여부입니다.
+  ///
+  /// 이후 pull-to-refresh 등으로 [status]가 다시 [CustomerHomeStatus.loading]로
+  /// 바뀌어도 되돌리지 않습니다 — 스플래시 화면은 앱 최초 부팅 때만
+  /// 이 값을 기다리면 되고, 화면 안에서의 새로고침에는 반응하면 안 되기 때문입니다.
+  bool hasCompletedInitialLoad = false;
+
   /// 홈의 매장 정보와 주문 정보를 함께 조회합니다.
   Future<void> load() async {
     final requestVersion = ++_requestVersion;
@@ -179,6 +186,7 @@ class CustomerHomeController extends ChangeNotifier {
     );
 
     status = CustomerHomeStatus.data;
+    hasCompletedInitialLoad = true;
 
     _syncOrderRefreshTimer(
       signedIn: signedIn,

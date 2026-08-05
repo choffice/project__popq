@@ -19,6 +19,7 @@ import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
 import '../features/favorites/customer_favorite_store_screen.dart';
+import '../features/home/customer_home_controller.dart';
 import '../features/home/customer_home_screen.dart';
 import '../features/home/customer_location_repository.dart';
 import '../features/inquiry/customer_order_chat_screen.dart';
@@ -75,6 +76,7 @@ GoRouter createCustomerRouter({
   required CustomerEngagementRepository engagementRepository,
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
+  required CustomerHomeController homeController,
   required CustomerPermissionGateway permissionGateway,
   required CustomerLocationRepository locationRepository,
   required String tossClientKey,
@@ -111,9 +113,9 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Duration minSplashDuration = const Duration(seconds: 2),
 }) {
   final splashStartedAt = DateTime.now();
-  const minSplashDuration = Duration(seconds: 2);
 
   late final GoRouter router;
   router = GoRouter(
@@ -121,6 +123,7 @@ GoRouter createCustomerRouter({
     refreshListenable: Listenable.merge([
       sessionController,
       onboardingController,
+      homeController,
     ]),
     redirect: (context, state) {
       final location = state.matchedLocation;
@@ -185,10 +188,20 @@ GoRouter createCustomerRouter({
             : CustomerRoutes.onboarding;
       }
 
-      if (isBootstrap ||
-          isSessionError ||
-          isOnboardingError ||
-          isOnboarding) {
+      final isEnteringHome =
+          isBootstrap ||
+              isSessionError ||
+              isOnboardingError ||
+              isOnboarding;
+
+      if (isEnteringHome &&
+          !homeController.hasCompletedInitialLoad) {
+        return isBootstrap
+            ? null
+            : CustomerRoutes.bootstrap;
+      }
+
+      if (isEnteringHome) {
         return CustomerRoutes.home;
       }
 
@@ -537,6 +550,8 @@ GoRouter createCustomerRouter({
                 permissionGateway,
                 locationRepository:
                 locationRepository,
+                preloadedController:
+                homeController,
               );
             },
           ),

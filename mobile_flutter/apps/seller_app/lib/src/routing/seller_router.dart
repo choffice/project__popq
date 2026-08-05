@@ -92,9 +92,9 @@ GoRouter createSellerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Duration minSplashDuration = const Duration(seconds: 2),
 }) {
   final splashStartedAt = DateTime.now();
-  const minSplashDuration = Duration(seconds: 2);
 
   late final GoRouter router;
   router = GoRouter(
