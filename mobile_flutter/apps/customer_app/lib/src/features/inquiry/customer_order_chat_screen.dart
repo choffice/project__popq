@@ -30,7 +30,7 @@ class CustomerOrderChatScreen extends StatefulWidget {
 class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     with WidgetsBindingObserver {
   static const Duration _pollingInterval = Duration(seconds: 3);
-  static const Duration _serverConfirmationTimeout = Duration(seconds: 10);
+  static const Duration _draftConfirmationMatchWindow = Duration(minutes: 2);
   static const int _pageSize = 30;
   static const int _processedEventLimit = 200;
   static const double _olderMessageTriggerOffset = 80;
@@ -40,7 +40,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   final ScrollController _scrollController = ScrollController();
 
   final List<_OutgoingMessageDraft> _outgoingDrafts = [];
-  final Map<int, Timer> _draftConfirmationTimers = <int, Timer>{};
   final Set<String> _processedEventIds = <String>{};
   final List<String> _processedEventOrder = <String>[];
 
@@ -107,7 +106,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
         oldWidget.orderRepository != widget.orderRepository ||
         oldWidget.messageRepository != widget.messageRepository) {
       _requestGeneration++;
-      _cancelAllDraftConfirmationTimers();
       _orderChatSubscription?.cancel();
       _orderChatSubscription = null;
 
@@ -159,7 +157,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   void dispose() {
     _requestGeneration++;
     _stopPolling();
-    _cancelAllDraftConfirmationTimers();
     _unbindRealtimeClient();
 
     WidgetsBinding.instance.removeObserver(this);
@@ -229,7 +226,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     return Column(
       children: [
         _OrderSummaryCard(order: _order!),
-        _RealtimeStatusBanner(status: _realtimeStatus),
         Expanded(
           child: _hasMoreOlder || _loadingOlder
               ? messageList
@@ -311,11 +307,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     );
   }
 
-  PopqRealtimeConnectionStatus get _realtimeStatus {
-    return _realtimeClient?.status ??
-        PopqRealtimeConnectionStatus.disconnected;
-  }
-
   void _subscribeToCurrentOrder() {
     final realtimeClient = _realtimeClient;
 
@@ -345,7 +336,9 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       return;
     }
 
-    setState(() {});
+    // 연결 상태 변경은 폴링 시작/중지만 제어합니다.
+    // 연결 재시도 때마다 화면 전체를 다시 그리지 않아서
+    // 채팅 화면이 위아래로 깜빡이지 않습니다.
     _applyRealtimeState();
   }
 
@@ -845,7 +838,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       return;
     }
 
-    _draftConfirmationTimers.remove(localId)?.cancel();
 
     setState(() {
       _sending = true;
@@ -859,56 +851,12 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   }
 
   Future<void> _deliverDraft(int localId) async {
-    final draftIndex = _findDraftIndex(localId);
-
-    if (draftIndex < 0) {
-      _setSending(false);
-      return;
-    }
-
-    final draft = _outgoingDrafts[draftIndex];
-    final realtimeClient = _realtimeClient;
-
-    if (realtimeClient?.isConnected ?? false) {
-      final sent = realtimeClient!.sendChatMessage(
-        orderPublicId: widget.orderPublicId,
-        content: draft.content,
-        clientMessageId: draft.clientMessageId,
-      );
-
-      if (sent) {
-        _setSending(false);
-        _scheduleServerConfirmation(localId);
-        _messageFocusNode.requestFocus();
-        return;
-      }
-    }
-
+    // 현재 STOMP 연결이 서버에서 1002 코드로 종료될 수 있으므로,
+    // 전송은 REST로 즉시 저장합니다.
+    // WebSocket은 실시간 수신과 읽음 이벤트 처리에만 사용합니다.
     await _sendDraftByRest(
       localId,
       updateGlobalSending: true,
-    );
-  }
-
-  void _scheduleServerConfirmation(int localId) {
-    _draftConfirmationTimers.remove(localId)?.cancel();
-
-    _draftConfirmationTimers[localId] = Timer(
-      _serverConfirmationTimeout,
-      () {
-        _draftConfirmationTimers.remove(localId);
-
-        if (!mounted || _findDraftIndex(localId) < 0) {
-          return;
-        }
-
-        unawaited(
-          _sendDraftByRest(
-            localId,
-            updateGlobalSending: false,
-          ),
-        );
-      },
     );
   }
 
@@ -1002,49 +950,131 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     );
   }
 
-  bool _containsConfirmedDraft(List<CustomerOrderMessage> messages) {
-    final clientMessageIds = messages
-        .map((message) => message.clientMessageId)
-        .whereType<String>()
-        .toSet();
-
-    return _outgoingDrafts.any(
-      (draft) => clientMessageIds.contains(draft.clientMessageId),
+  bool _containsConfirmedDraft(
+    List<CustomerOrderMessage> messages,
+  ) {
+    return messages.any(
+      (message) => _outgoingDrafts.any(
+        (draft) => _doesMessageConfirmDraft(
+          message,
+          draft,
+        ),
+      ),
     );
   }
 
-  void _removeConfirmedDrafts(Iterable<CustomerOrderMessage> messages) {
-    final clientMessageIds = messages
-        .map((message) => message.clientMessageId)
-        .whereType<String>()
-        .toSet();
-
-    if (clientMessageIds.isEmpty) {
+  void _removeConfirmedDrafts(
+    Iterable<CustomerOrderMessage> messages,
+  ) {
+    if (_outgoingDrafts.isEmpty) {
       return;
     }
 
-    final confirmedLocalIds = _outgoingDrafts
-        .where(
-          (draft) => clientMessageIds.contains(draft.clientMessageId),
-        )
-        .map((draft) => draft.localId)
-        .toList(growable: false);
+    final confirmedLocalIds = <int>{};
 
-    for (final localId in confirmedLocalIds) {
-      _draftConfirmationTimers.remove(localId)?.cancel();
+    for (final message in messages) {
+      final matchingDraft = _findMatchingDraft(
+        message,
+        excludedLocalIds: confirmedLocalIds,
+      );
+
+      if (matchingDraft == null) {
+        continue;
+      }
+
+      confirmedLocalIds.add(
+        matchingDraft.localId,
+      );
     }
 
+    if (confirmedLocalIds.isEmpty) {
+      return;
+    }
+
+
     _outgoingDrafts.removeWhere(
-      (draft) => clientMessageIds.contains(draft.clientMessageId),
+      (draft) => confirmedLocalIds.contains(
+        draft.localId,
+      ),
     );
   }
 
-  void _cancelAllDraftConfirmationTimers() {
-    for (final timer in _draftConfirmationTimers.values) {
-      timer.cancel();
+  _OutgoingMessageDraft? _findMatchingDraft(
+    CustomerOrderMessage message, {
+    required Set<int> excludedLocalIds,
+  }) {
+    final clientMessageId =
+        message.clientMessageId?.trim();
+
+    if (clientMessageId != null &&
+        clientMessageId.isNotEmpty) {
+      for (final draft in _outgoingDrafts) {
+        if (excludedLocalIds.contains(
+          draft.localId,
+        )) {
+          continue;
+        }
+
+        if (draft.clientMessageId ==
+            clientMessageId) {
+          return draft;
+        }
+      }
     }
 
-    _draftConfirmationTimers.clear();
+    // 병합 과정에서 백엔드가 아직 clientMessageId를 내려주지 않는
+    // 구버전 응답이 섞여도, 방금 보낸 구매자 메시지는 내용과 시각으로
+    // 한 번만 임시 말풍선과 결합합니다.
+    if (!message.sentByCustomer) {
+      return null;
+    }
+
+    for (final draft in _outgoingDrafts) {
+      if (excludedLocalIds.contains(
+        draft.localId,
+      )) {
+        continue;
+      }
+
+      if (_doesMessageConfirmDraft(
+        message,
+        draft,
+      )) {
+        return draft;
+      }
+    }
+
+    return null;
+  }
+
+  bool _doesMessageConfirmDraft(
+    CustomerOrderMessage message,
+    _OutgoingMessageDraft draft,
+  ) {
+    final clientMessageId =
+        message.clientMessageId?.trim();
+
+    if (clientMessageId != null &&
+        clientMessageId.isNotEmpty) {
+      return clientMessageId ==
+          draft.clientMessageId;
+    }
+
+    if (!message.sentByCustomer ||
+        message.content.trim() !=
+            draft.content.trim()) {
+      return false;
+    }
+
+    final difference = message.createdAt
+        .toUtc()
+        .difference(
+          draft.createdAt.toUtc(),
+        )
+        .abs();
+
+    return difference <=
+        _draftConfirmationMatchWindow;
   }
 
   List<CustomerOrderMessage> _mergeMessages(
@@ -1163,71 +1193,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     return left.year == right.year &&
         left.month == right.month &&
         left.day == right.day;
-  }
-}
-
-class _RealtimeStatusBanner extends StatelessWidget {
-  const _RealtimeStatusBanner({
-    required this.status,
-  });
-
-  final PopqRealtimeConnectionStatus status;
-
-  @override
-  Widget build(BuildContext context) {
-    if (status == PopqRealtimeConnectionStatus.connected) {
-      return const SizedBox.shrink();
-    }
-
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final connecting = status == PopqRealtimeConnectionStatus.connecting ||
-        status == PopqRealtimeConnectionStatus.reconnecting;
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(
-        PopqSpacing.md,
-        PopqSpacing.sm,
-        PopqSpacing.md,
-        0,
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: PopqSpacing.md,
-        vertical: PopqSpacing.sm,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Row(
-        children: [
-          if (connecting)
-            const SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          else
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 18,
-              color: colorScheme.error,
-            ),
-          const SizedBox(width: PopqSpacing.sm),
-          Expanded(
-            child: Text(
-              connecting
-                  ? '실시간 연결 중이에요. 연결 전까지 3초마다 새 메시지를 확인해요.'
-                  : '실시간 연결이 끊겼어요. 3초마다 새 메시지를 확인 중이에요.',
-              style: theme.textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 
