@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import {
   createDemoProductDetail,
   freshDemoCategories,
@@ -7,11 +8,14 @@ import {
 import {
   createSellerCategory,
   createSellerProduct,
+  deleteSellerProduct,
   getSellerCategories,
   getSellerProductDetail,
   getSellerProducts,
   replaceProductOptions,
+  updateSellerProduct,
   updateProductAvailability,
+  uploadSellerProductImage,
 } from '../../services/api'
 import type {
   ProductDetail,
@@ -46,6 +50,18 @@ function key() {
 
 function money(value: number) {
   return `${value.toLocaleString('ko-KR')}원`
+}
+
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.addEventListener('load', () => resolve(String(reader.result)))
+    reader.addEventListener('error', () => reject(new Error('이미지를 미리 볼 수 없습니다.')))
+    reader.readAsDataURL(file)
+  })
 }
 
 function emptyOption(): DraftOption {
@@ -92,12 +108,17 @@ export function ProductManagement({ connection, onError }: Props) {
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
   const [showProductForm, setShowProductForm] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<SellerProduct | null>(null)
   const [productCategoryId, setProductCategoryId] = useState(() =>
     isDemo ? String(freshDemoCategories()[0]?.categoryId ?? '') : '',
   )
   const [productName, setProductName] = useState('')
   const [productDescription, setProductDescription] = useState('')
   const [productPrice, setProductPrice] = useState('')
+  const [productImageFile, setProductImageFile] = useState<File | null>(null)
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null)
+  const [removeProductImage, setRemoveProductImage] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [optionProduct, setOptionProduct] = useState<SellerProduct | null>(null)
   const [draftGroups, setDraftGroups] = useState<DraftGroup[]>([])
   const [showOptions, setShowOptions] = useState(false)
@@ -232,7 +253,66 @@ export function ProductManagement({ connection, onError }: Props) {
     }
   }
 
-  async function addProduct() {
+  function resetProductForm() {
+    setEditingProduct(null)
+    setProductCategoryId(String(categories[0]?.categoryId ?? ''))
+    setProductName('')
+    setProductDescription('')
+    setProductPrice('')
+    setProductImageFile(null)
+    setProductImagePreview(null)
+    setRemoveProductImage(false)
+    setShowDeleteConfirm(false)
+  }
+
+  function openNewProductForm() {
+    resetProductForm()
+    setShowProductForm(true)
+  }
+
+  function openProductEditor(product: SellerProduct) {
+    setEditingProduct(product)
+    setProductCategoryId(String(product.categoryId))
+    setProductName(product.name)
+    setProductDescription(product.description ?? '')
+    setProductPrice(String(product.basePrice))
+    setProductImageFile(null)
+    setProductImagePreview(product.imageUrl)
+    setRemoveProductImage(false)
+    setShowDeleteConfirm(false)
+    setShowProductForm(true)
+  }
+
+  function closeProductForm() {
+    setShowProductForm(false)
+    resetProductForm()
+  }
+
+  async function selectProductImage(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+      event.target.value = ''
+      onError('JPG, PNG 또는 WEBP 이미지 파일만 첨부할 수 있습니다.')
+      return
+    }
+    if (file.size > MAX_IMAGE_SIZE) {
+      event.target.value = ''
+      onError('이미지는 최대 10MB까지 첨부할 수 있습니다.')
+      return
+    }
+    try {
+      const preview = await readFileAsDataUrl(file)
+      setProductImageFile(file)
+      setProductImagePreview(preview)
+      setRemoveProductImage(false)
+      onError(null)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '이미지를 미리 볼 수 없습니다.')
+    }
+  }
+
+  async function saveProduct() {
     const categoryId = Number(productCategoryId)
     const name = productName.trim()
     const basePrice = Number(productPrice)
@@ -249,55 +329,101 @@ export function ProductManagement({ connection, onError }: Props) {
       onError('카테고리, 상품 이름, 0원 이상의 판매가를 확인해 주세요.')
       return
     }
-    setUpdatingId(-2)
+    const processingId = editingProduct?.productId ?? -2
+    setUpdatingId(processingId)
     try {
+      const imageUrl = productImageFile
+        ? isDemo
+          ? productImagePreview
+          : await uploadSellerProductImage(connection, productImageFile)
+        : removeProductImage
+          ? null
+          : editingProduct?.imageUrl ?? null
+      const payload = {
+        categoryId,
+        name,
+        description: productDescription.trim() || null,
+        imageUrl,
+        basePrice,
+      }
       let detail: ProductDetail
       if (isDemo) {
-        const created: SellerProduct = {
-          productId:
-            Math.max(0, ...products.map((item) => item.productId)) + 1,
-          categoryId,
-          categoryName: selectedCategory.name,
-          name,
-          description: productDescription.trim() || null,
-          imageUrl: null,
-          basePrice,
-          status: 'ACTIVE',
-          soldOut: false,
-          availableForQr: true,
-          salesStartAt: null,
-          salesEndAt: null,
-          qrWebEnabled: true,
-          customerAppEnabled: true,
-        }
-        detail = {
-          ...createDemoProductDetail(created),
-          optionGroups: [],
-        }
+        const savedProduct: SellerProduct = editingProduct
+          ? {
+              ...editingProduct,
+              ...payload,
+              categoryName: selectedCategory.name,
+            }
+          : {
+              productId:
+                Math.max(0, ...products.map((item) => item.productId)) + 1,
+              ...payload,
+              categoryName: selectedCategory.name,
+              status: 'ACTIVE',
+              soldOut: false,
+              availableForQr: true,
+              salesStartAt: null,
+              salesEndAt: null,
+              qrWebEnabled: true,
+              customerAppEnabled: true,
+            }
+        const existingDetail = editingProduct
+          ? (details[editingProduct.productId] ??
+            createDemoProductDetail(editingProduct))
+          : createDemoProductDetail(savedProduct)
+        detail = { ...existingDetail, product: savedProduct }
       } else {
-        detail = await createSellerProduct(connection, {
-          categoryId,
-          name,
-          description: productDescription.trim() || null,
-          imageUrl: null,
-          basePrice,
-        })
+        detail = editingProduct
+          ? await updateSellerProduct(connection, editingProduct.productId, payload)
+          : await createSellerProduct(connection, payload)
       }
-      setProducts((current) => [...current, detail.product])
+      setProducts((current) =>
+        editingProduct
+          ? current.map((item) =>
+              item.productId === detail.product.productId
+                ? detail.product
+                : item,
+            )
+          : [...current, detail.product],
+      )
       setDetails((current) => ({
         ...current,
         [detail.product.productId]: detail,
       }))
-      setProductName('')
-      setProductDescription('')
-      setProductPrice('')
-      setShowProductForm(false)
+      closeProductForm()
       onError(null)
     } catch (caught) {
       onError(
         caught instanceof Error
           ? caught.message
-          : '상품을 생성하지 못했습니다.',
+          : `상품을 ${editingProduct ? '수정' : '생성'}하지 못했습니다.`,
+      )
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  async function removeProduct() {
+    if (!editingProduct) return
+    setUpdatingId(editingProduct.productId)
+    try {
+      if (!isDemo) {
+        await deleteSellerProduct(connection, editingProduct.productId)
+      }
+      const productId = editingProduct.productId
+      setProducts((current) =>
+        current.filter((item) => item.productId !== productId),
+      )
+      setDetails((current) => {
+        const next = { ...current }
+        delete next[productId]
+        return next
+      })
+      closeProductForm()
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : '상품을 삭제하지 못했습니다.',
       )
     } finally {
       setUpdatingId(null)
@@ -455,7 +581,7 @@ export function ProductManagement({ connection, onError }: Props) {
             <strong>{hiddenCount}</strong>
           </article>
         </div>
-        <button className="hero-action" onClick={() => setShowProductForm(true)}>
+        <button className="hero-action" onClick={openNewProductForm}>
           + 새 상품
         </button>
       </section>
@@ -500,14 +626,22 @@ export function ProductManagement({ connection, onError }: Props) {
             <span>판매 상태</span>
             <span>QR 주문</span>
             <span>고객 앱</span>
-            <span>옵션</span>
+            <span>관리</span>
           </header>
           {visibleProducts.map((product, index) => (
             <article key={product.productId}>
               <div className="product-identity">
-                <span className={`product-swatch tone-${index % 4}`}>
-                  {product.name.slice(0, 1)}
-                </span>
+                {product.imageUrl ? (
+                  <img
+                    className="product-thumbnail"
+                    src={product.imageUrl}
+                    alt=""
+                  />
+                ) : (
+                  <span className={`product-swatch tone-${index % 4}`}>
+                    {product.name.slice(0, 1)}
+                  </span>
+                )}
                 <div>
                   <strong>{product.name}</strong>
                   <small>
@@ -557,13 +691,23 @@ export function ProductManagement({ connection, onError }: Props) {
               >
                 <span />
               </button>
-              <button
-                className="option-edit-button"
-                disabled={updatingId === product.productId}
-                onClick={() => void openOptionEditor(product)}
-              >
-                옵션 편집
-              </button>
+              <div className="product-actions">
+                <button
+                  className="product-edit-button"
+                  aria-label={`${product.name} 상품 편집`}
+                  disabled={updatingId === product.productId}
+                  onClick={() => openProductEditor(product)}
+                >
+                  상품 편집
+                </button>
+                <button
+                  className="option-edit-button"
+                  disabled={updatingId === product.productId}
+                  onClick={() => void openOptionEditor(product)}
+                >
+                  옵션 편집
+                </button>
+              </div>
             </article>
           ))}
           {visibleProducts.length === 0 && (
@@ -622,13 +766,56 @@ export function ProductManagement({ connection, onError }: Props) {
             <button
               className="modal-close"
               aria-label="닫기"
-              onClick={() => setShowProductForm(false)}
+              onClick={closeProductForm}
             >
               ×
             </button>
-            <p className="eyebrow">NEW PRODUCT</p>
-            <h2 id="product-title">새 상품</h2>
-            <p>기본 상품을 만든 뒤 목록의 옵션 편집에서 구성을 추가할 수 있습니다.</p>
+            <p className="eyebrow">
+              {editingProduct ? 'EDIT PRODUCT' : 'NEW PRODUCT'}
+            </p>
+            <h2 id="product-title">
+              {editingProduct ? '상품 편집' : '새 상품'}
+            </h2>
+            <p>
+              {editingProduct
+                ? '상품의 이미지와 기본 정보를 수정하거나 상품을 삭제할 수 있습니다.'
+                : '이미지와 기본 정보를 등록한 뒤 옵션 구성을 추가할 수 있습니다.'}
+            </p>
+            <div className="product-image-field">
+              <span>상품 이미지</span>
+              <div className="product-image-input">
+                {productImagePreview ? (
+                  <img src={productImagePreview} alt="상품 이미지 미리보기" />
+                ) : (
+                  <div className="product-image-placeholder">이미지 없음</div>
+                )}
+                <div>
+                  <label className="image-file-button">
+                    이미지 선택
+                    <input
+                      type="file"
+                      aria-label="상품 이미지"
+                      accept="image/jpeg,image/png,image/webp"
+                      onChange={(event) => void selectProductImage(event)}
+                    />
+                  </label>
+                  {productImagePreview && (
+                    <button
+                      className="remove-image-button"
+                      type="button"
+                      onClick={() => {
+                        setProductImageFile(null)
+                        setProductImagePreview(null)
+                        setRemoveProductImage(true)
+                      }}
+                    >
+                      이미지 삭제
+                    </button>
+                  )}
+                  <small>JPG, PNG, WEBP · 최대 10MB</small>
+                </div>
+              </div>
+            </div>
             <label>
               카테고리
               <select
@@ -670,11 +857,47 @@ export function ProductManagement({ connection, onError }: Props) {
             </label>
             <button
               className="primary-action"
-              disabled={updatingId === -2 || categories.length === 0}
-              onClick={() => void addProduct()}
+              disabled={updatingId === (editingProduct?.productId ?? -2) || categories.length === 0}
+              onClick={() => void saveProduct()}
             >
-              {updatingId === -2 ? '생성 중…' : '상품 생성하기'}
+              {updatingId === (editingProduct?.productId ?? -2)
+                ? '저장 중…'
+                : editingProduct
+                  ? '변경사항 저장'
+                  : '상품 생성하기'}
             </button>
+            {editingProduct && (
+              <div className="product-delete-zone">
+                {showDeleteConfirm ? (
+                  <div>
+                    <p>이 상품을 삭제할까요? 주문 기록은 유지됩니다.</p>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      취소
+                    </button>
+                    <button
+                      className="danger-action"
+                      type="button"
+                      disabled={updatingId === editingProduct.productId}
+                      onClick={() => void removeProduct()}
+                    >
+                      삭제 확인
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="delete-product-button"
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                  >
+                    상품 삭제
+                  </button>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}

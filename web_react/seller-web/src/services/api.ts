@@ -273,6 +273,59 @@ export function createSellerProduct(
   )
 }
 
+export function updateSellerProduct(
+  connection: SellerConnection,
+  productId: number,
+  payload: {
+    categoryId: number
+    name: string
+    description: string | null
+    imageUrl: string | null
+    basePrice: number
+  },
+) {
+  return request<ProductDetail>(
+    `${storePath(connection)}/products/${productId}`,
+    connection,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    },
+  )
+}
+
+export function deleteSellerProduct(
+  connection: SellerConnection,
+  productId: number,
+) {
+  return request<boolean>(
+    `${storePath(connection)}/products/${productId}`,
+    connection,
+    { method: 'DELETE' },
+  )
+}
+
+export async function uploadSellerProductImage(
+  connection: SellerConnection,
+  file: File,
+) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await fetch('/api/v1/seller/store-images', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${connection.accessToken}`,
+    },
+    body: formData,
+  })
+  const envelope = (await response.json()) as ApiEnvelope<{ imageUrl: string }>
+  if (!response.ok || !envelope.success) {
+    throw new Error(envelope.error?.message ?? '이미지를 업로드하지 못했습니다.')
+  }
+  return envelope.data.imageUrl
+}
+
 export function getSellerProductDetail(
   connection: SellerConnection,
   productId: number,
