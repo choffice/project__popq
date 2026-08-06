@@ -21,7 +21,7 @@ popq:
       secret: popq-test-secret-must-be-at-least-32-bytes-long
       access-token-expiration: PT15M
   qr:
-    public-base-url: http://localhost:5173
+    public-base-url: https://order.popq.test
     guest-session-ttl: PT1H
     cookie-secure: false
     token-encryption-key: popq-test-qr-token-encryption-key-at-least-32-bytes

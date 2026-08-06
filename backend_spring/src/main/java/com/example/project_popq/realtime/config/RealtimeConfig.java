@@ -1,7 +1,9 @@
 package com.example.project_popq.realtime.config;
 
+import com.example.project_popq.qr.config.QrProperties;
 import com.example.project_popq.realtime.security.RealtimeStompErrorHandler;
 import com.example.project_popq.realtime.security.StompSecurityInterceptor;
+import java.util.LinkedHashSet;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
@@ -19,6 +21,7 @@ public class RealtimeConfig
     implements WebSocketMessageBrokerConfigurer {
 
     private final RealtimeProperties properties;
+    private final QrProperties qrProperties;
     private final GuestSessionHandshakeInterceptor
         guestSessionHandshakeInterceptor;
     private final StompSecurityInterceptor
@@ -56,10 +59,19 @@ public class RealtimeConfig
                 guestSessionHandshakeInterceptor
             )
             .setAllowedOriginPatterns(
-                properties
-                    .allowedOriginPatterns()
-                    .toArray(String[]::new)
+                allowedOriginPatterns()
             );
+    }
+
+    String[] allowedOriginPatterns() {
+        LinkedHashSet<String> allowedOriginPatterns =
+            new LinkedHashSet<>(
+                properties.allowedOriginPatterns()
+            );
+        allowedOriginPatterns.add(
+            qrProperties.publicOrigin()
+        );
+        return allowedOriginPatterns.toArray(String[]::new);
     }
 
     @Override

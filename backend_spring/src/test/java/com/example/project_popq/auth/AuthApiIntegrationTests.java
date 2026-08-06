@@ -497,6 +497,26 @@ class AuthApiIntegrationTests {
     }
 
     @Test
+    void configuredQrPublicOriginIsAlwaysAllowedByCors() throws Exception {
+        mockMvc.perform(options("/api/v1/qr/qr-token/sessions")
+                        .header("Origin", "https://order.popq.test")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header(
+                                "Access-Control-Request-Headers",
+                                "Content-Type"
+                        ))
+                .andExpect(status().isOk())
+                .andExpect(header().string(
+                        "Access-Control-Allow-Origin",
+                        "https://order.popq.test"
+                ))
+                .andExpect(header().string(
+                        "Access-Control-Allow-Credentials",
+                        "true"
+                ));
+    }
+
+    @Test
     void unknownWebOriginIsRejected() throws Exception {
         mockMvc.perform(options("/api/v1/qr/stores/1/products")
                         .header("Origin", "https://malicious.example")
