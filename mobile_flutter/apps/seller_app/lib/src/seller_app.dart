@@ -288,9 +288,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _withdraw(String? confirmationPhrase) async {
-    await _authRepository.withdraw(
-      confirmationPhrase: confirmationPhrase,
-    );
+    await _authRepository.withdraw(confirmationPhrase: confirmationPhrase);
     await _bootstrapController.signOut();
   }
 
@@ -298,9 +296,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     return _authRepository.connectCustomerAccess();
   }
 
-  Future<void> _completeSignIn(
-      AuthSession session,
-      ) async {
+  Future<void> _completeSignIn(AuthSession session) async {
     await _storeSelectionController.clear();
 
     await _sessionController.save(session);
@@ -411,7 +407,6 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       return;
     }
 
-
     if (!_sessionController.isSignedIn) {
       _realtimeClient.disconnect(clearSubscriptions: true);
       return;
@@ -434,7 +429,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
           settings.authorizationStatus == AuthorizationStatus.notDetermined) {
         debugPrint(
           'Seller 알림 권한이 없어 '
-              'FCM 기기를 등록하지 않습니다.',
+          'FCM 기기를 등록하지 않습니다.',
         );
         return;
       }
@@ -444,7 +439,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       if (token == null || token.trim().isEmpty) {
         debugPrint(
           'Seller FCM 토큰이 없어 '
-              '기기를 등록하지 않습니다.',
+          '기기를 등록하지 않습니다.',
         );
         return;
       }
@@ -461,15 +456,14 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
       debugPrint(
         'Seller FCM 기기 등록 완료: '
-            'deviceId=${device.deviceId}, '
-            'platform=${device.platform}',
+        'deviceId=${device.deviceId}, '
+        'platform=${device.platform}',
       );
     } catch (error, stackTrace) {
       debugPrint('Seller FCM 기기 등록 실패: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
-
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

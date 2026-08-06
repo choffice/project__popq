@@ -148,10 +148,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
 
     _identityRepository =
-        widget.identityRepository ??
-            ApiCustomerIdentityRepository(
-              _apiClient,
-            );
+        widget.identityRepository ?? ApiCustomerIdentityRepository(_apiClient);
 
     _kakaoAuthService = KakaoAuthService();
     _naverAuthService = NaverAuthService();
@@ -204,70 +201,29 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onSignIn: _signIn,
       onSignUp: _signUp,
       onFindId: _findId,
-      onVerifyForPasswordReset:
-      _verifyForPasswordReset,
-      onResetPassword:
-      _resetPassword,
-      onConnectSellerAccess:
-      _connectSellerAccess,
-      onWithdraw:
-      _withdraw,
-      sessionController:
-      _sessionController,
-      onboardingController:
-      _onboardingController,
-      storeDiscoveryRepository:
-      storeDiscoveryRepository,
-      catalogRepository:
-      catalogRepository,
-      orderRepository:
-      orderRepository,
-      orderMessageRepository:
-      orderMessageRepository,
-      engagementRepository:
-      engagementRepository,
-      notificationRepository:
-      _notificationRepository,
-      locationRepository:
-      locationRepository,
-      cartController:
-      _cartController,
-      homeController:
-      _homeController,
-      minSplashDuration:
-      widget.splashMinDuration,
-      permissionGateway:
-      permissionGateway,
-      apiBaseUrl:
-      widget.environment.apiBaseUrl,
-      tossClientKey:
-      widget.environment.tossClientKey,
-      themeController:
-      _themeController,
-      onDevelopmentSignIn:
-      // widget.environment.flavor ==
-      //     AppFlavor.development
-      // onVerifyForPasswordReset: _verifyForPasswordReset,
-      // onResetPassword: _resetPassword,
-      // sessionController: _sessionController,
-      // onboardingController: _onboardingController,
-      // storeDiscoveryRepository: storeDiscoveryRepository,
-      // catalogRepository: catalogRepository,
-      // orderRepository: orderRepository,
-      // orderMessageRepository: orderMessageRepository,
-      // engagementRepository: engagementRepository,
-      // notificationRepository: _notificationRepository,
-      // locationRepository: locationRepository,
-      // cartController: _cartController,
-      // homeController: _homeController,
-      // minSplashDuration: widget.splashMinDuration,
-      // permissionGateway: permissionGateway,
-      // apiBaseUrl: widget.environment.apiBaseUrl,
-      // tossClientKey: widget.environment.tossClientKey,
-      // themeController: _themeController,
-      // onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
-      //     ? _developmentSignIn
-      //     : null,
+      onVerifyForPasswordReset: _verifyForPasswordReset,
+      onResetPassword: _resetPassword,
+      onConnectSellerAccess: _connectSellerAccess,
+      onWithdraw: _withdraw,
+      sessionController: _sessionController,
+      onboardingController: _onboardingController,
+      storeDiscoveryRepository: storeDiscoveryRepository,
+      catalogRepository: catalogRepository,
+      orderRepository: orderRepository,
+      orderMessageRepository: orderMessageRepository,
+      engagementRepository: engagementRepository,
+      notificationRepository: _notificationRepository,
+      locationRepository: locationRepository,
+      cartController: _cartController,
+      homeController: _homeController,
+      minSplashDuration: widget.splashMinDuration,
+      permissionGateway: permissionGateway,
+      apiBaseUrl: widget.environment.apiBaseUrl,
+      tossClientKey: widget.environment.tossClientKey,
+      themeController: _themeController,
+      onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
+          ? _developmentSignIn
+          : null,
       onGoogleSignIn: _googleSignIn,
       onKakaoSignIn: _kakaoSignIn,
       onNaverSignIn: _naverSignIn,
@@ -370,9 +326,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   Future<void> _withdraw(String? confirmationPhrase) async {
-    await _authRepository.withdraw(
-      confirmationPhrase: confirmationPhrase,
-    );
+    await _authRepository.withdraw(confirmationPhrase: confirmationPhrase);
     await _sessionController.signOut();
   }
 
