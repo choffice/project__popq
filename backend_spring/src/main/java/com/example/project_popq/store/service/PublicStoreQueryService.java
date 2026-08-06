@@ -10,6 +10,7 @@ import com.example.project_popq.store.dto.PublicStoreResponse;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTagRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +26,7 @@ public class PublicStoreQueryService {
 
     private final StoreRepository storeRepository;
     private final StoreTagRepository storeTagRepository;
+    private final StoreOperatingHoursPolicy operatingHoursPolicy;
 
     @Transactional(readOnly = true)
     public List<PublicStoreResponse> search(
@@ -41,7 +43,9 @@ public class PublicStoreQueryService {
         );
         Map<Long, List<String>> tagsByStore = findTags(stores);
 
+        Instant now = Instant.now();
         return stores.stream()
+                .filter(store -> operatingHoursPolicy.isWithinOperatingHours(store, now))
                 .map(store -> toResponse(
                         store,
                         tagsByStore.getOrDefault(store.getId(), List.of()),
@@ -66,6 +70,9 @@ public class PublicStoreQueryService {
                         BusinessStatus.OPEN
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
+        if (!operatingHoursPolicy.isWithinOperatingHours(store, Instant.now())) {
+            throw new BusinessException(ErrorCode.STORE_NOT_FOUND);
+        }
         List<String> tags = storeTagRepository.findAllByStoreId(storeId)
                 .stream()
                 .map(storeTag -> storeTag.getTag().getName())

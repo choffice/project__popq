@@ -10,11 +10,15 @@ import '../announcements/seller_announcement_screen.dart';
 import '../home/seller_analytics_repository.dart';
 import '../products/seller_product_list_screen.dart';
 import '../products/seller_product_repository.dart';
+import '../orders/seller_order_repository.dart';
 import '../sales/seller_sales_screen.dart';
+import '../reviews/seller_review_repository.dart';
+import '../reviews/seller_review_section.dart';
 import '../stores/seller_store_edit_screen.dart';
 import '../stores/seller_store_location_picker_screen.dart';
 import '../stores/seller_store_repository.dart';
 import '../stores/seller_store_selection_controller.dart';
+import '../stores/seller_tag_editor.dart';
 
 class SellerOperationScreen extends StatefulWidget {
   const SellerOperationScreen({
@@ -22,7 +26,10 @@ class SellerOperationScreen extends StatefulWidget {
     required this.announcementRepository,
     required this.productRepository,
     required this.analyticsRepository,
+    required this.reviewRepository,
+    required this.orderRepository,
     required this.selectionController,
+    this.initialSection = 0,
     super.key,
   });
 
@@ -30,7 +37,10 @@ class SellerOperationScreen extends StatefulWidget {
   final SellerAnnouncementRepository announcementRepository;
   final SellerProductRepository productRepository;
   final SellerAnalyticsRepository analyticsRepository;
+  final SellerReviewRepository reviewRepository;
+  final SellerOrderRepository orderRepository;
   final SellerStoreSelectionController selectionController;
+  final int initialSection;
 
   @override
   State<SellerOperationScreen> createState() =>
@@ -77,13 +87,32 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   var _savingQuickEdit = false;
   var _pickingHeaderImage = false;
   var _endingOperation = false;
+  var _requestSerial = 0;
 
   int get _storeId => widget.selectionController.selectedStoreId!;
 
   @override
   void initState() {
     super.initState();
+    _section = widget.initialSection.clamp(0, 4).toInt();
+    widget.selectionController.addListener(_handleSelectionChanged);
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant SellerOperationScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectionController != widget.selectionController) {
+      oldWidget.selectionController.removeListener(_handleSelectionChanged);
+      widget.selectionController.addListener(_handleSelectionChanged);
+      _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.selectionController.removeListener(_handleSelectionChanged);
+    super.dispose();
   }
 
   @override
@@ -129,6 +158,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 '매출',
                 Icons.query_stats_outlined,
               ),
+              _sectionChip(
+                4,
+                '리뷰',
+                Icons.reviews_outlined,
+              ),
             ],
           ),
         ),
@@ -146,10 +180,16 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
               repository: widget.productRepository,
               selectionController: widget.selectionController,
             ),
-            _ => SellerSalesScreen(
+            3 => SellerSalesScreen(
               storeRepository: widget.storeRepository,
               analyticsRepository: widget.analyticsRepository,
               selectionController: widget.selectionController,
+            ),
+            _ => SellerReviewSection(
+              storeId: _storeId,
+              canReply: _store!.myRole == 'OWNER' ||
+                  _store!.myRole == 'MANAGER',
+              repository: widget.reviewRepository,
             ),
           },
         ),
@@ -271,14 +311,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             child: Text(
               'OWNER 또는 MANAGER만 영업 상태를 변경할 수 있습니다.',
             ),
-          ),
-
-        if (_changingStatus)
-          const Padding(
-            padding: EdgeInsets.only(
-              top: PopqSpacing.sm,
-            ),
-            child: LinearProgressIndicator(),
           ),
 
         const SizedBox(height: PopqSpacing.lg),
@@ -486,13 +518,19 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           const SizedBox(height: PopqSpacing.lg),
           const Divider(),
           TextButton.icon(
+            key: const Key('suspend-store-operation'),
+            onPressed: _endingOperation ? null : _confirmSuspendOperation,
+            icon: const Icon(Icons.pause_circle_outline_rounded),
+            label: const Text('사업장 휴업'),
+          ),
+          TextButton.icon(
             key: const Key('end-store-operation'),
             onPressed: _endingOperation ? null : _confirmEndOperation,
             style: TextButton.styleFrom(
               foregroundColor: theme.colorScheme.onSurfaceVariant,
             ),
             icon: const Icon(Icons.block_outlined),
-            label: const Text('사업장 운영 종료'),
+            label: const Text('사업장 폐업'),
           ),
         ],
       ],
@@ -954,41 +992,18 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   }
 
   Future<void> _editTags() async {
-    final String? value = await _requestTextEdit(
-      title: '검색 키워드 수정',
-      initialValue: _store!.tags.join(', '),
-      maxLength: 310,
-      requiredValue: false,
-      maxLines: 3,
-      hintText: '쉼표로 구분해 최대 10개까지 입력',
+    final List<String>? tags = await showSellerTagsEditorDialog(
+      context,
+      initialTags: _store!.tags,
+      maxCount: 10,
     );
-    if (value == null || !mounted) {
+    if (tags == null || !mounted) {
       return;
     }
-    final List<String> parsed = _parseTags(value);
-    if (parsed.length > 10) {
-      _showMessage('검색 키워드는 최대 10개까지 입력할 수 있습니다.');
-      return;
-    }
-    if (parsed.any((String tag) => tag.length > 30)) {
-      _showMessage('검색 키워드는 각각 30자 이하여야 합니다.');
-      return;
-    }
-    await _saveQuickEdit(tags: parsed, successMessage: '검색 키워드를 수정했습니다.');
-  }
-
-  List<String> _parseTags(String value) {
-    final List<String> tags = <String>[];
-    for (final String raw in value.split(',')) {
-      final String tag = raw
-          .trim()
-          .replaceFirst(RegExp(r'^#+'), '')
-          .toLowerCase();
-      if (tag.isNotEmpty && !tags.contains(tag)) {
-        tags.add(tag);
-      }
-    }
-    return List<String>.unmodifiable(tags);
+    await _saveQuickEdit(
+      tags: tags,
+      successMessage: '검색 키워드를 수정했습니다.',
+    );
   }
 
   Future<void> _editRepresentativeCategory() async {
@@ -1683,6 +1698,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   }
 
   Future<void> _load() async {
+    final requestedStoreId = widget.selectionController.selectedStoreId;
+    if (requestedStoreId == null) return;
+    final requestSerial = ++_requestSerial;
     setState(() {
       _loading = true;
       _error = null;
@@ -1690,10 +1708,12 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
 
     try {
       final store = await widget.storeRepository.findOne(
-        _storeId,
+        requestedStoreId,
       );
 
-      if (!mounted) {
+      if (!mounted || requestSerial != _requestSerial ||
+          widget.selectionController.selectedStoreId != requestedStoreId ||
+          store.storeId != requestedStoreId) {
         return;
       }
 
@@ -1702,7 +1722,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) {
+      if (!mounted || requestSerial != _requestSerial ||
+          widget.selectionController.selectedStoreId != requestedStoreId) {
         return;
       }
 
@@ -1711,6 +1732,10 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         _loading = false;
       });
     }
+  }
+
+  void _handleSelectionChanged() {
+    if (mounted) _load();
   }
 
   Future<void> _changeStatus(String status) async {
@@ -1815,16 +1840,16 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             void Function(void Function()) setDialogState,
           ) {
             return AlertDialog(
-              title: const Text('사업장 운영을 종료할까요?'),
+              title: const Text('사업장을 폐업할까요?'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    '${store.name}의 운영을 종료하면 판매자 사업장 목록에서 사라지고 '
+                    '${store.name}을 폐업하면 활성 사업장 목록에서 사라지고 '
                     '주문 접수가 중지됩니다.\n\n'
                     '기존 주문과 결제 기록은 보존됩니다.\n'
-                    '현재 앱에서는 운영 종료 후 직접 복구할 수 없습니다.',
+                    '폐업 후에는 직접 재개할 수 없습니다.',
                   ),
                   const SizedBox(height: PopqSpacing.md),
                   CheckboxListTile(
@@ -1892,7 +1917,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                               setDialogState(() {
                                 submitting = false;
                                 errorMessage =
-                                    '사업장 운영을 종료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                                    '사업장을 폐업하지 못했습니다. 잠시 후 다시 시도해 주세요.';
                               });
                             }
                           }
@@ -1902,7 +1927,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                           dimension: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('운영 종료'),
+                      : const Text('폐업 확정'),
                 ),
               ],
             );
@@ -1916,13 +1941,116 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     }
 
     await widget.selectionController.clear(
-      dashboardNotice: '사업장 운영을 종료했습니다.',
+      dashboardNotice: '사업장을 폐업했습니다.',
     );
 
     if (mounted) {
       context.go(SellerRoutes.dashboard);
     }
   }
+
+  Future<void> _confirmSuspendOperation() async {
+    final store = _store;
+    if (store == null || store.myRole != 'OWNER' || _endingOperation) return;
+    final _SuspensionSummary summary;
+    try {
+      summary = await _loadSuspensionSummary(store.storeId);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴업 전 운영 요약을 불러오지 못했습니다.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('사업장을 휴업할까요?'),
+        content: Text(
+          '휴업하면 고객에게 노출되지 않고 주문 접수가 중지됩니다. '
+          '사업장 정보와 주문·메뉴·리뷰는 그대로 보존됩니다.\n\n'
+          '마지막 주문일: ${summary.lastOrderDate}\n'
+          '최근 30일 주문: ${summary.orderCount}건\n'
+          '최근 30일 매출: ${summary.sales}원\n'
+          '미답변 리뷰: ${summary.unansweredReviewCount}건\n'
+          '비활성·품절 메뉴: ${summary.unavailableProductCount}개',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('휴업하기'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _endingOperation = true);
+    try {
+      await widget.storeRepository.suspend(store.storeId);
+      await widget.selectionController.clear(
+        dashboardNotice: '사업장을 휴업했습니다.',
+      );
+      if (mounted) context.go(SellerRoutes.dashboard);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _endingOperation = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사업장을 휴업하지 못했습니다.')),
+      );
+    }
+  }
+
+  Future<_SuspensionSummary> _loadSuspensionSummary(int storeId) async {
+    final now = DateTime.now();
+    final from = now.subtract(const Duration(days: 30));
+    final results = await Future.wait([
+      widget.orderRepository.findAll(storeId),
+      widget.analyticsRepository.findSales(storeId, from: from, to: now),
+      widget.reviewRepository.findAll(storeId, unanswered: true),
+      widget.productRepository.findAll(storeId),
+    ]);
+    final orders = results[0] as List<SellerOrder>;
+    final sales = results[1] as SellerSalesSummary;
+    final reviews = results[2] as List<SellerReview>;
+    final products = results[3] as List<SellerProduct>;
+    final dates = orders.map((order) => order.createdAt).whereType<DateTime>().toList()
+      ..sort();
+    return _SuspensionSummary(
+      lastOrderDate: dates.isEmpty
+          ? '주문 없음'
+          : '${dates.last.toLocal().year}.${dates.last.toLocal().month}.${dates.last.toLocal().day}',
+      orderCount: orders.where((order) {
+        final createdAt = order.createdAt;
+        return createdAt != null && !createdAt.isBefore(from);
+      }).length,
+      sales: sales.netSales,
+      unansweredReviewCount: reviews.length,
+      unavailableProductCount: products
+          .where((product) => product.status != 'ACTIVE' || product.soldOut)
+          .length,
+    );
+  }
+}
+
+class _SuspensionSummary {
+  const _SuspensionSummary({
+    required this.lastOrderDate,
+    required this.orderCount,
+    required this.sales,
+    required this.unansweredReviewCount,
+    required this.unavailableProductCount,
+  });
+
+  final String lastOrderDate;
+  final int orderCount;
+  final int sales;
+  final int unansweredReviewCount;
+  final int unavailableProductCount;
 }
 
 class _HeaderImageButton extends StatelessWidget {

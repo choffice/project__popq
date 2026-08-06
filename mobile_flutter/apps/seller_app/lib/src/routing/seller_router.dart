@@ -16,11 +16,14 @@ import '../features/customers/seller_customer_repository.dart';
 import '../features/customers/seller_customer_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
 import '../features/operations/seller_operation_screen.dart';
+import '../features/notifications/seller_notification_inbox_screen.dart';
+import '../features/notifications/seller_operational_alert_repository.dart';
 import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
 import '../features/profile/seller_my_screen.dart';
+import '../features/reviews/seller_review_repository.dart';
 import '../features/settings/seller_settings_screen.dart';
 import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
@@ -41,6 +44,7 @@ abstract final class SellerRoutes {
   static const orders = '/orders';
   static const customers = '/customers';
   static const my = '/my';
+  static const notifications = '/notifications';
 
   @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
   static const sales = my;
@@ -58,6 +62,8 @@ GoRouter createSellerRouter({
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
   required SellerCustomerRepository customerRepository,
+  required SellerReviewRepository reviewRepository,
+  required SellerOperationalAlertRepository operationalAlertRepository,
   required Future<void> Function() onSignOut,
   required Future<void> Function(String? confirmationPhrase) onWithdraw,
   required Future<void> Function() onConnectCustomerAccess,
@@ -179,6 +185,7 @@ GoRouter createSellerRouter({
           location != SellerRoutes.customers &&
           location != SellerRoutes.my &&
           location != SellerRoutes.settings &&
+          location != SellerRoutes.notifications &&
           !isStoreRegistration) {
         return SellerRoutes.dashboard;
       }
@@ -275,6 +282,16 @@ GoRouter createSellerRouter({
         },
       ),
       GoRoute(
+        path: SellerRoutes.notifications,
+        builder: (context, state) {
+          return SellerNotificationInboxScreen(
+            repository: operationalAlertRepository,
+            storeRepository: storeRepository,
+            selectionController: storeSelectionController,
+          );
+        },
+      ),
+      GoRoute(
         path: SellerRoutes.storeRegistration,
         builder: (context, state) {
           return SellerStoreRegistrationScreen(
@@ -297,6 +314,10 @@ GoRouter createSellerRouter({
             storeRepository: storeRepository,
             selectionController:
             storeSelectionController,
+            reviewRepository: reviewRepository,
+            storeId: int.tryParse(
+              state.uri.queryParameters['storeId'] ?? '',
+            ),
           );
         },
       ),
@@ -322,6 +343,7 @@ GoRouter createSellerRouter({
             onSignOut: onSignOut,
             customerRepository:
             customerRepository,
+            storeRepository: storeRepository,
             storeSelectionController:
             storeSelectionController,
             themeController: themeController,
@@ -351,8 +373,12 @@ GoRouter createSellerRouter({
                 productRepository,
                 analyticsRepository:
                 analyticsRepository,
+                reviewRepository: reviewRepository,
+                orderRepository: orderRepository,
                 selectionController:
                 storeSelectionController,
+                initialSection:
+                    state.uri.queryParameters['section'] == 'reviews' ? 4 : 0,
               );
             },
           ),
@@ -361,8 +387,13 @@ GoRouter createSellerRouter({
             builder: (context, state) {
               return SellerOrderListScreen(
                 repository: orderRepository,
+                storeRepository: storeRepository,
                 selectionController:
                 storeSelectionController,
+                initialCurrentFilter:
+                    state.uri.queryParameters['filter'] == 'placed'
+                        ? 'PLACED'
+                        : null,
               );
             },
           ),

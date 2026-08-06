@@ -16,6 +16,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,6 +49,15 @@ public class Review extends BaseTimeEntity {
 
     @Column(name = "content", length = 1000)
     private String content;
+
+    @Column(name = "seller_reply", length = 1000)
+    private String sellerReply;
+
+    @Column(name = "seller_replied_at")
+    private Instant sellerRepliedAt;
+
+    @Column(name = "seller_replied_by_user_id")
+    private Long sellerRepliedByUserId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
@@ -83,5 +93,17 @@ public class Review extends BaseTimeEntity {
 
     public boolean belongsTo(Long userId) {
         return user.getId().equals(userId);
+    }
+
+    public void reply(String reply, Long sellerUserId, Instant repliedAt) {
+        this.sellerReply = reply;
+        this.sellerRepliedByUserId = sellerUserId;
+        this.sellerRepliedAt = repliedAt;
+    }
+
+    public void deleteReply() {
+        this.sellerReply = null;
+        this.sellerRepliedByUserId = null;
+        this.sellerRepliedAt = null;
     }
 }

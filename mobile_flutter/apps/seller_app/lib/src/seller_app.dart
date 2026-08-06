@@ -15,8 +15,10 @@ import 'features/auth/seller_bootstrap_controller.dart';
 import 'features/auth/seller_identity_repository.dart';
 import 'features/customers/seller_customer_repository.dart';
 import 'features/home/seller_analytics_repository.dart';
+import 'features/notifications/seller_operational_alert_repository.dart';
 import 'features/orders/seller_order_repository.dart';
 import 'features/products/seller_product_repository.dart';
+import 'features/reviews/seller_review_repository.dart';
 import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
@@ -37,6 +39,8 @@ class PopqSellerApp extends StatefulWidget {
     this.productRepository,
     this.analyticsRepository,
     this.customerRepository,
+    this.reviewRepository,
+    this.operationalAlertRepository,
     this.themeController,
     this.authRepository,
     this.splashMinDuration = const Duration(seconds: 3),
@@ -53,6 +57,8 @@ class PopqSellerApp extends StatefulWidget {
   final SellerProductRepository? productRepository;
   final SellerAnalyticsRepository? analyticsRepository;
   final SellerCustomerRepository? customerRepository;
+  final SellerReviewRepository? reviewRepository;
+  final SellerOperationalAlertRepository? operationalAlertRepository;
   final PopqThemeController? themeController;
   final SellerAuthRepository? authRepository;
 
@@ -90,6 +96,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   late final SellerAnalyticsRepository _analyticsRepository;
 
   late final SellerCustomerRepository _customerRepository;
+  late final SellerReviewRepository _reviewRepository;
+  late final SellerOperationalAlertRepository _operationalAlertRepository;
 
   late final SellerAuthRepository _authRepository;
 
@@ -198,6 +206,12 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     _customerRepository =
         widget.customerRepository ?? ApiSellerCustomerRepository(_apiClient);
 
+    _reviewRepository =
+        widget.reviewRepository ?? ApiSellerReviewRepository(_apiClient);
+
+    _operationalAlertRepository = widget.operationalAlertRepository ??
+        ApiSellerOperationalAlertRepository(_apiClient);
+
     final identityRepository =
         widget.identityRepository ?? ApiSellerIdentityRepository(_apiClient);
 
@@ -220,6 +234,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       productRepository: _productRepository,
       analyticsRepository: _analyticsRepository,
       customerRepository: _customerRepository,
+      reviewRepository: _reviewRepository,
+      operationalAlertRepository: _operationalAlertRepository,
       onSignOut: _bootstrapController.signOut,
       onWithdraw: _withdraw,
       onConnectCustomerAccess: _connectCustomerAccess,

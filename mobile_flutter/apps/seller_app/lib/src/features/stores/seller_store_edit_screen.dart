@@ -8,6 +8,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
 import 'seller_store_location_picker_screen.dart';
 import 'seller_store_repository.dart';
+import 'seller_tag_editor.dart';
 
 enum _ImportedValueChoice { current, imported, manual }
 
@@ -83,7 +84,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _detailAddressController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _tagsController;
+  late final List<String> _tags;
 
   late String _storeType;
   String? _representativeCategory;
@@ -118,7 +119,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController = TextEditingController(text: store.address);
     _detailAddressController = TextEditingController(text: store.detailAddress);
     _phoneController = TextEditingController(text: store.phone);
-    _tagsController = TextEditingController(text: store.tags.join(', '));
+    _tags = List<String>.of(store.tags);
     _storeType = store.storeType;
     _representativeCategory = store.representativeCategory;
     _existingImageUrl = _emptyToNull(store.imageUrl);
@@ -146,7 +147,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController.dispose();
     _detailAddressController.dispose();
     _phoneController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
@@ -290,17 +290,19 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               _buildSection(
                 context,
                 title: '검색 키워드',
+                titleAction: IconButton.filledTonal(
+                  tooltip: '검색 키워드 추가',
+                  onPressed: _busy || _tags.length >= 10 ? null : _addTag,
+                  icon: const Icon(Icons.add_rounded),
+                ),
                 children: <Widget>[
-                  TextFormField(
+                  SellerTagBlocks(
                     key: const Key('edit-store-tags'),
-                    controller: _tagsController,
+                    tags: _tags,
+                    maxCount: 10,
                     enabled: !_busy,
-                    maxLength: 310,
-                    decoration: const InputDecoration(
-                      labelText: '검색 키워드',
-                      hintText: '쉼표로 구분해 최대 10개까지 입력',
-                    ),
-                    validator: _validateTags,
+                    onAdd: _addTag,
+                    onDeleted: (tag) => setState(() => _tags.remove(tag)),
                   ),
                 ],
               ),
@@ -343,6 +345,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     BuildContext context, {
     required String title,
     required List<Widget> children,
+    Widget? titleAction,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: PopqSpacing.md),
@@ -352,7 +355,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  if (titleAction != null) titleAction,
+                ],
+              ),
               const SizedBox(height: PopqSpacing.md),
               ...children,
             ],
@@ -1357,7 +1370,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         takeoutAvailable: _takeoutAvailable,
         dineInAvailable: _dineInAvailable,
         orderAcceptingEnabled: _orderAcceptingEnabled,
-        tags: _parseTags(),
+        tags: List<String>.unmodifiable(_tags),
       );
       if (!mounted) {
         return;
@@ -1377,29 +1390,14 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     }
   }
 
-  List<String> _parseTags() {
-    final List<String> tags = <String>[];
-    for (final String raw in _tagsController.text.split(',')) {
-      final String tag = raw
-          .trim()
-          .replaceFirst(RegExp(r'^#+'), '')
-          .toLowerCase();
-      if (tag.isNotEmpty && !tags.contains(tag)) {
-        tags.add(tag);
-      }
+  Future<void> _addTag() async {
+    final String? tag = await showSellerTagInputDialog(
+      context,
+      existingTags: _tags,
+    );
+    if (tag != null && mounted) {
+      setState(() => _tags.add(tag));
     }
-    return List<String>.unmodifiable(tags);
-  }
-
-  String? _validateTags(String? value) {
-    final List<String> tags = _parseTags();
-    if (tags.length > 10) {
-      return '검색 키워드는 최대 10개까지 입력할 수 있습니다.';
-    }
-    if (tags.any((String tag) => tag.length > 30)) {
-      return '검색 키워드는 각각 30자 이하여야 합니다.';
-    }
-    return null;
   }
 
   String? _requiredValidator(String? value, String message) {

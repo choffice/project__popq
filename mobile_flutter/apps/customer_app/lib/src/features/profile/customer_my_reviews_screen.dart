@@ -346,6 +346,18 @@ class _ReviewCard extends StatelessWidget {
               ),
               Text(review.content!),
             ],
+            if (review.sellerReply?.isNotEmpty ?? false) ...[
+              const SizedBox(height: PopqSpacing.sm),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(PopqSpacing.sm),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text('사장님 답글\n${review.sellerReply!}'),
+              ),
+            ],
             Row(
               mainAxisAlignment:
               MainAxisAlignment.end,

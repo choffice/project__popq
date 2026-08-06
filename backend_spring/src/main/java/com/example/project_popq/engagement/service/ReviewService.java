@@ -10,9 +10,12 @@ import com.example.project_popq.engagement.repository.ReviewRepository;
 import com.example.project_popq.order.domain.Order;
 import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.repository.OrderRepository;
+import com.example.project_popq.store.domain.StoreRole;
+import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import java.util.List;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ public class ReviewService {
 
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
+    private final StoreAuthorizationService storeAuthorizationService;
 
     @Transactional
     public ReviewResponse create(
@@ -92,6 +96,104 @@ public class ReviewService {
                 .stream()
                 .map(ReviewResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReviewResponse> findSellerStoreReviews(
+            User user,
+            Long storeId,
+            Integer rating,
+            Boolean unanswered
+    ) {
+        storeAuthorizationService.requireAnyRole(
+                user.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER,
+                StoreRole.STAFF
+        );
+        if (rating != null && (rating < 1 || rating > 5)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        return reviewRepository
+                .findAllByStoreIdAndStatusOrderByCreatedAtDesc(
+                        storeId,
+                        ReviewStatus.ACTIVE
+                )
+                .stream()
+                .filter(review -> rating == null || review.getRating() == rating)
+                .filter(review -> !Boolean.TRUE.equals(unanswered)
+                        || review.getSellerReply() == null)
+                .map(ReviewResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewResponse findSellerOrderReview(
+            User user,
+            Long storeId,
+            String orderPublicId
+    ) {
+        storeAuthorizationService.requireAnyRole(
+                user.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER,
+                StoreRole.STAFF
+        );
+        return reviewRepository.findByOrderOrderPublicIdAndStoreIdAndStatus(
+                        orderPublicId,
+                        storeId,
+                        ReviewStatus.ACTIVE
+                )
+                .map(ReviewResponse::from)
+                .orElse(null);
+    }
+
+    @Transactional
+    public ReviewResponse replyAsSeller(
+            User user,
+            Long storeId,
+            Long reviewId,
+            String reply
+    ) {
+        requireSellerReviewWriter(user, storeId);
+        Review review = requireActiveStoreReview(reviewId, storeId);
+        review.reply(reply.trim(), user.getId(), Instant.now());
+        reviewRepository.flush();
+        return ReviewResponse.from(review);
+    }
+
+    @Transactional
+    public ReviewResponse deleteSellerReply(
+            User user,
+            Long storeId,
+            Long reviewId
+    ) {
+        requireSellerReviewWriter(user, storeId);
+        Review review = requireActiveStoreReview(reviewId, storeId);
+        review.deleteReply();
+        reviewRepository.flush();
+        return ReviewResponse.from(review);
+    }
+
+    private void requireSellerReviewWriter(User user, Long storeId) {
+        storeAuthorizationService.requireAnyRole(
+                user.getId(),
+                storeId,
+                StoreRole.OWNER,
+                StoreRole.MANAGER
+        );
+    }
+
+    private Review requireActiveStoreReview(Long reviewId, Long storeId) {
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.REVIEW_NOT_FOUND));
+        if (!review.getStore().getId().equals(storeId)
+                || review.getStatus() != ReviewStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.REVIEW_NOT_FOUND);
+        }
+        return review;
     }
 
     private Review requireOwnedActive(User user, Long reviewId) {

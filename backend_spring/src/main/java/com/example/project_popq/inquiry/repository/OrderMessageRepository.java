@@ -81,6 +81,55 @@ public interface OrderMessageRepository
   );
 
   @Query("""
+      select message.order.store.id, count(message)
+      from OrderMessage message
+      where message.order.store.id in :storeIds
+        and message.senderType = :senderType
+        and message.readAt is null
+      group by message.order.store.id
+      """)
+  List<Object[]> countUnreadByStoreIds(
+      @Param("storeIds") List<Long> storeIds,
+      @Param("senderType") MessageSenderType senderType
+  );
+
+  @EntityGraph(
+      attributePaths = {
+          "order",
+          "order.store",
+          "order.user",
+          "sender"
+      }
+  )
+  @Query("""
+      select message
+      from OrderMessage message
+      where message.order.store.id in :storeIds
+        and exists (
+              select unread.id
+              from OrderMessage unread
+              where unread.order.id = message.order.id
+                and unread.senderType = :customerSenderType
+                and unread.readAt is null
+        )
+        and not exists (
+              select newer.id
+              from OrderMessage newer
+              where newer.order.id = message.order.id
+                and (
+                      newer.createdAt > message.createdAt
+                      or (newer.createdAt = message.createdAt and newer.id > message.id)
+                )
+        )
+      order by message.createdAt desc, message.id desc
+      """)
+  List<OrderMessage> findLatestUnreadConversationsByStoreIds(
+      @Param("storeIds") List<Long> storeIds,
+      @Param("customerSenderType") MessageSenderType customerSenderType,
+      Pageable pageable
+  );
+
+  @Query("""
       select new com.example.project_popq.inquiry.dto.CustomerOrderUnreadMessageResponse(
           message.order.orderPublicId,
           count(message)

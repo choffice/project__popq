@@ -10,6 +10,7 @@ import 'business_registration_ocr_service.dart';
 import 'seller_store_location_picker_screen.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
+import 'seller_tag_editor.dart';
 import 'package:geolocator/geolocator.dart';
 
 enum _ImportedValueChoice {
@@ -125,9 +126,6 @@ class _SellerStoreRegistrationScreenState
   final TextEditingController _imageUrlController =
   TextEditingController();
 
-  final TextEditingController _tagController =
-  TextEditingController();
-
   final ImagePicker _imagePicker = ImagePicker();
 
   XFile? _selectedRepresentativeImage;
@@ -197,8 +195,6 @@ class _SellerStoreRegistrationScreenState
     _phoneController.dispose();
     _descriptionController.dispose();
     _imageUrlController.dispose();
-    _tagController.dispose();
-
     super.dispose();
   }
 
@@ -1370,96 +1366,14 @@ class _SellerStoreRegistrationScreenState
         padding: const EdgeInsets.all(
           PopqSpacing.md,
         ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Text(
-              '검색 키워드',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
-            Text(
-              '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall,
-            ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
-            Row(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller:
-                    _tagController,
-                    enabled: !_submitting &&
-                        _tags.length < 8,
-                    maxLength: 30,
-                    textInputAction:
-                    TextInputAction.done,
-                    decoration:
-                    const InputDecoration(
-                      labelText: '키워드',
-                      hintText: '예: 떡볶이',
-                      prefixIcon: Icon(
-                        Icons.tag_rounded,
-                      ),
-                    ),
-                    onSubmitted:
-                        (String _) {
-                      _addTag();
-                    },
-                  ),
-                ),
-                const SizedBox(
-                  width: PopqSpacing.sm,
-                ),
-                IconButton.filled(
-                  tooltip: '키워드 추가',
-                  onPressed: _submitting ||
-                      _tags.length >= 8
-                      ? null
-                      : _addTag,
-                  icon: const Icon(
-                    Icons.add_rounded,
-                  ),
-                ),
-              ],
-            ),
-            if (_tags.isNotEmpty) ...[
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
-              Wrap(
-                spacing: PopqSpacing.sm,
-                runSpacing: PopqSpacing.sm,
-                children: _tags.map(
-                      (String tag) {
-                    return InputChip(
-                      label: Text('#$tag'),
-                      onDeleted: _submitting
-                          ? null
-                          : () {
-                        setState(() {
-                          _tags.remove(
-                            tag,
-                          );
-                        });
-                      },
-                    );
-                  },
-                ).toList(),
-              ),
-            ],
-          ],
+        child: SellerTagBlocks(
+          title: '검색 키워드',
+          description: '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
+          tags: _tags,
+          maxCount: 8,
+          enabled: !_submitting,
+          onAdd: _addTag,
+          onDeleted: (tag) => setState(() => _tags.remove(tag)),
         ),
       ),
     );
@@ -3459,7 +3373,7 @@ class _SellerStoreRegistrationScreenState
     });
   }
 
-  void _addTag() {
+  Future<void> _addTag() async {
     if (_submitting) {
       return;
     }
@@ -3472,48 +3386,11 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    final String tag = _tagController.text
-        .trim()
-        .replaceFirst(
-      RegExp(r'^#+'),
-      '',
-    )
-        .trim();
-
-    if (tag.isEmpty) {
-      _showMessage(
-        '추가할 검색 키워드를 입력해 주세요.',
-      );
-
-      return;
-    }
-
-    if (tag.length > 30) {
-      _showMessage(
-        '검색 키워드는 30자 이하로 입력해 주세요.',
-      );
-
-      return;
-    }
-
-    final bool duplicated = _tags.any(
-          (String existing) =>
-      existing.toLowerCase() ==
-          tag.toLowerCase(),
+    final String? tag = await showSellerTagInputDialog(
+      context,
+      existingTags: _tags,
     );
-
-    if (duplicated) {
-      _showMessage(
-        '이미 추가한 검색 키워드예요.',
-      );
-
-      return;
-    }
-
-    setState(() {
-      _tags.add(tag);
-      _tagController.clear();
-    });
+    if (tag != null && mounted) setState(() => _tags.add(tag));
   }
 
   Future<void> _submit() async {

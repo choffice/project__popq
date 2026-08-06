@@ -29,6 +29,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   bool _creating = false;
   int? _observedSelectedStoreId;
   String _searchQuery = '';
+  Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
 
   bool get _busy => _selecting || _creating;
 
@@ -168,32 +169,75 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     final bool selected =
         widget.controller.selectedStoreId == store.storeId;
 
-    return Card(
-      child: ListTile(
-        enabled: !_busy,
-        leading: CircleAvatar(
-          child: Icon(
-            store.storeType == 'EVENT_COMMERCE'
-                ? Icons.celebration_rounded
-                : Icons.storefront_rounded,
+    final summary = _summariesByStoreId[store.storeId];
+    return Tooltip(
+      message: '${store.name} 사업장 관리',
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: _busy ? null : () => _select(store),
+          child: Padding(
+            padding: const EdgeInsets.all(PopqSpacing.md),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  child: Icon(
+                    store.storeType == 'EVENT_COMMERCE'
+                        ? Icons.celebration_rounded
+                        : Icons.storefront_rounded,
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        store.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      if (store.address?.trim().isNotEmpty ?? false)
+                        Text(
+                          store.address!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      Text(
+                        '${_typeLabel(store.storeType)} · '
+                        '${_roleLabel(store.myRole)} · '
+                        '${_statusLabel(store.businessStatus)}'
+                        '${selected ? ' · 현재 선택' : ''}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.xs),
+                _StoreAlertButton(
+                  icon: Icons.notifications_rounded,
+                  count: summary?.waitingOrderCount ?? 0,
+                  tooltip: '${store.name} 접수대기 주문 '
+                      '${summary?.waitingOrderCount ?? 0}건',
+                  onPressed:
+                      _busy || summary == null ? null : () => _openOrders(store),
+                ),
+                const SizedBox(width: PopqSpacing.xs),
+                _StoreAlertButton(
+                  icon: Icons.chat_bubble_rounded,
+                  count: summary?.unreadChatCount ?? 0,
+                  tooltip: '${store.name} 읽지 않은 채팅 메시지 '
+                      '${summary?.unreadChatCount ?? 0}건',
+                  onPressed:
+                      _busy || summary == null ? null : () => _openChats(store),
+                ),
+              ],
+            ),
           ),
         ),
-        title: Text(store.name),
-        subtitle: Text(
-          '${_typeLabel(store.storeType)} · '
-          '${_roleLabel(store.myRole)} · '
-          '${_statusLabel(store.businessStatus)}',
-        ),
-        trailing: Icon(
-          selected
-              ? Icons.check_circle_rounded
-              : Icons.chevron_right_rounded,
-        ),
-        onTap: _busy
-            ? null
-            : () {
-                _select(store);
-              },
       ),
     );
   }
@@ -217,7 +261,15 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   }
 
   Future<List<SellerStore>> _load() async {
-    final List<SellerStore> stores = await widget.repository.findAll();
+    final results = await Future.wait([
+      widget.repository.findAll(),
+      widget.repository.findDashboardSummaries(),
+    ]);
+    final stores = results[0] as List<SellerStore>;
+    final summaries = results[1] as List<SellerDashboardSummary>;
+    _summariesByStoreId = {
+      for (final summary in summaries) summary.storeId: summary,
+    };
     final int? selectedId = widget.controller.selectedStoreId;
     final bool selectedStoreExists = selectedId == null ||
         stores.any((SellerStore store) => store.storeId == selectedId);
@@ -293,6 +345,32 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     }
   }
 
+  Future<void> _openOrders(SellerStore store) async {
+    await _selectAndOpen(
+      store,
+      '${SellerRoutes.orders}?view=current&filter=placed',
+    );
+  }
+
+  Future<void> _openChats(SellerStore store) async {
+    await _selectAndOpen(store, SellerRoutes.customers);
+  }
+
+  Future<void> _selectAndOpen(SellerStore store, String location) async {
+    if (_busy) return;
+    setState(() => _selecting = true);
+    try {
+      await widget.controller.select(store.storeId);
+      if (!mounted) return;
+      setState(() => _selecting = false);
+      context.go(location);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _selecting = false);
+      _showMessage('사업장 선택을 저장하지 못했어요.');
+    }
+  }
+
   Future<void> _openRegistrationScreen() async {
     if (_busy) {
       return;
@@ -343,6 +421,88 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _StoreAlertButton extends StatelessWidget {
+  const _StoreAlertButton({
+    required this.icon,
+    required this.count,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final int count;
+  final String tooltip;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = count > 0;
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Tooltip(
+        message: tooltip,
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 28,
+          child: SizedBox.square(
+            dimension: 46,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: active
+                          ? colors.primaryContainer
+                          : colors.surfaceContainerHighest,
+                      border: Border.all(
+                        color: active ? colors.primary : colors.outlineVariant,
+                      ),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: active
+                          ? colors.onPrimaryContainer
+                          : colors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                if (active)
+                  Positioned(
+                    top: -1,
+                    right: -1,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: BoxDecoration(
+                        color: colors.error,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        count > 9 ? '9+' : '$count',
+                        style: TextStyle(
+                          color: colors.onError,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

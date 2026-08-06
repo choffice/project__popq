@@ -7,6 +7,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import 'features/common/theme_mode_toggle.dart';
 import 'features/customers/seller_customer_repository.dart';
+import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'realtime/seller_realtime_scope.dart';
 import 'routing/seller_router.dart';
@@ -17,6 +18,7 @@ class SellerRootScreen extends StatefulWidget {
     required this.onSignOut,
     required this.child,
     this.customerRepository,
+    this.storeRepository,
     this.storeSelectionController,
     this.themeController,
     super.key,
@@ -27,6 +29,7 @@ class SellerRootScreen extends StatefulWidget {
   final Widget child;
 
   final SellerCustomerRepository? customerRepository;
+  final SellerStoreRepository? storeRepository;
   final SellerStoreSelectionController? storeSelectionController;
   final PopqThemeController? themeController;
 
@@ -61,12 +64,16 @@ class _SellerRootScreenState extends State<SellerRootScreen>
   static const int _maximumRememberedEventIds = 200;
 
   int _customerUnreadCount = 0;
+  int _operationalAlertCount = 0;
   int _unreadRequestSerial = 0;
+  int _operationalAlertRequestSerial = 0;
   int _lastConnectionEpoch = 0;
 
   Timer? _unreadPollingTimer;
 
   bool _unreadRequestInProgress = false;
+  bool _operationalAlertRequestInProgress = false;
+  bool _operationalAlertRefreshPending = false;
   bool _isAppActive = true;
 
   PopqRealtimeClient? _realtimeClient;
@@ -91,6 +98,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     );
 
     _scheduleUnreadRefresh();
+    _scheduleOperationalAlertRefresh();
     _startUnreadPolling();
   }
 
@@ -150,7 +158,12 @@ class _SellerRootScreenState extends State<SellerRootScreen>
       _resetUnreadCount();
     }
 
+    if (oldWidget.storeRepository != widget.storeRepository) {
+      _operationalAlertRequestSerial++;
+    }
+
     _scheduleUnreadRefresh();
+    _scheduleOperationalAlertRefresh();
   }
 
   @override
@@ -168,6 +181,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
         unawaited(
           _refreshCustomerUnreadCount(),
         );
+        unawaited(_refreshOperationalAlertCount());
 
         return;
 
@@ -184,6 +198,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
   @override
   void dispose() {
     _unreadRequestSerial++;
+    _operationalAlertRequestSerial++;
 
     _stopUnreadPolling();
 
@@ -229,14 +244,13 @@ class _SellerRootScreenState extends State<SellerRootScreen>
             controller: widget.themeController!,
           ),
         IconButton(
-          tooltip: '판매자 설정',
-          onPressed: () {
-            context.push(
-              SellerRoutes.settings,
-            );
+          tooltip: '운영 알림',
+          onPressed: () async {
+            await context.push(SellerRoutes.notifications);
+            if (mounted) await _refreshOperationalAlertCount();
           },
-          icon: const Icon(
-            Icons.settings_rounded,
+          icon: _OperationalNotificationIcon(
+            alertCount: _operationalAlertCount,
           ),
         ),
         IconButton(
@@ -254,6 +268,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
         unawaited(
           _refreshCustomerUnreadCount(),
         );
+        unawaited(_refreshOperationalAlertCount());
 
         final nextLocation = _locations[index];
 
@@ -323,6 +338,7 @@ class _SellerRootScreenState extends State<SellerRootScreen>
     unawaited(
       _refreshCustomerUnreadCount(),
     );
+    unawaited(_refreshOperationalAlertCount());
   }
 
   void _handleRealtimeClientChanged() {
@@ -422,6 +438,47 @@ class _SellerRootScreenState extends State<SellerRootScreen>
         _refreshCustomerUnreadCount(),
       );
     });
+  }
+
+  void _scheduleOperationalAlertRefresh() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refreshOperationalAlertCount());
+    });
+  }
+
+  Future<void> _refreshOperationalAlertCount() async {
+    if (_operationalAlertRequestInProgress) {
+      _operationalAlertRefreshPending = true;
+      return;
+    }
+    final repository = widget.storeRepository;
+    final requestSerial = ++_operationalAlertRequestSerial;
+    if (repository == null) return;
+    _operationalAlertRequestInProgress = true;
+    try {
+      final summaries = await repository.findDashboardSummaries();
+      final count = summaries.fold<int>(
+        0,
+        (total, summary) =>
+            total +
+            summary.waitingOrderCount +
+            summary.unreadChatCount +
+            summary.unansweredReviewCount,
+      );
+      if (!mounted || requestSerial != _operationalAlertRequestSerial) return;
+      if (_operationalAlertCount != count) {
+        setState(() => _operationalAlertCount = count);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('운영 알림 개수를 불러오지 못했습니다: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _operationalAlertRequestInProgress = false;
+      if (_operationalAlertRefreshPending && mounted) {
+        _operationalAlertRefreshPending = false;
+        unawaited(_refreshOperationalAlertCount());
+      }
+    }
   }
 
   void _updateUnreadPollingForConnection() {
@@ -613,6 +670,57 @@ class _CustomerNavigationIcon extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OperationalNotificationIcon extends StatelessWidget {
+  const _OperationalNotificationIcon({required this.alertCount});
+
+  final int alertCount;
+
+  @override
+  Widget build(BuildContext context) {
+    if (alertCount <= 0) {
+      return const Icon(Icons.notifications_none_rounded);
+    }
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      label: '확인할 운영 알림 $alertCount개',
+      child: SizedBox(
+        width: 32,
+        height: 28,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            const Icon(Icons.notifications_rounded),
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: colors.error,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: colors.surface, width: 1.5),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  alertCount > 99 ? '99+' : '$alertCount',
+                  style: TextStyle(
+                    color: colors.onError,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
