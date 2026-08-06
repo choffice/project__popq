@@ -1,8 +1,10 @@
 package com.example.project_popq.payment.provider;
 
 import com.example.project_popq.payment.config.KakaoPaymentProperties;
+import com.example.project_popq.payment.provider.KakaoPaymentOrderClient.LookupResult;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -15,791 +17,849 @@ import org.springframework.web.client.RestClientResponseException;
 public class KakaoPaymentClient {
 
     private static final String READY_PATH =
-        "/online/v1/payment/ready";
+            "/online/v1/payment/ready";
 
     private static final String APPROVE_PATH =
-        "/online/v1/payment/approve";
+            "/online/v1/payment/approve";
 
     private static final String CANCEL_PATH =
-        "/online/v1/payment/cancel";
+            "/online/v1/payment/cancel";
 
     private final KakaoPaymentProperties properties;
+    private final KakaoPaymentOrderClient kakaoPaymentOrderClient;
     private final RestClient restClient;
 
     public KakaoPaymentClient(
-        KakaoPaymentProperties properties
+            KakaoPaymentProperties properties,
+            KakaoPaymentOrderClient kakaoPaymentOrderClient
     ) {
         this.properties = properties;
+        this.kakaoPaymentOrderClient = kakaoPaymentOrderClient;
 
         this.restClient = RestClient.builder()
-            .baseUrl(
-                properties.resolvedApiBaseUrl()
-            )
-            .defaultHeader(
-                HttpHeaders.CONTENT_TYPE,
-                MediaType.APPLICATION_JSON_VALUE
-            )
-            .defaultHeader(
-                HttpHeaders.ACCEPT,
-                MediaType.APPLICATION_JSON_VALUE
-            )
-            .build();
+                .baseUrl(
+                        properties.resolvedApiBaseUrl()
+                )
+                .defaultHeader(
+                        HttpHeaders.CONTENT_TYPE,
+                        MediaType.APPLICATION_JSON_VALUE
+                )
+                .defaultHeader(
+                        HttpHeaders.ACCEPT,
+                        MediaType.APPLICATION_JSON_VALUE
+                )
+                .build();
     }
 
     public PrepareResult prepare(
-        PrepareCommand command
+            PrepareCommand command
     ) {
         if (!properties.hasSecretKey()) {
             return PrepareResult.failure(
-                "KAKAO_SECRET_KEY_MISSING",
-                "카카오페이 Secret key(dev)가 설정되지 않았습니다."
+                    "KAKAO_SECRET_KEY_MISSING",
+                    "카카오페이 Secret key(dev)가 설정되지 않았습니다."
             );
         }
 
         validatePrepareCommand(command);
 
         Map<String, Object> requestBody =
-            new LinkedHashMap<>();
+                new LinkedHashMap<>();
 
         requestBody.put(
-            "cid",
-            properties.resolvedCid()
+                "cid",
+                properties.resolvedCid()
         );
 
         if (properties.hasCidSecret()) {
             requestBody.put(
-                "cid_secret",
-                properties.cidSecret()
+                    "cid_secret",
+                    properties.cidSecret()
             );
         }
 
         requestBody.put(
-            "partner_order_id",
-            command.partnerOrderId()
+                "partner_order_id",
+                command.partnerOrderId()
         );
 
         requestBody.put(
-            "partner_user_id",
-            command.partnerUserId()
+                "partner_user_id",
+                command.partnerUserId()
         );
 
         requestBody.put(
-            "item_name",
-            command.itemName()
+                "item_name",
+                command.itemName()
         );
 
         requestBody.put(
-            "quantity",
-            command.quantity()
+                "quantity",
+                command.quantity()
         );
 
         requestBody.put(
-            "total_amount",
-            command.totalAmount()
+                "total_amount",
+                command.totalAmount()
         );
 
         requestBody.put(
-            "tax_free_amount",
-            command.taxFreeAmount()
+                "tax_free_amount",
+                command.taxFreeAmount()
         );
 
         if (command.vatAmount() != null) {
             requestBody.put(
-                "vat_amount",
-                command.vatAmount()
+                    "vat_amount",
+                    command.vatAmount()
             );
         }
 
         requestBody.put(
-            "approval_url",
-            command.approvalUrl()
+                "approval_url",
+                command.approvalUrl()
         );
 
         requestBody.put(
-            "cancel_url",
-            command.cancelUrl()
+                "cancel_url",
+                command.cancelUrl()
         );
 
         requestBody.put(
-            "fail_url",
-            command.failUrl()
+                "fail_url",
+                command.failUrl()
         );
 
         if (!isBlank(command.redirectSchemeUrl())) {
             requestBody.put(
-                "redirect_scheme_url",
-                command.redirectSchemeUrl()
+                    "redirect_scheme_url",
+                    command.redirectSchemeUrl()
             );
         }
 
         try {
             Map<String, Object> response =
-                restClient
-                    .post()
-                    .uri(READY_PATH)
-                    .header(
-                        HttpHeaders.AUTHORIZATION,
-                        createAuthorizationValue()
-                    )
-                    .body(requestBody)
-                    .retrieve()
-                    .body(
-                        new ParameterizedTypeReference<>() {
-                        }
-                    );
+                    restClient
+                            .post()
+                            .uri(READY_PATH)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    createAuthorizationValue()
+                            )
+                            .body(requestBody)
+                            .retrieve()
+                            .body(
+                                    new ParameterizedTypeReference<>() {
+                                    }
+                            );
 
             if (response == null) {
                 return PrepareResult.failure(
-                    "KAKAO_EMPTY_RESPONSE",
-                    "카카오페이 결제 준비 응답이 비어 있습니다."
+                        "KAKAO_EMPTY_RESPONSE",
+                        "카카오페이 결제 준비 응답이 비어 있습니다."
                 );
             }
 
             String tid = getString(
-                response,
-                "tid"
+                    response,
+                    "tid"
             );
 
             String appUrl = getString(
-                response,
-                "next_redirect_app_url"
+                    response,
+                    "next_redirect_app_url"
             );
 
             String mobileUrl = getString(
-                response,
-                "next_redirect_mobile_url"
+                    response,
+                    "next_redirect_mobile_url"
             );
 
             String pcUrl = getString(
-                response,
-                "next_redirect_pc_url"
+                    response,
+                    "next_redirect_pc_url"
             );
 
             String createdAt = getString(
-                response,
-                "created_at"
+                    response,
+                    "created_at"
             );
 
             if (isBlank(tid)
-                || (
-                isBlank(appUrl)
-                    && isBlank(mobileUrl)
+                    || (
+                    isBlank(appUrl)
+                            && isBlank(mobileUrl)
             )) {
                 return PrepareResult.failure(
-                    "KAKAO_INVALID_READY_RESPONSE",
-                    "카카오페이 결제 준비 응답 형식이 올바르지 않습니다."
+                        "KAKAO_INVALID_READY_RESPONSE",
+                        "카카오페이 결제 준비 응답 형식이 올바르지 않습니다."
                 );
             }
 
             return PrepareResult.success(
-                tid,
-                appUrl,
-                mobileUrl,
-                pcUrl,
-                createdAt
+                    tid,
+                    appUrl,
+                    mobileUrl,
+                    pcUrl,
+                    createdAt
             );
         } catch (
-            RestClientResponseException exception
+                RestClientResponseException exception
         ) {
             KakaoError error = extractError(exception);
 
             return PrepareResult.failure(
-                error.code(),
-                error.message()
+                    error.code(),
+                    error.message()
             );
         } catch (
-            RestClientException exception
+                RestClientException exception
         ) {
             return PrepareResult.failure(
-                "KAKAO_COMMUNICATION_ERROR",
-                "카카오페이 서버와 통신하지 못했습니다."
+                    "KAKAO_COMMUNICATION_ERROR",
+                    "카카오페이 서버와 통신하지 못했습니다."
             );
         }
     }
 
     public ApproveResult approve(
-        ApproveCommand command
+            ApproveCommand command
     ) {
         if (!properties.hasSecretKey()) {
             return ApproveResult.failure(
-                "KAKAO_SECRET_KEY_MISSING",
-                "카카오페이 Secret key(dev)가 설정되지 않았습니다."
+                    "KAKAO_SECRET_KEY_MISSING",
+                    "카카오페이 Secret key(dev)가 설정되지 않았습니다."
             );
         }
 
         validateApproveCommand(command);
 
         Map<String, Object> requestBody =
-            new LinkedHashMap<>();
+                new LinkedHashMap<>();
 
         requestBody.put(
-            "cid",
-            properties.resolvedCid()
+                "cid",
+                properties.resolvedCid()
         );
 
         if (properties.hasCidSecret()) {
             requestBody.put(
-                "cid_secret",
-                properties.cidSecret()
+                    "cid_secret",
+                    properties.cidSecret()
             );
         }
 
         requestBody.put(
-            "tid",
-            command.tid()
+                "tid",
+                command.tid()
         );
 
         requestBody.put(
-            "partner_order_id",
-            command.partnerOrderId()
+                "partner_order_id",
+                command.partnerOrderId()
         );
 
         requestBody.put(
-            "partner_user_id",
-            command.partnerUserId()
+                "partner_user_id",
+                command.partnerUserId()
         );
 
         requestBody.put(
-            "pg_token",
-            command.pgToken()
+                "pg_token",
+                command.pgToken()
         );
 
         try {
             Map<String, Object> response =
-                restClient
-                    .post()
-                    .uri(APPROVE_PATH)
-                    .header(
-                        HttpHeaders.AUTHORIZATION,
-                        createAuthorizationValue()
-                    )
-                    .body(requestBody)
-                    .retrieve()
-                    .body(
-                        new ParameterizedTypeReference<>() {
-                        }
-                    );
+                    restClient
+                            .post()
+                            .uri(APPROVE_PATH)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    createAuthorizationValue()
+                            )
+                            .body(requestBody)
+                            .retrieve()
+                            .body(
+                                    new ParameterizedTypeReference<>() {
+                                    }
+                            );
 
             if (response == null) {
-                return ApproveResult.failure(
-                    "KAKAO_EMPTY_RESPONSE",
-                    "카카오페이 승인 응답이 비어 있습니다."
+                return recoverApproval(
+                        command,
+                        ApproveResult.failure(
+                                "KAKAO_EMPTY_RESPONSE",
+                                "카카오페이 승인 응답이 비어 있습니다."
+                        )
                 );
             }
 
             String aid = getString(
-                response,
-                "aid"
+                    response,
+                    "aid"
             );
 
             String tid = getString(
-                response,
-                "tid"
+                    response,
+                    "tid"
             );
 
             String partnerOrderId = getString(
-                response,
-                "partner_order_id"
+                    response,
+                    "partner_order_id"
             );
 
             String partnerUserId = getString(
-                response,
-                "partner_user_id"
+                    response,
+                    "partner_user_id"
             );
 
             String paymentMethodType = getString(
-                response,
-                "payment_method_type"
+                    response,
+                    "payment_method_type"
             );
 
             Long approvedAmount = getNestedLong(
-                response,
-                "amount",
-                "total"
+                    response,
+                    "amount",
+                    "total"
             );
 
             String approvedAt = getString(
-                response,
-                "approved_at"
+                    response,
+                    "approved_at"
             );
 
             if (isBlank(aid)
-                || isBlank(tid)
-                || isBlank(partnerOrderId)
-                || isBlank(partnerUserId)
-                || approvedAmount == null
-                || approvedAmount < 1) {
-                return ApproveResult.failure(
-                    "KAKAO_INVALID_APPROVE_RESPONSE",
-                    "카카오페이 승인 응답 형식이 올바르지 않습니다."
+                    || isBlank(tid)
+                    || isBlank(partnerOrderId)
+                    || isBlank(partnerUserId)
+                    || approvedAmount == null
+                    || approvedAmount < 1) {
+                return recoverApproval(
+                        command,
+                        ApproveResult.failure(
+                                "KAKAO_INVALID_APPROVE_RESPONSE",
+                                "카카오페이 승인 응답 형식이 올바르지 않습니다."
+                        )
                 );
             }
 
             return ApproveResult.success(
-                aid,
-                tid,
-                partnerOrderId,
-                partnerUserId,
-                paymentMethodType,
-                approvedAmount,
-                approvedAt
+                    aid,
+                    tid,
+                    partnerOrderId,
+                    partnerUserId,
+                    paymentMethodType,
+                    approvedAmount,
+                    approvedAt
             );
         } catch (
-            RestClientResponseException exception
+                RestClientResponseException exception
         ) {
             KakaoError error = extractError(exception);
 
-            return ApproveResult.failure(
-                error.code(),
-                error.message()
+            return recoverApproval(
+                    command,
+                    ApproveResult.failure(
+                            error.code(),
+                            error.message()
+                    )
             );
         } catch (
-            RestClientException exception
+                RestClientException exception
         ) {
-            return ApproveResult.failure(
-                "KAKAO_COMMUNICATION_ERROR",
-                "카카오페이 승인 결과를 확인하지 못했습니다."
+            return recoverApproval(
+                    command,
+                    ApproveResult.failure(
+                            "KAKAO_COMMUNICATION_ERROR",
+                            "카카오페이 승인 결과를 확인하지 못했습니다."
+                    )
             );
         }
     }
 
     public CancelResult cancel(
-        CancelCommand command
+            CancelCommand command
     ) {
         if (!properties.hasSecretKey()) {
             return CancelResult.failure(
-                "KAKAO_SECRET_KEY_MISSING",
-                "카카오페이 Secret key(dev)가 설정되지 않았습니다."
+                    "KAKAO_SECRET_KEY_MISSING",
+                    "카카오페이 Secret key(dev)가 설정되지 않았습니다."
             );
         }
 
         validateCancelCommand(command);
 
         Map<String, Object> requestBody =
-            new LinkedHashMap<>();
+                new LinkedHashMap<>();
 
         requestBody.put(
-            "cid",
-            properties.resolvedCid()
+                "cid",
+                properties.resolvedCid()
         );
 
         if (properties.hasCidSecret()) {
             requestBody.put(
-                "cid_secret",
-                properties.cidSecret()
+                    "cid_secret",
+                    properties.cidSecret()
             );
         }
 
         requestBody.put(
-            "tid",
-            command.tid()
+                "tid",
+                command.tid()
         );
 
         requestBody.put(
-            "cancel_amount",
-            command.cancelAmount()
+                "cancel_amount",
+                command.cancelAmount()
         );
 
         requestBody.put(
-            "cancel_tax_free_amount",
-            command.cancelTaxFreeAmount()
+                "cancel_tax_free_amount",
+                command.cancelTaxFreeAmount()
         );
 
         if (command.cancelVatAmount() != null) {
             requestBody.put(
-                "cancel_vat_amount",
-                command.cancelVatAmount()
+                    "cancel_vat_amount",
+                    command.cancelVatAmount()
             );
         }
 
         try {
             Map<String, Object> response =
-                restClient
-                    .post()
-                    .uri(CANCEL_PATH)
-                    .header(
-                        HttpHeaders.AUTHORIZATION,
-                        createAuthorizationValue()
-                    )
-                    .body(requestBody)
-                    .retrieve()
-                    .body(
-                        new ParameterizedTypeReference<>() {
-                        }
-                    );
+                    restClient
+                            .post()
+                            .uri(CANCEL_PATH)
+                            .header(
+                                    HttpHeaders.AUTHORIZATION,
+                                    createAuthorizationValue()
+                            )
+                            .body(requestBody)
+                            .retrieve()
+                            .body(
+                                    new ParameterizedTypeReference<>() {
+                                    }
+                            );
 
             if (response == null) {
                 return CancelResult.failure(
-                    "KAKAO_EMPTY_RESPONSE",
-                    "카카오페이 취소 응답이 비어 있습니다."
+                        "KAKAO_EMPTY_RESPONSE",
+                        "카카오페이 취소 응답이 비어 있습니다."
                 );
             }
 
             String aid = getString(
-                response,
-                "aid"
+                    response,
+                    "aid"
             );
 
             String tid = getString(
-                response,
-                "tid"
+                    response,
+                    "tid"
             );
 
             String status = getString(
-                response,
-                "status"
+                    response,
+                    "status"
             );
 
             Long approvedCancelAmount = getNestedLong(
-                response,
-                "approved_cancel_amount",
-                "total"
+                    response,
+                    "approved_cancel_amount",
+                    "total"
             );
 
             Long canceledAmount = getNestedLong(
-                response,
-                "canceled_amount",
-                "total"
+                    response,
+                    "canceled_amount",
+                    "total"
             );
 
             Long cancelAvailableAmount = getNestedLong(
-                response,
-                "cancel_available_amount",
-                "total"
+                    response,
+                    "cancel_available_amount",
+                    "total"
             );
 
             String canceledAt = getString(
-                response,
-                "canceled_at"
+                    response,
+                    "canceled_at"
             );
 
             if (isBlank(aid)
-                || isBlank(tid)
-                || isBlank(status)
-                || approvedCancelAmount == null
-                || approvedCancelAmount < 1
-                || canceledAmount == null
-                || cancelAvailableAmount == null) {
+                    || isBlank(tid)
+                    || isBlank(status)
+                    || approvedCancelAmount == null
+                    || approvedCancelAmount < 1
+                    || canceledAmount == null
+                    || cancelAvailableAmount == null) {
                 return CancelResult.failure(
-                    "KAKAO_INVALID_CANCEL_RESPONSE",
-                    "카카오페이 취소 응답 형식이 올바르지 않습니다."
+                        "KAKAO_INVALID_CANCEL_RESPONSE",
+                        "카카오페이 취소 응답 형식이 올바르지 않습니다."
                 );
             }
 
             return CancelResult.success(
-                aid,
-                tid,
-                status,
-                approvedCancelAmount,
-                canceledAmount,
-                cancelAvailableAmount,
-                canceledAt
+                    aid,
+                    tid,
+                    status,
+                    approvedCancelAmount,
+                    canceledAmount,
+                    cancelAvailableAmount,
+                    canceledAt
             );
         } catch (
-            RestClientResponseException exception
+                RestClientResponseException exception
         ) {
             KakaoError error = extractError(exception);
 
             return CancelResult.failure(
-                error.code(),
-                error.message()
+                    error.code(),
+                    error.message()
             );
         } catch (
-            RestClientException exception
+                RestClientException exception
         ) {
-            /*
-             * 카카오페이에서 취소는 완료됐지만 POPQ가 응답을
-             * 받지 못한 상황일 수도 있습니다.
-             *
-             * 다음 단계에서 주문 조회 API로 실제 취소 상태를
-             * 확인하도록 연결합니다.
-             */
             return CancelResult.failure(
-                "KAKAO_COMMUNICATION_ERROR",
-                "카카오페이 취소 결과를 확인하지 못했습니다."
+                    "KAKAO_COMMUNICATION_ERROR",
+                    "카카오페이 취소 결과를 확인하지 못했습니다."
             );
         }
     }
 
+    private ApproveResult recoverApproval(
+            ApproveCommand command,
+            ApproveResult originalFailure
+    ) {
+        LookupResult lookupResult =
+                kakaoPaymentOrderClient.lookup(
+                        command.tid()
+                );
+
+        if (!lookupResult.success()) {
+            return originalFailure;
+        }
+
+        if (!Objects.equals(
+                command.tid(),
+                lookupResult.tid()
+        )) {
+            return ApproveResult.failure(
+                    "KAKAO_APPROVE_LOOKUP_TID_MISMATCH",
+                    "카카오페이 주문 조회의 결제번호가 준비된 결제와 일치하지 않습니다."
+            );
+        }
+
+        /*
+         * SUCCESS_PAYMENT일 때만 승인 완료로 복구합니다.
+         * 부분 취소 또는 전체 취소 상태를 PAID로 되돌리면 안 됩니다.
+         */
+        if (!lookupResult.isPaymentCompleted()) {
+            return originalFailure;
+        }
+
+        if (lookupResult.totalAmount() == null
+                || lookupResult.totalAmount() < 1) {
+            return ApproveResult.failure(
+                    "KAKAO_INVALID_APPROVE_LOOKUP_RESPONSE",
+                    "카카오페이 주문 조회에서 승인 금액을 확인할 수 없습니다."
+            );
+        }
+
+        return ApproveResult.success(
+                lookupResult.latestPaymentAid(),
+                lookupResult.tid(),
+                lookupResult.partnerOrderId(),
+                lookupResult.partnerUserId(),
+                lookupResult.paymentMethodType(),
+                lookupResult.totalAmount(),
+                lookupResult.approvedAt()
+        );
+    }
+
     private KakaoError extractError(
-        RestClientResponseException exception
+            RestClientResponseException exception
     ) {
         try {
             Map<String, Object> response =
-                exception.getResponseBodyAs(
-                    new ParameterizedTypeReference<>() {
-                    }
-                );
+                    exception.getResponseBodyAs(
+                            new ParameterizedTypeReference<>() {
+                            }
+                    );
 
             if (response != null) {
                 String code = getCode(
-                    response.get("error_code")
+                        response.get("error_code")
                 );
 
                 String message = getString(
-                    response,
-                    "error_message"
+                        response,
+                        "error_message"
                 );
 
                 return new KakaoError(
-                    isBlank(code)
-                        ? "KAKAO_API_ERROR"
-                        : "KAKAO_" + code,
-                    isBlank(message)
-                        ? "카카오페이 요청 처리에 실패했습니다."
-                        : message
+                        isBlank(code)
+                                ? "KAKAO_API_ERROR"
+                                : "KAKAO_" + code,
+                        isBlank(message)
+                                ? "카카오페이 요청 처리에 실패했습니다."
+                                : message
                 );
             }
         } catch (Exception ignored) {
             /*
-             * 카카오페이 오류 응답 파싱에 실패하면
-             * 아래의 기본 오류를 사용합니다.
+             * 오류 응답 파싱 실패 시
+             * 아래 기본 오류를 사용합니다.
              */
         }
 
         return new KakaoError(
-            "KAKAO_API_ERROR",
-            "카카오페이 요청 처리에 실패했습니다. HTTP 상태: "
-                + exception
-                .getStatusCode()
-                .value()
+                "KAKAO_API_ERROR",
+                "카카오페이 요청 처리에 실패했습니다. HTTP 상태: "
+                        + exception
+                        .getStatusCode()
+                        .value()
         );
     }
 
     private void validatePrepareCommand(
-        PrepareCommand command
+            PrepareCommand command
     ) {
         requireText(
-            command.partnerOrderId(),
-            "partnerOrderId"
+                command.partnerOrderId(),
+                "partnerOrderId"
         );
 
         requireText(
-            command.partnerUserId(),
-            "partnerUserId"
+                command.partnerUserId(),
+                "partnerUserId"
         );
 
         requireText(
-            command.itemName(),
-            "itemName"
+                command.itemName(),
+                "itemName"
         );
 
         requireText(
-            command.approvalUrl(),
-            "approvalUrl"
+                command.approvalUrl(),
+                "approvalUrl"
         );
 
         requireText(
-            command.cancelUrl(),
-            "cancelUrl"
+                command.cancelUrl(),
+                "cancelUrl"
         );
 
         requireText(
-            command.failUrl(),
-            "failUrl"
+                command.failUrl(),
+                "failUrl"
         );
 
         validateMaximumLength(
-            command.partnerOrderId(),
-            "partnerOrderId",
-            100
+                command.partnerOrderId(),
+                "partnerOrderId",
+                100
         );
 
         validateMaximumLength(
-            command.partnerUserId(),
-            "partnerUserId",
-            100
+                command.partnerUserId(),
+                "partnerUserId",
+                100
         );
 
         validateMaximumLength(
-            command.itemName(),
-            "itemName",
-            100
+                command.itemName(),
+                "itemName",
+                100
         );
 
         if (command.quantity() < 1) {
             throw new IllegalArgumentException(
-                "quantity는 1 이상이어야 합니다."
+                    "quantity는 1 이상이어야 합니다."
             );
         }
 
         if (command.totalAmount() < 1) {
             throw new IllegalArgumentException(
-                "totalAmount는 1원 이상이어야 합니다."
+                    "totalAmount는 1원 이상이어야 합니다."
             );
         }
 
         if (command.taxFreeAmount() < 0
-            || command.taxFreeAmount()
-            > command.totalAmount()) {
+                || command.taxFreeAmount()
+                > command.totalAmount()) {
             throw new IllegalArgumentException(
-                "taxFreeAmount가 올바르지 않습니다."
+                    "taxFreeAmount가 올바르지 않습니다."
             );
         }
 
         if (command.vatAmount() != null
-            && (
-            command.vatAmount() < 0
-                || command.vatAmount()
-                > command.totalAmount()
+                && (
+                command.vatAmount() < 0
+                        || command.vatAmount()
+                        > command.totalAmount()
         )) {
             throw new IllegalArgumentException(
-                "vatAmount가 올바르지 않습니다."
+                    "vatAmount가 올바르지 않습니다."
             );
         }
     }
 
     private void validateApproveCommand(
-        ApproveCommand command
+            ApproveCommand command
     ) {
         requireText(
-            command.tid(),
-            "tid"
+                command.tid(),
+                "tid"
         );
 
         requireText(
-            command.partnerOrderId(),
-            "partnerOrderId"
+                command.partnerOrderId(),
+                "partnerOrderId"
         );
 
         requireText(
-            command.partnerUserId(),
-            "partnerUserId"
+                command.partnerUserId(),
+                "partnerUserId"
         );
 
         requireText(
-            command.pgToken(),
-            "pgToken"
+                command.pgToken(),
+                "pgToken"
         );
 
         validateMaximumLength(
-            command.partnerOrderId(),
-            "partnerOrderId",
-            100
+                command.partnerOrderId(),
+                "partnerOrderId",
+                100
         );
 
         validateMaximumLength(
-            command.partnerUserId(),
-            "partnerUserId",
-            100
+                command.partnerUserId(),
+                "partnerUserId",
+                100
         );
 
         validateMaximumLength(
-            command.pgToken(),
-            "pgToken",
-            255
+                command.pgToken(),
+                "pgToken",
+                255
         );
     }
 
     private void validateCancelCommand(
-        CancelCommand command
+            CancelCommand command
     ) {
         requireText(
-            command.tid(),
-            "tid"
+                command.tid(),
+                "tid"
         );
 
         if (command.cancelAmount() < 1) {
             throw new IllegalArgumentException(
-                "cancelAmount는 1원 이상이어야 합니다."
+                    "cancelAmount는 1원 이상이어야 합니다."
             );
         }
 
         if (command.cancelTaxFreeAmount() < 0
-            || command.cancelTaxFreeAmount()
-            > command.cancelAmount()) {
+                || command.cancelTaxFreeAmount()
+                > command.cancelAmount()) {
             throw new IllegalArgumentException(
-                "cancelTaxFreeAmount가 올바르지 않습니다."
+                    "cancelTaxFreeAmount가 올바르지 않습니다."
             );
         }
 
         if (command.cancelVatAmount() != null
-            && (
-            command.cancelVatAmount() < 0
-                || command.cancelVatAmount()
-                > command.cancelAmount()
+                && (
+                command.cancelVatAmount() < 0
+                        || command.cancelVatAmount()
+                        > command.cancelAmount()
         )) {
             throw new IllegalArgumentException(
-                "cancelVatAmount가 올바르지 않습니다."
+                    "cancelVatAmount가 올바르지 않습니다."
             );
         }
     }
 
     private void validateMaximumLength(
-        String value,
-        String fieldName,
-        int maximumLength
+            String value,
+            String fieldName,
+            int maximumLength
     ) {
         if (value.length() > maximumLength) {
             throw new IllegalArgumentException(
-                fieldName
-                    + "은(는) "
-                    + maximumLength
-                    + "자를 초과할 수 없습니다."
+                    fieldName
+                            + "은(는) "
+                            + maximumLength
+                            + "자를 초과할 수 없습니다."
             );
         }
     }
 
     private void requireText(
-        String value,
-        String fieldName
+            String value,
+            String fieldName
     ) {
         if (isBlank(value)) {
             throw new IllegalArgumentException(
-                fieldName + "은(는) 필수입니다."
+                    fieldName + "은(는) 필수입니다."
             );
         }
     }
 
     private String createAuthorizationValue() {
         return "SECRET_KEY "
-            + properties.secretKey();
+                + properties.secretKey();
     }
 
     private String getString(
-        Map<String, Object> response,
-        String key
+            Map<String, Object> response,
+            String key
     ) {
         Object value = response.get(key);
 
         return value instanceof String stringValue
-            ? stringValue
-            : null;
+                ? stringValue
+                : null;
     }
 
     private String getCode(
-        Object value
+            Object value
     ) {
         if (value instanceof Number number) {
             return String.valueOf(
-                number.longValue()
+                    number.longValue()
             );
         }
 
         return value instanceof String stringValue
-            ? stringValue
-            : null;
+                ? stringValue
+                : null;
     }
 
     private Long getNestedLong(
-        Map<String, Object> response,
-        String parentKey,
-        String childKey
+            Map<String, Object> response,
+            String parentKey,
+            String childKey
     ) {
         Object parentValue =
-            response.get(parentKey);
+                response.get(parentKey);
 
         if (!(parentValue instanceof Map<?, ?> map)) {
             return null;
         }
 
         return toLong(
-            map.get(childKey)
+                map.get(childKey)
         );
     }
 
     private Long toLong(
-        Object value
+            Object value
     ) {
         if (value instanceof Number number) {
             return number.longValue();
@@ -808,7 +868,7 @@ public class KakaoPaymentClient {
         if (value instanceof String stringValue) {
             try {
                 return Long.parseLong(
-                    stringValue
+                        stringValue
                 );
             } catch (NumberFormatException ignored) {
                 return null;
@@ -819,258 +879,258 @@ public class KakaoPaymentClient {
     }
 
     private boolean isBlank(
-        String value
+            String value
     ) {
         return value == null
-            || value.isBlank();
+                || value.isBlank();
     }
 
     public record PrepareCommand(
 
-        String partnerOrderId,
+            String partnerOrderId,
 
-        String partnerUserId,
+            String partnerUserId,
 
-        String itemName,
+            String itemName,
 
-        int quantity,
+            int quantity,
 
-        long totalAmount,
+            long totalAmount,
 
-        long taxFreeAmount,
+            long taxFreeAmount,
 
-        Long vatAmount,
+            Long vatAmount,
 
-        String approvalUrl,
+            String approvalUrl,
 
-        String cancelUrl,
+            String cancelUrl,
 
-        String failUrl,
+            String failUrl,
 
-        String redirectSchemeUrl
+            String redirectSchemeUrl
 
     ) {
     }
 
     public record PrepareResult(
 
-        boolean success,
+            boolean success,
 
-        String tid,
+            String tid,
 
-        String nextRedirectAppUrl,
+            String nextRedirectAppUrl,
 
-        String nextRedirectMobileUrl,
+            String nextRedirectMobileUrl,
 
-        String nextRedirectPcUrl,
+            String nextRedirectPcUrl,
 
-        String createdAt,
+            String createdAt,
 
-        String failureCode,
+            String failureCode,
 
-        String failureMessage
+            String failureMessage
 
     ) {
 
         public static PrepareResult success(
-            String tid,
-            String nextRedirectAppUrl,
-            String nextRedirectMobileUrl,
-            String nextRedirectPcUrl,
-            String createdAt
+                String tid,
+                String nextRedirectAppUrl,
+                String nextRedirectMobileUrl,
+                String nextRedirectPcUrl,
+                String createdAt
         ) {
             return new PrepareResult(
-                true,
-                tid,
-                nextRedirectAppUrl,
-                nextRedirectMobileUrl,
-                nextRedirectPcUrl,
-                createdAt,
-                null,
-                null
+                    true,
+                    tid,
+                    nextRedirectAppUrl,
+                    nextRedirectMobileUrl,
+                    nextRedirectPcUrl,
+                    createdAt,
+                    null,
+                    null
             );
         }
 
         public static PrepareResult failure(
-            String failureCode,
-            String failureMessage
+                String failureCode,
+                String failureMessage
         ) {
             return new PrepareResult(
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                failureCode,
-                failureMessage
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    failureCode,
+                    failureMessage
             );
         }
     }
 
     public record ApproveCommand(
 
-        String tid,
+            String tid,
 
-        String partnerOrderId,
+            String partnerOrderId,
 
-        String partnerUserId,
+            String partnerUserId,
 
-        String pgToken
+            String pgToken
 
     ) {
     }
 
     public record ApproveResult(
 
-        boolean success,
+            boolean success,
 
-        String aid,
+            String aid,
 
-        String tid,
+            String tid,
 
-        String partnerOrderId,
+            String partnerOrderId,
 
-        String partnerUserId,
+            String partnerUserId,
 
-        String paymentMethodType,
+            String paymentMethodType,
 
-        long approvedAmount,
+            long approvedAmount,
 
-        String approvedAt,
+            String approvedAt,
 
-        String failureCode,
+            String failureCode,
 
-        String failureMessage
+            String failureMessage
 
     ) {
 
         public static ApproveResult success(
-            String aid,
-            String tid,
-            String partnerOrderId,
-            String partnerUserId,
-            String paymentMethodType,
-            long approvedAmount,
-            String approvedAt
+                String aid,
+                String tid,
+                String partnerOrderId,
+                String partnerUserId,
+                String paymentMethodType,
+                long approvedAmount,
+                String approvedAt
         ) {
             return new ApproveResult(
-                true,
-                aid,
-                tid,
-                partnerOrderId,
-                partnerUserId,
-                paymentMethodType,
-                approvedAmount,
-                approvedAt,
-                null,
-                null
+                    true,
+                    aid,
+                    tid,
+                    partnerOrderId,
+                    partnerUserId,
+                    paymentMethodType,
+                    approvedAmount,
+                    approvedAt,
+                    null,
+                    null
             );
         }
 
         public static ApproveResult failure(
-            String failureCode,
-            String failureMessage
+                String failureCode,
+                String failureMessage
         ) {
             return new ApproveResult(
-                false,
-                null,
-                null,
-                null,
-                null,
-                null,
-                0L,
-                null,
-                failureCode,
-                failureMessage
+                    false,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0L,
+                    null,
+                    failureCode,
+                    failureMessage
             );
         }
     }
 
     public record CancelCommand(
 
-        String tid,
+            String tid,
 
-        long cancelAmount,
+            long cancelAmount,
 
-        long cancelTaxFreeAmount,
+            long cancelTaxFreeAmount,
 
-        Long cancelVatAmount
+            Long cancelVatAmount
 
     ) {
     }
 
     public record CancelResult(
 
-        boolean success,
+            boolean success,
 
-        String aid,
+            String aid,
 
-        String tid,
+            String tid,
 
-        String status,
+            String status,
 
-        long approvedCancelAmount,
+            long approvedCancelAmount,
 
-        long canceledAmount,
+            long canceledAmount,
 
-        long cancelAvailableAmount,
+            long cancelAvailableAmount,
 
-        String canceledAt,
+            String canceledAt,
 
-        String failureCode,
+            String failureCode,
 
-        String failureMessage
+            String failureMessage
 
     ) {
 
         public static CancelResult success(
-            String aid,
-            String tid,
-            String status,
-            long approvedCancelAmount,
-            long canceledAmount,
-            long cancelAvailableAmount,
-            String canceledAt
+                String aid,
+                String tid,
+                String status,
+                long approvedCancelAmount,
+                long canceledAmount,
+                long cancelAvailableAmount,
+                String canceledAt
         ) {
             return new CancelResult(
-                true,
-                aid,
-                tid,
-                status,
-                approvedCancelAmount,
-                canceledAmount,
-                cancelAvailableAmount,
-                canceledAt,
-                null,
-                null
+                    true,
+                    aid,
+                    tid,
+                    status,
+                    approvedCancelAmount,
+                    canceledAmount,
+                    cancelAvailableAmount,
+                    canceledAt,
+                    null,
+                    null
             );
         }
 
         public static CancelResult failure(
-            String failureCode,
-            String failureMessage
+                String failureCode,
+                String failureMessage
         ) {
             return new CancelResult(
-                false,
-                null,
-                null,
-                null,
-                0L,
-                0L,
-                0L,
-                null,
-                failureCode,
-                failureMessage
+                    false,
+                    null,
+                    null,
+                    null,
+                    0L,
+                    0L,
+                    0L,
+                    null,
+                    failureCode,
+                    failureMessage
             );
         }
     }
 
     private record KakaoError(
 
-        String code,
+            String code,
 
-        String message
+            String message
 
     ) {
     }
