@@ -95,5 +95,14 @@ public class AuthController {
     ) {
         return ApiResponse.success(authService.resetPassword(request));
     }
+
+    @PostMapping("/connect-seller")
+    public ApiResponse<AckResponse> connectSeller(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+                authService.connectSellerAccess(Long.valueOf(jwt.getSubject()))
+        );
+    }
 }
 
