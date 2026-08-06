@@ -13,6 +13,7 @@ import com.example.project_popq.payment.dto.SellerPaymentSummaryResponse;
 import com.example.project_popq.payment.service.SellerRefundService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,14 +41,16 @@ public class SellerOrderController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long storeId,
             @RequestParam(required = false) OrderStatus status,
-            @RequestParam(required = false) List<OrderStatus> statuses
+            @RequestParam(required = false) List<OrderStatus> statuses,
+            @RequestParam(required = false) LocalDate date
     ) {
         return ApiResponse.success(
                 orderCommandService.findSellerOrders(
                         currentUserService.getRequired(jwt),
                         storeId,
                         status,
-                        statuses
+                        statuses,
+                        date
                 )
         );
     }

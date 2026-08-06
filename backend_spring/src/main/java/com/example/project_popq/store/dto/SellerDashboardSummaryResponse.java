@@ -9,6 +9,7 @@ public record SellerDashboardSummaryResponse(
         long waitingOrderCount,
         long activeOrderCount,
         long readyOrderCount,
-        long unansweredReviewCount
+        long unansweredReviewCount,
+        long unreadChatCount
 ) {
 }

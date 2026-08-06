@@ -25,8 +25,10 @@ import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.service.StoreAuthorizationService;
+import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +41,12 @@ public class OrderCommandService {
 
     private static final Set<Integer> PREPARATION_MINUTES = Set.of(
             0, 5, 10, 15, 20, 30, 40, 50
+    );
+    private static final Set<OrderStatus> TERMINAL_STATUSES = Set.of(
+            OrderStatus.COMPLETED,
+            OrderStatus.CANCELED,
+            OrderStatus.REJECTED,
+            OrderStatus.EXPIRED
     );
 
     private final GuestQrService guestQrService;
@@ -105,11 +113,34 @@ public class OrderCommandService {
             User user,
             Long storeId,
             OrderStatus status,
-            List<OrderStatus> statuses
+            List<OrderStatus> statuses,
+            LocalDate date
     ) {
         requireStoreMember(user.getId(), storeId);
         List<Order> orders;
-        if (status != null) {
+        if (date != null) {
+            List<OrderStatus> requestedStatuses = status != null
+                    ? List.of(status)
+                    : statuses == null || statuses.isEmpty()
+                    ? List.copyOf(TERMINAL_STATUSES)
+                    : statuses;
+            if (!TERMINAL_STATUSES.containsAll(requestedStatuses)) {
+                throw new BusinessException(ErrorCode.INVALID_REQUEST);
+            }
+            Instant fromInclusive = date.atStartOfDay(
+                    StoreOperatingHoursPolicy.BUSINESS_ZONE
+            ).toInstant();
+            Instant toExclusive = date.plusDays(1).atStartOfDay(
+                    StoreOperatingHoursPolicy.BUSINESS_ZONE
+            ).toInstant();
+            orders = orderRepository
+                    .findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                            storeId,
+                            requestedStatuses,
+                            fromInclusive,
+                            toExclusive
+                    );
+        } else if (status != null) {
             orders = orderRepository.findAllByStoreIdAndStatusOrderByCreatedAtDesc(
                     storeId,
                     status

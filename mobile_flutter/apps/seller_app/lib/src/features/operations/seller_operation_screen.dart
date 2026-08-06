@@ -18,6 +18,7 @@ import '../stores/seller_store_edit_screen.dart';
 import '../stores/seller_store_location_picker_screen.dart';
 import '../stores/seller_store_repository.dart';
 import '../stores/seller_store_selection_controller.dart';
+import '../stores/seller_tag_editor.dart';
 
 class SellerOperationScreen extends StatefulWidget {
   const SellerOperationScreen({
@@ -310,14 +311,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             child: Text(
               'OWNER 또는 MANAGER만 영업 상태를 변경할 수 있습니다.',
             ),
-          ),
-
-        if (_changingStatus)
-          const Padding(
-            padding: EdgeInsets.only(
-              top: PopqSpacing.sm,
-            ),
-            child: LinearProgressIndicator(),
           ),
 
         const SizedBox(height: PopqSpacing.lg),
@@ -999,41 +992,18 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   }
 
   Future<void> _editTags() async {
-    final String? value = await _requestTextEdit(
-      title: '검색 키워드 수정',
-      initialValue: _store!.tags.join(', '),
-      maxLength: 310,
-      requiredValue: false,
-      maxLines: 3,
-      hintText: '쉼표로 구분해 최대 10개까지 입력',
+    final List<String>? tags = await showSellerTagsEditorDialog(
+      context,
+      initialTags: _store!.tags,
+      maxCount: 10,
     );
-    if (value == null || !mounted) {
+    if (tags == null || !mounted) {
       return;
     }
-    final List<String> parsed = _parseTags(value);
-    if (parsed.length > 10) {
-      _showMessage('검색 키워드는 최대 10개까지 입력할 수 있습니다.');
-      return;
-    }
-    if (parsed.any((String tag) => tag.length > 30)) {
-      _showMessage('검색 키워드는 각각 30자 이하여야 합니다.');
-      return;
-    }
-    await _saveQuickEdit(tags: parsed, successMessage: '검색 키워드를 수정했습니다.');
-  }
-
-  List<String> _parseTags(String value) {
-    final List<String> tags = <String>[];
-    for (final String raw in value.split(',')) {
-      final String tag = raw
-          .trim()
-          .replaceFirst(RegExp(r'^#+'), '')
-          .toLowerCase();
-      if (tag.isNotEmpty && !tags.contains(tag)) {
-        tags.add(tag);
-      }
-    }
-    return List<String>.unmodifiable(tags);
+    await _saveQuickEdit(
+      tags: tags,
+      successMessage: '검색 키워드를 수정했습니다.',
+    );
   }
 
   Future<void> _editRepresentativeCategory() async {

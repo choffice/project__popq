@@ -259,6 +259,7 @@ abstract interface class SellerOrderRepository {
     int storeId, {
     String? status,
     List<String>? statuses,
+    DateTime? date,
   });
 
   Future<SellerOrder> findOne(int storeId, String orderPublicId);
@@ -303,12 +304,14 @@ class ApiSellerOrderRepository implements SellerOrderRepository {
     int storeId, {
     String? status,
     List<String>? statuses,
+    DateTime? date,
   }) {
     final query = <String, Object?>{};
     if (status != null) query['status'] = status;
     if (status == null && statuses != null && statuses.isNotEmpty) {
       query['statuses'] = statuses.join(',');
     }
+    if (date != null) query['date'] = _calendarDate(date);
     return _apiClient.get(
       _basePath(storeId),
       query: query,
@@ -422,13 +425,23 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
     int storeId, {
     String? status,
     List<String>? statuses,
+    DateTime? date,
   }) async {
+    final DateTime? fromUtc = date == null
+        ? null
+        : DateTime.utc(date.year, date.month, date.day)
+            .subtract(const Duration(hours: 9));
+    final DateTime? toUtc = fromUtc?.add(const Duration(days: 1));
     final values =
       _orders.where(
         (order) =>
             order.storeId == storeId &&
             (status == null || order.status == status) &&
-            (statuses == null || statuses.contains(order.status)),
+            (statuses == null || statuses.contains(order.status)) &&
+            (fromUtc == null ||
+                order.createdAt != null &&
+                    !order.createdAt!.toUtc().isBefore(fromUtc) &&
+                    order.createdAt!.toUtc().isBefore(toUtc!)),
       ).toList()
         ..sort((left, right) {
           final leftDate = left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -566,4 +579,10 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
           order.storeId == storeId && order.orderPublicId == orderPublicId,
     );
   }
+}
+
+String _calendarDate(DateTime date) {
+  return '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }

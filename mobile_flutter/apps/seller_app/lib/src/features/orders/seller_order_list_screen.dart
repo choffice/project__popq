@@ -12,12 +12,14 @@ class SellerOrderListScreen extends StatefulWidget {
     required this.repository,
     required this.storeRepository,
     required this.selectionController,
+    this.initialCurrentFilter,
     super.key,
   });
 
   final SellerOrderRepository repository;
   final SellerStoreRepository storeRepository;
   final SellerStoreSelectionController selectionController;
+  final String? initialCurrentFilter;
 
   @override
   State<SellerOrderListScreen> createState() => _SellerOrderListScreenState();
@@ -43,13 +45,19 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   late Future<List<SellerOrder>> _orders;
   String? _currentFilter;
   String? _recentFilter;
+  late DateTime _pastDate;
+  Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
   var _requestSerial = 0;
+  var _loadedTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(_handleTabChanged);
+    _currentFilter = widget.initialCurrentFilter;
+    final seoulNow = DateTime.now().toUtc().add(const Duration(hours: 9));
+    _pastDate = DateTime(seoulNow.year, seoulNow.month, seoulNow.day);
     widget.selectionController.addListener(_handleSelectionChanged);
     _stores = _loadStores();
     _orders = _loadOrders();
@@ -58,6 +66,9 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   @override
   void didUpdateWidget(covariant SellerOrderListScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialCurrentFilter != widget.initialCurrentFilter) {
+      _currentFilter = widget.initialCurrentFilter;
+    }
     if (oldWidget.selectionController != widget.selectionController) {
       oldWidget.selectionController.removeListener(_handleSelectionChanged);
       widget.selectionController.addListener(_handleSelectionChanged);
@@ -96,39 +107,87 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                 PopqSpacing.md,
                 PopqSpacing.xs,
               ),
-              child: DropdownButtonFormField<int>(
-                key: const Key('seller-order-store-selector'),
-                initialValue: validValue,
+              child: InputDecorator(
                 decoration: const InputDecoration(
                   labelText: '주문을 확인할 사업장',
                   prefixIcon: Icon(Icons.storefront_outlined),
                 ),
-                items: stores
-                    .map(
-                      (store) => DropdownMenuItem<int>(
-                        value: store.storeId,
-                        child: Text(store.name),
-                      ),
-                    )
-                    .toList(),
-                onChanged: snapshot.connectionState == ConnectionState.done
-                    ? (storeId) {
-                        if (storeId != null) {
-                          widget.selectionController.select(storeId);
-                        }
-                      }
-                    : null,
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<int>(
+                    key: const Key('seller-order-store-selector'),
+                    value: validValue,
+                    isExpanded: true,
+                    isDense: true,
+                    hint: Text(
+                      snapshot.connectionState == ConnectionState.done
+                          ? '사업장을 선택해 주세요.'
+                          : '사업장을 불러오는 중...',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    items: stores
+                        .map(
+                          (store) => DropdownMenuItem<int>(
+                            value: store.storeId,
+                            child: _storeDropdownItem(store),
+                          ),
+                        )
+                        .toList(),
+                    selectedItemBuilder: (context) => stores
+                        .map((store) => _storeDropdownItem(store))
+                        .toList(),
+                    onChanged:
+                        snapshot.connectionState == ConnectionState.done
+                            ? (storeId) {
+                                if (storeId != null) {
+                                  widget.selectionController.select(storeId);
+                                }
+                              }
+                            : null,
+                  ),
+                ),
               ),
             );
           },
         ),
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: '진행 중'),
-            Tab(text: '최근 주문'),
-          ],
+        Builder(
+          builder: (context) {
+            final dark = Theme.of(context).brightness == Brightness.dark;
+            final activeColor = dark
+                ? Theme.of(context).colorScheme.primary
+                : const Color(0xFF35663A);
+            return TabBar(
+              controller: _tabController,
+              labelColor: activeColor,
+              unselectedLabelColor:
+                  Theme.of(context).colorScheme.onSurfaceVariant,
+              indicatorColor: activeColor,
+              dividerColor: Theme.of(context).colorScheme.outlineVariant,
+              tabs: const [
+                Tab(text: '진행 중'),
+                Tab(text: '지난 주문'),
+              ],
+            );
+          },
         ),
+        AnimatedBuilder(
+          animation: _tabController,
+          builder: (context, _) => _tabController.index == 1
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    PopqSpacing.md,
+                    PopqSpacing.sm,
+                    PopqSpacing.md,
+                    0,
+                  ),
+                  child: OutlinedButton.icon(
+                    onPressed: _selectPastDate,
+                    icon: const Icon(Icons.calendar_month_outlined),
+                    label: Text(_dateLabel(_pastDate)),
+                  ),
+                )
+              : const SizedBox.shrink(),
+          ),
         SizedBox(
           height: 56,
           child: AnimatedBuilder(
@@ -153,6 +212,16 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                   return FilterChip(
                     label: Text(_filterLabel(filter)),
                     selected: selected == filter,
+                    selectedColor: const Color(0xFFFFC9BA),
+                    checkmarkColor: const Color(0xFF4A1C12),
+                    labelStyle: TextStyle(
+                      color: selected == filter
+                          ? const Color(0xFF4A1C12)
+                          : Theme.of(context).colorScheme.onSurface,
+                      fontWeight: selected == filter
+                          ? FontWeight.w800
+                          : FontWeight.w500,
+                    ),
                     onSelected: (_) => _selectFilter(filter),
                   );
                 },
@@ -191,7 +260,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                     icon: Icons.receipt_long_outlined,
                     title: _tabController.index == 0
                         ? '진행 중인 주문이 없어요.'
-                        : '최근 주문이 없어요.',
+                        : '${_dateLabel(_pastDate)} 지난 주문이 없어요.',
                     description: '아래로 당겨 주문 목록을 새로고침할 수 있어요.',
                   ),
                 ),
@@ -222,9 +291,17 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   }
 
   Future<List<SellerStore>> _loadStores() async {
-    final stores = (await widget.storeRepository.findAll())
+    final results = await Future.wait([
+      widget.storeRepository.findAll(),
+      widget.storeRepository.findDashboardSummaries(),
+    ]);
+    final stores = (results[0] as List<SellerStore>)
         .where((store) => store.status == 'ACTIVE')
         .toList();
+    final summaries = results[1] as List<SellerDashboardSummary>;
+    _summariesByStoreId = {
+      for (final summary in summaries) summary.storeId: summary,
+    };
     final selectedId = widget.selectionController.selectedStoreId;
     if (stores.isNotEmpty && !stores.any((store) => store.storeId == selectedId)) {
       await widget.selectionController.select(stores.first.storeId);
@@ -236,7 +313,12 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     final storeId = widget.selectionController.selectedStoreId;
     if (storeId == null) return const [];
     final serial = ++_requestSerial;
-    final orders = await widget.repository.findAll(storeId);
+    final current = _tabController.index == 0;
+    final orders = await widget.repository.findAll(
+      storeId,
+      statuses: current ? _currentStatuses : _recentStatuses,
+      date: current ? null : _pastDate,
+    );
     if (serial != _requestSerial ||
         storeId != widget.selectionController.selectedStoreId) {
       return const [];
@@ -287,7 +369,9 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   }
 
   void _handleTabChanged() {
-    if (!_tabController.indexIsChanging && mounted) setState(() {});
+    if (!mounted || _loadedTabIndex == _tabController.index) return;
+    _loadedTabIndex = _tabController.index;
+    setState(() => _orders = _loadOrders());
   }
 
   void _selectFilter(String? filter) {
@@ -304,8 +388,9 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     return switch (filter) {
       null => '전체',
       'ACCEPTED_PREPARING' => '접수·준비 중',
-      'CANCELED_FAMILY' => '취소',
-      'REJECTED_FAMILY' => '거절',
+      'COMPLETED' => '처리완료',
+      'CANCELED_FAMILY' => '주문취소',
+      'REJECTED_FAMILY' => '주문거절',
       _ => sellerOrderStatusLabel(filter),
     };
   }
@@ -317,6 +402,61 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     });
     await Future.wait([_stores, _orders]);
   }
+
+  Widget _storeDropdownItem(SellerStore store) {
+    final waiting = _summariesByStoreId[store.storeId]?.waitingOrderCount ?? 0;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            store.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (waiting > 0) ...[
+          const SizedBox(width: PopqSpacing.xs),
+          Icon(
+            Icons.notifications_rounded,
+            size: 18,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          const SizedBox(width: 2),
+          Text(
+            '접수대기 $waiting',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.error,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _selectPastDate() async {
+    final todayInSeoul = DateTime.now().toUtc().add(const Duration(hours: 9));
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: _pastDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(
+        todayInSeoul.year,
+        todayInSeoul.month,
+        todayInSeoul.day,
+      ),
+      helpText: '지난 주문 날짜 선택',
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _pastDate = DateTime(selected.year, selected.month, selected.day);
+      _orders = _loadOrders();
+    });
+  }
+
+  String _dateLabel(DateTime date) =>
+      '${date.year}.${date.month.toString().padLeft(2, '0')}.'
+      '${date.day.toString().padLeft(2, '0')}';
 }
 
 class _OrderCard extends StatelessWidget {
@@ -335,7 +475,10 @@ class _OrderCard extends StatelessWidget {
         contentPadding: const EdgeInsets.all(PopqSpacing.md),
         leading: CircleAvatar(
           backgroundColor: sellerOrderStatusColor(order.status),
-          child: const Icon(Icons.receipt_long_rounded, color: PopqPalette.ink),
+          child: Icon(
+            Icons.receipt_long_rounded,
+            color: sellerOrderStatusForegroundColor(order.status),
+          ),
         ),
         title: Text(
           sellerOrderStatusLabel(order.status),
@@ -396,12 +539,22 @@ String sellerOrderTypeLabel(String orderType) {
 
 Color sellerOrderStatusColor(String status) {
   return switch (status) {
-    'PLACED' => const Color(0xFFFFD2C9),
-    'ACCEPTED' || 'PREPARING' => const Color(0xFFFFE8A3),
-    'READY' => PopqPalette.lime,
+    'PLACED' => const Color(0xFFFFC9BA),
+    'ACCEPTED' || 'PREPARING' => const Color(0xFFFFD98A),
+    'READY' => const Color(0xFFC7D98B),
     'COMPLETED' => const Color(0xFFD7F0E3),
     'REJECTED' || 'CANCELED' || 'EXPIRED' => const Color(0xFFE7E4EA),
     _ => const Color(0xFFD9D2FF),
+  };
+}
+
+Color sellerOrderStatusForegroundColor(String status) {
+  return switch (status) {
+    'PLACED' => const Color(0xFF4A1C12),
+    'ACCEPTED' || 'PREPARING' => const Color(0xFF3F2B00),
+    'READY' => const Color(0xFF263400),
+    'COMPLETED' => const Color(0xFF123425),
+    _ => const Color(0xFF29242E),
   };
 }
 

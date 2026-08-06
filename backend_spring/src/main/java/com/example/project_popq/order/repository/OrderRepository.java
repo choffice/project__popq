@@ -52,6 +52,20 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findAllByStoreIdOrderByCreatedAtDesc(Long storeId);
 
+    List<Order> findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            Long storeId,
+            List<OrderStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    );
+
+    @EntityGraph(attributePaths = {"store", "items"})
+    List<Order> findAllByStoreIdInAndStatusOrderByCreatedAtDesc(
+            List<Long> storeIds,
+            OrderStatus status,
+            org.springframework.data.domain.Pageable pageable
+    );
+
     @Query("""
             select o.store.id, o.status, count(o)
             from Order o

@@ -23,6 +23,8 @@ import com.example.project_popq.engagement.domain.ReviewStatus;
 import com.example.project_popq.engagement.repository.ReviewRepository;
 import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.repository.OrderRepository;
+import com.example.project_popq.inquiry.domain.MessageSenderType;
+import com.example.project_popq.inquiry.repository.OrderMessageRepository;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
 import com.example.project_popq.store.dto.UpdateStoreRequest;
@@ -56,6 +58,7 @@ public class StoreApplicationService {
     private final StoreAuthorizationService storeAuthorizationService;
     private final OrderRepository orderRepository;
     private final ReviewRepository reviewRepository;
+    private final OrderMessageRepository orderMessageRepository;
 
     @Transactional
     public StoreSummaryResponse create(
@@ -220,6 +223,12 @@ public class StoreApplicationService {
         Map<Long, Long> unansweredCounts = new HashMap<>();
         reviewRepository.countUnansweredByStoreIds(storeIds, ReviewStatus.ACTIVE)
             .forEach(row -> unansweredCounts.put((Long) row[0], (Long) row[1]));
+        Map<Long, Long> unreadChatCounts = new HashMap<>();
+        orderMessageRepository.countUnreadByStoreIds(
+                storeIds,
+                MessageSenderType.CUSTOMER
+            )
+            .forEach(row -> unreadChatCounts.put((Long) row[0], (Long) row[1]));
 
         return stores.stream().map(store -> {
             Map<OrderStatus, Long> counts = orderCounts.getOrDefault(
@@ -234,7 +243,8 @@ public class StoreApplicationService {
                 counts.getOrDefault(OrderStatus.ACCEPTED, 0L)
                     + counts.getOrDefault(OrderStatus.PREPARING, 0L),
                 counts.getOrDefault(OrderStatus.READY, 0L),
-                unansweredCounts.getOrDefault(store.getId(), 0L)
+                unansweredCounts.getOrDefault(store.getId(), 0L),
+                unreadChatCounts.getOrDefault(store.getId(), 0L)
             );
         }).toList();
     }

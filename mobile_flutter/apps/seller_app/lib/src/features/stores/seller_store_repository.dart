@@ -9,6 +9,7 @@ class SellerDashboardSummary {
     required this.activeOrderCount,
     required this.readyOrderCount,
     required this.unansweredReviewCount,
+    required this.unreadChatCount,
   });
 
   factory SellerDashboardSummary.fromJson(Map<String, Object?> json) {
@@ -20,6 +21,7 @@ class SellerDashboardSummary {
       activeOrderCount: (json['activeOrderCount'] as num).toInt(),
       readyOrderCount: (json['readyOrderCount'] as num).toInt(),
       unansweredReviewCount: (json['unansweredReviewCount'] as num).toInt(),
+      unreadChatCount: (json['unreadChatCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -30,6 +32,7 @@ class SellerDashboardSummary {
   final int activeOrderCount;
   final int readyOrderCount;
   final int unansweredReviewCount;
+  final int unreadChatCount;
 }
 
 class SellerStore {
@@ -976,6 +979,7 @@ class MemorySellerStoreRepository
             activeOrderCount: 0,
             readyOrderCount: 0,
             unansweredReviewCount: 0,
+            unreadChatCount: 0,
           ),
         )
         .toList();

@@ -94,9 +94,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: sellerOrderStatusColor(order.status),
-                  child: const Icon(
+                  child: Icon(
                     Icons.receipt_long_rounded,
-                    color: PopqPalette.ink,
+                    color: sellerOrderStatusForegroundColor(order.status),
                     size: 30,
                   ),
                 ),

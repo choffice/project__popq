@@ -16,6 +16,8 @@ import '../features/customers/seller_customer_repository.dart';
 import '../features/customers/seller_customer_screen.dart';
 import '../features/home/seller_analytics_repository.dart';
 import '../features/operations/seller_operation_screen.dart';
+import '../features/notifications/seller_notification_inbox_screen.dart';
+import '../features/notifications/seller_operational_alert_repository.dart';
 import '../features/orders/seller_order_detail_screen.dart';
 import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
@@ -42,6 +44,7 @@ abstract final class SellerRoutes {
   static const orders = '/orders';
   static const customers = '/customers';
   static const my = '/my';
+  static const notifications = '/notifications';
 
   @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
   static const sales = my;
@@ -60,6 +63,7 @@ GoRouter createSellerRouter({
   required SellerAnalyticsRepository analyticsRepository,
   required SellerCustomerRepository customerRepository,
   required SellerReviewRepository reviewRepository,
+  required SellerOperationalAlertRepository operationalAlertRepository,
   required Future<void> Function() onSignOut,
   required Future<void> Function(String? confirmationPhrase) onWithdraw,
   required Future<void> Function() onConnectCustomerAccess,
@@ -181,6 +185,7 @@ GoRouter createSellerRouter({
           location != SellerRoutes.customers &&
           location != SellerRoutes.my &&
           location != SellerRoutes.settings &&
+          location != SellerRoutes.notifications &&
           !isStoreRegistration) {
         return SellerRoutes.dashboard;
       }
@@ -277,6 +282,16 @@ GoRouter createSellerRouter({
         },
       ),
       GoRoute(
+        path: SellerRoutes.notifications,
+        builder: (context, state) {
+          return SellerNotificationInboxScreen(
+            repository: operationalAlertRepository,
+            storeRepository: storeRepository,
+            selectionController: storeSelectionController,
+          );
+        },
+      ),
+      GoRoute(
         path: SellerRoutes.storeRegistration,
         builder: (context, state) {
           return SellerStoreRegistrationScreen(
@@ -328,6 +343,7 @@ GoRouter createSellerRouter({
             onSignOut: onSignOut,
             customerRepository:
             customerRepository,
+            storeRepository: storeRepository,
             storeSelectionController:
             storeSelectionController,
             themeController: themeController,
@@ -374,6 +390,10 @@ GoRouter createSellerRouter({
                 storeRepository: storeRepository,
                 selectionController:
                 storeSelectionController,
+                initialCurrentFilter:
+                    state.uri.queryParameters['filter'] == 'placed'
+                        ? 'PLACED'
+                        : null,
               );
             },
           ),
