@@ -193,11 +193,130 @@ describe('POPQ QR order demo', () => {
     expect(window.location.search).toBe('')
     expect(window.sessionStorage.getItem('popq:checkout:qr-token')).toBeNull()
   })
+
+  it('moves to order tracking when sync fails after payment approval', async () => {
+    const created = {
+      ...createDemoOrder(5000, 'TAKEOUT'),
+      orderPublicId: 'order-sync-failure',
+      status: 'CREATED' as const,
+      version: 0,
+    }
+    window.sessionStorage.setItem(
+      'popq:checkout:qr-token',
+      JSON.stringify({
+        orderKey: 'order-idempotency-key',
+        paymentKey: 'payment-idempotency-key',
+        order: created,
+      }),
+    )
+    window.history.replaceState(
+      {},
+      '',
+      '/q/qr-token?payment=success&paymentKey=toss-payment-key'
+        + '&orderId=order-sync-failure&amount=5000',
+    )
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path.endsWith('/sessions')) {
+        return response({
+          storeId: 1,
+          storeName: '성수 커피 연구소',
+          storeType: 'LOCAL_STORE',
+          businessStatus: 'OPEN',
+          storeTableId: null,
+          tableName: null,
+          sessionExpiresAt: '2026-08-05T12:00:00Z',
+        })
+      }
+      if (path === '/api/v1/qr/products') return response([])
+      if (path.includes('/payments')) return response({ status: 'PAID' })
+      if (path.includes('/sync')) {
+        return errorResponse(403, '주문 조회 권한이 없습니다.')
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: '주문이 전달됐어요' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/주문 조회 권한이 없습니다/)).not.toBeInTheDocument()
+    expect(window.location.search).toBe('')
+    expect(window.sessionStorage.getItem('popq:checkout:qr-token')).toBeNull()
+  })
+
+  it('blocks duplicate checkout and offers confirmation retry after a return error', async () => {
+    const user = userEvent.setup()
+    const created = {
+      ...createDemoOrder(5000, 'TAKEOUT'),
+      orderPublicId: 'order-confirmation-retry',
+      status: 'CREATED' as const,
+      version: 0,
+    }
+    window.sessionStorage.setItem(
+      'popq:checkout:qr-token',
+      JSON.stringify({
+        orderKey: 'order-idempotency-key',
+        paymentKey: 'payment-idempotency-key',
+        order: created,
+      }),
+    )
+    window.history.replaceState(
+      {},
+      '',
+      '/q/qr-token?payment=success&paymentKey=toss-payment-key'
+        + '&orderId=order-confirmation-retry&amount=5000',
+    )
+    let confirmationAttempts = 0
+    const fetchMock = vi.fn(async (path: string) => {
+      if (path.endsWith('/sessions')) {
+        return response({
+          storeId: 1,
+          storeName: '성수 커피 연구소',
+          storeType: 'LOCAL_STORE',
+          businessStatus: 'OPEN',
+          storeTableId: null,
+          tableName: null,
+          sessionExpiresAt: '2026-08-05T12:00:00Z',
+        })
+      }
+      if (path === '/api/v1/qr/products') return response([])
+      if (path.includes('/payments')) {
+        confirmationAttempts += 1
+        return errorResponse(403, '주문 조회 권한이 없습니다.')
+      }
+      throw new Error(`Unexpected request: ${path}`)
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: '결제 결과 확인이 필요해요' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /결제하기/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '결제 결과 다시 확인하기' }))
+    await waitFor(() => expect(confirmationAttempts).toBe(2))
+  })
 })
 
 function response(data: unknown) {
   return {
     ok: true,
     json: async () => ({ success: true, data, error: null }),
+  }
+}
+
+function errorResponse(status: number, message: string) {
+  return {
+    ok: false,
+    status,
+    json: async () => ({
+      success: false,
+      data: null,
+      error: { code: 'ORDER_ACCESS_DENIED', message },
+    }),
   }
 }

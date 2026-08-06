@@ -36,6 +36,7 @@ import type {
 } from './types'
 
 type Screen = 'menu' | 'cart' | 'tracking'
+type PaymentConfirmationState = 'idle' | 'confirming' | 'retry'
 type CheckoutAttempt = {
   orderKey: string
   paymentKey: string
@@ -114,6 +115,27 @@ function orderName(order: OrderResponse) {
   return order.items.length > 1 ? `${first} 외 ${order.items.length - 1}건` : first
 }
 
+function markOrderAsPlaced(order: OrderResponse): OrderResponse {
+  if (order.status !== 'CREATED') return order
+
+  return {
+    ...order,
+    status: 'PLACED',
+    version: order.version + 1,
+    statusHistory: [
+      ...order.statusHistory,
+      {
+        previousStatus: 'CREATED',
+        currentStatus: 'PLACED',
+        actorType: 'SYSTEM',
+        actorId: null,
+        reason: '결제 승인',
+        changedAt: new Date().toISOString(),
+      },
+    ],
+  }
+}
+
 function readStored<T>(storage: Storage, key: string, fallback: T): T {
   try {
     const value = storage.getItem(key)
@@ -188,6 +210,9 @@ function App() {
   const [paymentReturn] = useState(() =>
     readTossPaymentReturn(window.location.search),
   )
+  const [paymentConfirmation, setPaymentConfirmation] =
+    useState<PaymentConfirmationState>(paymentReturn ? 'confirming' : 'idle')
+  const [paymentConfirmationAttempt, setPaymentConfirmationAttempt] = useState(0)
   const paymentReturnHandled = useRef(false)
   const trackedOrderPublicId = order?.orderPublicId
   const storageScope = isDemo ? 'demo' : (qrToken ?? 'demo')
@@ -220,12 +245,13 @@ function App() {
       !paymentReturn ||
       !qrToken ||
       isDemo ||
-      paymentReturnHandled.current
+      (paymentReturnHandled.current && paymentConfirmationAttempt === 0)
     ) {
       return
     }
     const paymentResult = paymentReturn
     paymentReturnHandled.current = true
+    setPaymentConfirmation('confirming')
     setProcessing(true)
     setScreen('cart')
     setError(null)
@@ -233,6 +259,7 @@ function App() {
     async function finishPayment() {
       if (paymentResult.status === 'fail') {
         clearTossPaymentReturn()
+        setPaymentConfirmation('idle')
         throw new Error(paymentResult.message)
       }
 
@@ -254,25 +281,54 @@ function App() {
         checkoutAttempt.paymentKey,
         paymentResult.paymentKey,
       )
-      const synced = await syncOrder(
-        pendingOrder.orderPublicId,
-        pendingOrder.version,
-      )
-      setOrder(synced.order ?? pendingOrder)
+
+      // 결제 승인이 성공한 시점부터는 후속 동기화 실패를 결제 실패로
+      // 취급하지 않는다. 서버 상태 조회는 추적 화면에서 계속 복구한다.
+      const placedOrder = markOrderAsPlaced(pendingOrder)
+      setOrder(placedOrder)
       setCart([])
       setCheckoutAttempt(null)
       setScreen('tracking')
+      setPaymentConfirmation('idle')
       clearTossPaymentReturn()
+
+      try {
+        const synced = await syncOrder(
+          pendingOrder.orderPublicId,
+          pendingOrder.version,
+        )
+        if (synced.order) setOrder(synced.order)
+      } catch {
+        setConnected(false)
+      }
     }
 
     void finishPayment()
       .catch((caught) => {
-        setError(
-          caught instanceof Error ? caught.message : '결제를 완료하지 못했습니다.',
-        )
+        const message =
+          caught instanceof Error ? caught.message : '결제를 완료하지 못했습니다.'
+        const pendingOrder = checkoutAttempt?.order
+        const canRetryConfirmation =
+          paymentResult.status === 'success' &&
+          pendingOrder !== undefined &&
+          paymentResult.orderId === pendingOrder.orderPublicId &&
+          paymentResult.amount === pendingOrder.totalAmount
+        if (canRetryConfirmation) {
+          setPaymentConfirmation('retry')
+          setError(`결제 결과 확인을 마무리하지 못했습니다. ${message}`)
+        } else {
+          setPaymentConfirmation('idle')
+          setError(message)
+        }
       })
       .finally(() => setProcessing(false))
-  }, [checkoutAttempt, isDemo, paymentReturn, qrToken])
+  }, [
+    checkoutAttempt,
+    isDemo,
+    paymentConfirmationAttempt,
+    paymentReturn,
+    qrToken,
+  ])
 
   useEffect(() => {
     if (!selectedDetail) return
@@ -739,95 +795,132 @@ function App() {
         <main className="page-content cart-page">
           <p className="eyebrow">YOUR SELECTION</p>
           <h1>장바구니</h1>
-          <div className="order-type">
-            {context.storeTableId && (
-              <button
-                className={orderType === 'DINE_IN' ? 'active' : ''}
-                onClick={() => {
-                  setOrderType('DINE_IN')
-                  setCheckoutAttempt(null)
-                }}
-              >
-                매장에서
-              </button>
-            )}
-            <button
-              className={orderType === 'TAKEOUT' ? 'active' : ''}
-              onClick={() => {
-                setOrderType('TAKEOUT')
-                setCheckoutAttempt(null)
-              }}
-            >
-              포장해서
-            </button>
-          </div>
-          {cart.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-cup" />
-              <h2>아직 담긴 메뉴가 없어요</h2>
-              <p>오늘 마음에 드는 한 잔을 골라보세요.</p>
-              <button className="secondary-button" onClick={() => setScreen('menu')}>
-                메뉴 보러 가기
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="cart-list">
-                {cart.map((item) => (
-                  <article className="cart-item" key={item.cartId}>
-                    <div className={`cart-thumb ${item.product.visual ?? ''}`}>
-                      <span />
-                    </div>
-                    <div className="cart-item-copy">
-                      <h3>{item.product.name}</h3>
-                      <p>
-                        {item.options.map((option) => option.name).join(' · ') ||
-                          '기본 옵션'}
-                      </p>
-                      <strong>{money(itemPrice(item))}</strong>
-                    </div>
-                    <div className="stepper">
-                      <button
-                        aria-label="수량 줄이기"
-                        onClick={() => changeCartQuantity(item.cartId, -1)}
-                      >
-                        −
-                      </button>
-                      <span>{item.quantity}</span>
-                      <button
-                        aria-label="수량 늘리기"
-                        onClick={() => changeCartQuantity(item.cartId, 1)}
-                      >
-                        +
-                      </button>
-                    </div>
-                  </article>
-                ))}
+          {paymentConfirmation !== 'idle' && (
+            <section className="payment-confirmation" aria-live="polite">
+              <span className="payment-confirmation-mark" aria-hidden="true">
+                {paymentConfirmation === 'confirming' ? '…' : '!'}
+              </span>
+              <div>
+                <h2>
+                  {paymentConfirmation === 'confirming'
+                    ? '결제 결과를 확인하고 있어요'
+                    : '결제 결과 확인이 필요해요'}
+                </h2>
+                <p>
+                  {paymentConfirmation === 'confirming'
+                    ? '창을 닫지 마세요. 주문 화면으로 곧 이동합니다.'
+                    : '중복 결제를 막기 위해 결제 버튼 대신 기존 결제 결과를 다시 확인해 주세요.'}
+                </p>
+                {paymentConfirmation === 'retry' && (
+                  <button
+                    className="secondary-button"
+                    disabled={processing}
+                    onClick={() => setPaymentConfirmationAttempt((value) => value + 1)}
+                  >
+                    결제 결과 다시 확인하기
+                  </button>
+                )}
               </div>
-              <button className="add-more" onClick={() => setScreen('menu')}>
-                + 메뉴 더 담기
-              </button>
-              <section className="price-summary">
-                <div>
-                  <span>상품 금액</span>
-                  <span>{money(cartTotal)}</span>
+            </section>
+          )}
+          {paymentConfirmation === 'idle' && (
+            <>
+              <div className="order-type">
+                {context.storeTableId && (
+                  <button
+                    className={orderType === 'DINE_IN' ? 'active' : ''}
+                    onClick={() => {
+                      setOrderType('DINE_IN')
+                      setCheckoutAttempt(null)
+                    }}
+                  >
+                    매장에서
+                  </button>
+                )}
+                <button
+                  className={orderType === 'TAKEOUT' ? 'active' : ''}
+                  onClick={() => {
+                    setOrderType('TAKEOUT')
+                    setCheckoutAttempt(null)
+                  }}
+                >
+                  포장해서
+                </button>
+              </div>
+              {cart.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-cup" />
+                  <h2>아직 담긴 메뉴가 없어요</h2>
+                  <p>오늘 마음에 드는 한 잔을 골라보세요.</p>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setScreen('menu')}
+                  >
+                    메뉴 보러 가기
+                  </button>
                 </div>
-                <div>
-                  <span>할인</span>
-                  <span>0원</span>
-                </div>
-                <div className="total">
-                  <strong>결제할 금액</strong>
-                  <strong>{money(cartTotal)}</strong>
-                </div>
-              </section>
-              <button
-                className="primary-button checkout-button"
-                disabled={processing}
-                onClick={() => void checkout()}
-              >
-                {processing ? '주문을 전송하는 중…' : `${money(cartTotal)} 결제하기`}
-              </button>
+              ) : (
+                <>
+                  <div className="cart-list">
+                    {cart.map((item) => (
+                      <article className="cart-item" key={item.cartId}>
+                        <div className={`cart-thumb ${item.product.visual ?? ''}`}>
+                          <span />
+                        </div>
+                        <div className="cart-item-copy">
+                          <h3>{item.product.name}</h3>
+                          <p>
+                            {item.options.map((option) => option.name).join(' · ') ||
+                              '기본 옵션'}
+                          </p>
+                          <strong>{money(itemPrice(item))}</strong>
+                        </div>
+                        <div className="stepper">
+                          <button
+                            aria-label="수량 줄이기"
+                            onClick={() => changeCartQuantity(item.cartId, -1)}
+                          >
+                            −
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button
+                            aria-label="수량 늘리기"
+                            onClick={() => changeCartQuantity(item.cartId, 1)}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                  <button className="add-more" onClick={() => setScreen('menu')}>
+                    + 메뉴 더 담기
+                  </button>
+                  <section className="price-summary">
+                    <div>
+                      <span>상품 금액</span>
+                      <span>{money(cartTotal)}</span>
+                    </div>
+                    <div>
+                      <span>할인</span>
+                      <span>0원</span>
+                    </div>
+                    <div className="total">
+                      <strong>결제할 금액</strong>
+                      <strong>{money(cartTotal)}</strong>
+                    </div>
+                  </section>
+                  <button
+                    className="primary-button checkout-button"
+                    disabled={processing}
+                    onClick={() => void checkout()}
+                  >
+                    {processing
+                      ? '주문을 전송하는 중…'
+                      : `${money(cartTotal)} 결제하기`}
+                  </button>
+                </>
+              )}
             </>
           )}
         </main>
