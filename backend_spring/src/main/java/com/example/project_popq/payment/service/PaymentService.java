@@ -27,6 +27,7 @@ import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,6 +146,7 @@ public class PaymentService {
             );
 
             orderRepository.flush();
+
             orderEventPublisher.publish(
                     order,
                     transition
@@ -166,10 +168,7 @@ public class PaymentService {
                 paymentProperties.provider();
 
         PaymentMethod paymentMethod =
-                switch (providerType) {
-                    case TEST -> PaymentMethod.TEST;
-                    case TOSS_PAYMENTS -> PaymentMethod.CARD;
-                };
+                resolveLegacyPaymentMethod(providerType);
 
         Payment payment = Payment.ready(
                 order,
@@ -192,6 +191,19 @@ public class PaymentService {
         );
     }
 
+    private PaymentMethod resolveLegacyPaymentMethod(
+            PaymentProviderType providerType
+    ) {
+        return switch (providerType) {
+            case TEST -> PaymentMethod.TEST;
+            case TOSS_PAYMENTS -> PaymentMethod.CARD;
+            case KAKAO_PAY -> throw new BusinessException(
+                    ErrorCode.INVALID_REQUEST,
+                    "카카오페이는 카카오페이 결제 준비 API를 사용해야 합니다."
+            );
+        };
+    }
+
     private PaymentResponse replayOrResume(
             Payment payment,
             ConfirmPaymentRequest request
@@ -208,7 +220,7 @@ public class PaymentService {
             return PaymentResponse.from(payment);
         }
 
-        if (!java.util.Objects.equals(
+        if (!Objects.equals(
                 payment.getProviderPaymentKey(),
                 request.paymentKey()
         )) {
