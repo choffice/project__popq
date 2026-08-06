@@ -16,6 +16,8 @@ import jakarta.persistence.CollectionTable;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -60,6 +62,18 @@ public class User extends BaseTimeEntity {
     @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
+    @Column(name = "withdrawal_requested_at")
+    private Instant withdrawalRequestedAt;
+
+    @Column(name = "withdrawal_effective_at")
+    private Instant withdrawalEffectiveAt;
+
+    @Column(name = "token_valid_after")
+    private Instant tokenValidAfter;
+
+    private static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(7);
+    private static final String WITHDRAWN_NAME_PLACEHOLDER = "탈퇴한 회원";
+
     private User(String email, String name, String phone, PlatformRole role, String passwordHash) {
         this.email = email;
         this.name = name;
@@ -101,5 +115,51 @@ public class User extends BaseTimeEntity {
 
     public void addRole(PlatformRole role) {
         roles.add(role);
+    }
+
+    public boolean isTokenValid(Instant issuedAt) {
+        return tokenValidAfter == null || !issuedAt.isBefore(tokenValidAfter);
+    }
+
+    public boolean matchesWithdrawalConfirmationPhrase(String phrase) {
+        return phrase != null
+                && phrase.trim().equals(name + " / 탈퇴하겠습니다");
+    }
+
+    /**
+     * 탈퇴를 접수합니다. 이 시점부터 기존에 발급된 토큰은 즉시 무효화되고,
+     * {@link #WITHDRAWAL_GRACE_PERIOD} 안에 다시 로그인하지 않으면 확정 탈퇴됩니다.
+     */
+    public void requestWithdrawal(Instant now) {
+        this.status = UserStatus.WITHDRAWAL_PENDING;
+        this.withdrawalRequestedAt = now;
+        this.withdrawalEffectiveAt = now.plus(WITHDRAWAL_GRACE_PERIOD);
+        this.tokenValidAfter = now;
+    }
+
+    public void finalizeWithdrawal() {
+        this.status = UserStatus.WITHDRAWN;
+        this.name = WITHDRAWN_NAME_PLACEHOLDER;
+        this.phone = null;
+        this.email = null;
+        this.passwordHash = null;
+        this.roles.clear();
+    }
+
+    /**
+     * 탈퇴 대기 상태에서 로그인이 성공했을 때 호출합니다. 유예기간이 지났으면
+     * 그 시점에 확정 탈퇴 처리하고, 아직 유예기간 안이면 탈퇴 요청을 취소합니다.
+     */
+    public void reconcileWithdrawalState(Instant now) {
+        if (status != UserStatus.WITHDRAWAL_PENDING) {
+            return;
+        }
+        if (!now.isBefore(withdrawalEffectiveAt)) {
+            finalizeWithdrawal();
+            return;
+        }
+        this.status = UserStatus.ACTIVE;
+        this.withdrawalRequestedAt = null;
+        this.withdrawalEffectiveAt = null;
     }
 }

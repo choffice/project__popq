@@ -31,6 +31,7 @@ class CustomerProfileScreen extends StatefulWidget {
     required this.messageRepository,
     required this.onSignOut,
     required this.onConnectSellerAccess,
+    required this.onWithdraw,
     super.key,
   });
 
@@ -38,6 +39,7 @@ class CustomerProfileScreen extends StatefulWidget {
   final CustomerOrderMessageRepository messageRepository;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onConnectSellerAccess;
+  final Future<void> Function(String? confirmationPhrase) onWithdraw;
 
   @override
   State<CustomerProfileScreen> createState() =>
@@ -330,7 +332,7 @@ class _CustomerProfileScreenState
                     subtitle:
                     '회원 탈퇴 시 모든 정보가 삭제돼요',
                     color: _dangerColor,
-                    onTap: _showComingSoon,
+                    onTap: () => _withdraw(profile.name),
                   ),
                 ],
               ),
@@ -560,7 +562,145 @@ class _CustomerProfileScreenState
       context.go(CustomerRoutes.home);
     }
   }
+
+  Future<void> _withdraw(String memberName) async {
+    final expectedPhrase = '$memberName / 탈퇴하겠습니다';
+
+    final result = await showDialog<_WithdrawDialogResult>(
+      context: context,
+      builder: (context) => _WithdrawDialog(
+        expectedPhrase: expectedPhrase,
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    try {
+      await widget.onWithdraw(
+        result.immediate ? expectedPhrase : null,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              result.immediate
+                  ? '탈퇴가 완료됐어요.'
+                  : '탈퇴가 접수됐어요. 7일 안에 다시 로그인하면 탈퇴가 취소돼요.',
+            ),
+          ),
+        );
+      context.go(CustomerRoutes.home);
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('회원 탈퇴에 실패했어요. ($error)'),
+          ),
+        );
+    }
+  }
 }
+
+class _WithdrawDialogResult {
+  const _WithdrawDialogResult({required this.immediate});
+
+  final bool immediate;
+}
+
+class _WithdrawDialog extends StatefulWidget {
+  const _WithdrawDialog({required this.expectedPhrase});
+
+  final String expectedPhrase;
+
+  @override
+  State<_WithdrawDialog> createState() => _WithdrawDialogState();
+}
+
+class _WithdrawDialogState extends State<_WithdrawDialog> {
+  final _controller = TextEditingController();
+  bool _matchesPhrase = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('회원 탈퇴'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '탈퇴를 누르면 바로 사라지지 않고, 7일의 유예기간 뒤에 확정돼요.\n'
+            '그 안에 다시 로그인하면 탈퇴가 자동으로 취소돼요.',
+          ),
+          const SizedBox(height: PopqSpacing.md),
+          Text(
+            '유예기간 없이 지금 바로 탈퇴하려면 아래에\n'
+            '"${widget.expectedPhrase}"\n'
+            '를 정확히 입력하세요.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: widget.expectedPhrase,
+            ),
+            onChanged: (value) {
+              setState(() {
+                _matchesPhrase = _stripSpaces(value) ==
+                    _stripSpaces(widget.expectedPhrase);
+              });
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _WithdrawDialogResult(immediate: false),
+          ),
+          child: const Text('7일 후 탈퇴'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: _dangerColor,
+          ),
+          onPressed: _matchesPhrase
+              ? () => Navigator.of(context).pop(
+                    const _WithdrawDialogResult(immediate: true),
+                  )
+              : null,
+          child: const Text('지금 바로 탈퇴'),
+        ),
+      ],
+    );
+  }
+}
+
+String _stripSpaces(String value) => value.replaceAll(RegExp(r'\s+'), '');
 
 class _ProfileHeaderCard extends StatelessWidget {
   const _ProfileHeaderCard({

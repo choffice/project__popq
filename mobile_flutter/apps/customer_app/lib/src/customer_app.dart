@@ -240,6 +240,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       _resetPassword,
       onConnectSellerAccess:
       _connectSellerAccess,
+      onWithdraw:
+      _withdraw,
       sessionController:
       _sessionController,
       onboardingController:
@@ -421,6 +423,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
   Future<void> _connectSellerAccess() {
     return _authRepository.connectSellerAccess();
+  }
+
+  Future<void> _withdraw(String? confirmationPhrase) async {
+    await _authRepository.withdraw(
+      confirmationPhrase: confirmationPhrase,
+    );
+    await _sessionController.signOut();
   }
 
   Future<void> _googleSignIn() async {

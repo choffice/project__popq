@@ -16,6 +16,7 @@ import com.example.project_popq.user.domain.SocialProvider;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.repository.SocialAccountRepository;
 import com.example.project_popq.user.repository.UserRepository;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
@@ -360,6 +361,7 @@ public class SocialAuthService {
   }
 
   private void validateUser(User user) {
+    user.reconcileWithdrawalState(Instant.now());
     if (!user.isActive()) {
       throw new BusinessException(
           ErrorCode.USER_INACTIVE

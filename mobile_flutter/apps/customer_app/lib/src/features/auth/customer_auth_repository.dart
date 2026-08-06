@@ -36,6 +36,13 @@ abstract interface class CustomerAuthRepository {
 
   /// 이미 CUSTOMER로 가입된 계정에 SELLER(판매자) 접근 권한을 추가로 연결합니다.
   Future<void> connectSellerAccess();
+
+  /// 현재 로그인된 계정의 탈퇴를 접수합니다.
+  ///
+  /// [confirmationPhrase]가 "{이름} / 탈퇴하겠습니다"와 정확히 일치하면
+  /// 유예기간 없이 즉시 탈퇴되고, 그렇지 않으면(null 또는 생략) 7일의
+  /// 유예기간을 두고 탈퇴 대기 상태가 됩니다.
+  Future<void> withdraw({String? confirmationPhrase});
 }
 
 class ApiCustomerAuthRepository implements CustomerAuthRepository {
@@ -132,6 +139,17 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     );
   }
 
+  @override
+  Future<void> withdraw({String? confirmationPhrase}) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/withdraw',
+      body: confirmationPhrase == null
+          ? null
+          : {'confirmationPhrase': confirmationPhrase},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
   Future<AuthSession> _submit(
     String path,
     Map<String, Object?> body,
@@ -208,6 +226,9 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
 
   @override
   Future<void> connectSellerAccess() async {}
+
+  @override
+  Future<void> withdraw({String? confirmationPhrase}) async {}
 
   AuthSession _session() {
     return AuthSession(

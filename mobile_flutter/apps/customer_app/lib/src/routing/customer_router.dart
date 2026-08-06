@@ -111,6 +111,8 @@ GoRouter createCustomerRouter({
   onResetPassword,
   required Future<void> Function()
   onConnectSellerAccess,
+  required Future<void> Function(String? confirmationPhrase)
+  onWithdraw,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
   Future<void> Function()? onGoogleSignIn,
@@ -624,6 +626,8 @@ GoRouter createCustomerRouter({
                 sessionController.signOut,
                 onConnectSellerAccess:
                 onConnectSellerAccess,
+                onWithdraw:
+                onWithdraw,
               );
             },
           ),

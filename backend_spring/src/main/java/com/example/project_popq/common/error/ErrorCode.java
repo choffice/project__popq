@@ -23,6 +23,7 @@ public enum ErrorCode {
           "해당 앱에서 로그인할 수 없는 계정 역할입니다."
   ),
   IDENTITY_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "입력하신 정보와 일치하는 계정을 찾을 수 없습니다."),
+  WITHDRAWAL_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "입력하신 확인 문구가 일치하지 않습니다."),
   INVALID_DEV_ROLE(HttpStatus.BAD_REQUEST, "개발 로그인에서 허용되지 않는 역할입니다."),
   SELLER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "판매자 프로필을 찾을 수 없습니다."),
   STORE_NOT_FOUND(HttpStatus.NOT_FOUND, "스토어를 찾을 수 없습니다."),
