@@ -350,7 +350,12 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
           normalizedQuery == null ||
           normalizedQuery.isEmpty ||
           store.name.toLowerCase().contains(normalizedQuery) ||
-          (store.description?.toLowerCase().contains(normalizedQuery) ?? false);
+          (store.address?.toLowerCase().contains(normalizedQuery) ?? false) ||
+          store.tags.any(
+            (String value) => value.trim().toLowerCase().contains(
+              normalizedQuery,
+            ),
+          );
       final matchesTag = tag == null || tag.isEmpty || store.tags.contains(tag);
       return matchesQuery && matchesTag;
     }).toList();

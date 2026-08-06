@@ -11,6 +11,8 @@ import 'seller_store_repository.dart';
 
 enum _ImportedValueChoice { current, imported, manual }
 
+enum _RepresentativeImageAction { keep, replace, remove }
+
 class _SelectedStoreLocation {
   const _SelectedStoreLocation({
     required this.latitude,
@@ -87,6 +89,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   String? _representativeCategory;
   String? _existingImageUrl;
   XFile? _selectedRepresentativeImage;
+  _RepresentativeImageAction _representativeImageAction =
+      _RepresentativeImageAction.keep;
   _SelectedStoreLocation? _selectedLocation;
   TimeOfDay? _openTime;
   TimeOfDay? _closeTime;
@@ -441,53 +445,65 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
 
   Widget _buildImageSection(BuildContext context) {
     final XFile? localImage = _selectedRepresentativeImage;
+    final bool showLocalImage =
+        _representativeImageAction == _RepresentativeImageAction.replace &&
+        localImage != null;
+    final bool showExistingImage =
+        _representativeImageAction == _RepresentativeImageAction.keep &&
+        _existingImageUrl != null;
+    final bool hasVisibleImage = showLocalImage || showExistingImage;
     return _buildSection(
       context,
       title: '대표사진',
       children: <Widget>[
         AspectRatio(
           aspectRatio: 16 / 9,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: localImage != null
-                ? Image.file(File(localImage.path), fit: BoxFit.cover)
-                : _existingImageUrl != null
-                ? Image.network(
-                    _existingImageUrl!,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) =>
-                        const _EmptyImagePreview(label: '기존 사진을 불러오지 못했습니다.'),
-                  )
-                : const _EmptyImagePreview(label: '등록된 대표사진이 없습니다.'),
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: showLocalImage
+                    ? Image.file(File(localImage!.path), fit: BoxFit.cover)
+                    : showExistingImage
+                    ? Image.network(
+                        _existingImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const _EmptyImagePreview(
+                          label: '기존 사진을 불러오지 못했습니다.',
+                        ),
+                      )
+                    : const _EmptyImagePreview(label: '등록된 대표사진이 없습니다.'),
+              ),
+              Positioned(
+                top: PopqSpacing.sm,
+                right: PopqSpacing.sm,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    _ImageOverlayButton(
+                      key: const Key('edit-store-image-change'),
+                      tooltip: '대표사진 변경',
+                      icon: Icons.camera_alt_outlined,
+                      onPressed: _busy ? null : _openRepresentativeImagePicker,
+                    ),
+                    if (hasVisibleImage) ...<Widget>[
+                      const SizedBox(width: PopqSpacing.xs),
+                      _ImageOverlayButton(
+                        key: const Key('edit-store-image-remove'),
+                        tooltip: '대표사진 제거',
+                        icon: Icons.delete_outline_rounded,
+                        onPressed: _busy ? null : _confirmRepresentativeImageRemoval,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: PopqSpacing.sm),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('edit-store-image-camera'),
-                onPressed: _busy
-                    ? null
-                    : () => _pickRepresentativeImage(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera_outlined),
-                label: const Text('카메라 촬영'),
-              ),
-            ),
-            const SizedBox(width: PopqSpacing.sm),
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('edit-store-image-gallery'),
-                onPressed: _busy
-                    ? null
-                    : () => _pickRepresentativeImage(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('갤러리 선택'),
-              ),
-            ),
-          ],
-        ),
-        if (localImage != null) ...<Widget>[
+        if (_representativeImageAction ==
+            _RepresentativeImageAction.replace) ...<Widget>[
           const SizedBox(height: PopqSpacing.xs),
           Align(
             alignment: Alignment.centerRight,
@@ -496,7 +512,11 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               onPressed: _busy
                   ? null
                   : () {
-                      setState(() => _selectedRepresentativeImage = null);
+                      setState(() {
+                        _selectedRepresentativeImage = null;
+                        _representativeImageAction =
+                            _RepresentativeImageAction.keep;
+                      });
                     },
               icon: const Icon(Icons.undo_outlined),
               label: const Text('새 사진 선택 취소'),
@@ -617,6 +637,67 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     }
   }
 
+  Future<void> _openRepresentativeImagePicker() async {
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('카메라로 촬영'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('갤러리에서 선택'),
+              onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close_rounded),
+              title: const Text('취소'),
+              onTap: () => Navigator.of(sheetContext).pop(),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) {
+      return;
+    }
+    await _pickRepresentativeImage(source);
+  }
+
+  Future<void> _confirmRepresentativeImageRemoval() async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('대표사진을 제거할까요?'),
+        content: const Text(
+          '대표사진 연결만 제거되며 서버에 업로드된 실제 파일은 삭제되지 않습니다.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('사진 제거'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedRepresentativeImage = null;
+      _representativeImageAction = _RepresentativeImageAction.remove;
+    });
+  }
+
   Future<void> _pickRepresentativeImage(ImageSource source) async {
     if (_busy) {
       return;
@@ -634,7 +715,10 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       if (image != null) {
-        setState(() => _selectedRepresentativeImage = image);
+        setState(() {
+          _selectedRepresentativeImage = image;
+          _representativeImageAction = _RepresentativeImageAction.replace;
+        });
       }
     } catch (_) {
       if (mounted) {
@@ -1236,12 +1320,20 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
 
     setState(() => _submitting = true);
     try {
-      String? resolvedImageUrl = _existingImageUrl;
-      final XFile? selectedImage = _selectedRepresentativeImage;
-      if (selectedImage != null) {
-        resolvedImageUrl = await widget.repository.uploadRepresentativeImage(
-          selectedImage.path,
-        );
+      String? resolvedImageUrl;
+      switch (_representativeImageAction) {
+        case _RepresentativeImageAction.keep:
+          resolvedImageUrl = _existingImageUrl;
+          break;
+        case _RepresentativeImageAction.replace:
+          final XFile selectedImage = _selectedRepresentativeImage!;
+          resolvedImageUrl = await widget.repository.uploadRepresentativeImage(
+            selectedImage.path,
+          );
+          break;
+        case _RepresentativeImageAction.remove:
+          resolvedImageUrl = '';
+          break;
       }
 
       final _SelectedStoreLocation? location = _selectedLocation;
@@ -1373,6 +1465,34 @@ class _ButtonProgress extends StatelessWidget {
     return const SizedBox.square(
       dimension: 18,
       child: CircularProgressIndicator(strokeWidth: 2),
+    );
+  }
+}
+
+class _ImageOverlayButton extends StatelessWidget {
+  const _ImageOverlayButton({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.62),
+      shape: const CircleBorder(),
+      child: IconButton(
+        constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+        padding: EdgeInsets.zero,
+        tooltip: tooltip,
+        onPressed: onPressed,
+        icon: Icon(icon, size: 20, color: Colors.white),
+      ),
     );
   }
 }

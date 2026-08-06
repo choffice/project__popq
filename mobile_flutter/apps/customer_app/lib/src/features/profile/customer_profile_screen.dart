@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:popq_app_core/popq_app_core.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../realtime/customer_realtime_scope.dart';
@@ -30,12 +30,14 @@ class CustomerProfileScreen extends StatefulWidget {
     required this.repository,
     required this.messageRepository,
     required this.onSignOut,
+    required this.onConnectSellerAccess,
     super.key,
   });
 
   final CustomerEngagementRepository repository;
   final CustomerOrderMessageRepository messageRepository;
   final Future<void> Function() onSignOut;
+  final Future<void> Function() onConnectSellerAccess;
 
   @override
   State<CustomerProfileScreen> createState() =>
@@ -299,6 +301,13 @@ class _CustomerProfileScreenState
                     '자주 묻는 질문과 1:1 문의를 할 수 있어요',
                     onTap: _showComingSoon,
                   ),
+                  _MenuRowData(
+                    icon: Icons.storefront_rounded,
+                    title: '팝큐 비즈 연결하기',
+                    subtitle:
+                    '이 계정으로 판매자 (팝큐 비즈) 서비스도 이용하세요',
+                    onTap: _connectSellerAccess,
+                  ),
                 ],
               ),
 
@@ -475,6 +484,62 @@ class _CustomerProfileScreenState
       );
     } finally {
       _unreadRequestInProgress = false;
+    }
+  }
+
+  Future<void> _connectSellerAccess() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('팝큐 비즈 연결하기'),
+        content: const Text(
+          '이 계정으로 판매자(팝큐 비즈) 서비스도 이용할 수 있게 연결할까요?\n'
+          '연결 후에는 같은 이메일과 비밀번호로 판매자 앱에 로그인할 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('연결하기'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.onConnectSellerAccess();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              '팝큐 비즈 연결이 완료됐어요. 같은 계정으로 판매자 앱에 로그인해 보세요.',
+            ),
+          ),
+        );
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('팝큐 비즈 연결에 실패했어요. ($error)'),
+          ),
+        );
     }
   }
 

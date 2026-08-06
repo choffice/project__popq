@@ -1122,8 +1122,11 @@ class MemorySellerStoreRepository
       representativeCategory:
       representativeCategory ??
           store.representativeCategory,
-      imageUrl:
-      imageUrl ?? store.imageUrl,
+      imageUrl: imageUrl == null
+          ? store.imageUrl
+          : imageUrl.trim().isEmpty
+          ? null
+          : imageUrl,
       phone: phone ?? store.phone,
       latitude: latitude,
       longitude: longitude,

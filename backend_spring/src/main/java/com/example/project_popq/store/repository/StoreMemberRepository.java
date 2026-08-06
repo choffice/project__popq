@@ -23,4 +23,3 @@ public interface StoreMemberRepository extends JpaRepository<StoreMember, Long> 
             StoreMemberStatus status
     );
 }
-

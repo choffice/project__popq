@@ -1549,60 +1549,82 @@ class _SelectedStoreCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 3),
 
-                        if (walkingRouteLoading) ...[
-                          const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '도보 경로 확인 중...',
-                            style: TextStyle(
-                              color: colorScheme.onSurfaceVariant,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ] else if (walkingRoute != null)
-                          Text(
+                        Expanded(
+                          child: walkingRouteLoading
+                              ? Row(
+                            children: [
+                              const SizedBox(
+                                width: 12,
+                                height: 12,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  '도보 경로 확인 중...',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                              : walkingRoute != null
+                              ? Text(
                             '도보 '
-                            '${_formatDistance(walkingRoute!.distanceMeters)}'
-                            ' · 약 ${walkingRoute!.durationMinutes}분',
+                                '${_formatDistance(walkingRoute!.distanceMeters)}'
+                                ' · 약 ${walkingRoute!.durationMinutes}분',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
                             ),
                           )
-                        else if (walkingRouteError != null)
-                          TextButton.icon(
-                            onPressed: onWalkingRouteRetry,
-                            style: TextButton.styleFrom(
-                              foregroundColor: colorScheme.error,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 2,
+                              : walkingRouteError != null
+                              ? Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: onWalkingRouteRetry,
+                              style: TextButton.styleFrom(
+                                foregroundColor: colorScheme.error,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 2,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
                               ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            icon: const Icon(Icons.refresh_rounded, size: 14),
-                            label: const Text(
-                              '도보 정보 다시 시도',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                              icon: const Icon(
+                                Icons.refresh_rounded,
+                                size: 14,
+                              ),
+                              label: const Text(
+                                '도보 정보 다시 시도',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           )
-                        else
-                          Text(
+                              : Text(
                             '현재 위치를 켜면 도보 정보를 확인할 수 있어요.',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                               fontSize: 11,
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ],

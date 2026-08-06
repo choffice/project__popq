@@ -62,4 +62,3 @@ public class StoreMember extends BaseTimeEntity {
         return new StoreMember(store, user, role);
     }
 }
-
