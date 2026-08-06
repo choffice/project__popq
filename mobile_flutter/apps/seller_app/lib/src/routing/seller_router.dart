@@ -60,6 +60,7 @@ GoRouter createSellerRouter({
   required SellerCustomerRepository customerRepository,
   required Future<void> Function() onSignOut,
   required Future<void> Function(String? confirmationPhrase) onWithdraw,
+  required Future<void> Function() onConnectCustomerAccess,
   required Future<void> Function(
       String email,
       String password,
@@ -388,6 +389,7 @@ GoRouter createSellerRouter({
                 bootstrapController.identityRepository,
                 onSignOut: onSignOut,
                 onWithdraw: onWithdraw,
+                onConnectCustomerAccess: onConnectCustomerAccess,
               );
             },
           ),

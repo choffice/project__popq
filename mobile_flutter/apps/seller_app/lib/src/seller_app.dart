@@ -244,6 +244,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       customerRepository: _customerRepository,
       onSignOut: _bootstrapController.signOut,
       onWithdraw: _withdraw,
+      onConnectCustomerAccess: _connectCustomerAccess,
       onSignIn: _signIn,
       onSignUp: _signUp,
       onFindId: _findId,
@@ -323,6 +324,10 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       confirmationPhrase: confirmationPhrase,
     );
     await _bootstrapController.signOut();
+  }
+
+  Future<void> _connectCustomerAccess() {
+    return _authRepository.connectCustomerAccess();
   }
 
   Future<void> _completeSignIn(
