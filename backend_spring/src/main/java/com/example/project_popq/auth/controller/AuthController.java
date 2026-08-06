@@ -106,6 +106,15 @@ public class AuthController {
         );
     }
 
+    @PostMapping("/connect-customer")
+    public ApiResponse<AckResponse> connectCustomer(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+                authService.connectCustomerAccess(Long.valueOf(jwt.getSubject()))
+        );
+    }
+
     @PostMapping("/withdraw")
     public ApiResponse<AckResponse> withdraw(
             @AuthenticationPrincipal Jwt jwt,
