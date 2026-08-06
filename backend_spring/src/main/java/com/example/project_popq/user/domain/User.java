@@ -71,6 +71,15 @@ public class User extends BaseTimeEntity {
     @Column(name = "token_valid_after")
     private Instant tokenValidAfter;
 
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
+    @Column(name = "push_notification_enabled", nullable = false)
+    private boolean pushNotificationEnabled = true;
+
+    @Column(name = "marketing_opt_in", nullable = false)
+    private boolean marketingOptIn = false;
+
     private static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(7);
     private static final String WITHDRAWN_NAME_PLACEHOLDER = "탈퇴한 회원";
 
@@ -108,6 +117,22 @@ public class User extends BaseTimeEntity {
 
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    public void changePhone(String phone) {
+        this.phone = phone;
+    }
+
+    public void changeNotificationPreferences(
+            boolean pushNotificationEnabled,
+            boolean marketingOptIn
+    ) {
+        this.pushNotificationEnabled = pushNotificationEnabled;
+        this.marketingOptIn = marketingOptIn;
     }
     public boolean hasRole(PlatformRole role) {
         return roles.contains(role);

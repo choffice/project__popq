@@ -8,9 +8,14 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.profileImageUrl,
+    this.phone,
   });
 
-  factory CustomerProfile.fromJson(Map<String, Object?> json) {
+  factory CustomerProfile.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
     final user = Map<String, Object?>.from(json['user'] as Map);
     return CustomerProfile(
       userId: (user['userId'] as num).toInt(),
@@ -19,6 +24,11 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      profileImageUrl: _resolveImageUrl(
+        user['profileImageUrl'] as String?,
+        imageBaseUrl,
+      ),
+      phone: user['phone'] as String?,
     );
   }
 
@@ -28,11 +38,15 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final String? profileImageUrl;
+  final String? phone;
 
   CustomerProfile copyWith({
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    String? profileImageUrl,
+    String? phone,
   }) {
     return CustomerProfile(
       userId: userId,
@@ -41,8 +55,27 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      phone: phone ?? this.phone,
     );
   }
+}
+
+class NotificationPreference {
+  const NotificationPreference({
+    required this.pushNotificationEnabled,
+    required this.marketingOptIn,
+  });
+
+  factory NotificationPreference.fromJson(Map<String, Object?> json) {
+    return NotificationPreference(
+      pushNotificationEnabled: json['pushNotificationEnabled'] as bool,
+      marketingOptIn: json['marketingOptIn'] as bool,
+    );
+  }
+
+  final bool pushNotificationEnabled;
+  final bool marketingOptIn;
 }
 
 class InterestedStore {
@@ -154,6 +187,24 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<String> uploadProfileImage(String filePath);
+
+  Future<bool> updatePhone(String phone);
+
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
+  Future<NotificationPreference> getNotificationPreferences();
+
+  Future<NotificationPreference> updateNotificationPreferences({
+    required bool pushNotificationEnabled,
+    required bool marketingOptIn,
+  });
+
+  Future<List<String>> getLinkedSocialProviders();
+
   Future<List<InterestedStore>> findInterests();
 
   Future<bool> isInterested(int storeId);
@@ -194,9 +245,93 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   Future<CustomerProfile> getProfile() {
     return _apiClient.get(
       '/api/v1/customer/profile',
-      decode: (value) =>
-          CustomerProfile.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerProfile.fromJson(
+        Map<String, Object?>.from(value as Map),
+        imageBaseUrl: _imageBaseUrl,
+      ),
     );
+  }
+
+  @override
+  Future<String> uploadProfileImage(String filePath) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/users/me/profile-image',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['imageUrl'] as String;
+      },
+    );
+  }
+
+  @override
+  Future<bool> updatePhone(String phone) {
+    return _apiClient.patch<bool>(
+      '/api/v1/users/me/phone',
+      body: {'phone': phone},
+      decode: _decodeAck,
+    );
+  }
+
+  @override
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    return _apiClient.post<bool>(
+      '/api/v1/users/me/password',
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+      decode: _decodeAck,
+    );
+  }
+
+  @override
+  Future<NotificationPreference> getNotificationPreferences() {
+    return _apiClient.get(
+      '/api/v1/users/me/notification-preferences',
+      decode: (value) => NotificationPreference.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<NotificationPreference> updateNotificationPreferences({
+    required bool pushNotificationEnabled,
+    required bool marketingOptIn,
+  }) {
+    return _apiClient.patch(
+      '/api/v1/users/me/notification-preferences',
+      body: {
+        'pushNotificationEnabled': pushNotificationEnabled,
+        'marketingOptIn': marketingOptIn,
+      },
+      decode: (value) => NotificationPreference.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<List<String>> getLinkedSocialProviders() {
+    return _apiClient.get(
+      '/api/v1/users/me/social-accounts',
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return (json['providers'] as List<Object?>)
+            .map((item) => item as String)
+            .toList();
+      },
+    );
+  }
+
+  bool _decodeAck(Object? value) {
+    final json = Map<String, Object?>.from(value as Map);
+    return json['success'] as bool;
   }
 
   @override
@@ -345,6 +480,10 @@ class MemoryCustomerEngagementRepository
   CustomerProfile _profile;
   final List<InterestedStore> _interests;
   final List<CustomerReview> _reviews;
+  NotificationPreference _notificationPreference = const NotificationPreference(
+    pushNotificationEnabled: true,
+    marketingOptIn: false,
+  );
 
   @override
   Future<CustomerProfile> getProfile() async {
@@ -353,6 +492,49 @@ class MemoryCustomerEngagementRepository
       reviewCount: _reviews.where((review) => review.isActive).length,
     );
     return _profile;
+  }
+
+  @override
+  Future<String> uploadProfileImage(String filePath) async {
+    final imageUrl = Uri.file(filePath).toString();
+    _profile = _profile.copyWith(profileImageUrl: imageUrl);
+    return imageUrl;
+  }
+
+  @override
+  Future<bool> updatePhone(String phone) async {
+    _profile = _profile.copyWith(phone: phone);
+    return true;
+  }
+
+  @override
+  Future<bool> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    return true;
+  }
+
+  @override
+  Future<NotificationPreference> getNotificationPreferences() async {
+    return _notificationPreference;
+  }
+
+  @override
+  Future<NotificationPreference> updateNotificationPreferences({
+    required bool pushNotificationEnabled,
+    required bool marketingOptIn,
+  }) async {
+    _notificationPreference = NotificationPreference(
+      pushNotificationEnabled: pushNotificationEnabled,
+      marketingOptIn: marketingOptIn,
+    );
+    return _notificationPreference;
+  }
+
+  @override
+  Future<List<String>> getLinkedSocialProviders() async {
+    return const [];
   }
 
   @override

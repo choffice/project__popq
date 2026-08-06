@@ -218,6 +218,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         widget.identityRepository ??
             ApiSellerIdentityRepository(
               _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
             );
 
     _authRepository =

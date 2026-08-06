@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -53,6 +54,9 @@ class _CustomerProfileScreenState
   Duration(seconds: 3);
 
   late Future<CustomerProfile> _profile;
+
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _uploadingProfileImage = false;
 
   Timer? _unreadPollingTimer;
   PopqRealtimeClient? _realtimeClient;
@@ -214,7 +218,8 @@ class _CustomerProfileScreenState
             children: [
               _ProfileHeaderCard(
                 profile: profile,
-                onEditProfile: _showComingSoon,
+                onEditProfile: _editProfileImage,
+                isUploadingImage: _uploadingProfileImage,
               ),
 
               const SizedBox(
@@ -227,8 +232,12 @@ class _CustomerProfileScreenState
                     icon: Icons.person_outline_rounded,
                     title: '내 정보',
                     subtitle:
-                    '개인 정보 및 알림 설정을 관리해요',
-                    onTap: _showComingSoon,
+                    '프로필 사진, 연락처, 비밀번호를 관리해요',
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.myInfo,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon:
@@ -294,7 +303,11 @@ class _CustomerProfileScreenState
                     title: '알림 설정',
                     subtitle:
                     '푸시 알림 및 마케팅 수신 설정을 관리해요',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.notificationSettings,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon: Icons.help_outline_rounded,
@@ -545,6 +558,78 @@ class _CustomerProfileScreenState
     }
   }
 
+  Future<void> _editProfileImage() async {
+    if (_uploadingProfileImage) return;
+
+    final PopqImageSource? source =
+        await showPopqImageSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    final ImageSource pickerSource = source == PopqImageSource.camera
+        ? ImageSource.camera
+        : ImageSource.gallery;
+
+    XFile? image;
+    try {
+      image = await _imagePicker.pickImage(
+        source: pickerSource,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              pickerSource == ImageSource.camera
+                  ? '카메라를 실행하지 못했습니다.'
+                  : '갤러리에서 사진을 불러오지 못했습니다.',
+            ),
+          ),
+        );
+      return;
+    }
+
+    if (image == null || !mounted) return;
+
+    setState(() => _uploadingProfileImage = true);
+    try {
+      await widget.repository.uploadProfileImage(image.path);
+
+      if (!mounted) return;
+      await _reload();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
+        );
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingProfileImage = false);
+      }
+    }
+  }
+
   void _showComingSoon() {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -706,10 +791,12 @@ class _ProfileHeaderCard extends StatelessWidget {
   const _ProfileHeaderCard({
     required this.profile,
     required this.onEditProfile,
+    this.isUploadingImage = false,
   });
 
   final CustomerProfile profile;
   final VoidCallback onEditProfile;
+  final bool isUploadingImage;
 
   @override
   Widget build(BuildContext context) {
@@ -738,13 +825,41 @@ class _ProfileHeaderCard extends StatelessWidget {
                   children: [
                     Stack(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 32,
-                          child: Icon(
-                            Icons.person_rounded,
-                            size: 34,
-                          ),
+                          backgroundImage: profile.profileImageUrl != null
+                              ? NetworkImage(
+                                  profile.profileImageUrl!,
+                                )
+                              : null,
+                          child: profile.profileImageUrl == null
+                              ? const Icon(
+                                  Icons.person_rounded,
+                                  size: 34,
+                                )
+                              : null,
                         ),
+                        if (isUploadingImage)
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         Positioned(
                           right: -2,
                           bottom: -2,
@@ -884,16 +999,6 @@ class _ProfileHeaderCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(
-                  height: PopqSpacing.md,
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: onEditProfile,
-                    child: const Text('내 프로필'),
-                  ),
                 ),
               ],
             ),

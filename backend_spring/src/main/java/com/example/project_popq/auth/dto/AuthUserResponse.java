@@ -8,16 +8,20 @@ public record AuthUserResponse(
         Long userId,
         String email,
         String name,
+        String phone,
         PlatformRole role,
-        UserStatus status
+        UserStatus status,
+        String profileImageUrl
 ) {
     public static AuthUserResponse from(User user) {
         return new AuthUserResponse(
             user.getId(),
             user.getEmail(),
             user.getName(),
+            user.getPhone(),
             user.getRole(),
-            user.getStatus()
+            user.getStatus(),
+            user.getProfileImageUrl()
         );
     }
 
@@ -29,8 +33,10 @@ public record AuthUserResponse(
             user.getId(),
             user.getEmail(),
             user.getName(),
+            user.getPhone(),
             activeRole,
-            user.getStatus()
+            user.getStatus(),
+            user.getProfileImageUrl()
         );
     }
 }
