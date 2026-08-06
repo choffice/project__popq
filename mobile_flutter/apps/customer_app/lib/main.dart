@@ -4,9 +4,22 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'src/customer_app.dart';
 import 'package:naver_login_sdk/naver_login_sdk.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'src/notifications/customer_push_notification_service.dart';
 
 const naverClientId = String.fromEnvironment('NAVER_CLIENT_ID');
 const naverClientSecret = String.fromEnvironment('NAVER_CLIENT_SECRET');
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(
+    RemoteMessage message,
+    ) async {
+  await Firebase.initializeApp();
+
+  debugPrint(
+    'Customer 백그라운드 FCM 수신: ${message.messageId}',
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,5 +30,12 @@ Future<void> main() async {
   );
   await KakaoSdk.init(nativeAppKey: 'c4ae67811eeef68ede602afc04a8efbd',);
   await Firebase.initializeApp();
+
+  FirebaseMessaging.onBackgroundMessage(
+    firebaseMessagingBackgroundHandler,
+  );
+
+  await PushNotificationService.initialize();
+
   runApp(PopqCustomerApp(environment: AppEnvironment.fromEnvironment()));
 }

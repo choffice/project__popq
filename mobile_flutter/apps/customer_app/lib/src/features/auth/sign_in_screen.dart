@@ -463,34 +463,3 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.borderColor,
-    this.onPressed,
-  });
-
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final Color borderColor;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        disabledBackgroundColor: backgroundColor.withValues(alpha: 0.55),
-        disabledForegroundColor: foregroundColor.withValues(alpha: 0.55),
-        side: BorderSide(color: borderColor),
-      ),
-      child: Text(label),
-    );
-  }
-}
