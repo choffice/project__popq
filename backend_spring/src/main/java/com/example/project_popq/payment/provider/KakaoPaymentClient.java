@@ -20,6 +20,9 @@ public class KakaoPaymentClient {
     private static final String APPROVE_PATH =
         "/online/v1/payment/approve";
 
+    private static final String CANCEL_PATH =
+        "/online/v1/payment/cancel";
+
     private final KakaoPaymentProperties properties;
     private final RestClient restClient;
 
@@ -353,16 +356,167 @@ public class KakaoPaymentClient {
         } catch (
             RestClientException exception
         ) {
-            /*
-             * 통신 오류는 카카오페이에서는 승인됐지만 POPQ가
-             * 응답을 받지 못한 경우일 수도 있습니다.
-             *
-             * Service에서 Payment를 FAILED로 확정하지 않고
-             * IN_PROGRESS 상태로 유지해야 합니다.
-             */
             return ApproveResult.failure(
                 "KAKAO_COMMUNICATION_ERROR",
                 "카카오페이 승인 결과를 확인하지 못했습니다."
+            );
+        }
+    }
+
+    public CancelResult cancel(
+        CancelCommand command
+    ) {
+        if (!properties.hasSecretKey()) {
+            return CancelResult.failure(
+                "KAKAO_SECRET_KEY_MISSING",
+                "카카오페이 Secret key(dev)가 설정되지 않았습니다."
+            );
+        }
+
+        validateCancelCommand(command);
+
+        Map<String, Object> requestBody =
+            new LinkedHashMap<>();
+
+        requestBody.put(
+            "cid",
+            properties.resolvedCid()
+        );
+
+        if (properties.hasCidSecret()) {
+            requestBody.put(
+                "cid_secret",
+                properties.cidSecret()
+            );
+        }
+
+        requestBody.put(
+            "tid",
+            command.tid()
+        );
+
+        requestBody.put(
+            "cancel_amount",
+            command.cancelAmount()
+        );
+
+        requestBody.put(
+            "cancel_tax_free_amount",
+            command.cancelTaxFreeAmount()
+        );
+
+        if (command.cancelVatAmount() != null) {
+            requestBody.put(
+                "cancel_vat_amount",
+                command.cancelVatAmount()
+            );
+        }
+
+        try {
+            Map<String, Object> response =
+                restClient
+                    .post()
+                    .uri(CANCEL_PATH)
+                    .header(
+                        HttpHeaders.AUTHORIZATION,
+                        createAuthorizationValue()
+                    )
+                    .body(requestBody)
+                    .retrieve()
+                    .body(
+                        new ParameterizedTypeReference<>() {
+                        }
+                    );
+
+            if (response == null) {
+                return CancelResult.failure(
+                    "KAKAO_EMPTY_RESPONSE",
+                    "카카오페이 취소 응답이 비어 있습니다."
+                );
+            }
+
+            String aid = getString(
+                response,
+                "aid"
+            );
+
+            String tid = getString(
+                response,
+                "tid"
+            );
+
+            String status = getString(
+                response,
+                "status"
+            );
+
+            Long approvedCancelAmount = getNestedLong(
+                response,
+                "approved_cancel_amount",
+                "total"
+            );
+
+            Long canceledAmount = getNestedLong(
+                response,
+                "canceled_amount",
+                "total"
+            );
+
+            Long cancelAvailableAmount = getNestedLong(
+                response,
+                "cancel_available_amount",
+                "total"
+            );
+
+            String canceledAt = getString(
+                response,
+                "canceled_at"
+            );
+
+            if (isBlank(aid)
+                || isBlank(tid)
+                || isBlank(status)
+                || approvedCancelAmount == null
+                || approvedCancelAmount < 1
+                || canceledAmount == null
+                || cancelAvailableAmount == null) {
+                return CancelResult.failure(
+                    "KAKAO_INVALID_CANCEL_RESPONSE",
+                    "카카오페이 취소 응답 형식이 올바르지 않습니다."
+                );
+            }
+
+            return CancelResult.success(
+                aid,
+                tid,
+                status,
+                approvedCancelAmount,
+                canceledAmount,
+                cancelAvailableAmount,
+                canceledAt
+            );
+        } catch (
+            RestClientResponseException exception
+        ) {
+            KakaoError error = extractError(exception);
+
+            return CancelResult.failure(
+                error.code(),
+                error.message()
+            );
+        } catch (
+            RestClientException exception
+        ) {
+            /*
+             * 카카오페이에서 취소는 완료됐지만 POPQ가 응답을
+             * 받지 못한 상황일 수도 있습니다.
+             *
+             * 다음 단계에서 주문 조회 API로 실제 취소 상태를
+             * 확인하도록 연결합니다.
+             */
+            return CancelResult.failure(
+                "KAKAO_COMMUNICATION_ERROR",
+                "카카오페이 취소 결과를 확인하지 못했습니다."
             );
         }
     }
@@ -398,8 +552,8 @@ public class KakaoPaymentClient {
             }
         } catch (Exception ignored) {
             /*
-             * 오류 응답 파싱 실패 시
-             * 아래 기본 오류를 사용합니다.
+             * 카카오페이 오류 응답 파싱에 실패하면
+             * 아래의 기본 오류를 사용합니다.
              */
         }
 
@@ -535,6 +689,40 @@ public class KakaoPaymentClient {
             "pgToken",
             255
         );
+    }
+
+    private void validateCancelCommand(
+        CancelCommand command
+    ) {
+        requireText(
+            command.tid(),
+            "tid"
+        );
+
+        if (command.cancelAmount() < 1) {
+            throw new IllegalArgumentException(
+                "cancelAmount는 1원 이상이어야 합니다."
+            );
+        }
+
+        if (command.cancelTaxFreeAmount() < 0
+            || command.cancelTaxFreeAmount()
+            > command.cancelAmount()) {
+            throw new IllegalArgumentException(
+                "cancelTaxFreeAmount가 올바르지 않습니다."
+            );
+        }
+
+        if (command.cancelVatAmount() != null
+            && (
+            command.cancelVatAmount() < 0
+                || command.cancelVatAmount()
+                > command.cancelAmount()
+        )) {
+            throw new IllegalArgumentException(
+                "cancelVatAmount가 올바르지 않습니다."
+            );
+        }
     }
 
     private void validateMaximumLength(
@@ -791,6 +979,85 @@ public class KakaoPaymentClient {
                 null,
                 null,
                 null,
+                0L,
+                null,
+                failureCode,
+                failureMessage
+            );
+        }
+    }
+
+    public record CancelCommand(
+
+        String tid,
+
+        long cancelAmount,
+
+        long cancelTaxFreeAmount,
+
+        Long cancelVatAmount
+
+    ) {
+    }
+
+    public record CancelResult(
+
+        boolean success,
+
+        String aid,
+
+        String tid,
+
+        String status,
+
+        long approvedCancelAmount,
+
+        long canceledAmount,
+
+        long cancelAvailableAmount,
+
+        String canceledAt,
+
+        String failureCode,
+
+        String failureMessage
+
+    ) {
+
+        public static CancelResult success(
+            String aid,
+            String tid,
+            String status,
+            long approvedCancelAmount,
+            long canceledAmount,
+            long cancelAvailableAmount,
+            String canceledAt
+        ) {
+            return new CancelResult(
+                true,
+                aid,
+                tid,
+                status,
+                approvedCancelAmount,
+                canceledAmount,
+                cancelAvailableAmount,
+                canceledAt,
+                null,
+                null
+            );
+        }
+
+        public static CancelResult failure(
+            String failureCode,
+            String failureMessage
+        ) {
+            return new CancelResult(
+                false,
+                null,
+                null,
+                null,
+                0L,
+                0L,
                 0L,
                 null,
                 failureCode,
