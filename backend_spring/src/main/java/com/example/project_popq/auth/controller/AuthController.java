@@ -10,6 +10,7 @@ import com.example.project_popq.auth.dto.PasswordResetConfirmRequest;
 import com.example.project_popq.auth.dto.PasswordResetVerifyRequest;
 import com.example.project_popq.auth.dto.SignupRequest;
 import com.example.project_popq.auth.dto.SocialLoginRequest;
+import com.example.project_popq.auth.dto.WithdrawRequest;
 import com.example.project_popq.auth.service.AuthService;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.auth.service.SocialAuthService;
@@ -102,6 +103,17 @@ public class AuthController {
     ) {
         return ApiResponse.success(
                 authService.connectSellerAccess(Long.valueOf(jwt.getSubject()))
+        );
+    }
+
+    @PostMapping("/withdraw")
+    public ApiResponse<AckResponse> withdraw(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) WithdrawRequest request
+    ) {
+        String confirmationPhrase = request != null ? request.confirmationPhrase() : null;
+        return ApiResponse.success(
+                authService.withdraw(Long.valueOf(jwt.getSubject()), confirmationPhrase)
         );
     }
 }

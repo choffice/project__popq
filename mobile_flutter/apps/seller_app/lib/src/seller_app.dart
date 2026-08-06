@@ -243,6 +243,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       analyticsRepository: _analyticsRepository,
       customerRepository: _customerRepository,
       onSignOut: _bootstrapController.signOut,
+      onWithdraw: _withdraw,
       onSignIn: _signIn,
       onSignUp: _signUp,
       onFindId: _findId,
@@ -315,6 +316,13 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       phone: phone,
       newPassword: newPassword,
     );
+  }
+
+  Future<void> _withdraw(String? confirmationPhrase) async {
+    await _authRepository.withdraw(
+      confirmationPhrase: confirmationPhrase,
+    );
+    await _bootstrapController.signOut();
   }
 
   Future<void> _completeSignIn(

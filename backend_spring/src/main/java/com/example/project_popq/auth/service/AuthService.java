@@ -17,6 +17,7 @@ import com.example.project_popq.seller.repository.SellerProfileRepository;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.repository.UserRepository;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -57,7 +58,7 @@ public class AuthService {
         return issueToken(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthTokenResponse login(LoginRequest request) {
         String normalizedEmail = request.email().trim().toLowerCase();
         User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
@@ -67,6 +68,8 @@ public class AuthService {
                 || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
+
+        user.reconcileWithdrawalState(Instant.now());
         if (!user.isActive()) {
             throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
@@ -96,6 +99,31 @@ public class AuthService {
 
         user.addRole(PlatformRole.SELLER);
         ensureSellerProfile(user, PlatformRole.SELLER);
+        return AckResponse.ok();
+    }
+
+    /**
+     * 회원 탈퇴를 접수합니다. confirmationPhrase가 "{이름} / 탈퇴하겠습니다"와
+     * 정확히 일치하면 유예기간 없이 즉시 확정 탈퇴하고, 그렇지 않으면 7일의
+     * 유예기간을 두고 탈퇴 대기 상태로 전환합니다(그 안에 재로그인하면 취소).
+     */
+    @Transactional
+    public AckResponse withdraw(Long userId, String confirmationPhrase) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!user.isActive()) {
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
+        }
+
+        boolean immediate = confirmationPhrase != null && !confirmationPhrase.isBlank();
+        if (immediate && !user.matchesWithdrawalConfirmationPhrase(confirmationPhrase)) {
+            throw new BusinessException(ErrorCode.WITHDRAWAL_CONFIRMATION_MISMATCH);
+        }
+
+        user.requestWithdrawal(Instant.now());
+        if (immediate) {
+            user.finalizeWithdrawal();
+        }
         return AckResponse.ok();
     }
 

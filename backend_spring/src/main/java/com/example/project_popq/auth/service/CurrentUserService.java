@@ -26,6 +26,10 @@ public class CurrentUserService {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        if (jwt.getIssuedAt() != null && !user.isTokenValid(jwt.getIssuedAt())) {
+            throw new BusinessException(ErrorCode.AUTHENTICATION_REQUIRED);
+        }
         if (!user.isActive()) {
             throw new BusinessException(ErrorCode.USER_INACTIVE);
         }
