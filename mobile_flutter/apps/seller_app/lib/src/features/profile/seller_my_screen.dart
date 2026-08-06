@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/seller_router.dart';
+import '../auth/seller_identity_repository.dart';
 import '../stores/seller_store_repository.dart';
 import '../stores/seller_store_selection_controller.dart';
 
@@ -10,13 +12,17 @@ class SellerMyScreen extends StatefulWidget {
   const SellerMyScreen({
     required this.storeRepository,
     required this.selectionController,
+    required this.identityRepository,
     required this.onSignOut,
+    required this.onWithdraw,
     super.key,
   });
 
   final SellerStoreRepository storeRepository;
   final SellerStoreSelectionController selectionController;
+  final SellerIdentityRepository identityRepository;
   final Future<void> Function() onSignOut;
+  final Future<void> Function(String? confirmationPhrase) onWithdraw;
 
   @override
   State<SellerMyScreen> createState() => _SellerMyScreenState();
@@ -29,6 +35,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
   int? _lastSelectedStoreId;
   var _loading = true;
   var _signingOut = false;
+  var _withdrawing = false;
 
   @override
   void initState() {
@@ -217,6 +224,34 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                         ? null
                         : _confirmSignOut,
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: Icon(
+                      Icons.warning_amber_rounded,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(
+                      _withdrawing ? '탈퇴 처리 중...' : '회원 탈퇴',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      '판매자 계정을 탈퇴합니다.',
+                    ),
+                    trailing: _withdrawing
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.chevron_right_rounded,
+                          ),
+                    enabled: !_withdrawing,
+                    onTap: _withdrawing ? null : _withdraw,
+                  ),
                 ],
               ),
             ),
@@ -356,6 +391,160 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       );
     }
   }
+
+  Future<void> _withdraw() async {
+    final SellerIdentity identity;
+    try {
+      identity = await widget.identityRepository.getCurrent();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('계정 정보를 불러오지 못했어요.'),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+
+    final expectedPhrase = '${identity.name} / 탈퇴하겠습니다';
+    final result = await showDialog<_SellerWithdrawDialogResult>(
+      context: context,
+      builder: (context) => _SellerWithdrawDialog(
+        expectedPhrase: expectedPhrase,
+      ),
+    );
+
+    if (result == null || !mounted) return;
+
+    setState(() {
+      _withdrawing = true;
+    });
+
+    try {
+      await widget.onWithdraw(
+        result.immediate ? expectedPhrase : null,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.immediate
+                ? '탈퇴가 완료됐어요.'
+                : '탈퇴가 접수됐어요. 7일 안에 다시 로그인하면 탈퇴가 취소돼요.',
+          ),
+        ),
+      );
+      context.go(SellerRoutes.signIn);
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _withdrawing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _withdrawing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('회원 탈퇴에 실패했어요. ($error)'),
+        ),
+      );
+    }
+  }
+}
+
+class _SellerWithdrawDialogResult {
+  const _SellerWithdrawDialogResult({required this.immediate});
+
+  final bool immediate;
+}
+
+class _SellerWithdrawDialog extends StatefulWidget {
+  const _SellerWithdrawDialog({required this.expectedPhrase});
+
+  final String expectedPhrase;
+
+  @override
+  State<_SellerWithdrawDialog> createState() => _SellerWithdrawDialogState();
+}
+
+class _SellerWithdrawDialogState extends State<_SellerWithdrawDialog> {
+  final _controller = TextEditingController();
+  bool _matchesPhrase = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      scrollable: true,
+      title: const Text('회원 탈퇴'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '탈퇴를 누르면 바로 사라지지 않고, 7일의 유예기간 뒤에 확정돼요.\n'
+            '그 안에 다시 로그인하면 탈퇴가 자동으로 취소돼요.',
+          ),
+          const SizedBox(height: PopqSpacing.md),
+          Text(
+            '유예기간 없이 지금 바로 탈퇴하려면 아래에\n'
+            '"${widget.expectedPhrase}"\n'
+            '를 정확히 입력하세요.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: widget.expectedPhrase,
+            ),
+            onChanged: (value) {
+              setState(() {
+                _matchesPhrase = _stripSpaces(value) ==
+                    _stripSpaces(widget.expectedPhrase);
+              });
+            },
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('취소'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(
+            const _SellerWithdrawDialogResult(immediate: false),
+          ),
+          child: const Text('7일 후 탈퇴'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: _matchesPhrase
+              ? () => Navigator.of(context).pop(
+                    const _SellerWithdrawDialogResult(immediate: true),
+                  )
+              : null,
+          child: const Text('지금 바로 탈퇴'),
+        ),
+      ],
+    );
+  }
 }
 
 class _ProfileCard extends StatelessWidget {
@@ -449,6 +638,8 @@ class _ProfileCard extends StatelessWidget {
     );
   }
 }
+
+String _stripSpaces(String value) => value.replaceAll(RegExp(r'\s+'), '');
 
 class _SellerCenterCard extends StatelessWidget {
   const _SellerCenterCard({

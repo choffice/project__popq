@@ -42,6 +42,13 @@ abstract interface class SellerAuthRepository {
     required String phone,
     required String newPassword,
   });
+
+  /// 현재 로그인된 계정의 탈퇴를 접수합니다.
+  ///
+  /// [confirmationPhrase]가 "{이름} / 탈퇴하겠습니다"와 정확히 일치하면
+  /// 유예기간 없이 즉시 탈퇴되고, 그렇지 않으면(null 또는 생략) 7일의
+  /// 유예기간을 두고 탈퇴 대기 상태가 됩니다.
+  Future<void> withdraw({String? confirmationPhrase});
 }
 
 class MemorySellerAuthRepository implements SellerAuthRepository {
@@ -102,6 +109,9 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
     required String phone,
     required String newPassword,
   }) async {}
+
+  @override
+  Future<void> withdraw({String? confirmationPhrase}) async {}
 
   SellerAuthResult _result() {
     return SellerAuthResult(
@@ -197,6 +207,17 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/password-reset/confirm',
       body: {'email': email, 'phone': phone, 'newPassword': newPassword},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<void> withdraw({String? confirmationPhrase}) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/withdraw',
+      body: confirmationPhrase == null
+          ? null
+          : {'confirmationPhrase': confirmationPhrase},
       decode: (value) => Map<String, Object?>.from(value as Map),
     );
   }
