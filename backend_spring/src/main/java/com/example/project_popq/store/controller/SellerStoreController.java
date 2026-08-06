@@ -6,6 +6,7 @@ import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
 import com.example.project_popq.store.dto.SellerStoreDetailResponse;
+import com.example.project_popq.store.dto.SellerDashboardSummaryResponse;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
 import com.example.project_popq.store.dto.UpdateStoreRequest;
@@ -42,6 +43,28 @@ public class SellerStoreController {
     ) {
         return ApiResponse.success(
             storeApplicationService.findMyStores(
+                currentUserService.getRequired(jwt)
+            )
+        );
+    }
+
+    @GetMapping("/inactive")
+    public ApiResponse<List<StoreSummaryResponse>> findMyInactiveStores(
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+            storeApplicationService.findMyInactiveStores(
+                currentUserService.getRequired(jwt)
+            )
+        );
+    }
+
+    @GetMapping("/dashboard-summary")
+    public ApiResponse<List<SellerDashboardSummaryResponse>> dashboardSummary(
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+            storeApplicationService.findDashboardSummaries(
                 currentUserService.getRequired(jwt)
             )
         );
@@ -102,6 +125,32 @@ public class SellerStoreController {
         );
 
         return ApiResponse.success(true);
+    }
+
+    @PostMapping("/{storeId}/suspend")
+    public ApiResponse<StoreSummaryResponse> suspend(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
+    ) {
+        return ApiResponse.success(
+            storeApplicationService.suspend(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
+        );
+    }
+
+    @PostMapping("/{storeId}/reopen")
+    public ApiResponse<StoreSummaryResponse> reopen(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId
+    ) {
+        return ApiResponse.success(
+            storeApplicationService.reopen(
+                currentUserService.getRequired(jwt),
+                storeId
+            )
+        );
     }
 
     @PatchMapping("/{storeId}/business-status")

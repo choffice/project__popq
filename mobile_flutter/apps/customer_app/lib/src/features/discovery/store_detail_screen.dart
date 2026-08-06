@@ -418,9 +418,24 @@ class _StoreReviewSection extends StatelessWidget {
                       Text(List.filled(review.rating, '★').join()),
                     ],
                   ),
-                  subtitle: review.content == null
-                      ? null
-                      : Text(review.content!),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (review.content != null) Text(review.content!),
+                      if (review.sellerReply?.isNotEmpty ?? false) ...[
+                        const SizedBox(height: PopqSpacing.sm),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(PopqSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text('사장님 답글\n${review.sellerReply!}'),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
           ],

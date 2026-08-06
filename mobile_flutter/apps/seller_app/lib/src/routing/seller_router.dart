@@ -21,6 +21,7 @@ import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
 import '../features/profile/seller_my_screen.dart';
+import '../features/reviews/seller_review_repository.dart';
 import '../features/settings/seller_settings_screen.dart';
 import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
@@ -58,6 +59,7 @@ GoRouter createSellerRouter({
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
   required SellerCustomerRepository customerRepository,
+  required SellerReviewRepository reviewRepository,
   required Future<void> Function() onSignOut,
   required Future<void> Function(String? confirmationPhrase) onWithdraw,
   required Future<void> Function() onConnectCustomerAccess,
@@ -297,6 +299,10 @@ GoRouter createSellerRouter({
             storeRepository: storeRepository,
             selectionController:
             storeSelectionController,
+            reviewRepository: reviewRepository,
+            storeId: int.tryParse(
+              state.uri.queryParameters['storeId'] ?? '',
+            ),
           );
         },
       ),
@@ -351,8 +357,12 @@ GoRouter createSellerRouter({
                 productRepository,
                 analyticsRepository:
                 analyticsRepository,
+                reviewRepository: reviewRepository,
+                orderRepository: orderRepository,
                 selectionController:
                 storeSelectionController,
+                initialSection:
+                    state.uri.queryParameters['section'] == 'reviews' ? 4 : 0,
               );
             },
           ),
@@ -361,6 +371,7 @@ GoRouter createSellerRouter({
             builder: (context, state) {
               return SellerOrderListScreen(
                 repository: orderRepository,
+                storeRepository: storeRepository,
                 selectionController:
                 storeSelectionController,
               );

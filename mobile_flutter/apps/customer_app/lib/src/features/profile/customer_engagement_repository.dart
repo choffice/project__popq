@@ -108,6 +108,8 @@ class CustomerReview {
     required this.status,
     required this.createdAt,
     this.content,
+    this.sellerReply,
+    this.sellerRepliedAt,
   });
 
   factory CustomerReview.fromJson(Map<String, Object?> json) {
@@ -121,6 +123,10 @@ class CustomerReview {
       content: json['content'] as String?,
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      sellerReply: json['sellerReply'] as String?,
+      sellerRepliedAt: json['sellerRepliedAt'] is String
+          ? DateTime.tryParse(json['sellerRepliedAt'] as String)
+          : null,
     );
   }
 
@@ -133,6 +139,8 @@ class CustomerReview {
   final String? content;
   final String status;
   final DateTime createdAt;
+  final String? sellerReply;
+  final DateTime? sellerRepliedAt;
 
   bool get isActive => status == 'ACTIVE';
 
@@ -147,6 +155,8 @@ class CustomerReview {
       content: content ?? this.content,
       status: status ?? this.status,
       createdAt: createdAt,
+      sellerReply: sellerReply,
+      sellerRepliedAt: sellerRepliedAt,
     );
   }
 }

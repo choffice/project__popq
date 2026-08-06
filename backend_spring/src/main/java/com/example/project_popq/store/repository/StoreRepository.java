@@ -1,6 +1,8 @@
 package com.example.project_popq.store.repository;
 
 import com.example.project_popq.store.domain.Store;
+import com.example.project_popq.store.domain.BusinessStatus;
+import com.example.project_popq.store.domain.StoreStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -8,6 +10,11 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface StoreRepository extends JpaRepository<Store, Long> {
+
+    List<Store> findAllByStatusAndBusinessStatus(
+            StoreStatus status,
+            BusinessStatus businessStatus
+    );
 
     @Query("""
             select distinct store

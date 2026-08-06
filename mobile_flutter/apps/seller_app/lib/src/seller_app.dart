@@ -16,6 +16,7 @@ import 'features/customers/seller_customer_repository.dart';
 import 'features/home/seller_analytics_repository.dart';
 import 'features/orders/seller_order_repository.dart';
 import 'features/products/seller_product_repository.dart';
+import 'features/reviews/seller_review_repository.dart';
 import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
@@ -35,6 +36,7 @@ class PopqSellerApp extends StatefulWidget {
     this.productRepository,
     this.analyticsRepository,
     this.customerRepository,
+    this.reviewRepository,
     this.themeController,
     this.authRepository,
     this.splashMinDuration = const Duration(seconds: 3),
@@ -51,6 +53,7 @@ class PopqSellerApp extends StatefulWidget {
   final SellerProductRepository? productRepository;
   final SellerAnalyticsRepository? analyticsRepository;
   final SellerCustomerRepository? customerRepository;
+  final SellerReviewRepository? reviewRepository;
   final PopqThemeController? themeController;
   final SellerAuthRepository? authRepository;
 
@@ -88,6 +91,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   late final SellerAnalyticsRepository _analyticsRepository;
 
   late final SellerCustomerRepository _customerRepository;
+  late final SellerReviewRepository _reviewRepository;
 
   late final SellerAuthRepository _authRepository;
 
@@ -214,6 +218,9 @@ class _PopqSellerAppState extends State<PopqSellerApp>
               _apiClient,
             );
 
+    _reviewRepository =
+        widget.reviewRepository ?? ApiSellerReviewRepository(_apiClient);
+
     final identityRepository =
         widget.identityRepository ??
             ApiSellerIdentityRepository(
@@ -242,6 +249,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       productRepository: _productRepository,
       analyticsRepository: _analyticsRepository,
       customerRepository: _customerRepository,
+      reviewRepository: _reviewRepository,
       onSignOut: _bootstrapController.signOut,
       onWithdraw: _withdraw,
       onConnectCustomerAccess: _connectCustomerAccess,

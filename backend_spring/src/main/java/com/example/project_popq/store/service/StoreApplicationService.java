@@ -18,6 +18,11 @@ import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
 import com.example.project_popq.store.dto.SellerStoreDetailResponse;
+import com.example.project_popq.store.dto.SellerDashboardSummaryResponse;
+import com.example.project_popq.engagement.domain.ReviewStatus;
+import com.example.project_popq.engagement.repository.ReviewRepository;
+import com.example.project_popq.order.domain.OrderStatus;
+import com.example.project_popq.order.repository.OrderRepository;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
 import com.example.project_popq.store.dto.UpdateStoreRequest;
@@ -36,6 +41,8 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +54,8 @@ public class StoreApplicationService {
     private final StoreTagRepository storeTagRepository;
     private final TagRepository tagRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final OrderRepository orderRepository;
+    private final ReviewRepository reviewRepository;
 
     @Transactional
     public StoreSummaryResponse create(
@@ -160,6 +169,74 @@ public class StoreApplicationService {
                 )
             )
             .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<StoreSummaryResponse> findMyInactiveStores(User currentUser) {
+        return storeMemberRepository
+            .findAllByUserIdAndStatusOrderByIdAsc(
+                currentUser.getId(),
+                StoreMemberStatus.ACTIVE
+            )
+            .stream()
+            .filter(member -> member.getStore().getStatus() != StoreStatus.ACTIVE)
+            .map(member -> StoreSummaryResponse.of(
+                member.getStore(),
+                member.getRole()
+            ))
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerDashboardSummaryResponse> findDashboardSummaries(
+        User currentUser
+    ) {
+        List<Store> stores = storeMemberRepository
+            .findAllByUserIdAndStatusOrderByIdAsc(
+                currentUser.getId(),
+                StoreMemberStatus.ACTIVE
+            )
+            .stream()
+            .map(StoreMember::getStore)
+            .filter(Store::isActive)
+            .toList();
+        if (stores.isEmpty()) {
+            return List.of();
+        }
+        List<Long> storeIds = stores.stream().map(Store::getId).toList();
+        Map<Long, Map<OrderStatus, Long>> orderCounts = new HashMap<>();
+        orderRepository.countByStoreIdsAndStatuses(
+                storeIds,
+                List.of(
+                    OrderStatus.PLACED,
+                    OrderStatus.ACCEPTED,
+                    OrderStatus.PREPARING,
+                    OrderStatus.READY
+                )
+            )
+            .forEach(row -> orderCounts
+                .computeIfAbsent((Long) row[0], ignored -> new HashMap<>())
+                .put((OrderStatus) row[1], (Long) row[2]));
+        Map<Long, Long> unansweredCounts = new HashMap<>();
+        reviewRepository.countUnansweredByStoreIds(storeIds, ReviewStatus.ACTIVE)
+            .forEach(row -> unansweredCounts.put((Long) row[0], (Long) row[1]));
+
+        return stores.stream().map(store -> {
+            Map<OrderStatus, Long> counts = orderCounts.getOrDefault(
+                store.getId(),
+                Map.of()
+            );
+            return new SellerDashboardSummaryResponse(
+                store.getId(),
+                store.getName(),
+                store.getBusinessStatus(),
+                counts.getOrDefault(OrderStatus.PLACED, 0L),
+                counts.getOrDefault(OrderStatus.ACCEPTED, 0L)
+                    + counts.getOrDefault(OrderStatus.PREPARING, 0L),
+                counts.getOrDefault(OrderStatus.READY, 0L),
+                unansweredCounts.getOrDefault(store.getId(), 0L)
+            );
+        }).toList();
     }
 
     @Transactional(readOnly = true)
@@ -319,6 +396,36 @@ public class StoreApplicationService {
         store.changeStatus(
             StoreStatus.CLOSED
         );
+    }
+
+    @Transactional
+    public StoreSummaryResponse suspend(User currentUser, Long storeId) {
+        StoreMember member = storeAuthorizationService.requireAnyRole(
+            currentUser.getId(),
+            storeId,
+            StoreRole.OWNER
+        );
+        Store store = member.getStore();
+        if (store.getStatus() != StoreStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        store.suspend();
+        return StoreSummaryResponse.of(store, member.getRole());
+    }
+
+    @Transactional
+    public StoreSummaryResponse reopen(User currentUser, Long storeId) {
+        StoreMember member = storeAuthorizationService.requireAnyRole(
+            currentUser.getId(),
+            storeId,
+            StoreRole.OWNER
+        );
+        Store store = member.getStore();
+        if (store.getStatus() != StoreStatus.SUSPENDED) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        store.reopen();
+        return StoreSummaryResponse.of(store, member.getRole());
     }
 
     @Transactional

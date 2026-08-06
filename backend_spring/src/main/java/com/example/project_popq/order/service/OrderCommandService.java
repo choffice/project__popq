@@ -28,6 +28,7 @@ import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class OrderCommandService {
+
+    private static final Set<Integer> PREPARATION_MINUTES = Set.of(
+            0, 5, 10, 15, 20, 30, 40, 50
+    );
 
     private final GuestQrService guestQrService;
     private final GuestOrderService guestOrderService;
@@ -99,16 +104,54 @@ public class OrderCommandService {
     public List<OrderResponse> findSellerOrders(
             User user,
             Long storeId,
-            OrderStatus status
+            OrderStatus status,
+            List<OrderStatus> statuses
     ) {
         requireStoreMember(user.getId(), storeId);
-        List<Order> orders = status == null
-                ? orderRepository.findAllByStoreIdOrderByCreatedAtAsc(storeId)
-                : orderRepository.findAllByStoreIdAndStatusOrderByCreatedAtAsc(
-                        storeId,
-                        status
-                );
+        List<Order> orders;
+        if (status != null) {
+            orders = orderRepository.findAllByStoreIdAndStatusOrderByCreatedAtDesc(
+                    storeId,
+                    status
+            );
+        } else if (statuses != null && !statuses.isEmpty()) {
+            orders = orderRepository.findAllByStoreIdAndStatusInOrderByCreatedAtDesc(
+                    storeId,
+                    statuses
+            );
+        } else {
+            orders = orderRepository.findAllByStoreIdOrderByCreatedAtDesc(storeId);
+        }
         return orders.stream().map(OrderResponse::from).toList();
+    }
+
+    @Transactional
+    public OrderResponse acceptBySeller(
+            User user,
+            Long storeId,
+            String orderPublicId,
+            int preparationMinutes,
+            boolean applyAsStoreDefault,
+            String reason
+    ) {
+        requireStoreMember(user.getId(), storeId);
+        if (!PREPARATION_MINUTES.contains(preparationMinutes)) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        Order order = lockedSellerOrder(storeId, orderPublicId);
+        Instant now = Instant.now();
+        OrderTransition transition = order.accept(
+                preparationMinutes,
+                OrderActorType.SELLER,
+                user.getId(),
+                reason,
+                now
+        );
+        if (applyAsStoreDefault) {
+            order.getStore().changeDefaultPreparationMinutes(preparationMinutes);
+        }
+        flushAndPublish(order, transition);
+        return OrderResponse.from(order);
     }
 
     @Transactional(readOnly = true)

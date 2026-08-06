@@ -144,6 +144,14 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                   ),
                   const Divider(height: 1),
                   ListTile(
+                    leading: const Icon(Icons.inventory_2_outlined),
+                    title: const Text('휴업·폐업 사업장'),
+                    subtitle: const Text('휴업 사업장을 재개하거나 폐업 이력을 확인합니다.'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: _showInactiveStores,
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
                     leading: const Icon(
                       Icons.swap_horiz_rounded,
                     ),
@@ -406,6 +414,124 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _showInactiveStores() async {
+    final List<SellerStore> stores;
+    try {
+      stores = await widget.storeRepository.findInactive();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('휴업·폐업 사업장을 불러오지 못했습니다.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.7,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(PopqSpacing.lg),
+                child: Text(
+                  '휴업·폐업 사업장',
+                  style: Theme.of(sheetContext).textTheme.titleLarge,
+                ),
+              ),
+              Expanded(
+                child: stores.isEmpty
+                    ? const PopqEmptyView(
+                        icon: Icons.store_outlined,
+                        title: '휴업·폐업 사업장이 없어요.',
+                        description: '현재 운영 중인 사업장은 사업장 전환에서 확인할 수 있어요.',
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(PopqSpacing.md),
+                        itemCount: stores.length,
+                        separatorBuilder: (_, _) => const Divider(),
+                        itemBuilder: (context, index) {
+                          final store = stores[index];
+                          final suspended = store.status == 'SUSPENDED';
+                          return ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage: store.imageUrl?.isNotEmpty == true
+                                  ? NetworkImage(store.imageUrl!)
+                                  : null,
+                              child: store.imageUrl?.isNotEmpty == true
+                                  ? null
+                                  : Icon(
+                                      suspended
+                                          ? Icons.pause_circle_outline_rounded
+                                          : Icons.block_outlined,
+                                    ),
+                            ),
+                            title: Text(store.name),
+                            subtitle: Text(
+                              '${suspended ? '휴업 중' : '폐업'}'
+                              '${store.address?.isNotEmpty == true ? ' · ${store.address}' : ''}',
+                            ),
+                            trailing: suspended && store.myRole == 'OWNER'
+                                ? FilledButton.tonal(
+                                    onPressed: () => _reopenStore(
+                                      sheetContext,
+                                      store,
+                                    ),
+                                    child: const Text('재개'),
+                                  )
+                                : const Text('조회만 가능'),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _reopenStore(
+    BuildContext sheetContext,
+    SellerStore store,
+  ) async {
+    final SellerStore reopened;
+    try {
+      reopened = await widget.storeRepository.reopen(store.storeId);
+      await widget.selectionController.select(reopened.storeId);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('사업장을 재개하지 못했습니다.')),
+      );
+      return;
+    }
+    if (!mounted || !sheetContext.mounted) return;
+    Navigator.pop(sheetContext);
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('사업장을 재개했습니다'),
+        content: const Text(
+          '영업 시작 전 아래 항목을 확인해 주세요.\n\n'
+          '□ 영업시간\n'
+          '□ 메뉴와 가격\n'
+          '□ 품절 상태\n'
+          '□ 주문 접수 설정\n'
+          '□ 대표 이미지와 주소',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _connectCustomerAccess() async {

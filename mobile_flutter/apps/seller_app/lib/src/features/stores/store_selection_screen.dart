@@ -29,6 +29,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   bool _creating = false;
   int? _observedSelectedStoreId;
   String _searchQuery = '';
+  Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
 
   bool get _busy => _selecting || _creating;
 
@@ -168,6 +169,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     final bool selected =
         widget.controller.selectedStoreId == store.storeId;
 
+    final summary = _summariesByStoreId[store.storeId];
     return Card(
       child: ListTile(
         enabled: !_busy,
@@ -179,10 +181,45 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
           ),
         ),
         title: Text(store.name),
-        subtitle: Text(
-          '${_typeLabel(store.storeType)} · '
-          '${_roleLabel(store.myRole)} · '
-          '${_statusLabel(store.businessStatus)}',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${_typeLabel(store.storeType)} · '
+              '${_roleLabel(store.myRole)} · '
+              '${_statusLabel(store.businessStatus)}'
+              '${selected ? ' · 현재 선택' : ''}',
+            ),
+            if (summary != null) ...[
+              const SizedBox(height: PopqSpacing.sm),
+              Wrap(
+                spacing: PopqSpacing.xs,
+                runSpacing: PopqSpacing.xs,
+                children: [
+                  ActionChip(
+                    avatar: const Icon(Icons.schedule_rounded, size: 16),
+                    label: Text('접수대기 ${summary.waitingOrderCount}'),
+                    onPressed: _busy ? null : () => _openOrders(store),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.soup_kitchen_outlined, size: 16),
+                    label: Text('진행중 ${summary.activeOrderCount}'),
+                    onPressed: _busy ? null : () => _openOrders(store),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.shopping_bag_outlined, size: 16),
+                    label: Text('픽업대기 ${summary.readyOrderCount}'),
+                    onPressed: _busy ? null : () => _openOrders(store),
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.reviews_outlined, size: 16),
+                    label: Text('미답변 ${summary.unansweredReviewCount}'),
+                    onPressed: _busy ? null : () => _openReviews(store),
+                  ),
+                ],
+              ),
+            ],
+          ],
         ),
         trailing: Icon(
           selected
@@ -217,7 +254,15 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   }
 
   Future<List<SellerStore>> _load() async {
-    final List<SellerStore> stores = await widget.repository.findAll();
+    final results = await Future.wait([
+      widget.repository.findAll(),
+      widget.repository.findDashboardSummaries(),
+    ]);
+    final stores = results[0] as List<SellerStore>;
+    final summaries = results[1] as List<SellerDashboardSummary>;
+    _summariesByStoreId = {
+      for (final summary in summaries) summary.storeId: summary,
+    };
     final int? selectedId = widget.controller.selectedStoreId;
     final bool selectedStoreExists = selectedId == null ||
         stores.any((SellerStore store) => store.storeId == selectedId);
@@ -291,6 +336,16 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       });
       _showMessage('사업장 선택을 저장하지 못했어요.');
     }
+  }
+
+  Future<void> _openOrders(SellerStore store) async {
+    await widget.controller.select(store.storeId);
+    if (mounted) context.go(SellerRoutes.orders);
+  }
+
+  Future<void> _openReviews(SellerStore store) async {
+    await widget.controller.select(store.storeId);
+    if (mounted) context.go('${SellerRoutes.operations}?section=reviews');
   }
 
   Future<void> _openRegistrationScreen() async {

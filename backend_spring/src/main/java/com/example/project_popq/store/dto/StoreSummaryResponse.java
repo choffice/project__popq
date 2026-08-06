@@ -30,6 +30,7 @@ public record StoreSummaryResponse(
         boolean takeoutAvailable,
         boolean dineInAvailable,
         boolean orderAcceptingEnabled,
+        Integer defaultPreparationMinutes,
         StoreStatus status,
         BusinessStatus businessStatus,
         StoreRole myRole
@@ -57,6 +58,7 @@ public record StoreSummaryResponse(
                 store.isTakeoutAvailable(),
                 store.isDineInAvailable(),
                 store.isOrderAcceptingEnabled(),
+                store.getDefaultPreparationMinutes(),
                 store.getStatus(),
                 store.getBusinessStatus(),
                 myRole
