@@ -9,6 +9,8 @@ import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.CustomerOrderService;
 import com.example.project_popq.order.service.OrderCommandService;
 import com.example.project_popq.payment.dto.ConfirmPaymentRequest;
+import com.example.project_popq.payment.dto.KakaoPaymentApproveRequest;
+import com.example.project_popq.payment.dto.KakaoPaymentApproveResponse;
 import com.example.project_popq.payment.dto.KakaoPaymentPrepareRequest;
 import com.example.project_popq.payment.dto.KakaoPaymentPrepareResponse;
 import com.example.project_popq.payment.dto.PaymentResponse;
@@ -44,115 +46,129 @@ public class CustomerOrderController {
 
     @PostMapping("/stores/{storeId}")
     public ResponseEntity<ApiResponse<OrderResponse>> create(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody CreateCustomerOrderRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody
+        CreateCustomerOrderRequest request
     ) {
-        OrderResponse created = customerOrderService.create(
+        OrderResponse created =
+            customerOrderService.create(
                 currentUserService.getRequired(jwt),
                 storeId,
                 request
-        );
+            );
 
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 
     @GetMapping
     public ApiResponse<List<OrderResponse>> findAll(
-            @AuthenticationPrincipal Jwt jwt
+        @AuthenticationPrincipal Jwt jwt
     ) {
         return ApiResponse.success(
-                customerOrderService.findAll(
-                        currentUserService.getRequired(jwt)
-                )
+            customerOrderService.findAll(
+                currentUserService.getRequired(jwt)
+            )
         );
     }
 
     @GetMapping("/{orderPublicId}")
     public ApiResponse<OrderResponse> findOne(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId
     ) {
         return ApiResponse.success(
-                customerOrderService.findOne(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId
-                )
+            customerOrderService.findOne(
+                currentUserService.getRequired(jwt),
+                orderPublicId
+            )
         );
     }
 
     @GetMapping("/{orderPublicId}/sync")
     public ApiResponse<OrderSyncResponse> sync(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @RequestParam long knownVersion
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @RequestParam long knownVersion
     ) {
         return ApiResponse.success(
-                customerOrderService.sync(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        knownVersion
-                )
+            customerOrderService.sync(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                knownVersion
+            )
         );
     }
 
-    /**
-     * 기존 토스페이먼츠 및 테스트 결제 승인 API입니다.
-     *
-     * 카카오페이는 이 API를 사용하지 않고
-     * /payments/kakao/prepare와 추후 추가될
-     * /payments/kakao/approve API를 사용합니다.
-     */
     @PostMapping("/{orderPublicId}/payments")
     public ApiResponse<PaymentResponse> confirmPayment(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @Valid @RequestBody ConfirmPaymentRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        ConfirmPaymentRequest request
     ) {
         return ApiResponse.success(
-                paymentService.confirmCustomer(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        request
-                )
+            paymentService.confirmCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request
+            )
         );
     }
 
-    /**
-     * 카카오페이 결제를 준비하고 결제창 이동 URL을 반환합니다.
-     */
     @PostMapping(
-            "/{orderPublicId}/payments/kakao/prepare"
+        "/{orderPublicId}/payments/kakao/prepare"
     )
     public ApiResponse<KakaoPaymentPrepareResponse>
     prepareKakaoPayment(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @Valid @RequestBody
-            KakaoPaymentPrepareRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        KakaoPaymentPrepareRequest request
     ) {
         return ApiResponse.success(
-                kakaoPaymentService.prepareCustomer(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        request.idempotencyKey()
-                )
+            kakaoPaymentService.prepareCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request.idempotencyKey()
+            )
+        );
+    }
+
+    @PostMapping(
+        "/{orderPublicId}/payments/kakao/approve"
+    )
+    public ApiResponse<KakaoPaymentApproveResponse>
+    approveKakaoPayment(
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        KakaoPaymentApproveRequest request
+    ) {
+        return ApiResponse.success(
+            kakaoPaymentService.approveCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request
+            )
         );
     }
 
     @PostMapping("/{orderPublicId}/cancel")
     public ApiResponse<OrderResponse> cancel(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @Valid @RequestBody OrderCommandRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        OrderCommandRequest request
     ) {
         return ApiResponse.success(
-                orderCommandService.cancelByCustomer(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        request.reasonOr("고객 주문 취소")
-                )
+            orderCommandService.cancelByCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request.reasonOr("고객 주문 취소")
+            )
         );
     }
 }
