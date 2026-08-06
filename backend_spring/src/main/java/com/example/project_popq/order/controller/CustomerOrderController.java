@@ -9,7 +9,10 @@ import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.CustomerOrderService;
 import com.example.project_popq.order.service.OrderCommandService;
 import com.example.project_popq.payment.dto.ConfirmPaymentRequest;
+import com.example.project_popq.payment.dto.KakaoPaymentPrepareRequest;
+import com.example.project_popq.payment.dto.KakaoPaymentPrepareResponse;
 import com.example.project_popq.payment.dto.PaymentResponse;
+import com.example.project_popq.payment.service.KakaoPaymentService;
 import com.example.project_popq.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -36,6 +39,7 @@ public class CustomerOrderController {
     private final CurrentUserService currentUserService;
     private final CustomerOrderService customerOrderService;
     private final PaymentService paymentService;
+    private final KakaoPaymentService kakaoPaymentService;
     private final OrderCommandService orderCommandService;
 
     @PostMapping("/stores/{storeId}")
@@ -49,6 +53,7 @@ public class CustomerOrderController {
                 storeId,
                 request
         );
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(created));
     }
@@ -92,6 +97,13 @@ public class CustomerOrderController {
         );
     }
 
+    /**
+     * 기존 토스페이먼츠 및 테스트 결제 승인 API입니다.
+     *
+     * 카카오페이는 이 API를 사용하지 않고
+     * /payments/kakao/prepare와 추후 추가될
+     * /payments/kakao/approve API를 사용합니다.
+     */
     @PostMapping("/{orderPublicId}/payments")
     public ApiResponse<PaymentResponse> confirmPayment(
             @AuthenticationPrincipal Jwt jwt,
@@ -103,6 +115,28 @@ public class CustomerOrderController {
                         currentUserService.getRequired(jwt),
                         orderPublicId,
                         request
+                )
+        );
+    }
+
+    /**
+     * 카카오페이 결제를 준비하고 결제창 이동 URL을 반환합니다.
+     */
+    @PostMapping(
+            "/{orderPublicId}/payments/kakao/prepare"
+    )
+    public ApiResponse<KakaoPaymentPrepareResponse>
+    prepareKakaoPayment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String orderPublicId,
+            @Valid @RequestBody
+            KakaoPaymentPrepareRequest request
+    ) {
+        return ApiResponse.success(
+                kakaoPaymentService.prepareCustomer(
+                        currentUserService.getRequired(jwt),
+                        orderPublicId,
+                        request.idempotencyKey()
                 )
         );
     }
