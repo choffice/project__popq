@@ -2,16 +2,9 @@ package com.example.project_popq.payment.provider;
 
 import com.example.project_popq.payment.domain.PaymentProviderType;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnProperty(
-        prefix = "popq.payment",
-        name = "provider",
-        havingValue = "TEST",
-        matchIfMissing = true
-)
 public class TestPaymentProvider implements PaymentProvider {
 
     @Override

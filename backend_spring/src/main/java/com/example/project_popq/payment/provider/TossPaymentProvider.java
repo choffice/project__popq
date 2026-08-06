@@ -7,7 +7,6 @@ import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -17,11 +16,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-@ConditionalOnProperty(
-        prefix = "popq.payment",
-        name = "provider",
-        havingValue = "TOSS_PAYMENTS"
-)
 public class TossPaymentProvider implements PaymentProvider {
 
   private final TossPaymentProperties properties;
@@ -31,12 +25,6 @@ public class TossPaymentProvider implements PaymentProvider {
           TossPaymentProperties properties
   ) {
     this.properties = properties;
-
-    if (isBlank(properties.secretKey())) {
-      throw new IllegalStateException(
-              "POPQ_TOSS_SECRET_KEY must be configured when TOSS_PAYMENTS is enabled."
-      );
-    }
 
     String authorizationValue = createAuthorizationValue(
             properties.secretKey()
@@ -79,6 +67,7 @@ public class TossPaymentProvider implements PaymentProvider {
     }
 
     Map<String, Object> requestBody = new LinkedHashMap<>();
+
     requestBody.put(
             "paymentKey",
             command.paymentKey()
@@ -165,6 +154,7 @@ public class TossPaymentProvider implements PaymentProvider {
     }
 
     Map<String, Object> requestBody = new LinkedHashMap<>();
+
     requestBody.put(
             "cancelReason",
             command.reason()
@@ -272,7 +262,7 @@ public class TossPaymentProvider implements PaymentProvider {
         );
       }
     } catch (Exception ignored) {
-      // 오류 응답 파싱 실패 시 아래 기본 오류를 사용합니다.
+      // 오류 응답 파싱 실패 시 기본 오류를 사용합니다.
     }
 
     return new TossError(
@@ -320,7 +310,9 @@ public class TossPaymentProvider implements PaymentProvider {
 
     String encoded = Base64.getEncoder()
             .encodeToString(
-                    credentials.getBytes(StandardCharsets.UTF_8)
+                    credentials.getBytes(
+                            StandardCharsets.UTF_8
+                    )
             );
 
     return "Basic " + encoded;
