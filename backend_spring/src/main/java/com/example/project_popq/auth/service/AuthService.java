@@ -103,6 +103,22 @@ public class AuthService {
     }
 
     /**
+     * 이미 다른 role로 가입된 계정에 CUSTOMER 접근 권한을 추가합니다.
+     * (판매자 앱 마이페이지의 "팝큐 고객으로도 이용하기")
+     */
+    @Transactional
+    public AckResponse connectCustomerAccess(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        if (!user.isActive()) {
+            throw new BusinessException(ErrorCode.USER_INACTIVE);
+        }
+
+        user.addRole(PlatformRole.CUSTOMER);
+        return AckResponse.ok();
+    }
+
+    /**
      * 회원 탈퇴를 접수합니다. confirmationPhrase가 "{이름} / 탈퇴하겠습니다"와
      * 정확히 일치하면 유예기간 없이 즉시 확정 탈퇴하고, 그렇지 않으면 7일의
      * 유예기간을 두고 탈퇴 대기 상태로 전환합니다(그 안에 재로그인하면 취소).

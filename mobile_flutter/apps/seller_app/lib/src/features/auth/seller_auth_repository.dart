@@ -49,6 +49,9 @@ abstract interface class SellerAuthRepository {
   /// 유예기간 없이 즉시 탈퇴되고, 그렇지 않으면(null 또는 생략) 7일의
   /// 유예기간을 두고 탈퇴 대기 상태가 됩니다.
   Future<void> withdraw({String? confirmationPhrase});
+
+  /// 이미 SELLER로 가입된 계정에 CUSTOMER(고객) 접근 권한을 추가로 연결합니다.
+  Future<void> connectCustomerAccess();
 }
 
 class MemorySellerAuthRepository implements SellerAuthRepository {
@@ -112,6 +115,9 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
 
   @override
   Future<void> withdraw({String? confirmationPhrase}) async {}
+
+  @override
+  Future<void> connectCustomerAccess() async {}
 
   SellerAuthResult _result() {
     return SellerAuthResult(
@@ -218,6 +224,14 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
       body: confirmationPhrase == null
           ? null
           : {'confirmationPhrase': confirmationPhrase},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<void> connectCustomerAccess() async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/connect-customer',
       decode: (value) => Map<String, Object?>.from(value as Map),
     );
   }

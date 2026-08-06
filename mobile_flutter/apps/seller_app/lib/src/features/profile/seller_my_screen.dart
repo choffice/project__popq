@@ -15,6 +15,7 @@ class SellerMyScreen extends StatefulWidget {
     required this.identityRepository,
     required this.onSignOut,
     required this.onWithdraw,
+    required this.onConnectCustomerAccess,
     super.key,
   });
 
@@ -23,6 +24,7 @@ class SellerMyScreen extends StatefulWidget {
   final SellerIdentityRepository identityRepository;
   final Future<void> Function() onSignOut;
   final Future<void> Function(String? confirmationPhrase) onWithdraw;
+  final Future<void> Function() onConnectCustomerAccess;
 
   @override
   State<SellerMyScreen> createState() => _SellerMyScreenState();
@@ -157,6 +159,20 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                         SellerRoutes.dashboard,
                       );
                     },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
+                      Icons.person_add_alt_1_rounded,
+                    ),
+                    title: const Text('팝큐 고객으로도 이용하기'),
+                    subtitle: const Text(
+                      '이 계정으로 고객 앱 서비스도 이용할 수 있게 연결합니다.',
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                    ),
+                    onTap: _connectCustomerAccess,
                   ),
                 ],
               ),
@@ -387,6 +403,56 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('로그아웃하지 못했어요.'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _connectCustomerAccess() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('팝큐 고객으로도 이용하기'),
+        content: const Text(
+          '이 계정으로 고객 앱 서비스도 이용할 수 있게 연결할까요?\n'
+          '연결 후에는 같은 이메일과 비밀번호로 고객 앱에 로그인할 수 있어요.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('연결하기'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await widget.onConnectCustomerAccess();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '팝큐 고객 연결이 완료됐어요. 같은 계정으로 고객 앱에 로그인해 보세요.',
+          ),
+        ),
+      );
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failure.message)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('팝큐 고객 연결에 실패했어요. ($error)'),
         ),
       );
     }
