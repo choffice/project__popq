@@ -7,6 +7,7 @@ import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreTag;
 import com.example.project_popq.store.dto.PublicStoreResponse;
+import com.example.project_popq.store.dto.StoreScheduleResponse;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTagRepository;
 import java.math.BigDecimal;
@@ -27,6 +28,7 @@ public class PublicStoreQueryService {
     private final StoreRepository storeRepository;
     private final StoreTagRepository storeTagRepository;
     private final StoreOperatingHoursPolicy operatingHoursPolicy;
+    private final StoreScheduleService storeScheduleService;
 
     @Transactional(readOnly = true)
     public List<PublicStoreResponse> search(
@@ -42,15 +44,19 @@ public class PublicStoreQueryService {
                 normalize(tag)
         );
         Map<Long, List<String>> tagsByStore = findTags(stores);
-
         Instant now = Instant.now();
+        Map<Long, StoreScheduleResponse> schedules =
+                storeScheduleService.findAllForEvaluation(stores, now);
         return stores.stream()
-                .filter(store -> operatingHoursPolicy.isWithinOperatingHours(store, now))
+                .filter(store -> operatingHoursPolicy.isWithinOperatingHours(
+                        store, now, schedules.get(store.getId())
+                ))
                 .map(store -> toResponse(
                         store,
                         tagsByStore.getOrDefault(store.getId(), List.of()),
                         latitude,
-                        longitude
+                        longitude,
+                        schedules.get(store.getId())
                 ))
                 .filter(response -> radiusKm == null
                         || response.distanceMeters() != null
@@ -70,7 +76,10 @@ public class PublicStoreQueryService {
                         BusinessStatus.OPEN
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
-        if (!operatingHoursPolicy.isWithinOperatingHours(store, Instant.now())) {
+        StoreScheduleResponse schedule = storeScheduleService.find(store);
+        if (!operatingHoursPolicy.isWithinOperatingHours(
+                store, Instant.now(), schedule
+        )) {
             throw new BusinessException(ErrorCode.STORE_NOT_FOUND);
         }
         List<String> tags = storeTagRepository.findAllByStoreId(storeId)
@@ -78,7 +87,9 @@ public class PublicStoreQueryService {
                 .map(storeTag -> storeTag.getTag().getName())
                 .sorted()
                 .toList();
-        return PublicStoreResponse.of(store, tags, null);
+        return PublicStoreResponse.of(
+                store, tags, null, schedule
+        );
     }
 
     private Map<Long, List<String>> findTags(List<Store> stores) {
@@ -104,7 +115,8 @@ public class PublicStoreQueryService {
             Store store,
             List<String> tags,
             BigDecimal latitude,
-            BigDecimal longitude
+            BigDecimal longitude,
+            StoreScheduleResponse schedule
     ) {
         Long distance = null;
         if (latitude != null && store.getLatitude() != null
@@ -116,7 +128,9 @@ public class PublicStoreQueryService {
                     store.getLongitude().doubleValue()
             ));
         }
-        return PublicStoreResponse.of(store, tags, distance);
+        return PublicStoreResponse.of(
+                store, tags, distance, schedule
+        );
     }
 
     private void validateLocation(

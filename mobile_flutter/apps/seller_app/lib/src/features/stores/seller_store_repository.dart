@@ -1,5 +1,7 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+import 'seller_business_schedule.dart';
+
 class SellerDashboardSummary {
   const SellerDashboardSummary({
     required this.storeId,
@@ -59,6 +61,7 @@ class SellerStore {
     this.orderAcceptingEnabled = true,
     this.defaultPreparationMinutes,
     this.tags = const [],
+    this.schedule,
   });
 
   factory SellerStore.fromJson(Map<String, Object?> json) {
@@ -91,6 +94,12 @@ class SellerStore {
       tags: _readStringList(
         json['tags'],
       ),
+      schedule: SellerBusinessSchedule.fromJson(
+        json['schedule'],
+        legacyOpenTime: json['openTime'] as String?,
+        legacyCloseTime: json['closeTime'] as String?,
+        legacyClosedDays: _readStringList(json['closedDays']),
+      ),
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
       myRole: json['myRole'] as String,
@@ -116,6 +125,7 @@ class SellerStore {
   final bool orderAcceptingEnabled;
   final int? defaultPreparationMinutes;
   final List<String> tags;
+  final SellerBusinessSchedule? schedule;
   final String status;
   final String businessStatus;
   final String myRole;
@@ -141,6 +151,7 @@ class SellerStore {
     List<String>? tags,
     String? businessStatus,
     String? status,
+    SellerBusinessSchedule? schedule,
   }) {
     return SellerStore(
       storeId: storeId,
@@ -174,6 +185,7 @@ class SellerStore {
       businessStatus:
       businessStatus ?? this.businessStatus,
       myRole: myRole,
+      schedule: schedule ?? this.schedule,
     );
   }
 }
@@ -501,6 +513,7 @@ abstract interface class SellerStoreRepository {
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   });
 
   Future<SellerStore> changeBusinessStatus(
@@ -531,6 +544,7 @@ abstract interface class SellerStoreRepository {
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       });
 
   Future<void> delete(
@@ -780,6 +794,7 @@ class ApiSellerStoreRepository
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   }) {
     return _apiClient.post(
       '/api/v1/seller/stores',
@@ -803,6 +818,7 @@ class ApiSellerStoreRepository
         'orderAcceptingEnabled':
         orderAcceptingEnabled,
         'tags': tags,
+        'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
         return SellerStore.fromJson(
@@ -875,6 +891,7 @@ class ApiSellerStoreRepository
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       }) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
@@ -898,6 +915,7 @@ class ApiSellerStoreRepository
         'orderAcceptingEnabled':
         orderAcceptingEnabled,
         'tags': tags,
+        'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
         return SellerStore.fromJson(
@@ -1108,6 +1126,7 @@ class MemorySellerStoreRepository
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   }) async {
     final int nextStoreId = _stores.isEmpty
         ? 1
@@ -1151,6 +1170,7 @@ class MemorySellerStoreRepository
       status: 'ACTIVE',
       businessStatus: 'PRE_OPEN',
       myRole: 'OWNER',
+      schedule: schedule,
     );
 
     _stores.add(store);
@@ -1242,6 +1262,7 @@ class MemorySellerStoreRepository
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       }) async {
     final int index = _stores.indexWhere(
           (SellerStore store) {
@@ -1307,6 +1328,7 @@ class MemorySellerStoreRepository
       businessStatus:
       store.businessStatus,
       myRole: store.myRole,
+      schedule: schedule ?? store.schedule,
     );
 
     _stores[index] = updated;

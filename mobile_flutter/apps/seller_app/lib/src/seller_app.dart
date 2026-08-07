@@ -136,6 +136,10 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final useMemoryStorage =
         kIsWeb && widget.environment.flavor == AppFlavor.development;
 
+    // 오창
+    final isWebDevelopment =
+        kIsWeb && widget.environment.flavor == AppFlavor.development;
+
     _sessionStore =
         widget.sessionStore ??
         (useMemoryStorage
@@ -178,14 +182,18 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    _googleAuthService = GoogleAuthService(
-      webClientId:
-          '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-    );
+    //오창
+    if (!(kIsWeb &&
+    widget.environment.flavor == AppFlavor.development)) {
+      _googleAuthService = GoogleAuthService(
+        webClientId:
+        '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+      );
 
-    _kakaoAuthService = KakaoAuthService();
+      _kakaoAuthService = KakaoAuthService();
 
-    _naverAuthService = NaverAuthService();
+      _naverAuthService = NaverAuthService();
+    }
 
     _storeRepository =
         widget.storeRepository ?? ApiSellerStoreRepository(_apiClient);
@@ -428,7 +436,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       return;
     }
 
-    unawaited(_registerPushDevice());
+    //오창
+    if (!(kIsWeb &&
+        widget.environment.flavor == AppFlavor.development)) {
+      unawaited(_registerPushDevice());
+    }
 
     if (_isAppActive) {
       unawaited(_realtimeClient.connect());

@@ -14,6 +14,7 @@ import '../orders/seller_order_repository.dart';
 import '../sales/seller_sales_screen.dart';
 import '../reviews/seller_review_repository.dart';
 import '../reviews/seller_review_section.dart';
+import '../stores/seller_business_schedule.dart';
 import '../stores/seller_store_edit_screen.dart';
 import '../stores/seller_store_location_picker_screen.dart';
 import '../stores/seller_store_repository.dart';
@@ -66,16 +67,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     '팝업·행사',
     '기타',
   ];
-  static const Map<String, String> _days = <String, String>{
-    'MONDAY': '월',
-    'TUESDAY': '화',
-    'WEDNESDAY': '수',
-    'THURSDAY': '목',
-    'FRIDAY': '금',
-    'SATURDAY': '토',
-    'SUNDAY': '일',
-  };
-
   var _section = 0;
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -260,6 +251,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       padding: const EdgeInsets.all(PopqSpacing.lg),
       children: [
         _storeTitleCard(store, canManage: canManage),
+        const SizedBox(height: PopqSpacing.sm),
+        _businessScheduleCard(store, canManage: canManage),
         const SizedBox(height: PopqSpacing.lg),
 
         Text(
@@ -404,50 +397,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                     : store.tags.map((String tag) => '#$tag').join(', '),
                 canEdit: canManage,
                 onTap: _editTags,
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: PopqSpacing.lg),
-
-        Text(
-          '영업 정보',
-          style: theme.textTheme.titleLarge,
-        ),
-        const SizedBox(height: PopqSpacing.sm),
-
-        Card(
-          child: Column(
-            children: [
-              ListTile(
-                leading: const Icon(
-                  Icons.schedule_outlined,
-                ),
-                title: const Text('영업시간'),
-                subtitle: Text(
-                  _businessHoursLabel(store),
-                ),
-                trailing: canManage
-                    ? const Icon(Icons.edit_outlined)
-                    : null,
-                onTap: canManage && !_savingQuickEdit ? _editOperatingHours : null,
-              ),
-              const Divider(height: 1),
-              ListTile(
-                leading: const Icon(
-                  Icons.event_busy_outlined,
-                ),
-                title: const Text('정기 휴무일'),
-                subtitle: Text(
-                  _closedDaysLabel(
-                    store.closedDays,
-                  ),
-                ),
-                trailing: canManage
-                    ? const Icon(Icons.edit_outlined)
-                    : null,
-                onTap: canManage && !_savingQuickEdit ? _editClosedDays : null,
               ),
             ],
           ),
@@ -657,6 +606,53 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     );
   }
 
+  Widget _businessScheduleCard(
+    SellerStore store, {
+    required bool canManage,
+  }) {
+    final schedule = store.schedule ?? SellerBusinessSchedule.legacy(
+      openTime: store.openTime,
+      closeTime: store.closeTime,
+      closedDays: store.closedDays,
+    );
+    final lines = sellerScheduleSummary(schedule);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(Icons.schedule_outlined),
+                const SizedBox(width: PopqSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '영업시간',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: canManage && !_savingQuickEdit
+                      ? _editBusinessSchedule
+                      : null,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('수정'),
+                ),
+              ],
+            ),
+            const SizedBox(height: PopqSpacing.xs),
+            for (final line in lines)
+              Padding(
+                padding: const EdgeInsets.only(bottom: PopqSpacing.xs),
+                child: Text(line),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _editableTile({
     required IconData icon,
     required String title,
@@ -711,6 +707,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     Object? openTime = _unchanged,
     Object? closeTime = _unchanged,
     Object? closedDays = _unchanged,
+    Object? schedule = _unchanged,
     Object? takeoutAvailable = _unchanged,
     Object? dineInAvailable = _unchanged,
     Object? orderAcceptingEnabled = _unchanged,
@@ -764,6 +761,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         closedDays: identical(closedDays, _unchanged)
             ? current.closedDays
             : closedDays as List<String>,
+        schedule: identical(schedule, _unchanged)
+            ? null
+            : schedule as SellerBusinessSchedule?,
         takeoutAvailable: identical(takeoutAvailable, _unchanged)
             ? current.takeoutAvailable
             : takeoutAvailable as bool,
@@ -1509,133 +1509,95 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     );
   }
 
-  Future<void> _editOperatingHours() async {
-    TimeOfDay? open = _parseTimeOfDay(_store!.openTime);
-    TimeOfDay? close = _parseTimeOfDay(_store!.closeTime);
-    String? errorText;
-    final List<TimeOfDay>? result = await showDialog<List<TimeOfDay>>(
+  Future<void> _editBusinessSchedule() async {
+    final store = _store!;
+    var edited = store.schedule ?? SellerBusinessSchedule.legacy(
+      openTime: store.openTime,
+      closeTime: store.closeTime,
+      closedDays: store.closedDays,
+    );
+    final result = await showModalBottomSheet<SellerBusinessSchedule>(
       context: context,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
-          title: const Text('영업시간 수정'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              ListTile(
-                leading: const Icon(Icons.login_rounded),
-                title: const Text('시작 시간'),
-                trailing: Text(open == null ? '선택' : _formatTimeOfDay(open!)),
-                onTap: () async {
-                  final TimeOfDay? selected = await showTimePicker(
-                    context: dialogContext,
-                    initialTime: open ?? TimeOfDay.now(),
-                    helpText: '영업 시작 시간',
-                  );
-                  if (selected != null) {
-                    setDialogState(() => open = selected);
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout_rounded),
-                title: const Text('종료 시간'),
-                trailing: Text(close == null ? '선택' : _formatTimeOfDay(close!)),
-                onTap: () async {
-                  final TimeOfDay? selected = await showTimePicker(
-                    context: dialogContext,
-                    initialTime: close ?? TimeOfDay.now(),
-                    helpText: '영업 종료 시간',
-                  );
-                  if (selected != null) {
-                    setDialogState(() => close = selected);
-                  }
-                },
-              ),
-              if (errorText != null)
-                Text(
-                  errorText!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
-            ],
+      useSafeArea: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (open == null || close == null) {
-                  setDialogState(() => errorText = '시작 시간과 종료 시간을 모두 선택해 주세요.');
-                  return;
-                }
-                Navigator.of(dialogContext).pop(<TimeOfDay>[open!, close!]);
-              },
-              child: const Text('저장'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (result == null || !mounted) {
-      return;
-    }
-    await _saveQuickEdit(
-      openTime: _toApiTime(result[0]),
-      closeTime: _toApiTime(result[1]),
-      successMessage: '영업시간을 수정했습니다.',
-    );
-  }
-
-  Future<void> _editClosedDays() async {
-    final Set<String> selected = <String>{..._store!.closedDays};
-    final List<String>? result = await showDialog<List<String>>(
-      context: context,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
-          title: const Text('정기 휴무일 수정'),
-          content: Wrap(
-            spacing: PopqSpacing.sm,
-            runSpacing: PopqSpacing.sm,
-            children: _days.entries
-                .map(
-                  (MapEntry<String, String> entry) => FilterChip(
-                    label: Text(entry.value),
-                    selected: selected.contains(entry.key),
-                    onSelected: (bool value) {
-                      setDialogState(() {
-                        if (value) {
-                          selected.add(entry.key);
-                        } else {
-                          selected.remove(entry.key);
-                        }
-                      });
-                    },
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.9,
+            child: Column(
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    PopqSpacing.lg,
+                    PopqSpacing.lg,
+                    PopqSpacing.sm,
+                    PopqSpacing.sm,
                   ),
-                )
-                .toList(growable: false),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          '영업시간 설정',
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PopqSpacing.lg,
+                    ),
+                    child: SellerBusinessScheduleEditor(
+                      initialSchedule: edited,
+                      onChanged: (value) =>
+                          setSheetState(() => edited = value),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(PopqSpacing.lg),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () {
+                        final error = edited.validationMessage;
+                        if (error != null) {
+                          ScaffoldMessenger.of(sheetContext)
+                            ..hideCurrentSnackBar()
+                            ..showSnackBar(SnackBar(content: Text(error)));
+                          return;
+                        }
+                        Navigator.pop(sheetContext, edited);
+                      },
+                      child: const Text('저장'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(
-                _days.keys.where(selected.contains).toList(growable: false),
-              ),
-              child: const Text('저장'),
-            ),
-          ],
         ),
       ),
     );
-    if (result == null || !mounted) {
-      return;
-    }
+    if (result == null || !mounted) return;
+    final legacyHour = result.legacyRepresentative;
+    final legacyOpen = legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
+    final legacyClose = legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
     await _saveQuickEdit(
-      closedDays: result,
-      successMessage: '정기 휴무일을 수정했습니다.',
+      openTime: legacyHour.open24Hours ? '00:00:00' : _toApiTime(legacyOpen),
+      closeTime: legacyHour.open24Hours ? '00:00:00' : _toApiTime(legacyClose),
+      closedDays: result.legacyClosedDays,
+      schedule: result,
+      successMessage: '영업시간을 수정했습니다.',
     );
   }
 
@@ -1662,29 +1624,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           ? store.orderAcceptingEnabled
           : orderAcceptingEnabled,
       successMessage: '주문 운영 설정을 수정했습니다.',
-    );
-  }
-
-  TimeOfDay? _parseTimeOfDay(String? value) {
-    if (value == null || value.trim().isEmpty) {
-      return null;
-    }
-    final List<String> parts = value.split(':');
-    if (parts.length < 2) {
-      return null;
-    }
-    final int? hour = int.tryParse(parts[0]);
-    final int? minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) {
-      return null;
-    }
-    return TimeOfDay(hour: hour, minute: minute);
-  }
-
-  String _formatTimeOfDay(TimeOfDay value) {
-    return MaterialLocalizations.of(context).formatTimeOfDay(
-      value,
-      alwaysUse24HourFormat: true,
     );
   }
 
@@ -2118,62 +2057,6 @@ String _fullAddress(SellerStore store) {
         (value) =>
     value != null &&
         value.trim().isNotEmpty,
-  )
+      )
       .join(' ');
-}
-
-String _businessHoursLabel(SellerStore store) {
-  final openTime = _displayTime(
-    store.openTime,
-  );
-
-  final closeTime = _displayTime(
-    store.closeTime,
-  );
-
-  if (openTime == null || closeTime == null) {
-    return '영업시간 미등록';
-  }
-
-  return '$openTime ~ $closeTime';
-}
-
-String? _displayTime(String? value) {
-  if (value == null || value.isEmpty) {
-    return null;
-  }
-
-  final parts = value.split(':');
-
-  if (parts.length < 2) {
-    return value;
-  }
-
-  return '${parts[0].padLeft(2, '0')}:'
-      '${parts[1].padLeft(2, '0')}';
-}
-
-String _closedDaysLabel(
-    List<String> closedDays,
-    ) {
-  if (closedDays.isEmpty) {
-    return '정기 휴무 없음';
-  }
-
-  return closedDays
-      .map(_dayLabel)
-      .join(', ');
-}
-
-String _dayLabel(String day) {
-  return switch (day) {
-    'MONDAY' => '월요일',
-    'TUESDAY' => '화요일',
-    'WEDNESDAY' => '수요일',
-    'THURSDAY' => '목요일',
-    'FRIDAY' => '금요일',
-    'SATURDAY' => '토요일',
-    'SUNDAY' => '일요일',
-    _ => day,
-  };
 }

@@ -29,12 +29,14 @@ public record PublicStoreResponse(
         boolean dineInAvailable,
         boolean orderAcceptingEnabled,
         List<String> tags,
-        Long distanceMeters
+        Long distanceMeters,
+        StoreScheduleResponse schedule
 ) {
     public static PublicStoreResponse of(
             Store store,
             List<String> tags,
-            Long distanceMeters
+            Long distanceMeters,
+            StoreScheduleResponse schedule
     ) {
         return new PublicStoreResponse(
                 store.getId(),
@@ -56,7 +58,8 @@ public record PublicStoreResponse(
                 store.isDineInAvailable(),
                 store.isOrderAcceptingEnabled(),
                 tags,
-                distanceMeters
+                distanceMeters,
+                schedule
         );
     }
 

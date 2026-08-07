@@ -415,7 +415,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
         Positioned(
           right: 16,
-          bottom: _selectedStore == null ? 20 : 102,
+          bottom: _selectedStore == null ? 20 : 158,
           child: _CurrentLocationButton(
             active: _controller.location != null,
             onPressed: _useCurrentLocation,
@@ -1532,6 +1532,31 @@ class _SelectedStoreCard extends StatelessWidget {
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                               fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 3),
+
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.schedule_outlined,
+                          size: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 3),
+                        Expanded(
+                          child: Text(
+                            store.resolvedSchedule.todayLabel(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),

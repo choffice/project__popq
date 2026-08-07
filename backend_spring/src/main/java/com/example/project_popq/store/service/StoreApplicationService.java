@@ -59,6 +59,7 @@ public class StoreApplicationService {
     private final OrderRepository orderRepository;
     private final ReviewRepository reviewRepository;
     private final OrderMessageRepository orderMessageRepository;
+    private final StoreScheduleService storeScheduleService;
 
     @Transactional
     public StoreSummaryResponse create(
@@ -132,6 +133,8 @@ public class StoreApplicationService {
 
         storeRepository.save(store);
 
+        storeScheduleService.createInitialSchedule(store, request.schedule());
+
         saveTags(
             store,
             request.tags()
@@ -147,7 +150,8 @@ public class StoreApplicationService {
 
         return StoreSummaryResponse.of(
             store,
-            owner.getRole()
+            owner.getRole(),
+            storeScheduleService.find(store)
 
         );
     }
@@ -168,7 +172,8 @@ public class StoreApplicationService {
             .map(member ->
                 StoreSummaryResponse.of(
                     member.getStore(),
-                    member.getRole()
+                    member.getRole(),
+                    storeScheduleService.find(member.getStore())
                 )
             )
             .toList();
@@ -185,7 +190,8 @@ public class StoreApplicationService {
             .filter(member -> member.getStore().getStatus() != StoreStatus.ACTIVE)
             .map(member -> StoreSummaryResponse.of(
                 member.getStore(),
-                member.getRole()
+                member.getRole(),
+                storeScheduleService.find(member.getStore())
             ))
             .toList();
     }
@@ -356,6 +362,8 @@ public class StoreApplicationService {
                 : request.orderAcceptingEnabled()
         );
 
+        storeScheduleService.replace(store, request.schedule());
+
         storeTagRepository.deleteAllByStoreId(
             storeId
         );
@@ -420,7 +428,9 @@ public class StoreApplicationService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         store.suspend();
-        return StoreSummaryResponse.of(store, member.getRole());
+        return StoreSummaryResponse.of(
+            store, member.getRole(), storeScheduleService.find(store)
+        );
     }
 
     @Transactional
@@ -435,7 +445,9 @@ public class StoreApplicationService {
             throw new BusinessException(ErrorCode.INVALID_REQUEST);
         }
         store.reopen();
-        return StoreSummaryResponse.of(store, member.getRole());
+        return StoreSummaryResponse.of(
+            store, member.getRole(), storeScheduleService.find(store)
+        );
     }
 
     @Transactional
@@ -460,7 +472,8 @@ public class StoreApplicationService {
 
         return StoreSummaryResponse.of(
             store,
-            member.getRole()
+            member.getRole(),
+            storeScheduleService.find(store)
         );
     }
 
@@ -680,7 +693,8 @@ public class StoreApplicationService {
         return SellerStoreDetailResponse.of(
             member.getStore(),
             member.getRole(),
-            tags
+            tags,
+            storeScheduleService.find(member.getStore())
         );
     }
 }

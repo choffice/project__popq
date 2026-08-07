@@ -34,13 +34,15 @@ public record SellerStoreDetailResponse(
         List<String> tags,
         StoreStatus status,
         BusinessStatus businessStatus,
-        StoreRole myRole
+        StoreRole myRole,
+        StoreScheduleResponse schedule
 ) {
 
     public static SellerStoreDetailResponse of(
             Store store,
             StoreRole myRole,
-            List<String> tags
+            List<String> tags,
+            StoreScheduleResponse schedule
     ) {
         return new SellerStoreDetailResponse(
                 store.getId(),
@@ -64,7 +66,8 @@ public record SellerStoreDetailResponse(
                 List.copyOf(tags),
                 store.getStatus(),
                 store.getBusinessStatus(),
-                myRole
+                myRole,
+                schedule
         );
     }
 
