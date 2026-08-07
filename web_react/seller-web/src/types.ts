@@ -122,9 +122,10 @@ export type SellerAuthResult = {
 }
 
 export type SellerConnection = {
-  storeId: number
+  storeId: number | null
   accessToken: string
   storeName?: string
+  storeRole?: StoreRole
   user?: SellerAuthUser
 }
 
@@ -238,7 +239,12 @@ export type QrCodeDetail = {
 export type SalesSummary = {
   from: string
   to: string
+  grossSales: number
   netSales: number
+  refundedAmount: number
+  refundCount: number
+  canceledOrderCount: number
+  canceledAmount: number
   completedOrderCount: number
   averageOrderAmount: number
   dineInSales: number
@@ -257,14 +263,138 @@ export type SalesSummary = {
 
 export type BusinessStatus = 'PRE_OPEN' | 'OPEN' | 'CLOSED'
 
+export type StoreRole = 'OWNER' | 'MANAGER' | 'STAFF'
+export type StoreType = 'LOCAL_STORE' | 'EVENT_COMMERCE'
+export type StoreStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
+export type StoreClosedDay =
+  | 'MONDAY'
+  | 'TUESDAY'
+  | 'WEDNESDAY'
+  | 'THURSDAY'
+  | 'FRIDAY'
+  | 'SATURDAY'
+  | 'SUNDAY'
+
 export type StoreSummary = {
   storeId: number
-  storeType: 'LOCAL_STORE' | 'EVENT_COMMERCE'
+  storeType: StoreType
   name: string
   description: string | null
-  status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
+  address: string | null
+  detailAddress: string | null
+  representativeCategory: string | null
+  imageUrl: string | null
+  phone: string | null
+  latitude: number | null
+  longitude: number | null
+  openTime: string | null
+  closeTime: string | null
+  closedDays: StoreClosedDay[]
+  takeoutAvailable: boolean
+  dineInAvailable: boolean
+  orderAcceptingEnabled: boolean
+  status: StoreStatus
   businessStatus: BusinessStatus
-  myRole: 'OWNER' | 'MANAGER' | 'STAFF'
+  myRole: StoreRole
+}
+
+export type StoreDetail = StoreSummary & {
+  tags: string[]
+}
+
+export type StoreSavePayload = {
+  storeType: StoreType
+  name: string
+  description: string | null
+  address: string | null
+  detailAddress: string | null
+  representativeCategory: string | null
+  imageUrl: string | null
+  phone: string | null
+  latitude: number | null
+  longitude: number | null
+  openTime: string | null
+  closeTime: string | null
+  closedDays: StoreClosedDay[]
+  takeoutAvailable: boolean
+  dineInAvailable: boolean
+  orderAcceptingEnabled: boolean
+  tags: string[]
+}
+
+export type AnnouncementStatus = 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
+
+export type Announcement = {
+  announcementId: number
+  storeId: number
+  title: string
+  content: string
+  status: AnnouncementStatus
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type MessageSenderType = 'CUSTOMER' | 'SELLER'
+
+export type OrderMessage = {
+  orderMessageId: number
+  senderUserId: number
+  senderName: string
+  senderType: MessageSenderType
+  clientMessageId: string | null
+  content: string
+  read: boolean
+  readAt: string | null
+  createdAt: string
+}
+
+export type SellerConversationSummary = {
+  orderPublicId: string
+  customerUserId: number | null
+  customerName: string
+  orderStatus: OrderStatus
+  lastMessage: string
+  lastMessageSenderType: MessageSenderType
+  lastMessageAt: string
+  unreadCount: number
+}
+
+export type SellerConversationDetail = {
+  orderPublicId: string
+  storeId: number
+  storeName: string
+  customerUserId: number | null
+  customerName: string
+  orderType: OrderType
+  orderStatus: OrderStatus
+  totalAmount: number
+  orderedAt: string
+  orderItems: {
+    orderItemId: number
+    productName: string
+    quantity: number
+    itemTotalPrice: number
+  }[]
+  messages: OrderMessage[]
+}
+
+export type OrderMessagePage = {
+  messages: OrderMessage[]
+  hasMore: boolean
+  nextBeforeMessageId: number | null
+}
+
+export type OrderChatEvent = {
+  eventId: string
+  eventType: 'MESSAGE_CREATED' | 'MESSAGE_READ'
+  orderPublicId: string
+  storeId: number
+  customerUserId: number | null
+  message: OrderMessage | null
+  readMessageIds: number[]
+  readerType: MessageSenderType | null
+  occurredAt: string
 }
 
 export type AdminOverview = {

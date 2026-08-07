@@ -123,6 +123,7 @@ describe('판매자 웹 인증', () => {
         body: JSON.stringify({
           email: 'seller@popq.test',
           password: 'password1',
+          role: 'SELLER',
         }),
       }),
     )
@@ -142,5 +143,56 @@ describe('판매자 웹 인증', () => {
         storeName: '성수 라운지',
       }),
     )
+  })
+
+  it('관리자 로그인은 스토어 선택 없이 관리자 세션을 만든다', async () => {
+    const user = userEvent.setup()
+    const onAuthenticated = vi.fn()
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          success: true,
+          data: {
+            accessToken: 'admin-token',
+            tokenType: 'Bearer',
+            expiresIn: 3600,
+            user: {
+              userId: 99,
+              email: 'admin@popq.test',
+              name: 'POPQ 관리자',
+              role: 'ADMIN',
+              status: 'ACTIVE',
+            },
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    )
+
+    render(
+      <SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />,
+    )
+    await user.click(screen.getByRole('tab', { name: '관리자' }))
+    await user.type(screen.getByLabelText('이메일'), 'admin@popq.test')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/auth/login',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          email: 'admin@popq.test',
+          password: 'password1',
+          role: 'ADMIN',
+        }),
+      }),
+    )
+    expect(onAuthenticated).toHaveBeenCalledWith({
+      storeId: null,
+      accessToken: 'admin-token',
+      user: expect.objectContaining({ role: 'ADMIN' }),
+    })
   })
 })

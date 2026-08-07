@@ -11,6 +11,7 @@ import com.example.project_popq.payment.domain.PaymentTransaction;
 import com.example.project_popq.payment.domain.PaymentTransactionType;
 import com.example.project_popq.payment.domain.Refund;
 import com.example.project_popq.payment.domain.RefundRequesterType;
+import com.example.project_popq.payment.domain.RefundStatus;
 import com.example.project_popq.payment.dto.CreateSellerRefundRequest;
 import com.example.project_popq.payment.dto.SellerPaymentSummaryResponse;
 import com.example.project_popq.payment.provider.PaymentCancellationCommand;
@@ -30,193 +31,213 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SellerRefundService {
 
-    private final StoreAuthorizationService storeAuthorizationService;
-    private final OrderRepository orderRepository;
-    private final PaymentRepository paymentRepository;
-    private final PaymentProviderRegistry paymentProviderRegistry;
+  private final StoreAuthorizationService storeAuthorizationService;
+  private final OrderRepository orderRepository;
+  private final PaymentRepository paymentRepository;
+  private final PaymentProviderRegistry paymentProviderRegistry;
 
-    @Transactional(readOnly = true)
-    public SellerPaymentSummaryResponse findSummary(
-            User user,
-            Long storeId,
-            String orderPublicId
-    ) {
-        requireStoreMember(
-                user,
-                storeId
+  @Transactional(readOnly = true)
+  public SellerPaymentSummaryResponse findSummary(
+      User user,
+      Long storeId,
+      String orderPublicId
+  ) {
+    requireStoreMember(
+        user,
+        storeId
+    );
+
+    Payment payment = paymentRepository
+        .findByOrderOrderPublicIdAndOrderStoreId(
+            orderPublicId,
+            storeId
+        )
+        .orElseThrow(
+            () -> new BusinessException(
+                ErrorCode.PAYMENT_NOT_FOUND
+            )
         );
 
-        Payment payment = paymentRepository
-                .findByOrderOrderPublicIdAndOrderStoreId(
-                        orderPublicId,
-                        storeId
-                )
-                .orElseThrow(
-                        () -> new BusinessException(
-                                ErrorCode.PAYMENT_NOT_FOUND
-                        )
-                );
+    return SellerPaymentSummaryResponse.from(payment);
+  }
 
-        return SellerPaymentSummaryResponse.from(payment);
+  @Transactional(noRollbackFor = RefundProcessingException.class)
+  public SellerPaymentSummaryResponse refundCompletedOrder(
+      User user,
+      Long storeId,
+      String orderPublicId,
+      CreateSellerRefundRequest request
+  ) {
+    requireRefundManager(
+        user,
+        storeId
+    );
+
+    Order order = orderRepository
+        .findForUpdateByOrderPublicId(orderPublicId)
+        .orElseThrow(
+            () -> new BusinessException(
+                ErrorCode.ORDER_NOT_FOUND
+            )
+        );
+
+    if (!order.getStore().getId().equals(storeId)) {
+      throw new BusinessException(
+          ErrorCode.ORDER_NOT_FOUND
+      );
     }
 
-    @Transactional(noRollbackFor = RefundProcessingException.class)
-    public SellerPaymentSummaryResponse refundCompletedOrder(
-            User user,
-            Long storeId,
-            String orderPublicId,
-            CreateSellerRefundRequest request
-    ) {
-        requireRefundManager(
-                user,
-                storeId
-        );
-
-        Order order = orderRepository
-                .findForUpdateByOrderPublicId(orderPublicId)
-                .orElseThrow(
-                        () -> new BusinessException(
-                                ErrorCode.ORDER_NOT_FOUND
-                        )
-                );
-
-        if (!order.getStore().getId().equals(storeId)) {
-            throw new BusinessException(
-                    ErrorCode.ORDER_NOT_FOUND
-            );
-        }
-
-        if (order.getStatus() != OrderStatus.COMPLETED) {
-            throw new BusinessException(
-                    ErrorCode.REFUND_NOT_ALLOWED
-            );
-        }
-
-        Payment payment = paymentRepository
-                .findForUpdateByOrderId(order.getId())
-                .orElseThrow(
-                        () -> new BusinessException(
-                                ErrorCode.PAYMENT_NOT_FOUND
-                        )
-                );
-
-        if (payment.getStatus() != PaymentStatus.PAID
-                || payment.getApprovedAmount() == null) {
-            throw new BusinessException(
-                    ErrorCode.REFUND_NOT_ALLOWED
-            );
-        }
-
-        if (request.amount() != payment.getApprovedAmount()) {
-            throw new BusinessException(
-                    ErrorCode.INVALID_REFUND_AMOUNT
-            );
-        }
-
-        String reason = request.reason().trim();
-        Instant requestedAt = Instant.now();
-
-        Refund refund = Refund.requested(
-                payment,
-                request.amount(),
-                reason,
-                RefundRequesterType.SELLER,
-                user.getId(),
-                requestedAt
-        );
-
-        refund.markProcessing();
-        payment.addRefund(refund);
-
-        PaymentCancellationCommand command =
-                new PaymentCancellationCommand(
-                        payment.getProviderPaymentKey(),
-                        refund.getAmount(),
-                        reason
-                );
-
-        PaymentProvider paymentProvider =
-                paymentProviderRegistry.get(
-                        payment.getProvider()
-                );
-
-        PaymentCancellationResult result =
-                paymentProvider.cancel(command);
-
-        String requestPayload =
-                "{\"amount\":" + refund.getAmount() + "}";
-
-        Instant processedAt = Instant.now();
-
-        if (!result.success()) {
-            refund.markFailed(
-                    result.failureCode(),
-                    result.failureMessage()
-            );
-
-            payment.addTransaction(
-                    PaymentTransaction.failed(
-                            payment,
-                            PaymentTransactionType.CANCEL,
-                            requestPayload,
-                            "{\"success\":false}",
-                            result.failureCode(),
-                            result.failureMessage(),
-                            processedAt
-                    )
-            );
-
-            paymentRepository.flush();
-
-            throw new RefundProcessingException(
-                    result.failureMessage()
-            );
-        }
-
-        refund.markSucceeded(
-                result.providerRefundKey(),
-                processedAt
-        );
-
-        payment.markRefunded(processedAt);
-
-        payment.addTransaction(
-                PaymentTransaction.succeeded(
-                        payment,
-                        PaymentTransactionType.CANCEL,
-                        requestPayload,
-                        "{\"success\":true}",
-                        processedAt
-                )
-        );
-
-        paymentRepository.flush();
-
-        return SellerPaymentSummaryResponse.from(payment);
+    if (order.getStatus() != OrderStatus.COMPLETED) {
+      throw new BusinessException(
+          ErrorCode.REFUND_NOT_ALLOWED
+      );
     }
 
-    private void requireStoreMember(
-            User user,
-            Long storeId
-    ) {
-        storeAuthorizationService.requireAnyRole(
-                user.getId(),
-                storeId,
-                StoreRole.OWNER,
-                StoreRole.MANAGER,
-                StoreRole.STAFF
+    Payment payment = paymentRepository
+        .findForUpdateByOrderId(order.getId())
+        .orElseThrow(
+            () -> new BusinessException(
+                ErrorCode.PAYMENT_NOT_FOUND
+            )
         );
+
+    if ((payment.getStatus() != PaymentStatus.PAID
+        && payment.getStatus()
+        != PaymentStatus.PARTIALLY_REFUNDED)
+        || payment.getApprovedAmount() == null) {
+      throw new BusinessException(
+          ErrorCode.REFUND_NOT_ALLOWED
+      );
     }
 
-    private void requireRefundManager(
-            User user,
-            Long storeId
-    ) {
-        storeAuthorizationService.requireAnyRole(
-                user.getId(),
-                storeId,
-                StoreRole.OWNER,
-                StoreRole.MANAGER
-        );
+    long alreadyRefunded = payment.getRefunds()
+        .stream()
+        .filter(
+            existing ->
+                existing.getStatus()
+                    == RefundStatus.SUCCEEDED
+        )
+        .mapToLong(Refund::getAmount)
+        .sum();
+
+    long refundableAmount =
+        payment.getApprovedAmount() - alreadyRefunded;
+
+    if (request.amount() <= 0
+        || request.amount() > refundableAmount) {
+      throw new BusinessException(
+          ErrorCode.INVALID_REFUND_AMOUNT
+      );
     }
+
+    String reason = request.reason().trim();
+    Instant requestedAt = Instant.now();
+
+    Refund refund = Refund.requested(
+        payment,
+        request.amount(),
+        reason,
+        RefundRequesterType.SELLER,
+        user.getId(),
+        requestedAt
+    );
+
+    refund.markProcessing();
+    payment.addRefund(refund);
+
+    PaymentCancellationCommand command =
+        new PaymentCancellationCommand(
+            payment.getProviderPaymentKey(),
+            refund.getAmount(),
+            reason
+        );
+
+    PaymentProvider paymentProvider =
+        paymentProviderRegistry.get(
+            payment.getProvider()
+        );
+
+    PaymentCancellationResult result =
+        paymentProvider.cancel(command);
+
+    String requestPayload =
+        "{\"amount\":" + refund.getAmount() + "}";
+
+    Instant processedAt = Instant.now();
+
+    if (!result.success()) {
+      refund.markFailed(
+          result.failureCode(),
+          result.failureMessage()
+      );
+
+      payment.addTransaction(
+          PaymentTransaction.failed(
+              payment,
+              PaymentTransactionType.CANCEL,
+              requestPayload,
+              "{\"success\":false}",
+              result.failureCode(),
+              result.failureMessage(),
+              processedAt
+          )
+      );
+
+      paymentRepository.flush();
+
+      throw new RefundProcessingException(
+          result.failureMessage()
+      );
+    }
+
+    refund.markSucceeded(
+        result.providerRefundKey(),
+        processedAt
+    );
+
+    if (refund.getAmount() == refundableAmount) {
+      payment.markRefunded(processedAt);
+    } else {
+      payment.markPartiallyRefunded();
+    }
+
+    payment.addTransaction(
+        PaymentTransaction.succeeded(
+            payment,
+            PaymentTransactionType.CANCEL,
+            requestPayload,
+            "{\"success\":true}",
+            processedAt
+        )
+    );
+
+    paymentRepository.flush();
+
+    return SellerPaymentSummaryResponse.from(payment);
+  }
+
+  private void requireStoreMember(
+      User user,
+      Long storeId
+  ) {
+    storeAuthorizationService.requireAnyRole(
+        user.getId(),
+        storeId,
+        StoreRole.OWNER,
+        StoreRole.MANAGER,
+        StoreRole.STAFF
+    );
+  }
+
+  private void requireRefundManager(
+      User user,
+      Long storeId
+  ) {
+    storeAuthorizationService.requireAnyRole(
+        user.getId(),
+        storeId,
+        StoreRole.OWNER,
+        StoreRole.MANAGER
+    );
+  }
 }

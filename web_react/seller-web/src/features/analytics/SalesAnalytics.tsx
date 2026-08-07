@@ -28,7 +28,10 @@ function rangeDates(days: number) {
 
 export function SalesAnalytics({ connection, onError }: Props) {
   const isDemo = !connection
-  const [range, setRange] = useState<7 | 30>(7)
+  const initialRange = rangeDates(7)
+  const [range, setRange] = useState<7 | 30 | 'custom'>(7)
+  const [from, setFrom] = useState(initialRange.from)
+  const [to, setTo] = useState(initialRange.to)
   const [summary, setSummary] = useState<SalesSummary>(() =>
     createDemoSalesSummary(7),
   )
@@ -36,14 +39,21 @@ export function SalesAnalytics({ connection, onError }: Props) {
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
+      const dayCount = Math.round(
+        (new Date(to).getTime() - new Date(from).getTime()) / 86_400_000,
+      ) + 1
+      if (!from || !to || dayCount < 1 || dayCount > 31) {
+        setLoading(false)
+        onError('매출 조회 기간은 시작일 이후 최대 31일로 선택해 주세요.')
+        return
+      }
       if (!connection) {
-        setSummary(createDemoSalesSummary(range))
+        setSummary(createDemoSalesSummary(dayCount <= 7 ? 7 : 30))
         setLoading(false)
         return
       }
-      const dates = rangeDates(range)
       setLoading(true)
-      void getSalesSummary(connection, dates.from, dates.to)
+      void getSalesSummary(connection, from, to)
         .then((data) => {
           setSummary(data)
           onError(null)
@@ -58,17 +68,46 @@ export function SalesAnalytics({ connection, onError }: Props) {
         .finally(() => setLoading(false))
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [connection, onError, range])
+  }, [connection, from, onError, to])
 
   const maxSales = Math.max(1, ...summary.dailySales.map((day) => day.sales))
   const chartDays = useMemo(
-    () => (range === 30 ? summary.dailySales.slice(-14) : summary.dailySales),
-    [range, summary.dailySales],
+    () => summary.dailySales.length > 14 ? summary.dailySales.slice(-14) : summary.dailySales,
+    [summary.dailySales],
   )
   const dineInRatio =
-    summary.netSales === 0
+    summary.grossSales === 0
       ? 0
-      : Math.round((summary.dineInSales / summary.netSales) * 100)
+      : Math.round((summary.dineInSales / summary.grossSales) * 100)
+
+  function selectPreset(days: 7 | 30) {
+    const dates = rangeDates(days)
+    setRange(days)
+    setFrom(dates.from)
+    setTo(dates.to)
+  }
+
+  function exportCsv() {
+    const rows = [
+      ['날짜', '순매출', '완료 주문 수'],
+      ...summary.dailySales.map((day) => [day.date, day.sales, day.orderCount]),
+      [],
+      ['지표', '값'],
+      ['총 완료 매출', summary.grossSales],
+      ['환불 금액', summary.refundedAmount],
+      ['환불 건수', summary.refundCount],
+      ['취소/거절 주문 수', summary.canceledOrderCount],
+      ['취소/거절 금액', summary.canceledAmount],
+      ['순매출', summary.netSales],
+    ]
+    const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `popq-sales-${summary.from}-${summary.to}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
 
   return (
     <main className="management-page analytics-page">
@@ -83,16 +122,19 @@ export function SalesAnalytics({ connection, onError }: Props) {
         <div className="range-control" aria-label="매출 조회 기간">
           <button
             className={range === 7 ? 'active' : ''}
-            onClick={() => setRange(7)}
+            onClick={() => selectPreset(7)}
           >
             최근 7일
           </button>
           <button
             className={range === 30 ? 'active' : ''}
-            onClick={() => setRange(30)}
+            onClick={() => selectPreset(30)}
           >
             최근 30일
           </button>
+          <label>시작일<input type="date" value={from} max={to} onChange={(event) => { setRange('custom'); setFrom(event.target.value) }} /></label>
+          <label>종료일<input type="date" value={to} min={from} onChange={(event) => { setRange('custom'); setTo(event.target.value) }} /></label>
+          <button className="csv-export" onClick={exportCsv}>CSV 내보내기</button>
         </div>
       </section>
 
@@ -114,6 +156,14 @@ export function SalesAnalytics({ connection, onError }: Props) {
                 <small>완료 주문</small>
                 <strong>{summary.completedOrderCount}건</strong>
               </div>
+            </article>
+            <article>
+              <span className="metric-symbol coral">↩</span>
+              <div><small>환불</small><strong>{money(summary.refundedAmount)}</strong><p>{summary.refundCount}건</p></div>
+            </article>
+            <article>
+              <span className="metric-symbol violet">×</span>
+              <div><small>취소·거절</small><strong>{summary.canceledOrderCount}건</strong><p>{money(summary.canceledAmount)}</p></div>
             </article>
             <article>
               <span className="metric-symbol violet">₩</span>

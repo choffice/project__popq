@@ -36,31 +36,31 @@ public class Payment extends BaseTimeEntity {
 
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
-            name = "order_id",
-            nullable = false,
-            unique = true
+        name = "order_id",
+        nullable = false,
+        unique = true
     )
     private Order order;
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "provider",
-            nullable = false,
-            length = 30
+        name = "provider",
+        nullable = false,
+        length = 30
     )
     private PaymentProviderType provider;
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "payment_method",
-            nullable = false,
-            length = 30
+        name = "payment_method",
+        nullable = false,
+        length = 30
     )
     private PaymentMethod paymentMethod;
 
     @Column(
-            name = "requested_amount",
-            nullable = false
+        name = "requested_amount",
+        nullable = false
     )
     private long requestedAmount;
 
@@ -69,21 +69,21 @@ public class Payment extends BaseTimeEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(
-            name = "status",
-            nullable = false,
-            length = 30
+        name = "status",
+        nullable = false,
+        length = 30
     )
     private PaymentStatus status;
 
     @Column(
-            name = "provider_payment_key",
-            length = 255
+        name = "provider_payment_key",
+        length = 255
     )
     private String providerPaymentKey;
 
     @Column(
-            name = "provider_redirect_url",
-            length = 1000
+        name = "provider_redirect_url",
+        length = 1000
     )
     private String providerRedirectUrl;
 
@@ -91,10 +91,10 @@ public class Payment extends BaseTimeEntity {
     private Instant providerExpiresAt;
 
     @Column(
-            name = "idempotency_key",
-            nullable = false,
-            length = 100,
-            unique = true
+        name = "idempotency_key",
+        nullable = false,
+        length = 100,
+        unique = true
     )
     private String idempotencyKey;
 
@@ -105,41 +105,41 @@ public class Payment extends BaseTimeEntity {
     private Instant canceledAt;
 
     @Column(
-            name = "failure_code",
-            length = 100
+        name = "failure_code",
+        length = 100
     )
     private String failureCode;
 
     @Column(
-            name = "failure_message",
-            length = 500
+        name = "failure_message",
+        length = 500
     )
     private String failureMessage;
 
     @OneToMany(
-            mappedBy = "payment",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
+        mappedBy = "payment",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
     )
     @OrderBy("occurredAt ASC, id ASC")
     private List<PaymentTransaction> transactions =
-            new ArrayList<>();
+        new ArrayList<>();
 
     @OneToMany(
-            mappedBy = "payment",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
+        mappedBy = "payment",
+        cascade = CascadeType.ALL,
+        orphanRemoval = true
     )
     @OrderBy("requestedAt ASC, id ASC")
     private List<Refund> refunds =
-            new ArrayList<>();
+        new ArrayList<>();
 
     private Payment(
-            Order order,
-            PaymentProviderType provider,
-            PaymentMethod paymentMethod,
-            long requestedAmount,
-            String idempotencyKey
+        Order order,
+        PaymentProviderType provider,
+        PaymentMethod paymentMethod,
+        long requestedAmount,
+        String idempotencyKey
     ) {
         this.order = order;
         this.provider = provider;
@@ -150,30 +150,29 @@ public class Payment extends BaseTimeEntity {
     }
 
     public static Payment ready(
-            Order order,
-            PaymentProviderType provider,
-            PaymentMethod paymentMethod,
-            long requestedAmount,
-            String idempotencyKey
+        Order order,
+        PaymentProviderType provider,
+        PaymentMethod paymentMethod,
+        long requestedAmount,
+        String idempotencyKey
     ) {
         return new Payment(
-                order,
-                provider,
-                paymentMethod,
-                requestedAmount,
-                idempotencyKey
+            order,
+            provider,
+            paymentMethod,
+            requestedAmount,
+            idempotencyKey
         );
     }
 
     /**
-     * 토스페이먼츠처럼 별도의 redirect URL 저장이 필요하지 않은
-     * 결제사를 IN_PROGRESS 상태로 변경합니다.
+     * 토스페이먼츠처럼 별도의 리다이렉트 URL 저장이 필요하지 않은
+     * 결제를 진행 중 상태로 변경합니다.
      */
     public void markInProgress(
-            String providerPaymentKey
+        String providerPaymentKey
     ) {
-        this.providerPaymentKey =
-                providerPaymentKey;
+        this.providerPaymentKey = providerPaymentKey;
 
         this.providerRedirectUrl = null;
         this.providerExpiresAt = null;
@@ -185,21 +184,19 @@ public class Payment extends BaseTimeEntity {
     }
 
     /**
-     * 카카오페이 ready 요청이 성공했을 때 사용합니다.
+     * 리다이렉트 방식 결제의 준비 결과를 저장합니다.
+     *
+     * 현재 토스 통합결제에서는 사용하지 않지만,
+     * 이미 적용된 DB 컬럼과의 호환성을 위해 유지합니다.
      */
     public void markPrepared(
-            String providerPaymentKey,
-            String providerRedirectUrl,
-            Instant providerExpiresAt
+        String providerPaymentKey,
+        String providerRedirectUrl,
+        Instant providerExpiresAt
     ) {
-        this.providerPaymentKey =
-                providerPaymentKey;
-
-        this.providerRedirectUrl =
-                providerRedirectUrl;
-
-        this.providerExpiresAt =
-                providerExpiresAt;
+        this.providerPaymentKey = providerPaymentKey;
+        this.providerRedirectUrl = providerRedirectUrl;
+        this.providerExpiresAt = providerExpiresAt;
 
         this.failureCode = null;
         this.failureMessage = null;
@@ -208,46 +205,42 @@ public class Payment extends BaseTimeEntity {
     }
 
     /**
-     * 앱 종료 또는 화면 이탈 뒤에도 기존 카카오페이 결제 준비 결과를
-     * 다시 사용할 수 있는지 확인합니다.
+     * 기존에 준비된 리다이렉트 결제 정보를 재사용할 수 있는지 확인합니다.
      */
     public boolean hasReusablePreparation(
-            Instant now
+        Instant now
     ) {
         return status == PaymentStatus.IN_PROGRESS
-                && hasText(providerPaymentKey)
-                && hasText(providerRedirectUrl)
-                && providerExpiresAt != null
-                && now.isBefore(providerExpiresAt);
+            && hasText(providerPaymentKey)
+            && hasText(providerRedirectUrl)
+            && providerExpiresAt != null
+            && now.isBefore(providerExpiresAt);
     }
 
     /**
-     * ready API가 실패한 경우 이전에 저장된 만료 URL이나 tid를
-     * 재사용하지 못하도록 제거합니다.
+     * 결제 준비 실패 시 저장된 준비 정보를 제거합니다.
      */
     public void markPreparationFailed(
-            String failureCode,
-            String failureMessage
+        String failureCode,
+        String failureMessage
     ) {
         this.providerPaymentKey = null;
         this.providerRedirectUrl = null;
         this.providerExpiresAt = null;
 
         markFailed(
-                failureCode,
-                failureMessage
+            failureCode,
+            failureMessage
         );
     }
 
     public void markPaid(
-            long approvedAmount,
-            String providerPaymentKey,
-            Instant approvedAt
+        long approvedAmount,
+        String providerPaymentKey,
+        Instant approvedAt
     ) {
         this.approvedAmount = approvedAmount;
-
-        this.providerPaymentKey =
-                providerPaymentKey;
+        this.providerPaymentKey = providerPaymentKey;
 
         this.providerRedirectUrl = null;
         this.providerExpiresAt = null;
@@ -261,8 +254,8 @@ public class Payment extends BaseTimeEntity {
     }
 
     public void markFailed(
-            String failureCode,
-            String failureMessage
+        String failureCode,
+        String failureMessage
     ) {
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
@@ -270,7 +263,7 @@ public class Payment extends BaseTimeEntity {
     }
 
     public void markCanceled(
-            Instant canceledAt
+        Instant canceledAt
     ) {
         this.providerRedirectUrl = null;
         this.providerExpiresAt = null;
@@ -280,7 +273,7 @@ public class Payment extends BaseTimeEntity {
     }
 
     public void markRefunded(
-            Instant refundedAt
+        Instant refundedAt
     ) {
         this.providerRedirectUrl = null;
         this.providerExpiresAt = null;
@@ -289,22 +282,27 @@ public class Payment extends BaseTimeEntity {
         this.status = PaymentStatus.REFUNDED;
     }
 
+    public void markPartiallyRefunded() {
+        this.canceledAt = null;
+        this.status = PaymentStatus.PARTIALLY_REFUNDED;
+    }
+
     public void addTransaction(
-            PaymentTransaction transaction
+        PaymentTransaction transaction
     ) {
         transactions.add(transaction);
     }
 
     public void addRefund(
-            Refund refund
+        Refund refund
     ) {
         refunds.add(refund);
     }
 
     private boolean hasText(
-            String value
+        String value
     ) {
         return value != null
-                && !value.isBlank();
+            && !value.isBlank();
     }
 }
