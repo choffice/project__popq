@@ -457,10 +457,15 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     final segments = uri.pathSegments;
 
-    return segments.length == 2 &&
+    final storeId = int.tryParse(uri.queryParameters['storeId'] ?? '');
+    final isChat = segments.length == 2 &&
         segments.first == 'customers' &&
-        segments[1].isNotEmpty &&
-        int.tryParse(uri.queryParameters['storeId'] ?? '') != null;
+        segments[1].isNotEmpty;
+    final isOrder = segments.length == 2 &&
+        segments.first == 'orders' &&
+        segments[1].isNotEmpty;
+
+    return storeId != null && (isChat || isOrder);
   }
 
   void _handleBootstrapChanged() {

@@ -7,6 +7,7 @@ class SellerIdentity {
     required this.name,
     required this.role,
     this.profileImageUrl,
+    this.phone,
   });
 
   factory SellerIdentity.fromJson(
@@ -22,6 +23,7 @@ class SellerIdentity {
         json['profileImageUrl'] as String?,
         imageBaseUrl,
       ),
+      phone: json['phone'] as String?,
     );
   }
 
@@ -30,6 +32,7 @@ class SellerIdentity {
   final String name;
   final String role;
   final String? profileImageUrl;
+  final String? phone;
 
   bool get isSeller => role == 'SELLER';
 
@@ -40,6 +43,7 @@ class SellerIdentity {
       name: name,
       role: role,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      phone: phone,
     );
   }
 }

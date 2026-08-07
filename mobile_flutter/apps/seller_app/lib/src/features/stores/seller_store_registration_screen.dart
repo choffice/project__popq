@@ -9,9 +9,11 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
 import 'seller_business_schedule.dart';
 import 'seller_store_location_picker_screen.dart';
+import 'seller_phone_input.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
 import 'seller_tag_editor.dart';
+import '../auth/seller_identity_repository.dart';
 import 'package:geolocator/geolocator.dart';
 
 enum _ImportedValueChoice {
@@ -66,11 +68,13 @@ class SellerStoreRegistrationScreen extends StatefulWidget {
   const SellerStoreRegistrationScreen({
     required this.repository,
     required this.selectionController,
+    this.identityRepository,
     super.key,
   });
 
   final SellerStoreRepository repository;
   final SellerStoreSelectionController selectionController;
+  final SellerIdentityRepository? identityRepository;
 
   @override
   State<SellerStoreRegistrationScreen> createState() =>
@@ -591,21 +595,10 @@ class _SellerStoreRegistrationScreenState
             const SizedBox(
               height: PopqSpacing.md,
             ),
-            TextFormField(
+            SellerPhoneInput(
               controller: _phoneController,
               enabled: !_submitting,
-              maxLength: 30,
-              keyboardType:
-              TextInputType.phone,
-              textInputAction:
-              TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: '사업장 연락처',
-                hintText: '예: 051-123-4567',
-                prefixIcon: Icon(
-                  Icons.phone_outlined,
-                ),
-              ),
+              identityRepository: widget.identityRepository,
               validator: (String? value) {
                 final String phone =
                     value?.trim() ?? '';

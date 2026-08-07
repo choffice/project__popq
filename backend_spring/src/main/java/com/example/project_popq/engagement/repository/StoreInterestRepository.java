@@ -16,5 +16,8 @@ public interface StoreInterestRepository
     @EntityGraph(attributePaths = "store")
     List<StoreInterest> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 
+    @EntityGraph(attributePaths = "user")
+    List<StoreInterest> findAllByStoreId(Long storeId);
+
     long countByUserId(Long userId);
 }

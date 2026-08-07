@@ -5,6 +5,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/seller_router.dart';
+import '../auth/seller_identity_repository.dart';
 import '../announcements/seller_announcement_repository.dart';
 import '../announcements/seller_announcement_screen.dart';
 import '../home/seller_analytics_repository.dart';
@@ -30,6 +31,7 @@ class SellerOperationScreen extends StatefulWidget {
     required this.reviewRepository,
     required this.orderRepository,
     required this.selectionController,
+    this.identityRepository,
     this.initialSection = 0,
     super.key,
   });
@@ -41,6 +43,7 @@ class SellerOperationScreen extends StatefulWidget {
   final SellerReviewRepository reviewRepository;
   final SellerOrderRepository orderRepository;
   final SellerStoreSelectionController selectionController;
+  final SellerIdentityRepository? identityRepository;
   final int initialSection;
 
   @override
@@ -289,7 +292,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 ),
                 const SizedBox(width: PopqSpacing.xs),
                 Text(
-                  operationEnded ? '종료됨' : '영업 중',
+                  operationEnded
+                      ? '종료됨'
+                      : store.businessStatus == 'OPEN'
+                          ? '영업 중'
+                          : '준비 중',
                   style: theme.textTheme.titleMedium,
                 ),
               ],
@@ -1736,6 +1743,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           return SellerStoreEditScreen(
             repository: widget.storeRepository,
             store: current,
+            identityRepository: widget.identityRepository,
           );
         },
       ),
