@@ -18,12 +18,6 @@ abstract interface class CustomerAuthRepository {
     required String providerToken,
   });
 
-  /// 이미 로그인된 계정에 소셜 로그인 수단을 추가로 연동합니다.
-  Future<void> linkSocialAccount({
-    required String provider,
-    required String providerToken,
-  });
-
   Future<String> findId({
     required String name,
     required String phone,
@@ -96,21 +90,6 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
         'providerToken': providerToken,
         'role': 'CUSTOMER',
       },
-    );
-  }
-
-  @override
-  Future<void> linkSocialAccount({
-    required String provider,
-    required String providerToken,
-  }) async {
-    await _apiClient.post<Map<String, Object?>>(
-      '/api/v1/users/me/social-accounts',
-      body: {
-        'provider': provider,
-        'providerToken': providerToken,
-      },
-      decode: (value) => Map<String, Object?>.from(value as Map),
     );
   }
 
@@ -223,12 +202,6 @@ class MemoryCustomerAuthRepository implements CustomerAuthRepository {
   }) async {
     return _session();
   }
-
-  @override
-  Future<void> linkSocialAccount({
-    required String provider,
-    required String providerToken,
-  }) async {}
 
   @override
   Future<String> findId({

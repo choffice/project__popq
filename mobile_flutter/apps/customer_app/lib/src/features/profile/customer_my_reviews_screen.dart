@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'customer_engagement_repository.dart';
-import 'store_category_filter.dart';
 
 class CustomerMyReviewsScreen extends StatefulWidget {
   const CustomerMyReviewsScreen({
@@ -20,7 +19,6 @@ class CustomerMyReviewsScreen extends StatefulWidget {
 class _CustomerMyReviewsScreenState
     extends State<CustomerMyReviewsScreen> {
   late Future<List<CustomerReview>> _reviews;
-  int _selectedCategoryIndex = 0;
 
   @override
   void initState() {
@@ -47,60 +45,45 @@ class _CustomerMyReviewsScreenState
           );
         }
 
-        final allReviews = snapshot.requireData
+        final reviews = snapshot.requireData
             .where((review) => review.isActive)
-            .toList();
-
-        final selectedLabel =
-            popqStoreCategoryLabels[_selectedCategoryIndex];
-        final reviews = allReviews
-            .where(
-              (review) => matchesStoreCategoryLabel(
-                review.storeCategory,
-                selectedLabel,
-              ),
-            )
             .toList();
 
         return RefreshIndicator(
           onRefresh: () async => _reload(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(PopqSpacing.lg),
-            children: [
-              PopqCategoryTabsRow(
-                selectedIndex: _selectedCategoryIndex,
-                onSelected: (index) {
-                  setState(() => _selectedCategoryIndex = index);
-                },
-              ),
-              const SizedBox(height: PopqSpacing.md),
-              if (allReviews.isEmpty)
-                const _EmptyReviews()
-              else if (reviews.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: PopqSpacing.xl,
-                  ),
-                  child: Text(
-                    '$selectedLabel 카테고리의 리뷰가 없어요.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                )
-              else
-                for (final review in reviews)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      bottom: PopqSpacing.sm,
-                    ),
-                    child: _ReviewCard(
-                      review: review,
-                      onEdit: () => _editReview(review),
-                      onDelete: () => _deleteReview(review),
-                    ),
-                  ),
+          child: reviews.isEmpty
+              ? ListView(
+            physics:
+            const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(
+              PopqSpacing.lg,
+            ),
+            children: const [
+              _EmptyReviews(),
             ],
+          )
+              : ListView.separated(
+            physics:
+            const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(
+              PopqSpacing.lg,
+            ),
+            itemCount: reviews.length,
+            separatorBuilder: (context, index) {
+              return const SizedBox(
+                height: PopqSpacing.sm,
+              );
+            },
+            itemBuilder: (context, index) {
+              final review = reviews[index];
+
+              return _ReviewCard(
+                review: review,
+                onEdit: () => _editReview(review),
+                onDelete: () =>
+                    _deleteReview(review),
+              );
+            },
           ),
         );
       },

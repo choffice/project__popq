@@ -75,7 +75,6 @@ public enum ErrorCode {
   INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "업로드할 이미지 파일이 올바르지 않습니다."),
   UPLOAD_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 파일 크기가 허용 범위를 초과했습니다."),
   FILE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 파일을 저장하지 못했습니다."),
-  SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 계정에 연동된 소셜 로그인입니다."),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
 
