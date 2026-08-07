@@ -691,6 +691,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
         _processing = false;
       });
 
+      if (_order?.status == 'COMPLETED') {
+        await Future.wait(<Future<void>>[_loadPayment(), _loadReview()]);
+      }
+
       _showMessage(
         result.refreshRequired ? '최신 주문 상태로 갱신했습니다.' : '이미 최신 상태입니다.',
       );
@@ -1032,36 +1036,87 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
   }
 
   Future<void> _editReviewReply(SellerReview review) async {
+    List<SellerReviewReplyTemplate> templates;
+    try {
+      templates = await widget.reviewRepository.findReplyTemplates(_storeId);
+    } catch (_) {
+      templates = const <SellerReviewReplyTemplate>[];
+    }
+    if (!mounted) return;
+
     final controller = TextEditingController(text: review.sellerReply ?? '');
+    var selectedTemplateId = 0;
     final value = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('리뷰 답글'),
-        content: TextField(
-          controller: controller,
-          maxLength: 1000,
-          maxLines: 5,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('리뷰 답글'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                DropdownButtonFormField<int>(
+                  initialValue: selectedTemplateId,
+                  decoration: const InputDecoration(labelText: '대표 답글 문구'),
+                  items: <DropdownMenuItem<int>>[
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('저장된 답글 없음'),
+                    ),
+                    ...templates.map(
+                      (template) => DropdownMenuItem<int>(
+                        value: template.templateId,
+                        child: Text(
+                          template.content,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (int? value) {
+                    if (value == null) return;
+                    setDialogState(() => selectedTemplateId = value);
+                    if (value == 0) return;
+                    controller.text = templates
+                        .firstWhere((item) => item.templateId == value)
+                        .content;
+                  },
+                ),
+                const SizedBox(height: PopqSpacing.sm),
+                TextField(
+                  controller: controller,
+                  maxLength: 1000,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: '답글 내용'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reply = controller.text.trim();
+                if (reply.isNotEmpty) Navigator.pop(context, reply);
+              },
+              child: const Text('작성 완료'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final reply = controller.text.trim();
-              if (reply.isNotEmpty) Navigator.pop(context, reply);
-            },
-            child: const Text('저장'),
-          ),
-        ],
       ),
     );
     controller.dispose();
     if (value == null || !mounted) return;
     try {
-      await widget.reviewRepository.reply(_storeId, review.reviewId, value);
-      if (mounted) await _loadReview();
+      final saved =
+          await widget.reviewRepository.reply(_storeId, review.reviewId, value);
+      if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 저장하지 못했습니다.');
     }
@@ -1086,8 +1141,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
     );
     if (confirmed != true) return;
     try {
-      await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
-      if (mounted) await _loadReview();
+      final saved =
+          await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
+      if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 삭제하지 못했습니다.');
     }

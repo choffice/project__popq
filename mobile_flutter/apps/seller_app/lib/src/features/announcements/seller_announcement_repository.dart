@@ -63,6 +63,7 @@ abstract interface class SellerAnnouncementRepository {
     int storeId, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   });
 
   Future<SellerAnnouncement> update(
@@ -70,6 +71,7 @@ abstract interface class SellerAnnouncementRepository {
     SellerAnnouncement announcement, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   });
 
   Future<SellerAnnouncement> changeStatus(
@@ -107,10 +109,15 @@ class ApiSellerAnnouncementRepository
     int storeId, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   }) {
     return _apiClient.post(
       _basePath(storeId),
-      body: {'title': title, 'content': content},
+      body: {
+        'title': title,
+        'content': content,
+        'notifyInterestedCustomers': notifyInterestedCustomers,
+      },
       decode: (value) => SellerAnnouncement.fromJson(
         Map<String, Object?>.from(value as Map),
       ),
@@ -123,11 +130,16 @@ class ApiSellerAnnouncementRepository
     SellerAnnouncement announcement, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   }) {
     _requireStore(storeId, announcement);
     return _apiClient.patch(
       '${_basePath(storeId)}/${announcement.announcementId}',
-      body: {'title': title, 'content': content},
+      body: {
+        'title': title,
+        'content': content,
+        'notifyInterestedCustomers': notifyInterestedCustomers,
+      },
       decode: (value) => SellerAnnouncement.fromJson(
         Map<String, Object?>.from(value as Map),
       ),
@@ -179,6 +191,7 @@ class MemorySellerAnnouncementRepository
     int storeId, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   }) async {
     final now = DateTime.now().toUtc();
     final nextId = _announcements.fold<int>(
@@ -192,7 +205,8 @@ class MemorySellerAnnouncementRepository
       storeId: storeId,
       title: title,
       content: content,
-      status: 'DRAFT',
+      status: notifyInterestedCustomers ? 'PUBLISHED' : 'DRAFT',
+      publishedAt: notifyInterestedCustomers ? now : null,
       createdAt: now,
       updatedAt: now,
     );
@@ -206,11 +220,14 @@ class MemorySellerAnnouncementRepository
     SellerAnnouncement announcement, {
     required String title,
     required String content,
+    required bool notifyInterestedCustomers,
   }) async {
     final index = _findIndex(storeId, announcement);
     final updated = announcement.copyWith(
       title: title,
       content: content,
+      status: notifyInterestedCustomers ? 'PUBLISHED' : announcement.status,
+      publishedAt: notifyInterestedCustomers ? DateTime.now().toUtc() : null,
       updatedAt: DateTime.now().toUtc(),
     );
     _announcements[index] = updated;
@@ -246,4 +263,3 @@ class MemorySellerAnnouncementRepository
     return index;
   }
 }
-

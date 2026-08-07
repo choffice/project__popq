@@ -178,24 +178,21 @@ class _SellerNotificationInboxScreenState
 
   Future<void> _openOrder(SellerOrder order) async {
     if (!await _selectStore(order.storeId) || !mounted) return;
-    await context.push(
+    context.go(
       '${SellerRoutes.orders}/${order.orderPublicId}?storeId=${order.storeId}',
     );
-    if (mounted) await _refresh();
   }
 
   Future<void> _openChat(SellerChatAlert chat) async {
     if (!await _selectStore(chat.storeId) || !mounted) return;
-    await context.push(
+    context.go(
       '${SellerRoutes.customers}/${Uri.encodeComponent(chat.orderPublicId)}',
     );
-    if (mounted) await _refresh();
   }
 
   Future<void> _openReviews(int storeId) async {
     if (!await _selectStore(storeId) || !mounted) return;
-    await context.push('${SellerRoutes.operations}?section=reviews');
-    if (mounted) await _refresh();
+    context.go('${SellerRoutes.operations}?section=reviews');
   }
 
   Future<bool> _selectStore(int storeId) async {

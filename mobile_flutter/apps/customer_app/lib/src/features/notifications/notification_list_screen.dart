@@ -100,6 +100,13 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
         );
         return;
       }
+      if (notification.targetType == 'STORE' &&
+          notification.targetId.isNotEmpty) {
+        context.push(
+          '${CustomerRoutes.stores}/${Uri.encodeComponent(notification.targetId)}',
+        );
+        return;
+      }
       _reload();
     } catch (_) {
       if (!mounted) return;

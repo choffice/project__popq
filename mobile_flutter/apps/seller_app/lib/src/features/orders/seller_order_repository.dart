@@ -230,7 +230,7 @@ class SellerPaymentSummary {
 }
 
 enum SellerOrderCommand {
-  accept('accept', 'ACCEPTED'),
+  accept('accept', 'PREPARING'),
   reject('reject', 'REJECTED'),
   prepare('prepare', 'PREPARING'),
   ready('ready', 'READY'),
