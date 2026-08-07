@@ -34,8 +34,11 @@ import '../features/orders/order_detail_screen.dart';
 import '../features/orders/order_list_screen.dart';
 import '../features/permissions/customer_permission_gateway.dart';
 import '../features/profile/customer_engagement_repository.dart';
+import '../features/profile/customer_my_info_screen.dart';
 import '../features/profile/customer_my_reviews_screen.dart';
+import '../features/profile/customer_notification_settings_screen.dart';
 import '../features/profile/customer_profile_screen.dart';
+import '../features/profile/customer_visit_history_screen.dart';
 import '../features/profile/review_editor_screen.dart';
 import '../features/qr/customer_qr_scanner_screen.dart';
 
@@ -59,7 +62,10 @@ abstract final class CustomerRoutes {
   static const orders = '/orders';
   static const profile = '/profile';
   static const myReviews = '/my-reviews';
+  static const myInfo = '/my-info';
+  static const visitHistory = '/visit-history';
   static const notifications = '/notifications';
+  static const notificationSettings = '/notification-settings';
 
   static String orderMessages(String orderPublicId) {
     return '$orders/$orderPublicId/messages';
@@ -118,6 +124,9 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Future<void> Function()? onGoogleLink,
+  Future<void> Function()? onKakaoLink,
+  Future<void> Function()? onNaverLink,
   Duration minSplashDuration = const Duration(seconds: 3),
 }) {
   final splashStartedAt = DateTime.now();
@@ -221,7 +230,13 @@ GoRouter createCustomerRouter({
               location ==
                   CustomerRoutes.myReviews ||
               location ==
-                  CustomerRoutes.notifications;
+                  CustomerRoutes.myInfo ||
+              location ==
+                  CustomerRoutes.visitHistory ||
+              location ==
+                  CustomerRoutes.notifications ||
+              location ==
+                  CustomerRoutes.notificationSettings;
 
       if (requiresSession &&
           !sessionController.isSignedIn) {
@@ -609,6 +624,42 @@ GoRouter createCustomerRouter({
             path: CustomerRoutes.myReviews,
             builder: (context, state) {
               return CustomerMyReviewsScreen(
+                repository:
+                engagementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.myInfo,
+            builder: (context, state) {
+              return CustomerMyInfoScreen(
+                repository:
+                engagementRepository,
+                onSignOut:
+                sessionController.signOut,
+                onGoogleLink:
+                onGoogleLink,
+                onKakaoLink:
+                onKakaoLink,
+                onNaverLink:
+                onNaverLink,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.visitHistory,
+            builder: (context, state) {
+              return CustomerVisitHistoryScreen(
+                repository:
+                engagementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path:
+            CustomerRoutes.notificationSettings,
+            builder: (context, state) {
+              return CustomerNotificationSettingsScreen(
                 repository:
                 engagementRepository,
               );

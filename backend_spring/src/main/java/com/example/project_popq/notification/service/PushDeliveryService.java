@@ -12,32 +12,44 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PushDeliveryService {
 
-    private final PushDeviceRepository pushDeviceRepository;
-    private final PushNotificationGateway pushNotificationGateway;
+  private final PushDeviceRepository pushDeviceRepository;
+  private final PushNotificationGateway pushNotificationGateway;
 
-    public void deliver(UserNotification notification) {
-        pushDeviceRepository
-                .findAllByUserIdOrderByCreatedAtDesc(
-                        notification.getUser().getId()
-                )
-                .forEach(device -> pushNotificationGateway.send(
-                        new PushMessage(
-                                device.getToken(),
-                                notification.getTitle(),
-                                notification.getMessage(),
-                                Map.of(
-                                        "notificationId",
-                                        notification.getId().toString(),
-                                        "type",
-                                        notification.getType().name(),
-                                        "targetType",
-                                        notification.getTargetType().name(),
-                                        "targetId",
-                                        notification.getTargetId(),
-                                        "deepLink",
-                                        notification.getDeepLink()
-                                )
-                        )
-                ));
-    }
+  public void deliver(UserNotification notification) {
+    deliverToUser(
+        notification.getUser().getId(),
+        notification.getTitle(),
+        notification.getMessage(),
+        Map.of(
+            "notificationId",
+            notification.getId().toString(),
+            "type",
+            notification.getType().name(),
+            "targetType",
+            notification.getTargetType().name(),
+            "targetId",
+            notification.getTargetId(),
+            "deepLink",
+            notification.getDeepLink()
+        )
+    );
+  }
+
+  public void deliverToUser(
+      Long userId,
+      String title,
+      String body,
+      Map<String, String> data
+  ) {
+    pushDeviceRepository
+        .findAllByUserIdOrderByCreatedAtDesc(userId)
+        .forEach(device -> pushNotificationGateway.send(
+            new PushMessage(
+                device.getToken(),
+                title,
+                body,
+                data
+            )
+        ));
+  }
 }

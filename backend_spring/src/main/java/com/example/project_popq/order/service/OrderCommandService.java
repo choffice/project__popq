@@ -18,6 +18,7 @@ import com.example.project_popq.payment.domain.RefundRequesterType;
 import com.example.project_popq.payment.provider.PaymentCancellationCommand;
 import com.example.project_popq.payment.provider.PaymentCancellationResult;
 import com.example.project_popq.payment.provider.PaymentProvider;
+import com.example.project_popq.payment.provider.PaymentProviderRegistry;
 import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.payment.service.RefundProcessingException;
 import com.example.project_popq.qr.service.GuestQrService;
@@ -41,7 +42,7 @@ public class OrderCommandService {
     private final StoreAuthorizationService storeAuthorizationService;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
-    private final PaymentProvider paymentProvider;
+    private final PaymentProviderRegistry paymentProviderRegistry;
     private final OrderDomainEventPublisher orderEventPublisher;
 
     @Transactional(noRollbackFor = RefundProcessingException.class)
@@ -51,12 +52,26 @@ public class OrderCommandService {
             String reason
     ) {
         ResolvedGuestSession session = guestQrService.resolve(rawSessionToken);
-        Order order = orderRepository.findForUpdateByOrderPublicId(orderPublicId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-        guestOrderService.requireGuestOwnership(order, session.guestSessionId());
+
+        Order order = orderRepository
+                .findForUpdateByOrderPublicId(orderPublicId)
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.ORDER_NOT_FOUND
+                        )
+                );
+
+        guestOrderService.requireGuestOwnership(
+                order,
+                session.guestSessionId()
+        );
+
         if (order.getStatus() != OrderStatus.PLACED) {
-            throw new BusinessException(ErrorCode.ORDER_CANNOT_CANCEL);
+            throw new BusinessException(
+                    ErrorCode.ORDER_CANNOT_CANCEL
+            );
         }
+
         OrderTransition transition = refundAndTransition(
                 order,
                 OrderStatus.CANCELED,
@@ -65,7 +80,12 @@ public class OrderCommandService {
                 reason,
                 RefundRequesterType.GUEST
         );
-        flushAndPublish(order, transition);
+
+        flushAndPublish(
+                order,
+                transition
+        );
+
         return OrderResponse.from(order);
     }
 
@@ -75,14 +95,26 @@ public class OrderCommandService {
             String orderPublicId,
             String reason
     ) {
-        Order order = orderRepository.findForUpdateByOrderPublicId(orderPublicId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+        Order order = orderRepository
+                .findForUpdateByOrderPublicId(orderPublicId)
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.ORDER_NOT_FOUND
+                        )
+                );
+
         if (!order.belongsToUser(user.getId())) {
-            throw new BusinessException(ErrorCode.ORDER_ACCESS_DENIED);
+            throw new BusinessException(
+                    ErrorCode.ORDER_ACCESS_DENIED
+            );
         }
+
         if (order.getStatus() != OrderStatus.PLACED) {
-            throw new BusinessException(ErrorCode.ORDER_CANNOT_CANCEL);
+            throw new BusinessException(
+                    ErrorCode.ORDER_CANNOT_CANCEL
+            );
         }
+
         OrderTransition transition = refundAndTransition(
                 order,
                 OrderStatus.CANCELED,
@@ -91,7 +123,12 @@ public class OrderCommandService {
                 reason,
                 RefundRequesterType.CUSTOMER
         );
-        flushAndPublish(order, transition);
+
+        flushAndPublish(
+                order,
+                transition
+        );
+
         return OrderResponse.from(order);
     }
 
@@ -101,14 +138,23 @@ public class OrderCommandService {
             Long storeId,
             OrderStatus status
     ) {
-        requireStoreMember(user.getId(), storeId);
+        requireStoreMember(
+                user.getId(),
+                storeId
+        );
+
         List<Order> orders = status == null
-                ? orderRepository.findAllByStoreIdOrderByCreatedAtAsc(storeId)
-                : orderRepository.findAllByStoreIdAndStatusOrderByCreatedAtAsc(
+                ? orderRepository
+                .findAllByStoreIdOrderByCreatedAtAsc(storeId)
+                : orderRepository
+                .findAllByStoreIdAndStatusOrderByCreatedAtAsc(
                         storeId,
                         status
                 );
-        return orders.stream().map(OrderResponse::from).toList();
+
+        return orders.stream()
+                .map(OrderResponse::from)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -117,10 +163,22 @@ public class OrderCommandService {
             Long storeId,
             String orderPublicId
     ) {
-        requireStoreMember(user.getId(), storeId);
+        requireStoreMember(
+                user.getId(),
+                storeId
+        );
+
         Order order = orderRepository
-                .findDetailedByOrderPublicIdAndStoreId(orderPublicId, storeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+                .findDetailedByOrderPublicIdAndStoreId(
+                        orderPublicId,
+                        storeId
+                )
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.ORDER_NOT_FOUND
+                        )
+                );
+
         return OrderResponse.from(order);
     }
 
@@ -131,11 +189,26 @@ public class OrderCommandService {
             String orderPublicId,
             long knownVersion
     ) {
-        requireStoreMember(user.getId(), storeId);
+        requireStoreMember(
+                user.getId(),
+                storeId
+        );
+
         Order order = orderRepository
-                .findDetailedByOrderPublicIdAndStoreId(orderPublicId, storeId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
-        return OrderSyncResponse.from(order, knownVersion);
+                .findDetailedByOrderPublicIdAndStoreId(
+                        orderPublicId,
+                        storeId
+                )
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.ORDER_NOT_FOUND
+                        )
+                );
+
+        return OrderSyncResponse.from(
+                order,
+                knownVersion
+        );
     }
 
     @Transactional(noRollbackFor = RefundProcessingException.class)
@@ -146,12 +219,23 @@ public class OrderCommandService {
             OrderStatus targetStatus,
             String reason
     ) {
-        requireStoreMember(user.getId(), storeId);
-        Order order = lockedSellerOrder(storeId, orderPublicId);
+        requireStoreMember(
+                user.getId(),
+                storeId
+        );
+
+        Order order = lockedSellerOrder(
+                storeId,
+                orderPublicId
+        );
+
         if (targetStatus == OrderStatus.REJECTED) {
             if (order.getStatus() != OrderStatus.PLACED) {
-                throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+                throw new BusinessException(
+                        ErrorCode.INVALID_ORDER_STATUS
+                );
             }
+
             OrderTransition transition = refundAndTransition(
                     order,
                     OrderStatus.REJECTED,
@@ -160,7 +244,11 @@ public class OrderCommandService {
                     reason,
                     RefundRequesterType.SELLER
             );
-            flushAndPublish(order, transition);
+
+            flushAndPublish(
+                    order,
+                    transition
+            );
         } else {
             OrderTransition transition = order.transitionTo(
                     targetStatus,
@@ -169,17 +257,34 @@ public class OrderCommandService {
                     reason,
                     Instant.now()
             );
-            flushAndPublish(order, transition);
+
+            flushAndPublish(
+                    order,
+                    transition
+            );
         }
+
         return OrderResponse.from(order);
     }
 
-    private Order lockedSellerOrder(Long storeId, String orderPublicId) {
-        Order order = orderRepository.findForUpdateByOrderPublicId(orderPublicId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.ORDER_NOT_FOUND));
+    private Order lockedSellerOrder(
+            Long storeId,
+            String orderPublicId
+    ) {
+        Order order = orderRepository
+                .findForUpdateByOrderPublicId(orderPublicId)
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.ORDER_NOT_FOUND
+                        )
+                );
+
         if (!order.getStore().getId().equals(storeId)) {
-            throw new BusinessException(ErrorCode.ORDER_NOT_FOUND);
+            throw new BusinessException(
+                    ErrorCode.ORDER_NOT_FOUND
+            );
         }
+
         return order;
     }
 
@@ -191,56 +296,95 @@ public class OrderCommandService {
             String reason,
             RefundRequesterType requesterType
     ) {
-        Payment payment = paymentRepository.findByOrderId(order.getId())
-                .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
+        Payment payment = paymentRepository
+                .findByOrderId(order.getId())
+                .orElseThrow(
+                        () -> new BusinessException(
+                                ErrorCode.PAYMENT_NOT_FOUND
+                        )
+                );
+
         if (payment.getStatus() != PaymentStatus.PAID
                 || payment.getApprovedAmount() == null) {
-            throw new BusinessException(ErrorCode.ORDER_CANNOT_CANCEL);
+            throw new BusinessException(
+                    ErrorCode.ORDER_CANNOT_CANCEL
+            );
         }
 
-        Instant now = Instant.now();
+        Instant requestedAt = Instant.now();
+
         Refund refund = Refund.requested(
                 payment,
                 payment.getApprovedAmount(),
                 reason,
                 requesterType,
                 actorId,
-                now
+                requestedAt
         );
+
         refund.markProcessing();
         payment.addRefund(refund);
 
-        PaymentCancellationCommand command = new PaymentCancellationCommand(
-                payment.getProviderPaymentKey(),
-                refund.getAmount(),
-                reason
-        );
-        PaymentCancellationResult result = paymentProvider.cancel(command);
-        String requestPayload = "{\"amount\":" + refund.getAmount() + "}";
+        PaymentCancellationCommand command =
+                new PaymentCancellationCommand(
+                        payment.getProviderPaymentKey(),
+                        refund.getAmount(),
+                        reason
+                );
+
+        PaymentProvider paymentProvider =
+                paymentProviderRegistry.get(
+                        payment.getProvider()
+                );
+
+        PaymentCancellationResult result =
+                paymentProvider.cancel(command);
+
+        String requestPayload =
+                "{\"amount\":" + refund.getAmount() + "}";
+
         Instant processedAt = Instant.now();
+
         if (!result.success()) {
-            refund.markFailed(result.failureCode(), result.failureMessage());
-            payment.addTransaction(PaymentTransaction.failed(
-                    payment,
-                    PaymentTransactionType.CANCEL,
-                    requestPayload,
-                    "{\"success\":false}",
+            refund.markFailed(
                     result.failureCode(),
-                    result.failureMessage(),
-                    processedAt
-            ));
-            throw new RefundProcessingException(result.failureMessage());
+                    result.failureMessage()
+            );
+
+            payment.addTransaction(
+                    PaymentTransaction.failed(
+                            payment,
+                            PaymentTransactionType.CANCEL,
+                            requestPayload,
+                            "{\"success\":false}",
+                            result.failureCode(),
+                            result.failureMessage(),
+                            processedAt
+                    )
+            );
+
+            throw new RefundProcessingException(
+                    result.failureMessage()
+            );
         }
 
-        refund.markSucceeded(result.providerRefundKey(), processedAt);
-        payment.markCanceled(processedAt);
-        payment.addTransaction(PaymentTransaction.succeeded(
-                payment,
-                PaymentTransactionType.CANCEL,
-                requestPayload,
-                "{\"success\":true}",
+        refund.markSucceeded(
+                result.providerRefundKey(),
                 processedAt
-        ));
+        );
+
+        payment.markCanceled(processedAt);
+
+        payment.addTransaction(
+                PaymentTransaction.succeeded(
+                        payment,
+                        PaymentTransactionType.CANCEL,
+                        requestPayload,
+                        "{\"success\":true}",
+                        processedAt
+                )
+        );
+
         return order.transitionTo(
                 targetStatus,
                 actorType,
@@ -250,12 +394,22 @@ public class OrderCommandService {
         );
     }
 
-    private void flushAndPublish(Order order, OrderTransition transition) {
+    private void flushAndPublish(
+            Order order,
+            OrderTransition transition
+    ) {
         orderRepository.flush();
-        orderEventPublisher.publish(order, transition);
+
+        orderEventPublisher.publish(
+                order,
+                transition
+        );
     }
 
-    private void requireStoreMember(Long userId, Long storeId) {
+    private void requireStoreMember(
+            Long userId,
+            Long storeId
+    ) {
         storeAuthorizationService.requireAnyRole(
                 userId,
                 storeId,

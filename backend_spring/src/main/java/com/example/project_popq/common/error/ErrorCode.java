@@ -25,6 +25,7 @@ public enum ErrorCode {
   IDENTITY_VERIFICATION_FAILED(HttpStatus.BAD_REQUEST, "입력하신 정보와 일치하는 계정을 찾을 수 없습니다."),
   WITHDRAWAL_CONFIRMATION_MISMATCH(HttpStatus.BAD_REQUEST, "입력하신 확인 문구가 일치하지 않습니다."),
   INVALID_DEV_ROLE(HttpStatus.BAD_REQUEST, "개발 로그인에서 허용되지 않는 역할입니다."),
+  INVALID_SIGNUP_ROLE(HttpStatus.BAD_REQUEST, "공개 회원가입에서 허용되지 않는 역할입니다."),
   SELLER_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "판매자 프로필을 찾을 수 없습니다."),
   STORE_NOT_FOUND(HttpStatus.NOT_FOUND, "스토어를 찾을 수 없습니다."),
   STORE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "스토어 접근 권한이 없습니다."),
@@ -74,6 +75,7 @@ public enum ErrorCode {
   INVALID_UPLOAD_FILE(HttpStatus.BAD_REQUEST, "업로드할 이미지 파일이 올바르지 않습니다."),
   UPLOAD_FILE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "업로드 파일 크기가 허용 범위를 초과했습니다."),
   FILE_STORAGE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "이미지 파일을 저장하지 못했습니다."),
+  SOCIAL_ACCOUNT_ALREADY_LINKED(HttpStatus.CONFLICT, "이미 다른 계정에 연동된 소셜 로그인입니다."),
   INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다.");
 
 

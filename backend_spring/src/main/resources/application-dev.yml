@@ -14,3 +14,6 @@ popq:
 
   seed:
     enabled: true
+
+  push:
+    firebase-enabled: ${POPQ_FIREBASE_ENABLED:false}

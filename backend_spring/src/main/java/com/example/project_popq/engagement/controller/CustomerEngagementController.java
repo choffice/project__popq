@@ -8,8 +8,10 @@ import com.example.project_popq.engagement.dto.ReviewResponse;
 import com.example.project_popq.engagement.dto.StoreInterestResponse;
 import com.example.project_popq.engagement.dto.UpsertReviewRequest;
 import com.example.project_popq.engagement.service.CustomerProfileService;
+import com.example.project_popq.engagement.service.CustomerVisitHistoryService;
 import com.example.project_popq.engagement.service.ReviewService;
 import com.example.project_popq.engagement.service.StoreInterestService;
+import com.example.project_popq.order.dto.VisitedStoreResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class CustomerEngagementController {
     private final StoreInterestService storeInterestService;
     private final ReviewService reviewService;
     private final CustomerProfileService customerProfileService;
+    private final CustomerVisitHistoryService customerVisitHistoryService;
 
     @GetMapping("/profile")
     public ApiResponse<CustomerProfileResponse> profile(
@@ -44,6 +47,17 @@ public class CustomerEngagementController {
     ) {
         return ApiResponse.success(
                 customerProfileService.get(currentUserService.getRequired(jwt))
+        );
+    }
+
+    @GetMapping("/visited-stores")
+    public ApiResponse<List<VisitedStoreResponse>> visitedStores(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+                customerVisitHistoryService.findVisitedStores(
+                        currentUserService.getRequired(jwt)
+                )
         );
     }
 

@@ -4,6 +4,8 @@ import { freshDemoOrders } from './data/demo'
 import {
   getSellerPaymentSummary,
   getSellerOrders,
+  getSellerStores,
+  getSellerUnreadConversationCount,
   refundSellerOrder,
   transitionSellerOrder,
 } from './services/api'
@@ -14,7 +16,9 @@ import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
+import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
 import { SellerAuth } from './features/auth/SellerAuth'
+import { MessageManagement } from './features/messages/MessageManagement'
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -22,6 +26,7 @@ import type {
   SellerConnection,
   SellerOrder,
   SellerPaymentSummary,
+  StoreSummary,
 } from './types'
 
 type OrderFilter = 'ACTIVE' | OrderStatus
@@ -30,6 +35,8 @@ type SellerView =
   | 'products'
   | 'qr'
   | 'analytics'
+  | 'announcements'
+  | 'messages'
   | 'settings'
   | 'admin'
 type TransitionAction =
@@ -123,6 +130,8 @@ const VIEW_COPY: Record<
   products: { eyebrow: 'CATALOG CONTROL', title: '상품 관리' },
   qr: { eyebrow: 'TABLE ACCESS', title: 'QR 관리' },
   analytics: { eyebrow: 'SALES PULSE', title: '매출 분석' },
+  announcements: { eyebrow: 'STORE ANNOUNCEMENTS', title: '공지사항' },
+  messages: { eyebrow: 'CUSTOMER CONVERSATIONS', title: '고객 문의' },
   settings: { eyebrow: 'STORE OPERATIONS', title: '스토어 설정' },
   admin: { eyebrow: 'PLATFORM CONTROL', title: '관리자 운영' },
 }
@@ -146,6 +155,11 @@ function readConnection(): SellerConnection | null {
 
 function readDemoMode() {
   return window.sessionStorage.getItem(DEMO_KEY) === 'true'
+}
+
+function connectionScope(connection: SellerConnection | null) {
+  if (!connection) return null
+  return `${connection.user?.userId ?? 'anonymous'}:${connection.storeId ?? 'admin'}:${connection.accessToken}`
 }
 
 function lastChangedAt(order: SellerOrder) {
@@ -195,7 +209,9 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
 
 function App() {
   const { theme, toggleTheme } = useThemePreference()
-  const [activeView, setActiveView] = useState<SellerView>('orders')
+  const [activeView, setActiveView] = useState<SellerView>(() =>
+    readConnection()?.user?.role === 'ADMIN' ? 'admin' : 'orders',
+  )
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
   )
@@ -220,14 +236,31 @@ function App() {
     useState<SellerPaymentSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showConnection, setShowConnection] = useState(false)
+  const [accountStores, setAccountStores] = useState<StoreSummary[]>([])
+  const [accountStoresLoading, setAccountStoresLoading] = useState(false)
+  const [accountStoresError, setAccountStoresError] = useState<string | null>(null)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const seenEvents = useRef(new Set<string>())
+  const accountRequestId = useRef(0)
+  const activeConnectionScope = useRef(connectionScope(connection))
   const isDemo = authenticated && !connection
+  const isAdmin = connection?.user?.role === 'ADMIN'
+  const resolvedStoreRole =
+    connection?.storeRole ??
+    accountStores.find((store) => store.storeId === connection?.storeId)?.myRole
+  const canManageStore =
+    isDemo ||
+    resolvedStoreRole === 'OWNER' ||
+    resolvedStoreRole === 'MANAGER'
+  const storeScopeKey = isDemo ? 'demo' : `store-${connection?.storeId ?? 'none'}`
 
   const loadOrders = useCallback(async () => {
-    if (!connection) return
+    if (!connection || connection.user?.role === 'ADMIN') return
+    const requestScope = connectionScope(connection)
     setLoading(true)
     try {
       const nextOrders = await getSellerOrders(connection)
+      if (activeConnectionScope.current !== requestScope) return
       setOrders(nextOrders)
       setSelectedId((current) =>
         current && nextOrders.some((order) => order.orderPublicId === current)
@@ -236,13 +269,16 @@ function App() {
       )
       setError(null)
     } catch (caught) {
+      if (activeConnectionScope.current !== requestScope) return
       setError(
         caught instanceof Error
           ? caught.message
           : '주문 목록을 불러오지 못했습니다.',
       )
     } finally {
-      setLoading(false)
+      if (activeConnectionScope.current === requestScope) {
+        setLoading(false)
+      }
     }
   }, [connection])
 
@@ -252,7 +288,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!connection) return
+    if (!connection || connection.user?.role === 'ADMIN') return
     const initialLoad = window.setTimeout(() => void loadOrders(), 0)
     const disconnect = connectSellerRealtime(
       connection,
@@ -273,6 +309,79 @@ function App() {
     }
   }, [connection, loadOrders])
 
+  useEffect(() => {
+    if (!connection || isAdmin) {
+      return
+    }
+    let active = true
+    const refreshAccount = async () => {
+      try {
+        const [stores, unread] = await Promise.all([
+          getSellerStores(connection),
+          getSellerUnreadConversationCount(connection),
+        ])
+        if (!active) return
+        setUnreadMessageCount(unread)
+        setAccountStores(stores)
+        const currentStore = stores.find(
+          (store) => store.storeId === connection.storeId,
+        )
+        if (
+          currentStore &&
+          (connection.storeRole !== currentStore.myRole ||
+            connection.storeName !== currentStore.name)
+        ) {
+          const next = {
+            ...connection,
+            storeName: currentStore.name,
+            storeRole: currentStore.myRole,
+          }
+          window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
+        }
+      } catch {
+        // Feature screens surface request failures when the user opens them.
+      }
+    }
+    void refreshAccount()
+    const timer = window.setInterval(() => {
+      void getSellerUnreadConversationCount(connection)
+        .then((count) => {
+          if (active) setUnreadMessageCount(count)
+        })
+        .catch(() => undefined)
+    }, 30_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [connection, isAdmin])
+
+  function openAccount() {
+    setShowConnection(true)
+    if (!connection || isAdmin) return
+    const requestId = accountRequestId.current + 1
+    accountRequestId.current = requestId
+    setAccountStoresLoading(true)
+    setAccountStoresError(null)
+    void getSellerStores(connection)
+      .then((stores) => {
+        if (accountRequestId.current === requestId) setAccountStores(stores)
+      })
+      .catch((caught: unknown) => {
+        if (accountRequestId.current !== requestId) return
+        setAccountStoresError(
+          caught instanceof Error
+            ? caught.message
+            : '스토어 목록을 불러오지 못했습니다.',
+        )
+      })
+      .finally(() => {
+        if (accountRequestId.current === requestId) {
+          setAccountStoresLoading(false)
+        }
+      })
+  }
+
   const visibleOrders = useMemo(() => {
     if (filter === 'ACTIVE') {
       return orders.filter((order) =>
@@ -286,6 +395,7 @@ function App() {
     orders.find((order) => order.orderPublicId === selectedId) ?? null
 
   useEffect(() => {
+    let active = true
     const timer = window.setTimeout(() => {
       if (!selectedOrder) {
         setPaymentSummary(null)
@@ -304,10 +414,12 @@ function App() {
       setPaymentLoading(true)
       void getSellerPaymentSummary(connection, selectedOrder.orderPublicId)
         .then((summary) => {
+          if (!active) return
           setPaymentSummary(summary)
           setError(null)
         })
         .catch((caught: unknown) => {
+          if (!active) return
           setPaymentSummary(null)
           setError(
             caught instanceof Error
@@ -315,9 +427,14 @@ function App() {
               : '결제 정보를 불러오지 못했습니다.',
           )
         })
-        .finally(() => setPaymentLoading(false))
+        .finally(() => {
+          if (active) setPaymentLoading(false)
+        })
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
   }, [connection, selectedOrder])
 
   const openOrders = orders.filter((order) =>
@@ -384,8 +501,16 @@ function App() {
     }
   }
 
-  async function refundOrder(order: SellerOrder, reason: string) {
-    if (!paymentSummary || paymentSummary.refundableAmount <= 0) return
+  async function refundOrder(
+    order: SellerOrder,
+    amount: number,
+    reason: string,
+  ) {
+    if (
+      !paymentSummary ||
+      amount <= 0 ||
+      amount > paymentSummary.refundableAmount
+    ) return
     setProcessing(true)
     try {
       let updated: SellerPaymentSummary
@@ -393,14 +518,17 @@ function App() {
         const completedAt = new Date().toISOString()
         updated = {
           ...paymentSummary,
-          paymentStatus: 'REFUNDED',
-          refundedAmount: paymentSummary.approvedAmount,
-          refundableAmount: 0,
+          paymentStatus:
+            amount === paymentSummary.refundableAmount
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED',
+          refundedAmount: paymentSummary.refundedAmount + amount,
+          refundableAmount: paymentSummary.refundableAmount - amount,
           refunds: [
             ...paymentSummary.refunds,
             {
               refundId: paymentSummary.refunds.length + 1,
-              amount: paymentSummary.approvedAmount,
+              amount,
               reason,
               requesterType: 'SELLER',
               status: 'SUCCEEDED',
@@ -415,13 +543,22 @@ function App() {
         updated = await refundSellerOrder(
           connection!,
           order.orderPublicId,
-          paymentSummary.refundableAmount,
+          amount,
           reason,
         )
       }
       setPaymentSummary(updated)
       setError(null)
     } catch (caught) {
+      if (connection) {
+        try {
+          setPaymentSummary(
+            await getSellerPaymentSummary(connection, order.orderPublicId),
+          )
+        } catch {
+          // Preserve the original refund error if recovery refresh also fails.
+        }
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -438,11 +575,14 @@ function App() {
       JSON.stringify(nextConnection),
     )
     window.sessionStorage.removeItem(DEMO_KEY)
+    activeConnectionScope.current = connectionScope(nextConnection)
     setConnection(nextConnection)
     setAuthenticated(true)
+    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
@@ -450,12 +590,15 @@ function App() {
   function useDemo() {
     window.sessionStorage.removeItem(CONNECTION_KEY)
     window.sessionStorage.setItem(DEMO_KEY, 'true')
+    activeConnectionScope.current = null
     setConnection(null)
     setAuthenticated(true)
+    setActiveView('orders')
     const demo = freshDemoOrders()
     setOrders(demo)
     setSelectedId(demo[0]?.orderPublicId ?? null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
@@ -463,14 +606,64 @@ function App() {
   function signOut() {
     window.sessionStorage.removeItem(CONNECTION_KEY)
     window.sessionStorage.removeItem(DEMO_KEY)
+    activeConnectionScope.current = null
     setConnection(null)
     setAuthenticated(false)
+    setActiveView('orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
+
+  function switchStore(store: StoreSummary) {
+    if (!connection || connection.storeId === store.storeId) return
+    const nextConnection: SellerConnection = {
+      ...connection,
+      storeId: store.storeId,
+      storeName: store.name,
+      storeRole: store.myRole,
+    }
+    window.sessionStorage.setItem(
+      CONNECTION_KEY,
+      JSON.stringify(nextConnection),
+    )
+    activeConnectionScope.current = connectionScope(nextConnection)
+    seenEvents.current.clear()
+    setConnection(nextConnection)
+    setOrders([])
+    setSelectedId(null)
+    setFilter('ACTIVE')
+    setPaymentSummary(null)
+    setPaymentLoading(false)
+    setProcessing(false)
+    setConnected(false)
+    setUnreadMessageCount(0)
+    setLoading(true)
+    setBusinessStatus(store.businessStatus)
+    setError(null)
+    setShowConnection(false)
+  }
+
+  const updateCurrentStore = useCallback((store: StoreSummary) => {
+    setConnection((current) => {
+      if (!current || current.storeId !== store.storeId) return current
+      if (
+        current.storeName === store.name &&
+        current.storeRole === store.myRole
+      ) return current
+      const next = {
+        ...current,
+        storeName: store.name,
+        storeRole: store.myRole,
+      }
+      window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
+      return next
+    })
+    setBusinessStatus(store.businessStatus)
+  }, [])
 
   if (!authenticated) {
     return (
@@ -499,60 +692,83 @@ function App() {
           <span className="brand-mark">P</span>
           <div>
             <strong>POPQ</strong>
-            <small>SELLER</small>
+            <small>{isAdmin ? 'ADMIN' : 'SELLER'}</small>
           </div>
         </div>
-        <nav aria-label="판매자 메뉴">
-          <button
-            className={activeView === 'orders' ? 'active' : ''}
-            onClick={() => setActiveView('orders')}
-          >
-            <span>⌁</span>
-            주문 운영
-            {newOrderCount > 0 && <b>{newOrderCount}</b>}
-          </button>
-          <button
-            className={activeView === 'products' ? 'active' : ''}
-            onClick={() => setActiveView('products')}
-          >
-            <span>□</span>
-            상품 관리
-          </button>
-          <button
-            className={activeView === 'qr' ? 'active' : ''}
-            onClick={() => setActiveView('qr')}
-          >
-            <span>⌗</span>
-            QR 관리
-          </button>
-          <button
-            className={activeView === 'analytics' ? 'active' : ''}
-            onClick={() => setActiveView('analytics')}
-          >
-            <span>↗</span>
-            매출 분석
-          </button>
-          <button
-            className={activeView === 'settings' ? 'active' : ''}
-            onClick={() => setActiveView('settings')}
-          >
-            <span>⚙</span>
-            스토어 설정
-          </button>
-          <button
-            className={activeView === 'admin' ? 'active' : ''}
-            onClick={() => setActiveView('admin')}
-          >
-            <span>◇</span>
-            관리자
-          </button>
+        <nav aria-label={isAdmin ? '관리자 메뉴' : '판매자 메뉴'}>
+          {isAdmin ? (
+            <button className="active" onClick={() => setActiveView('admin')}>
+              <span>◇</span>
+              관리자 운영
+            </button>
+          ) : (
+            <>
+              <button
+                className={activeView === 'orders' ? 'active' : ''}
+                onClick={() => setActiveView('orders')}
+              >
+                <span>⌁</span>
+                주문 운영
+                {newOrderCount > 0 && <b>{newOrderCount}</b>}
+              </button>
+              <button
+                className={activeView === 'products' ? 'active' : ''}
+                onClick={() => setActiveView('products')}
+              >
+                <span>□</span>
+                상품 관리
+              </button>
+              <button
+                className={activeView === 'qr' ? 'active' : ''}
+                onClick={() => setActiveView('qr')}
+              >
+                <span>⌗</span>
+                QR 관리
+              </button>
+              <button
+                className={activeView === 'analytics' ? 'active' : ''}
+                onClick={() => setActiveView('analytics')}
+              >
+                <span>↗</span>
+                매출 분석
+              </button>
+              <button
+                className={activeView === 'announcements' ? 'active' : ''}
+                onClick={() => setActiveView('announcements')}
+              >
+                <span>📢</span>
+                공지사항
+              </button>
+              <button
+                className={activeView === 'messages' ? 'active' : ''}
+                onClick={() => setActiveView('messages')}
+              >
+                <span>💬</span>
+                고객 문의
+                {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
+              </button>
+              <button
+                className={activeView === 'settings' ? 'active' : ''}
+                onClick={() => setActiveView('settings')}
+              >
+                <span>⚙</span>
+                스토어 설정
+              </button>
+            </>
+          )}
         </nav>
         <div className="sidebar-bottom">
-          <button className="profile-button" onClick={() => setShowConnection(true)}>
-            <span>SL</span>
+          <button className="profile-button" onClick={openAccount}>
+            <span>{isAdmin ? 'AD' : 'SL'}</span>
             <div>
               <strong>{isDemo ? '데모 운영자' : connection?.user?.name ?? '판매자'}</strong>
-              <small>{isDemo ? '데모 스토어' : connection?.storeName ?? `스토어 ${connection?.storeId}`}</small>
+              <small>
+                {isDemo
+                  ? '데모 스토어'
+                  : isAdmin
+                    ? '플랫폼 관리자'
+                    : connection?.storeName ?? `스토어 ${connection?.storeId}`}
+              </small>
             </div>
             <b>···</b>
           </button>
@@ -575,28 +791,32 @@ function App() {
             >
               <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
             </button>
-            <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
-              <i />
-              {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}
-            </span>
-            <button
-              className={`store-toggle ${
-                businessStatus === 'OPEN' ? 'open' : ''
-              }`}
-              onClick={() => setActiveView('settings')}
-              aria-pressed={businessStatus === 'OPEN'}
-            >
-              <span />
-              {businessStatus === 'OPEN'
-                ? '영업 중'
-                : businessStatus === 'PRE_OPEN'
-                  ? '오픈 준비'
-                  : '영업 종료'}
-            </button>
+            {!isAdmin && (
+              <>
+                <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
+                  <i />
+                  {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}
+                </span>
+                <button
+                  className={`store-toggle ${
+                    businessStatus === 'OPEN' ? 'open' : ''
+                  }`}
+                  onClick={() => setActiveView('settings')}
+                  aria-pressed={businessStatus === 'OPEN'}
+                >
+                  <span />
+                  {businessStatus === 'OPEN'
+                    ? '영업 중'
+                    : businessStatus === 'PRE_OPEN'
+                      ? '오픈 준비'
+                      : '영업 종료'}
+                </button>
+              </>
+            )}
             <button
               className="icon-button"
               aria-label="계정 설정"
-              onClick={() => setShowConnection(true)}
+              onClick={openAccount}
             >
               ⚙
             </button>
@@ -620,7 +840,12 @@ function App() {
                   minute: '2-digit',
                 })}
               </strong>
-              <p>성수 라운지의 주문 흐름이 안정적입니다.</p>
+              <p>
+                {isDemo
+                  ? '데모 스토어'
+                  : connection?.storeName ?? `스토어 ${connection?.storeId}`}
+                의 주문 흐름이 안정적입니다.
+              </p>
             </div>
             <article>
               <span className="metric-icon coral">↘</span>
@@ -747,22 +972,59 @@ function App() {
           </section>
         </main>}
         {activeView === 'products' && (
-          <ProductManagement connection={connection} onError={setError} />
+          <ProductManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
         )}
         {activeView === 'qr' && (
-          <QrManagement connection={connection} onError={setError} />
+          <QrManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
         )}
         {activeView === 'analytics' && (
-          <SalesAnalytics connection={connection} onError={setError} />
+          <SalesAnalytics
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+          />
         )}
         {activeView === 'settings' && (
           <StoreSettings
+            key={storeScopeKey}
             connection={connection}
             onError={setError}
             onBusinessStatusChange={setBusinessStatus}
+            onStoreSelected={switchStore}
+            onStoreUpdated={updateCurrentStore}
+            onStoreDeleted={(remaining) => {
+              if (remaining.length > 0) switchStore(remaining[0])
+              else signOut()
+            }}
           />
         )}
-        {activeView === 'admin' && (
+        {activeView === 'announcements' && (
+          <AnnouncementManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {activeView === 'messages' && (
+          <MessageManagement
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+            onUnreadChange={setUnreadMessageCount}
+          />
+        )}
+        {isAdmin && activeView === 'admin' && (
           <AdminManagement connection={connection} onError={setError} />
         )}
       </div>
@@ -781,7 +1043,10 @@ function App() {
             paymentSummary={paymentSummary}
             onClose={() => setSelectedId(null)}
             onAction={(action) => void changeStatus(selectedOrder, action)}
-            onRefund={(reason) => void refundOrder(selectedOrder, reason)}
+            canRefund={canManageStore}
+            onRefund={(amount, reason) =>
+              void refundOrder(selectedOrder, amount, reason)
+            }
           />
         )}
       </aside>
@@ -802,12 +1067,63 @@ function App() {
               ×
             </button>
             <p className="eyebrow">ACCOUNT</p>
-            <h2 id="connection-title">판매자 계정</h2>
+            <h2 id="connection-title">{isAdmin ? '관리자 계정' : '판매자 계정'}</h2>
             <p>
               {isDemo
                 ? '현재 데모 데이터로 판매자 웹을 체험하고 있습니다.'
-                : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
+                : isAdmin
+                  ? `${connection?.user?.email ?? '관리자 계정'} · 플랫폼 관리자`
+                  : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
             </p>
+            {!isDemo && !isAdmin && (
+              <div className="account-store-switcher">
+                <div className="account-store-heading">
+                  <strong>운영 스토어</strong>
+                  <small>전환하면 스토어별 운영 데이터가 새로 연결됩니다.</small>
+                </div>
+                {accountStoresLoading ? (
+                  <p className="account-store-status">스토어를 불러오는 중…</p>
+                ) : accountStoresError ? (
+                  <p className="account-store-error" role="alert">
+                    {accountStoresError}
+                  </p>
+                ) : (
+                  <div className="account-store-list">
+                    {accountStores.map((store) => {
+                      const current = store.storeId === connection?.storeId
+                      return (
+                        <button
+                          key={store.storeId}
+                          type="button"
+                          className={current ? 'current' : ''}
+                          disabled={current}
+                          aria-label={
+                            current
+                              ? `${store.name} 현재 스토어`
+                              : `${store.name}로 전환`
+                          }
+                          onClick={() => switchStore(store)}
+                        >
+                          <span>{store.name.slice(0, 1)}</span>
+                          <div>
+                            <strong>{store.name}</strong>
+                            <small>
+                              {store.myRole} · {store.businessStatus}
+                            </small>
+                          </div>
+                          <b>{current ? '현재' : '전환'}</b>
+                        </button>
+                      )
+                    })}
+                    {accountStores.length === 0 && (
+                      <p className="account-store-status">
+                        전환할 수 있는 스토어가 없습니다.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <button className="primary-action" onClick={signOut}>
               {isDemo ? '로그인 화면으로 이동' : '로그아웃'}
             </button>
@@ -870,6 +1186,7 @@ function OrderDetail({
   processing,
   paymentLoading,
   paymentSummary,
+  canRefund: canIssueRefund,
   onClose,
   onAction,
   onRefund,
@@ -878,20 +1195,26 @@ function OrderDetail({
   processing: boolean
   paymentLoading: boolean
   paymentSummary: SellerPaymentSummary | null
+  canRefund: boolean
   onClose: () => void
   onAction: (action: TransitionAction) => void
-  onRefund: (reason: string) => void
+  onRefund: (amount: number, reason: string) => void
 }) {
   const [showRefundForm, setShowRefundForm] = useState(false)
   const [refundReason, setRefundReason] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
   const actions = ACTIONS[order.status]
   const canRefund =
+    canIssueRefund &&
     order.status === 'COMPLETED' &&
-    paymentSummary?.paymentStatus === 'PAID' &&
+    (paymentSummary?.paymentStatus === 'PAID' ||
+      paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED') &&
     paymentSummary.refundableAmount > 0
   const paymentStatus =
     paymentSummary?.paymentStatus === 'REFUNDED'
       ? '환불 완료'
+      : paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED'
+        ? '부분 환불'
       : paymentSummary?.paymentStatus === 'CANCELED'
         ? '결제 취소'
         : paymentSummary?.paymentStatus === 'PAID'
@@ -1001,6 +1324,18 @@ function OrderDetail({
                             : '처리 중'}
                       </span>
                     </p>
+                    {refund.status === 'FAILED' && (
+                      <div className="refund-failure-recovery">
+                        <small>{refund.failureMessage ?? '환불 처리에 실패했습니다.'}</small>
+                        {canRefund && (
+                          <button onClick={() => {
+                            setRefundAmount(String(Math.min(refund.amount, paymentSummary.refundableAmount)))
+                            setRefundReason(refund.reason)
+                            setShowRefundForm(true)
+                          }}>같은 내용으로 다시 시도</button>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -1008,13 +1343,27 @@ function OrderDetail({
             {canRefund && !showRefundForm && (
               <button
                 className="refund-open"
-                onClick={() => setShowRefundForm(true)}
+                onClick={() => {
+                  setRefundAmount(String(paymentSummary.refundableAmount))
+                  setShowRefundForm(true)
+                }}
               >
                 전액 환불
               </button>
             )}
             {canRefund && showRefundForm && (
               <div className="refund-form">
+                <label>
+                  환불 금액
+                  <input
+                    type="number"
+                    min={1}
+                    max={paymentSummary.refundableAmount}
+                    value={refundAmount}
+                    onChange={(event) => setRefundAmount(event.target.value)}
+                  />
+                  <small>환불 가능 {money(paymentSummary.refundableAmount)}</small>
+                </label>
                 <label>
                   환불 사유
                   <textarea
@@ -1024,10 +1373,7 @@ function OrderDetail({
                     onChange={(event) => setRefundReason(event.target.value)}
                   />
                 </label>
-                <p>
-                  {money(paymentSummary.refundableAmount)} 전액이 환불되며
-                  되돌릴 수 없습니다.
-                </p>
+                <p>입력한 금액만 환불됩니다. 승인 후에는 되돌릴 수 없습니다.</p>
                 <div>
                   <button
                     className="secondary-action"
@@ -1037,10 +1383,19 @@ function OrderDetail({
                   </button>
                   <button
                     className="refund-confirm"
-                    disabled={processing || !refundReason.trim()}
-                    onClick={() => onRefund(refundReason.trim())}
+                    disabled={
+                      processing ||
+                      !refundReason.trim() ||
+                      Number(refundAmount) <= 0 ||
+                      Number(refundAmount) > paymentSummary.refundableAmount
+                    }
+                    onClick={() => onRefund(Number(refundAmount), refundReason.trim())}
                   >
-                    {processing ? '환불 처리 중…' : '전액 환불 확정'}
+                    {processing
+                      ? '환불 처리 중…'
+                      : Number(refundAmount) === paymentSummary.refundableAmount
+                        ? '전액 환불 확정'
+                        : `${money(Number(refundAmount) || 0)} 부분 환불 확정`}
                   </button>
                 </div>
               </div>

@@ -66,8 +66,8 @@ popq:
       client-id: ${POPQ_GOOGLE_CLIENT_ID}
     kakao:
       api-base-url: ${POPQ_KAKAO_API_BASE_URL:https://kapi.kakao.com}
-      customer-app-id: ${POPQ_KAKAO_CUSTOMER_APP_ID}
-      seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID}
+      customer-app-id: ${POPQ_KAKAO_CUSTOMER_APP_ID:0}
+      seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID:0}
     naver:
       api-base-url: ${POPQ_NAVER_API_BASE_URL:https://openapi.naver.com}
 
