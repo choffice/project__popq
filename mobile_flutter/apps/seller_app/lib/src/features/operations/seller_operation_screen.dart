@@ -65,6 +65,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     '주점',
     '푸드트럭',
     '팝업·행사',
+    '플리마켓·행사',
     '기타',
   ];
   var _section = 0;

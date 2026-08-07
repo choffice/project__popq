@@ -71,6 +71,15 @@ public class User extends BaseTimeEntity {
     @Column(name = "token_valid_after")
     private Instant tokenValidAfter;
 
+    @Column(name = "profile_image_url", length = 500)
+    private String profileImageUrl;
+
+    @Column(name = "push_notification_enabled", nullable = false)
+    private boolean pushNotificationEnabled = true;
+
+    @Column(name = "marketing_opt_in", nullable = false)
+    private boolean marketingOptIn = false;
+
     private static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(7);
     private static final String WITHDRAWN_NAME_PLACEHOLDER = "탈퇴한 회원";
 
@@ -108,6 +117,34 @@ public class User extends BaseTimeEntity {
 
     public void changePasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    /**
+     * 지정한 시각 이전에 발급된 액세스 토큰을 모두 무효화합니다.
+     * 비밀번호 변경 등으로 기존에 로그인된 모든 기기를 강제 로그아웃시킬 때 사용합니다.
+     */
+    public void invalidateTokensIssuedBefore(Instant now) {
+        this.tokenValidAfter = now;
+    }
+
+    public void changeProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
+    public void changePhone(String phone) {
+        this.phone = phone;
+    }
+
+    public void changeName(String name) {
+        this.name = name;
+    }
+
+    public void changeNotificationPreferences(
+            boolean pushNotificationEnabled,
+            boolean marketingOptIn
+    ) {
+        this.pushNotificationEnabled = pushNotificationEnabled;
+        this.marketingOptIn = marketingOptIn;
     }
     public boolean hasRole(PlatformRole role) {
         return roles.contains(role);

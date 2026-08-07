@@ -197,6 +197,24 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                 children: [
                   ListTile(
                     leading: const Icon(
+                      Icons.person_outline_rounded,
+                    ),
+                    title: const Text('내 프로필'),
+                    subtitle: const Text(
+                      '이름, 이메일과 프로필 사진을 확인합니다.',
+                    ),
+                    trailing: const Icon(
+                      Icons.chevron_right_rounded,
+                    ),
+                    onTap: () {
+                      context.push(
+                        SellerRoutes.myProfile,
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(
                       Icons.settings_outlined,
                     ),
                     title: const Text('설정'),

@@ -224,7 +224,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         ApiSellerOperationalAlertRepository(_apiClient);
 
     final identityRepository =
-        widget.identityRepository ?? ApiSellerIdentityRepository(_apiClient);
+        widget.identityRepository ??
+            ApiSellerIdentityRepository(
+              _apiClient,
+              imageBaseUrl: widget.environment.apiBaseUrl,
+            );
 
     _authRepository =
         widget.authRepository ?? ApiSellerAuthRepository(_apiClient);
