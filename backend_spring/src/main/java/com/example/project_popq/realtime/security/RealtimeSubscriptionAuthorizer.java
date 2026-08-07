@@ -65,6 +65,16 @@ public class RealtimeSubscriptionAuthorizer {
         );
 
     /**
+     * 로그인 구매자 주문 상태 갱신 경로입니다.
+     *
+     * /user/queue/orders
+     */
+    private static final Pattern CUSTOMER_ORDER_DESTINATION =
+        Pattern.compile(
+            "^/user/queue/orders$"
+        );
+
+    /**
      * 기존 QR 게스트 주문 실시간 구독 경로입니다.
      *
      * /user/queue/orders/{orderPublicId}
@@ -152,6 +162,9 @@ public class RealtimeSubscriptionAuthorizer {
 
         if (
             CUSTOMER_CHAT_DESTINATION
+                .matcher(destination)
+                .matches()
+            || CUSTOMER_ORDER_DESTINATION
                 .matcher(destination)
                 .matches()
         ) {

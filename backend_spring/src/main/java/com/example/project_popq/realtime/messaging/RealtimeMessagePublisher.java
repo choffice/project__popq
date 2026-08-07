@@ -16,6 +16,16 @@ public class RealtimeMessagePublisher {
                 "/topic/stores/" + event.storeId() + "/orders",
                 event
         );
+
+        if (event.userId() != null) {
+            messagingTemplate.convertAndSendToUser(
+                    String.valueOf(event.userId()),
+                    "/queue/orders",
+                    event
+            );
+            return;
+        }
+
         if (event.guestSessionId() != null) {
             messagingTemplate.convertAndSendToUser(
                     GuestRealtimePrincipal.nameOf(event.guestSessionId()),
