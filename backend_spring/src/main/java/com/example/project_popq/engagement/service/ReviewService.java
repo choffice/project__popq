@@ -4,13 +4,17 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.engagement.domain.Review;
 import com.example.project_popq.engagement.domain.ReviewStatus;
+import com.example.project_popq.engagement.domain.SellerReviewReplyTemplate;
 import com.example.project_popq.engagement.dto.ReviewResponse;
+import com.example.project_popq.engagement.dto.SellerReviewReplyTemplateResponse;
 import com.example.project_popq.engagement.dto.UpsertReviewRequest;
 import com.example.project_popq.engagement.repository.ReviewRepository;
+import com.example.project_popq.engagement.repository.SellerReviewReplyTemplateRepository;
 import com.example.project_popq.order.domain.Order;
 import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.repository.OrderRepository;
 import com.example.project_popq.store.domain.StoreRole;
+import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
@@ -27,6 +31,8 @@ public class ReviewService {
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final StoreRepository storeRepository;
+    private final SellerReviewReplyTemplateRepository replyTemplateRepository;
 
     @Transactional
     public ReviewResponse create(
@@ -175,6 +181,69 @@ public class ReviewService {
         review.deleteReply();
         reviewRepository.flush();
         return ReviewResponse.from(review);
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerReviewReplyTemplateResponse> findReplyTemplates(
+            User user,
+            Long storeId
+    ) {
+        storeAuthorizationService.requireAnyRole(
+                user.getId(), storeId,
+                StoreRole.OWNER, StoreRole.MANAGER, StoreRole.STAFF
+        );
+        return replyTemplateRepository.findAllByStoreIdOrderByIdAsc(storeId)
+                .stream()
+                .map(SellerReviewReplyTemplateResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public SellerReviewReplyTemplateResponse createReplyTemplate(
+            User user,
+            Long storeId,
+            String content
+    ) {
+        requireSellerReviewWriter(user, storeId);
+        if (replyTemplateRepository.countByStoreId(storeId) >= 20) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST);
+        }
+        var store = storeRepository.findById(storeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
+        return SellerReviewReplyTemplateResponse.from(
+                replyTemplateRepository.save(
+                        SellerReviewReplyTemplate.create(store, content.trim())
+                )
+        );
+    }
+
+    @Transactional
+    public SellerReviewReplyTemplateResponse updateReplyTemplate(
+            User user,
+            Long storeId,
+            Long templateId,
+            String content
+    ) {
+        requireSellerReviewWriter(user, storeId);
+        SellerReviewReplyTemplate template = requireReplyTemplate(
+                storeId, templateId
+        );
+        template.update(content.trim());
+        return SellerReviewReplyTemplateResponse.from(template);
+    }
+
+    @Transactional
+    public void deleteReplyTemplate(User user, Long storeId, Long templateId) {
+        requireSellerReviewWriter(user, storeId);
+        replyTemplateRepository.delete(requireReplyTemplate(storeId, templateId));
+    }
+
+    private SellerReviewReplyTemplate requireReplyTemplate(
+            Long storeId,
+            Long templateId
+    ) {
+        return replyTemplateRepository.findByIdAndStoreId(templateId, storeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_REQUEST));
     }
 
     private void requireSellerReviewWriter(User user, Long storeId) {

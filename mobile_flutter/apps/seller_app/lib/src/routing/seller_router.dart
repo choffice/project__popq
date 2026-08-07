@@ -298,6 +298,7 @@ GoRouter createSellerRouter({
             repository: storeRepository,
             selectionController:
             storeSelectionController,
+            identityRepository: bootstrapController.identityRepository,
           );
         },
       ),
@@ -377,6 +378,7 @@ GoRouter createSellerRouter({
                 orderRepository: orderRepository,
                 selectionController:
                 storeSelectionController,
+                identityRepository: bootstrapController.identityRepository,
                 initialSection:
                     state.uri.queryParameters['section'] == 'reviews' ? 4 : 0,
               );

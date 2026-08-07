@@ -106,6 +106,27 @@ public class UserNotification extends BaseTimeEntity {
         );
     }
 
+    public static UserNotification storeAnnouncement(
+            User user,
+            String eventId,
+            Long storeId,
+            String title,
+            String message,
+            Instant occurredAt
+    ) {
+        return new UserNotification(
+                user,
+                eventId,
+                NotificationType.STORE_ANNOUNCEMENT,
+                NotificationTargetType.STORE,
+                storeId.toString(),
+                title,
+                message,
+                "/stores/" + storeId,
+                occurredAt
+        );
+    }
+
     public void markRead() {
         read = true;
     }

@@ -127,7 +127,7 @@ class CustomerOrderApiIntegrationTests {
                         .queryParam("knownVersion", "1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.refreshRequired").value(true))
-                .andExpect(jsonPath("$.data.order.status").value("ACCEPTED"));
+                .andExpect(jsonPath("$.data.order.status").value("PREPARING"));
     }
 
     @Test

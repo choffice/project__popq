@@ -8,8 +8,10 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
 import 'seller_business_schedule.dart';
 import 'seller_store_location_picker_screen.dart';
+import 'seller_phone_input.dart';
 import 'seller_store_repository.dart';
 import 'seller_tag_editor.dart';
+import '../auth/seller_identity_repository.dart';
 
 enum _ImportedValueChoice { current, imported, manual }
 
@@ -33,11 +35,13 @@ class SellerStoreEditScreen extends StatefulWidget {
   const SellerStoreEditScreen({
     required this.repository,
     required this.store,
+    this.identityRepository,
     super.key,
   });
 
   final SellerStoreRepository repository;
   final SellerStore store;
+  final SellerIdentityRepository? identityRepository;
 
   @override
   State<SellerStoreEditScreen> createState() => _SellerStoreEditScreenState();
@@ -262,13 +266,12 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                     decoration: const InputDecoration(labelText: '설명'),
                   ),
                   const SizedBox(height: PopqSpacing.sm),
-                  TextFormField(
+                  SellerPhoneInput(
                     key: const Key('edit-store-phone'),
                     controller: _phoneController,
                     enabled: !_busy,
-                    maxLength: 30,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(labelText: '전화번호'),
+                    identityRepository: widget.identityRepository,
+                    labelText: '전화번호',
                     validator: (String? value) =>
                         _requiredValidator(value, '전화번호를 입력해 주세요.'),
                   ),
