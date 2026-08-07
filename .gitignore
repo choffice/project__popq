@@ -12,3 +12,4 @@ uploads/
 .env.intellij
 .env.example
 .idea/workspace.xml
+.idea/libraries/Dart_SDK.xml
