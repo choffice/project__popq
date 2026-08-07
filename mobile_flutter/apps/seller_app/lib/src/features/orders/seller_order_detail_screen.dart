@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/seller_realtime_scope.dart';
 import '../stores/seller_store_selection_controller.dart';
 import '../stores/seller_store_repository.dart';
 import 'seller_order_list_screen.dart';
@@ -30,7 +34,9 @@ class SellerOrderDetailScreen extends StatefulWidget {
       _SellerOrderDetailScreenState();
 }
 
-class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
+class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
+    with WidgetsBindingObserver {
+  static const Duration _pollingInterval = Duration(seconds: 3);
   SellerOrder? _order;
   SellerPaymentSummary? _payment;
   SellerReview? _review;
@@ -41,9 +47,16 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   var _paymentLoading = false;
   var _canRefund = false;
   var _defaultPreparationMinutes = 10;
+  var _lastConnectionEpoch = 0;
+  var _isAppActive = true;
+
+  Timer? _pollingTimer;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _orderSubscription;
 
   int get _storeId {
-    final storeId = widget.storeId ?? widget.selectionController.selectedStoreId;
+    final storeId =
+        widget.storeId ?? widget.selectionController.selectedStoreId;
     if (storeId == null) throw StateError('selected store is missing');
     return storeId;
   }
@@ -51,7 +64,73 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addObserver(this);
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    unawaited(_load());
+    _startPolling();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = SellerRealtimeScope.maybeOf(context);
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _realtimeClient?.removeListener(_handleRealtimeClientChanged);
+    _orderSubscription?.cancel();
+    _orderSubscription = null;
+
+    _realtimeClient = nextRealtimeClient;
+    _lastConnectionEpoch = nextRealtimeClient?.connectionEpoch ?? 0;
+    nextRealtimeClient?.addListener(_handleRealtimeClientChanged);
+
+    _subscribeToOrder();
+    _updatePollingForConnection();
+  }
+
+  @override
+  void didUpdateWidget(covariant SellerOrderDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.orderPublicId != widget.orderPublicId ||
+        oldWidget.storeId != widget.storeId ||
+        oldWidget.repository != widget.repository ||
+        oldWidget.selectionController != widget.selectionController) {
+      _orderSubscription?.cancel();
+      _orderSubscription = null;
+      _order = null;
+      _payment = null;
+      _review = null;
+      _error = null;
+      _subscribeToOrder();
+      unawaited(_load());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _subscribeToOrder();
+        _updatePollingForConnection();
+        unawaited(_syncSilently());
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopPolling();
+        return;
+    }
   }
 
   @override
@@ -105,14 +184,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   sellerOrderStatusLabel(order.status),
                   style: Theme.of(
                     context,
-                  ).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                  ),
+                  ).textTheme.headlineSmall?.copyWith(color: Colors.white),
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
                   '${sellerOrderTypeLabel(order.orderType)} · '
-                      '${formatPopqOrderNumber(order.orderPublicId)}',
+                  '${formatPopqOrderNumber(order.orderPublicId)}',
                   style: const TextStyle(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
@@ -120,10 +197,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
             ),
           ),
           const SizedBox(height: PopqSpacing.lg),
-          Text(
-            '주문 상품',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text('주문 상품', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: PopqSpacing.sm),
           for (final item in order.items)
             ListTile(
@@ -134,35 +208,20 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   '${item.quantity}개 · 단가 ${sellerWon(item.unitPrice)}',
                   if (item.options.isNotEmpty)
                     item.options
-                        .map(
-                          (option) =>
-                      '${option.groupName}: ${option.name}',
-                    )
+                        .map((option) => '${option.groupName}: ${option.name}')
                         .join(', '),
                 ].join('\n'),
               ),
               trailing: Text(sellerWon(item.itemTotalPrice)),
             ),
           const Divider(),
-          _AmountRow(
-            label: '상품 금액',
-            amount: order.subtotalAmount,
-          ),
+          _AmountRow(label: '상품 금액', amount: order.subtotalAmount),
           if (order.discountAmount != 0)
-            _AmountRow(
-              label: '할인',
-              amount: -order.discountAmount,
-            ),
+            _AmountRow(label: '할인', amount: -order.discountAmount),
           if (order.taxAmount != 0)
-            _AmountRow(
-              label: '세금',
-              amount: order.taxAmount,
-            ),
+            _AmountRow(label: '세금', amount: order.taxAmount),
           if (order.serviceFeeAmount != 0)
-            _AmountRow(
-              label: '서비스 수수료',
-              amount: order.serviceFeeAmount,
-            ),
+            _AmountRow(label: '서비스 수수료', amount: order.serviceFeeAmount),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
@@ -185,9 +244,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
               ),
               subtitle: order.estimatedReadyAt == null
                   ? null
-                  : Text(
-                      '예상 완료 ${_formatDateTime(order.estimatedReadyAt!)}',
-                    ),
+                  : Text('예상 완료 ${_formatDateTime(order.estimatedReadyAt!)}'),
             ),
           ],
           if (order.status == 'COMPLETED') ...[
@@ -206,7 +263,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           const SizedBox(height: PopqSpacing.sm),
           Text(
             '서버 버전 ${order.version} · '
-                '선택된 스토어 #${order.storeId} 전용 주문',
+            '선택된 스토어 #${order.storeId} 전용 주문',
             textAlign: TextAlign.center,
           ),
         ],
@@ -252,8 +309,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
     final canRequestRefund =
         _canRefund &&
-            payment.paymentStatus == 'PAID' &&
-            payment.refundableAmount > 0;
+        payment.paymentStatus == 'PAID' &&
+        payment.refundableAmount > 0;
 
     return Card(
       child: Padding(
@@ -269,18 +326,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
-                Chip(
-                  label: Text(
-                    _paymentStatusLabel(payment.paymentStatus),
-                  ),
-                ),
+                Chip(label: Text(_paymentStatusLabel(payment.paymentStatus))),
               ],
             ),
             const SizedBox(height: PopqSpacing.sm),
-            _PaymentRow(
-              label: '결제 수단',
-              value: payment.paymentMethod,
-            ),
+            _PaymentRow(label: '결제 수단', value: payment.paymentMethod),
             _PaymentRow(
               label: '승인 금액',
               value: sellerWon(payment.approvedAmount),
@@ -311,7 +361,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   title: Text(refund.reason),
                   subtitle: Text(
                     '${_refundRequesterLabel(refund.requesterType)} · '
-                        '${_refundStatusLabel(refund.status)}',
+                    '${_refundStatusLabel(refund.status)}',
                   ),
                   trailing: Text(sellerWon(refund.amount)),
                 ),
@@ -320,18 +370,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
               const SizedBox(height: PopqSpacing.sm),
               FilledButton.icon(
                 key: const Key('refund-order'),
-                onPressed: _processing
-                    ? null
-                    : () => _refund(order),
-                icon: const Icon(
-                  Icons.currency_exchange_rounded,
-                ),
-                label: Text(
-                  '${sellerWon(payment.refundableAmount)} 전액 환불',
-                ),
+                onPressed: _processing ? null : () => _refund(order),
+                icon: const Icon(Icons.currency_exchange_rounded),
+                label: Text('${sellerWon(payment.refundableAmount)} 전액 환불'),
               ),
-            ] else if (!_canRefund &&
-                payment.refundableAmount > 0) ...[
+            ] else if (!_canRefund && payment.refundableAmount > 0) ...[
               const SizedBox(height: PopqSpacing.sm),
               const Text(
                 '환불은 사업장 OWNER 또는 MANAGER만 처리할 수 있습니다.',
@@ -349,12 +392,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       'PLACED' => [
         FilledButton.icon(
           key: const Key('accept-order'),
-          onPressed: _processing
-              ? null
-              : _accept,
-          icon: const Icon(
-            Icons.check_circle_outline_rounded,
-          ),
+          onPressed: _processing ? null : _accept,
+          icon: const Icon(Icons.check_circle_outline_rounded),
           label: const Text('주문 접수'),
         ),
         const SizedBox(height: PopqSpacing.sm),
@@ -370,9 +409,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('prepare-order'),
           onPressed: _processing
               ? null
-              : () => _transition(
-            SellerOrderCommand.prepare,
-          ),
+              : () => _transition(SellerOrderCommand.prepare),
           icon: const Icon(Icons.soup_kitchen_outlined),
           label: const Text('준비 시작'),
         ),
@@ -382,12 +419,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('ready-order'),
           onPressed: _processing
               ? null
-              : () => _transition(
-            SellerOrderCommand.ready,
-          ),
-          icon: const Icon(
-            Icons.notifications_active_outlined,
-          ),
+              : () => _transition(SellerOrderCommand.ready),
+          icon: const Icon(Icons.notifications_active_outlined),
           label: const Text('준비 완료'),
         ),
       ],
@@ -396,9 +429,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('complete-order'),
           onPressed: _processing
               ? null
-              : () => _transition(
-            SellerOrderCommand.complete,
-          ),
+              : () => _transition(SellerOrderCommand.complete),
           icon: const Icon(Icons.task_alt_rounded),
           label: const Text('주문 완료'),
         ),
@@ -410,10 +441,176 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       return actions;
     }
 
-    return [
-      ...actions,
-      const SizedBox(height: PopqSpacing.sm),
-    ];
+    return [...actions, const SizedBox(height: PopqSpacing.sm)];
+  }
+
+  void _handleRealtimeClientChanged() {
+    if (!mounted) return;
+
+    final client = _realtimeClient;
+    if (client == null) {
+      _updatePollingForConnection();
+      return;
+    }
+
+    final connectionEpoch = client.connectionEpoch;
+    if (client.isConnected && connectionEpoch != _lastConnectionEpoch) {
+      _lastConnectionEpoch = connectionEpoch;
+      unawaited(_syncSilently());
+    }
+
+    _updatePollingForConnection();
+  }
+
+  void _subscribeToOrder() {
+    _orderSubscription?.cancel();
+    _orderSubscription = null;
+
+    final client = _realtimeClient;
+    if (client == null) return;
+
+    int storeId;
+    try {
+      storeId = _storeId;
+    } catch (_) {
+      return;
+    }
+
+    _orderSubscription = client.subscribeToStoreOrders(
+      storeId: storeId,
+      onEvent: _handleOrderEvent,
+      onError: (error) {
+        debugPrint('판매자 주문 상세 실시간 구독 오류: $error');
+      },
+    );
+  }
+
+  void _handleOrderEvent(PopqOrderRealtimeEvent event) {
+    if (!mounted ||
+        event.storeId != _storeId ||
+        event.orderPublicId != widget.orderPublicId) {
+      return;
+    }
+
+    final current = _order;
+    if (current == null) {
+      unawaited(_load());
+      return;
+    }
+
+    if (event.isDuplicateOrOlderThan(current.version)) {
+      return;
+    }
+
+    final knownVersion = current.version;
+    setState(() {
+      _order = current.copyWith(
+        status: event.currentStatus,
+        version: event.version,
+      );
+    });
+
+    // ACCEPTED의 준비시간처럼 이벤트에 포함되지 않은 필드는
+    // 이벤트 직전 버전을 기준으로 /sync 하여 전체 주문 스냅샷으로 보정한다.
+    unawaited(_syncFromKnownVersion(knownVersion));
+  }
+
+  Future<void> _syncFromKnownVersion(int knownVersion) async {
+    try {
+      final result = await widget.repository.sync(
+        _storeId,
+        widget.orderPublicId,
+        knownVersion,
+      );
+
+      if (!mounted) return;
+
+      final refreshed = result.order;
+      if (refreshed != null) {
+        setState(() {
+          final current = _order;
+          if (current == null || refreshed.version >= current.version) {
+            _order = refreshed;
+          }
+        });
+      }
+
+      final latest = _order;
+      if (latest?.status == 'COMPLETED') {
+        await _loadPayment();
+        await _loadReview();
+      }
+    } catch (error) {
+      debugPrint('판매자 주문 상세 이벤트 보정 오류: $error');
+    }
+  }
+
+  Future<void> _syncSilently() async {
+    final current = _order;
+    if (!mounted || !_isAppActive) return;
+
+    if (current == null) {
+      await _load();
+      return;
+    }
+
+    try {
+      final result = await widget.repository.sync(
+        _storeId,
+        current.orderPublicId,
+        current.version,
+      );
+
+      if (!mounted) return;
+
+      final refreshed = result.order;
+      if (refreshed != null) {
+        setState(() {
+          final latest = _order;
+          if (latest == null || refreshed.version >= latest.version) {
+            _order = refreshed;
+          }
+        });
+      }
+
+      final latest = _order;
+      if (latest?.status == 'COMPLETED') {
+        await _loadPayment();
+        await _loadReview();
+      }
+    } catch (error) {
+      debugPrint('판매자 주문 상세 REST 동기화 오류: $error');
+    }
+  }
+
+  void _updatePollingForConnection() {
+    final shouldUseRestFallback =
+        _realtimeClient?.shouldUseRestFallback ?? true;
+
+    if (_isAppActive && shouldUseRestFallback) {
+      _startPolling();
+      return;
+    }
+
+    _stopPolling();
+  }
+
+  void _startPolling() {
+    if (!_isAppActive ||
+        !(_realtimeClient?.shouldUseRestFallback ?? true) ||
+        (_pollingTimer?.isActive ?? false)) {
+      return;
+    }
+
+    _pollingTimer = Timer.periodic(
+      _pollingInterval,
+      (_) => unawaited(_syncSilently()),
+    );
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   Future<void> _load() async {
@@ -424,10 +621,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
     try {
       final result = await Future.wait([
-        widget.repository.findOne(
-          _storeId,
-          widget.orderPublicId,
-        ),
+        widget.repository.findOne(_storeId, widget.orderPublicId),
         widget.storeRepository.findOne(_storeId),
       ]);
 
@@ -439,16 +633,17 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       }
 
       setState(() {
-        _order = order;
-        _canRefund =
-            store.myRole == 'OWNER' ||
-                store.myRole == 'MANAGER';
-        _defaultPreparationMinutes =
-            store.defaultPreparationMinutes ?? 10;
+        final current = _order;
+        if (current == null || order.version >= current.version) {
+          _order = order;
+        }
+        _canRefund = store.myRole == 'OWNER' || store.myRole == 'MANAGER';
+        _defaultPreparationMinutes = store.defaultPreparationMinutes ?? 10;
         _loading = false;
       });
 
-      if (order.status == 'COMPLETED') {
+      final latestOrder = _order;
+      if (latestOrder?.status == 'COMPLETED') {
         await _loadPayment();
         await _loadReview();
       }
@@ -485,17 +680,19 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       }
 
       setState(() {
-        if (result.order != null) {
-          _order = result.order;
+        final refreshed = result.order;
+        final currentOrder = _order;
+        if (refreshed != null &&
+            (currentOrder == null ||
+                refreshed.version >= currentOrder.version)) {
+          _order = refreshed;
         }
 
         _processing = false;
       });
 
       _showMessage(
-        result.refreshRequired
-            ? '최신 주문 상태로 갱신했습니다.'
-            : '이미 최신 상태입니다.',
+        result.refreshRequired ? '최신 주문 상태로 갱신했습니다.' : '이미 최신 상태입니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -518,15 +715,21 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       return;
     }
 
-    await _transition(
-      SellerOrderCommand.reject,
-      reason: reason,
-    );
+    await _transition(SellerOrderCommand.reject, reason: reason);
   }
 
   Future<void> _accept() async {
-    var minutes = const <int>[0, 5, 10, 15, 20, 30, 40, 50]
-            .contains(_defaultPreparationMinutes)
+    var minutes =
+        const <int>[
+          0,
+          5,
+          10,
+          15,
+          20,
+          30,
+          40,
+          50,
+        ].contains(_defaultPreparationMinutes)
         ? _defaultPreparationMinutes
         : 10;
     var applyAsDefault = false;
@@ -547,7 +750,16 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   spacing: PopqSpacing.xs,
                   runSpacing: PopqSpacing.xs,
                   children: [
-                    for (final value in const <int>[0, 5, 10, 15, 20, 30, 40, 50])
+                    for (final value in const <int>[
+                      0,
+                      5,
+                      10,
+                      15,
+                      20,
+                      30,
+                      40,
+                      50,
+                    ])
                       ChoiceChip(
                         label: Text(value == 0 ? '즉시' : '$value분'),
                         selected: minutes == value,
@@ -559,16 +771,15 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                   contentPadding: EdgeInsets.zero,
                   value: applyAsDefault,
                   title: const Text('이 시간을 사업장 기본 준비시간으로 사용'),
-                  onChanged: (value) => setSheetState(
-                    () => applyAsDefault = value ?? false,
-                  ),
+                  onChanged: (value) =>
+                      setSheetState(() => applyAsDefault = value ?? false),
                 ),
                 FilledButton(
                   key: const Key('confirm-accept-order'),
-                  onPressed: () => Navigator.pop(
-                    context,
-                    (minutes: minutes, apply: applyAsDefault),
-                  ),
+                  onPressed: () => Navigator.pop(context, (
+                    minutes: minutes,
+                    apply: applyAsDefault,
+                  )),
                   child: const Text('주문 접수'),
                 ),
               ],
@@ -586,11 +797,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   }
 
   Future<void> _transition(
-      SellerOrderCommand command, {
-        String? reason,
-        int? preparationMinutes,
-        bool applyAsStoreDefault = false,
-      }) async {
+    SellerOrderCommand command, {
+    String? reason,
+    int? preparationMinutes,
+    bool applyAsStoreDefault = false,
+  }) async {
     final current = _order;
 
     if (current == null || _processing) {
@@ -614,15 +825,17 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       }
 
       setState(() {
-        _order = updated;
+        final currentOrder = _order;
+        if (currentOrder == null || updated.version >= currentOrder.version) {
+          _order = updated;
+        }
         _processing = false;
       });
 
-      _showMessage(
-        '${sellerOrderStatusLabel(updated.status)} 상태로 변경했습니다.',
-      );
+      final latestOrder = _order ?? updated;
+      _showMessage('${sellerOrderStatusLabel(latestOrder.status)} 상태로 변경했습니다.');
 
-      if (updated.status == 'COMPLETED') {
+      if (latestOrder.status == 'COMPLETED') {
         await _loadPayment();
         await _loadReview();
       }
@@ -633,9 +846,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
       setState(() => _processing = false);
 
-      _showMessage(
-        '주문 상태를 변경하지 못했습니다. 최신 상태를 확인해 주세요.',
-      );
+      _showMessage('주문 상태를 변경하지 못했습니다. 최신 상태를 확인해 주세요.');
     }
   }
 
@@ -680,17 +891,13 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   Future<void> _refund(SellerOrder order) async {
     final payment = _payment;
 
-    if (payment == null ||
-        payment.refundableAmount <= 0 ||
-        _processing) {
+    if (payment == null || payment.refundableAmount <= 0 || _processing) {
       return;
     }
 
     final reason = await showDialog<String>(
       context: context,
-      builder: (_) => _RefundDialog(
-        amount: payment.refundableAmount,
-      ),
+      builder: (_) => _RefundDialog(amount: payment.refundableAmount),
     );
 
     if (reason == null || !mounted) {
@@ -758,9 +965,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _reviewSection() {
@@ -830,9 +1037,16 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('리뷰 답글'),
-        content: TextField(controller: controller, maxLength: 1000, maxLines: 5),
+        content: TextField(
+          controller: controller,
+          maxLength: 1000,
+          maxLines: 5,
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
           FilledButton(
             onPressed: () {
               final reply = controller.text.trim();
@@ -859,8 +1073,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
       builder: (context) => AlertDialog(
         title: const Text('답글을 삭제할까요?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
         ],
       ),
     );
@@ -878,13 +1098,20 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     String two(int number) => number.toString().padLeft(2, '0');
     return '${local.month}/${local.day} ${two(local.hour)}:${two(local.minute)}';
   }
+
+  @override
+  void dispose() {
+    _stopPolling();
+    _orderSubscription?.cancel();
+    _orderSubscription = null;
+    _realtimeClient?.removeListener(_handleRealtimeClientChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 }
 
 class _AmountRow extends StatelessWidget {
-  const _AmountRow({
-    required this.label,
-    required this.amount,
-  });
+  const _AmountRow({required this.label, required this.amount});
 
   final String label;
   final int amount;
@@ -901,10 +1128,7 @@ class _AmountRow extends StatelessWidget {
 }
 
 class _PaymentRow extends StatelessWidget {
-  const _PaymentRow({
-    required this.label,
-    required this.value,
-  });
+  const _PaymentRow({required this.label, required this.value});
 
   final String label;
   final String value;
@@ -916,12 +1140,7 @@ class _PaymentRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(label)),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
         ],
       ),
     );
@@ -932,13 +1151,11 @@ class _RejectDialog extends StatefulWidget {
   const _RejectDialog();
 
   @override
-  State<_RejectDialog> createState() =>
-      _RejectDialogState();
+  State<_RejectDialog> createState() => _RejectDialogState();
 }
 
 class _RejectDialogState extends State<_RejectDialog> {
-  final TextEditingController _controller =
-  TextEditingController();
+  final TextEditingController _controller = TextEditingController();
 
   @override
   void dispose() {
@@ -970,12 +1187,7 @@ class _RejectDialogState extends State<_RejectDialog> {
           onPressed: () {
             final value = _controller.text.trim();
 
-            Navigator.pop(
-              context,
-              value.isEmpty
-                  ? '판매자 주문 거절'
-                  : value,
-            );
+            Navigator.pop(context, value.isEmpty ? '판매자 주문 거절' : value);
           },
           child: const Text('거절 확정'),
         ),
@@ -985,20 +1197,16 @@ class _RejectDialogState extends State<_RejectDialog> {
 }
 
 class _RefundDialog extends StatefulWidget {
-  const _RefundDialog({
-    required this.amount,
-  });
+  const _RefundDialog({required this.amount});
 
   final int amount;
 
   @override
-  State<_RefundDialog> createState() =>
-      _RefundDialogState();
+  State<_RefundDialog> createState() => _RefundDialogState();
 }
 
 class _RefundDialogState extends State<_RefundDialog> {
-  final TextEditingController _controller =
-  TextEditingController();
+  final TextEditingController _controller = TextEditingController();
 
   @override
   void dispose() {
@@ -1014,9 +1222,7 @@ class _RefundDialogState extends State<_RefundDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '${sellerWon(widget.amount)} 전액을 환불합니다.',
-            ),
+            Text('${sellerWon(widget.amount)} 전액을 환불합니다.'),
             const SizedBox(height: PopqSpacing.sm),
             TextField(
               key: const Key('refund-reason'),

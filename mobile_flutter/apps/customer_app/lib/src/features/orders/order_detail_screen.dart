@@ -37,6 +37,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   CustomerOrder? _order;
   PopqRealtimeClient? _realtimeClient;
   PopqRealtimeSubscription? _customerChatSubscription;
+  PopqRealtimeSubscription? _customerOrderSubscription;
   Timer? _fallbackPollingTimer;
 
   Object? _error;
@@ -77,6 +78,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     _customerChatSubscription?.cancel();
     _customerChatSubscription = null;
 
+    _customerOrderSubscription?.cancel();
+    _customerOrderSubscription = null;
+
     _realtimeClient?.removeListener(
       _handleRealtimeClientChanged,
     );
@@ -93,6 +97,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         nextRealtimeClient.subscribeToCustomerChat(
       onEvent: _handleCustomerChatEvent,
       onError: _handleCustomerChatError,
+    );
+
+    _customerOrderSubscription =
+        nextRealtimeClient.subscribeToCustomerOrders(
+      onEvent: _handleCustomerOrderEvent,
+      onError: _handleCustomerOrderError,
     );
 
     _syncFallbackPollingWithRealtime();
@@ -125,7 +135,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _syncFallbackPollingWithRealtime();
 
         unawaited(
-          _refreshUnreadCount(),
+          _recoverLatestState(),
         );
 
         return;
@@ -154,6 +164,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
     _customerChatSubscription?.cancel();
     _customerChatSubscription = null;
+
+    _customerOrderSubscription?.cancel();
+    _customerOrderSubscription = null;
 
     _realtimeClient?.removeListener(
       _handleRealtimeClientChanged,
@@ -404,6 +417,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   }
 
   Future<void> _load() async {
+    final generation = ++_requestGeneration;
+
     setState(() {
       _loading = true;
       _error = null;
@@ -415,20 +430,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       );
 
       final unreadCount =
-      await _findUnreadCount();
+          await _findUnreadCount();
 
-      if (!mounted) {
+      if (!mounted || generation != _requestGeneration) {
         return;
       }
 
       setState(() {
-        _order = order;
+        _order = _newerOrder(
+          current: _order,
+          candidate: order,
+        );
         _unreadCount = unreadCount ?? 0;
         _loading = false;
         _error = null;
       });
     } catch (caught) {
-      if (!mounted) {
+      if (!mounted || generation != _requestGeneration) {
         return;
       }
 
@@ -440,20 +458,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   }
 
   Future<void> _refresh() async {
+    final generation = _requestGeneration;
+
     try {
       final order = await widget.repository.findOne(
         widget.orderPublicId,
       );
 
       final unreadCount =
-      await _findUnreadCount();
+          await _findUnreadCount();
 
-      if (!mounted) {
+      if (!mounted || generation != _requestGeneration) {
         return;
       }
 
       setState(() {
-        _order = order;
+        _order = _newerOrder(
+          current: _order,
+          candidate: order,
+        );
 
         if (unreadCount != null) {
           _unreadCount = unreadCount;
@@ -462,7 +485,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _error = null;
       });
     } catch (_) {
-      if (!mounted) {
+      if (!mounted || generation != _requestGeneration) {
         return;
       }
 
@@ -474,6 +497,80 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         ),
       );
     }
+  }
+
+  Future<void> _refreshOrderSilently() async {
+    final generation = _requestGeneration;
+
+    try {
+      final order = await widget.repository.findOne(
+        widget.orderPublicId,
+      );
+
+      if (!mounted || generation != _requestGeneration) {
+        return;
+      }
+
+      setState(() {
+        _order = _newerOrder(
+          current: _order,
+          candidate: order,
+        );
+        _error = null;
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '주문 상세 최신 상태를 자동 복구하지 못했습니다: $error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _syncOrderAfterRealtimeEvent({
+    required int knownVersion,
+  }) async {
+    final generation = _requestGeneration;
+
+    try {
+      final result = await widget.repository.sync(
+        widget.orderPublicId,
+        knownVersion,
+      );
+      final serverOrder = result.order;
+
+      if (!mounted ||
+          generation != _requestGeneration ||
+          serverOrder == null) {
+        return;
+      }
+
+      setState(() {
+        _order = _newerOrder(
+          current: _order,
+          candidate: serverOrder,
+        );
+        _error = null;
+      });
+    } catch (error, stackTrace) {
+      // status/version은 실시간 이벤트에서 이미 반영했습니다.
+      // 준비시간 같은 나머지 필드는 재연결/fallback REST 조회에서
+      // 다시 복구합니다.
+      debugPrint(
+        '주문 상세 실시간 이벤트 후 REST 동기화에 실패했습니다: $error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _recoverLatestState() async {
+    await Future.wait<void>(<Future<void>>[
+      _refreshOrderSilently(),
+      _refreshUnreadCount(),
+    ]);
   }
 
   Future<void> _sync() async {
@@ -502,7 +599,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
       setState(() {
         if (result.order != null) {
-          _order = result.order;
+          _order = _newerOrder(
+            current: _order,
+            candidate: result.order!,
+          );
         }
 
         if (unreadCount != null) {
@@ -585,7 +685,10 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       }
 
       setState(() {
-        _order = order;
+        _order = _newerOrder(
+          current: _order,
+          candidate: order,
+        );
         _unreadCount = unreadCount ?? 0;
         _error = null;
       });
@@ -664,13 +767,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       _observedConnectionEpoch =
           realtimeClient.connectionEpoch;
 
-      // 재연결 직후 끊긴 동안 놓친 배지 변화를 REST로 복구합니다.
+      // 재연결 직후 끊긴 동안 놓친 주문 상태와 문의 배지를
+      // REST로 다시 조회합니다.
       unawaited(
-        _refreshUnreadCount(),
+        _recoverLatestState(),
       );
     }
 
     _syncFallbackPollingWithRealtime();
+  }
+
+  void _handleCustomerOrderEvent(
+    PopqOrderRealtimeEvent event,
+  ) {
+    if (event.orderPublicId != widget.orderPublicId) {
+      return;
+    }
+
+    final currentOrder = _order;
+
+    if (currentOrder == null) {
+      unawaited(
+        _refreshOrderSilently(),
+      );
+      return;
+    }
+
+    if (event.isDuplicateOrOlderThan(currentOrder.version)) {
+      return;
+    }
+
+    final knownVersion = currentOrder.version;
+
+    setState(() {
+      _order = currentOrder.applyRealtimeEvent(event);
+      _error = null;
+    });
+
+    // 화면에는 즉시 상태를 보여주고, 이벤트에 포함되지 않은
+    // 준비시간/예상완료시간 등은 REST sync로 보정합니다.
+    unawaited(
+      _syncOrderAfterRealtimeEvent(
+        knownVersion: knownVersion,
+      ),
+    );
+  }
+
+  void _handleCustomerOrderError(
+    Object error,
+  ) {
+    debugPrint(
+      '주문 상세 실시간 상태 이벤트를 처리하지 못했습니다: $error',
+    );
   }
 
   void _handleCustomerChatEvent(
@@ -727,7 +875,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       _fallbackPollingInterval,
       (_) {
         unawaited(
-          _refreshUnreadCount(),
+          _recoverLatestState(),
         );
       },
     );
@@ -736,6 +884,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   void _stopFallbackPolling() {
     _fallbackPollingTimer?.cancel();
     _fallbackPollingTimer = null;
+  }
+  CustomerOrder _newerOrder({
+    required CustomerOrder? current,
+    required CustomerOrder candidate,
+  }) {
+    if (current != null && current.version > candidate.version) {
+      return current;
+    }
+
+    return candidate;
   }
 }
 

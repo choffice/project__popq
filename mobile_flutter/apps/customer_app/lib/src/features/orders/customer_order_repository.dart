@@ -51,6 +51,44 @@ class CustomerOrder {
   final int? preparationMinutes;
   final DateTime? estimatedReadyAt;
 
+  CustomerOrder copyWith({
+    String? status,
+    int? version,
+    DateTime? acceptedAt,
+    int? preparationMinutes,
+    DateTime? estimatedReadyAt,
+  }) {
+    return CustomerOrder(
+      orderPublicId: orderPublicId,
+      storeId: storeId,
+      storeName: storeName,
+      status: status ?? this.status,
+      totalAmount: totalAmount,
+      version: version ?? this.version,
+      items: items,
+      createdAt: createdAt,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
+      preparationMinutes:
+          preparationMinutes ?? this.preparationMinutes,
+      estimatedReadyAt:
+          estimatedReadyAt ?? this.estimatedReadyAt,
+    );
+  }
+
+  CustomerOrder applyRealtimeEvent(
+    PopqOrderRealtimeEvent event,
+  ) {
+    if (event.orderPublicId != orderPublicId ||
+        event.isDuplicateOrOlderThan(version)) {
+      return this;
+    }
+
+    return copyWith(
+      status: event.currentStatus,
+      version: event.version,
+    );
+  }
+
   static DateTime? _dateTime(Object? value) {
     return value is String ? DateTime.tryParse(value) : null;
   }

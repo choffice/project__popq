@@ -8,18 +8,18 @@ import '../network/popq_api_client.dart';
 import 'popq_realtime_connection_status.dart';
 import 'popq_realtime_event.dart';
 
-typedef PopqRealtimeEventCallback = void Function(
-    PopqRealtimeEvent event,
-    );
+typedef PopqRealtimeEventCallback = void Function(PopqRealtimeEvent event);
 
-typedef PopqRealtimeErrorCallback = void Function(
-    Object error,
-    );
+typedef PopqOrderRealtimeEventCallback =
+    void Function(PopqOrderRealtimeEvent event);
+
+typedef _PopqRealtimeJsonCallback = void Function(Map<String, Object?> json);
+
+typedef PopqRealtimeErrorCallback = void Function(Object error);
 
 class PopqRealtimeSubscription {
-  PopqRealtimeSubscription._({
-    required VoidCallback onCancel,
-  }) : _onCancel = onCancel;
+  PopqRealtimeSubscription._({required VoidCallback onCancel})
+    : _onCancel = onCancel;
 
   VoidCallback? _onCancel;
 
@@ -42,14 +42,10 @@ class PopqRealtimeClient extends ChangeNotifier {
     required Uri webSocketUri,
     required AccessTokenReader accessTokenReader,
     this.enableLogs = false,
-    this.connectionTimeout = const Duration(
-      seconds: 10,
-    ),
-    this.heartbeatInterval = const Duration(
-      seconds: 10,
-    ),
-  })  : _webSocketUri = webSocketUri,
-        _accessTokenReader = accessTokenReader;
+    this.connectionTimeout = const Duration(seconds: 10),
+    this.heartbeatInterval = const Duration(seconds: 10),
+  }) : _webSocketUri = webSocketUri,
+       _accessTokenReader = accessTokenReader;
 
   final Uri _webSocketUri;
   final AccessTokenReader _accessTokenReader;
@@ -58,9 +54,8 @@ class PopqRealtimeClient extends ChangeNotifier {
   final Duration connectionTimeout;
   final Duration heartbeatInterval;
 
-  final Map<String, _DestinationSubscription>
-  _destinationSubscriptions =
-  <String, _DestinationSubscription>{};
+  final Map<String, _DestinationSubscription> _destinationSubscriptions =
+      <String, _DestinationSubscription>{};
 
   StompClient? _stompClient;
   Timer? _reconnectTimer;
@@ -94,8 +89,7 @@ class PopqRealtimeClient extends ChangeNotifier {
   }
 
   bool get isConnected {
-    return _status.isConnected &&
-        (_stompClient?.connected ?? false);
+    return _status.isConnected && (_stompClient?.connected ?? false);
   }
 
   bool get shouldUseRestFallback {
@@ -128,9 +122,7 @@ class PopqRealtimeClient extends ChangeNotifier {
 
     _reconnectAttempt = 0;
 
-    await _startConnection(
-      reconnecting: _connectionEpoch > 0,
-    );
+    await _startConnection(reconnecting: _connectionEpoch > 0);
   }
 
   /**
@@ -150,9 +142,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     _reconnectTimer = null;
 
     _stopCurrentClient();
-    _setStatus(
-      PopqRealtimeConnectionStatus.disconnected,
-    );
+    _setStatus(PopqRealtimeConnectionStatus.disconnected);
   }
 
   /**
@@ -161,9 +151,7 @@ class PopqRealtimeClient extends ChangeNotifier {
    * clearSubscriptions가 true이면 등록된 모든
    * 주문·사업장·구매자 채널 listener도 삭제합니다.
    */
-  void disconnect({
-    bool clearSubscriptions = true,
-  }) {
+  void disconnect({bool clearSubscriptions = true}) {
     if (_disposed) {
       return;
     }
@@ -181,9 +169,7 @@ class PopqRealtimeClient extends ChangeNotifier {
 
     _lastError = null;
 
-    _setStatus(
-      PopqRealtimeConnectionStatus.disconnected,
-    );
+    _setStatus(PopqRealtimeConnectionStatus.disconnected);
   }
 
   PopqRealtimeSubscription subscribeToOrderChat({
@@ -191,16 +177,16 @@ class PopqRealtimeClient extends ChangeNotifier {
     required PopqRealtimeEventCallback onEvent,
     PopqRealtimeErrorCallback? onError,
   }) {
-    final normalizedOrderPublicId =
-    _requireNonEmptyValue(
+    final normalizedOrderPublicId = _requireNonEmptyValue(
       orderPublicId,
       'orderPublicId',
     );
 
     return _subscribe(
-      destination:
-      '/topic/orders/$normalizedOrderPublicId/chat',
-      onEvent: onEvent,
+      destination: '/topic/orders/$normalizedOrderPublicId/chat',
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqRealtimeEvent.fromJson(json));
+      },
       onError: onError,
     );
   }
@@ -211,7 +197,9 @@ class PopqRealtimeClient extends ChangeNotifier {
   }) {
     return _subscribe(
       destination: '/user/queue/chat',
-      onEvent: onEvent,
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqRealtimeEvent.fromJson(json));
+      },
       onError: onError,
     );
   }
@@ -222,16 +210,45 @@ class PopqRealtimeClient extends ChangeNotifier {
     PopqRealtimeErrorCallback? onError,
   }) {
     if (storeId <= 0) {
-      throw ArgumentError.value(
-        storeId,
-        'storeId',
-        'storeId는 1 이상이어야 합니다.',
-      );
+      throw ArgumentError.value(storeId, 'storeId', 'storeId는 1 이상이어야 합니다.');
     }
 
     return _subscribe(
       destination: '/topic/stores/$storeId/chat',
-      onEvent: onEvent,
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqRealtimeEvent.fromJson(json));
+      },
+      onError: onError,
+    );
+  }
+
+  PopqRealtimeSubscription subscribeToCustomerOrders({
+    required PopqOrderRealtimeEventCallback onEvent,
+    PopqRealtimeErrorCallback? onError,
+  }) {
+    return _subscribe(
+      destination: '/user/queue/orders',
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqOrderRealtimeEvent.fromJson(json));
+      },
+      onError: onError,
+    );
+  }
+
+  PopqRealtimeSubscription subscribeToStoreOrders({
+    required int storeId,
+    required PopqOrderRealtimeEventCallback onEvent,
+    PopqRealtimeErrorCallback? onError,
+  }) {
+    if (storeId <= 0) {
+      throw ArgumentError.value(storeId, 'storeId', 'storeId는 1 이상이어야 합니다.');
+    }
+
+    return _subscribe(
+      destination: '/topic/stores/$storeId/orders',
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqOrderRealtimeEvent.fromJson(json));
+      },
       onError: onError,
     );
   }
@@ -253,26 +270,20 @@ class PopqRealtimeClient extends ChangeNotifier {
     required String content,
     required String clientMessageId,
   }) {
-    final normalizedOrderPublicId =
-    _requireNonEmptyValue(
+    final normalizedOrderPublicId = _requireNonEmptyValue(
       orderPublicId,
       'orderPublicId',
     );
 
-    final normalizedContent = _requireNonEmptyValue(
-      content,
-      'content',
-    );
+    final normalizedContent = _requireNonEmptyValue(content, 'content');
 
-    final normalizedClientMessageId =
-    _requireNonEmptyValue(
+    final normalizedClientMessageId = _requireNonEmptyValue(
       clientMessageId,
       'clientMessageId',
     );
 
     return _sendJson(
-      destination:
-      '/app/orders/$normalizedOrderPublicId/chat/messages',
+      destination: '/app/orders/$normalizedOrderPublicId/chat/messages',
       body: <String, Object?>{
         'content': normalizedContent,
         'clientMessageId': normalizedClientMessageId,
@@ -288,8 +299,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     required String orderPublicId,
     required int lastReadMessageId,
   }) {
-    final normalizedOrderPublicId =
-    _requireNonEmptyValue(
+    final normalizedOrderPublicId = _requireNonEmptyValue(
       orderPublicId,
       'orderPublicId',
     );
@@ -303,20 +313,13 @@ class PopqRealtimeClient extends ChangeNotifier {
     }
 
     return _sendJson(
-      destination:
-      '/app/orders/$normalizedOrderPublicId/chat/read',
-      body: <String, Object?>{
-        'lastReadMessageId': lastReadMessageId,
-      },
+      destination: '/app/orders/$normalizedOrderPublicId/chat/read',
+      body: <String, Object?>{'lastReadMessageId': lastReadMessageId},
     );
   }
 
-  Future<void> _startConnection({
-    required bool reconnecting,
-  }) async {
-    if (_disposed ||
-        !_shouldStayConnected ||
-        _connectionAttemptInProgress) {
+  Future<void> _startConnection({required bool reconnecting}) async {
+    if (_disposed || !_shouldStayConnected || _connectionAttemptInProgress) {
       return;
     }
 
@@ -333,8 +336,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     String? accessToken;
 
     try {
-      accessToken =
-          (await _accessTokenReader())?.trim();
+      accessToken = (await _accessTokenReader())?.trim();
     } on Object catch (error) {
       _connectionAttemptInProgress = false;
       _lastError = error;
@@ -349,13 +351,9 @@ class PopqRealtimeClient extends ChangeNotifier {
 
     if (accessToken == null || accessToken.isEmpty) {
       _connectionAttemptInProgress = false;
-      _lastError = StateError(
-        'WebSocket 연결에 필요한 로그인 토큰이 없습니다.',
-      );
+      _lastError = StateError('WebSocket 연결에 필요한 로그인 토큰이 없습니다.');
 
-      _setStatus(
-        PopqRealtimeConnectionStatus.failed,
-      );
+      _setStatus(PopqRealtimeConnectionStatus.failed);
 
       return;
     }
@@ -377,17 +375,10 @@ class PopqRealtimeClient extends ChangeNotifier {
           'Authorization': 'Bearer $accessToken',
         },
         onConnect: (StompFrame frame) {
-          _handleConnected(
-            generation,
-          );
+          _handleConnected(generation);
         },
         onDisconnect: (StompFrame frame) {
-          _handleConnectionLost(
-            generation,
-            StateError(
-              'STOMP 연결이 종료되었습니다.',
-            ),
-          );
+          _handleConnectionLost(generation, StateError('STOMP 연결이 종료되었습니다.'));
         },
         onStompError: (StompFrame frame) {
           _handleConnectionLost(
@@ -402,27 +393,19 @@ class PopqRealtimeClient extends ChangeNotifier {
         onWebSocketError: (dynamic error) {
           _handleConnectionLost(
             generation,
-            error is Object
-                ? error
-                : StateError(
-              'WebSocket 연결 오류가 발생했습니다.',
-            ),
+            error is Object ? error : StateError('WebSocket 연결 오류가 발생했습니다.'),
           );
         },
         onWebSocketDone: () {
           _handleConnectionLost(
             generation,
-            StateError(
-              'WebSocket 연결이 종료되었습니다.',
-            ),
+            StateError('WebSocket 연결이 종료되었습니다.'),
           );
         },
         onDebugMessage: enableLogs
             ? (String message) {
-          debugPrint(
-            '[POPQ STOMP] $message',
-          );
-        }
+                debugPrint('[POPQ STOMP] $message');
+              }
             : (String message) {},
       ),
     );
@@ -432,18 +415,12 @@ class PopqRealtimeClient extends ChangeNotifier {
     try {
       client.activate();
     } on Object catch (error) {
-      _handleConnectionLost(
-        generation,
-        error,
-      );
+      _handleConnectionLost(generation, error);
     }
   }
 
-  void _handleConnected(
-      int generation,
-      ) {
-    if (_disposed ||
-        generation != _clientGeneration) {
+  void _handleConnected(int generation) {
+    if (_disposed || generation != _clientGeneration) {
       return;
     }
 
@@ -459,19 +436,13 @@ class PopqRealtimeClient extends ChangeNotifier {
 
     _clearUnderlyingSubscriptionHandles();
 
-    _setStatus(
-      PopqRealtimeConnectionStatus.connected,
-    );
+    _setStatus(PopqRealtimeConnectionStatus.connected);
 
     _activateAllSubscriptions();
   }
 
-  void _handleConnectionLost(
-      int generation,
-      Object error,
-      ) {
-    if (_disposed ||
-        generation != _clientGeneration) {
+  void _handleConnectionLost(int generation, Object error) {
+    if (_disposed || generation != _clientGeneration) {
       return;
     }
 
@@ -481,9 +452,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     _stopCurrentClient();
 
     if (!_shouldStayConnected) {
-      _setStatus(
-        PopqRealtimeConnectionStatus.disconnected,
-      );
+      _setStatus(PopqRealtimeConnectionStatus.disconnected);
 
       return;
     }
@@ -500,76 +469,49 @@ class PopqRealtimeClient extends ChangeNotifier {
       return;
     }
 
-    final delay = _reconnectDelayForAttempt(
-      _reconnectAttempt,
-    );
+    final delay = _reconnectDelayForAttempt(_reconnectAttempt);
 
     _reconnectAttempt++;
 
-    _setStatus(
-      PopqRealtimeConnectionStatus.reconnecting,
-    );
+    _setStatus(PopqRealtimeConnectionStatus.reconnecting);
 
-    _log(
-      '재연결 예정: ${delay.inSeconds}초 후',
-    );
+    _log('재연결 예정: ${delay.inSeconds}초 후');
 
-    _reconnectTimer = Timer(
-      delay,
-          () {
-        _reconnectTimer = null;
+    _reconnectTimer = Timer(delay, () {
+      _reconnectTimer = null;
 
-        unawaited(
-          _startConnection(
-            reconnecting: true,
-          ),
-        );
-      },
-    );
+      unawaited(_startConnection(reconnecting: true));
+    });
   }
 
-  Duration _reconnectDelayForAttempt(
-      int attempt,
-      ) {
-    const delaysInSeconds = <int>[
-      2,
-      4,
-      8,
-      16,
-      30,
-    ];
+  Duration _reconnectDelayForAttempt(int attempt) {
+    const delaysInSeconds = <int>[2, 4, 8, 16, 30];
 
     final index = attempt < delaysInSeconds.length
         ? attempt
         : delaysInSeconds.length - 1;
 
-    return Duration(
-      seconds: delaysInSeconds[index],
-    );
+    return Duration(seconds: delaysInSeconds[index]);
   }
 
   PopqRealtimeSubscription _subscribe({
     required String destination,
-    required PopqRealtimeEventCallback onEvent,
+    required _PopqRealtimeJsonCallback onJson,
     PopqRealtimeErrorCallback? onError,
   }) {
     _checkNotDisposed();
 
     final listenerId = ++_nextListenerId;
 
-    final subscription =
-    _destinationSubscriptions.putIfAbsent(
+    final subscription = _destinationSubscriptions.putIfAbsent(
       destination,
-          () => _DestinationSubscription(
-        destination: destination,
-      ),
+      () => _DestinationSubscription(destination: destination),
     );
 
-    subscription.listeners[listenerId] =
-        _RealtimeListener(
-          onEvent: onEvent,
-          onError: onError,
-        );
+    subscription.listeners[listenerId] = _RealtimeListener(
+      onJson: onJson,
+      onError: onError,
+    );
 
     if (isConnected) {
       _activateSubscription(subscription);
@@ -577,20 +519,13 @@ class PopqRealtimeClient extends ChangeNotifier {
 
     return PopqRealtimeSubscription._(
       onCancel: () {
-        _removeListener(
-          destination: destination,
-          listenerId: listenerId,
-        );
+        _removeListener(destination: destination, listenerId: listenerId);
       },
     );
   }
 
-  void _removeListener({
-    required String destination,
-    required int listenerId,
-  }) {
-    final subscription =
-    _destinationSubscriptions[destination];
+  void _removeListener({required String destination, required int listenerId}) {
+    final subscription = _destinationSubscriptions[destination];
 
     if (subscription == null) {
       return;
@@ -602,8 +537,7 @@ class PopqRealtimeClient extends ChangeNotifier {
       return;
     }
 
-    final unsubscribe =
-        subscription.stompUnsubscribe;
+    final unsubscribe = subscription.stompUnsubscribe;
 
     subscription.stompUnsubscribe = null;
 
@@ -611,27 +545,20 @@ class PopqRealtimeClient extends ChangeNotifier {
       try {
         unsubscribe();
       } on Object catch (error) {
-        _log(
-          '구독 해제 중 오류: $destination / $error',
-        );
+        _log('구독 해제 중 오류: $destination / $error');
       }
     }
 
-    _destinationSubscriptions.remove(
-      destination,
-    );
+    _destinationSubscriptions.remove(destination);
   }
 
   void _activateAllSubscriptions() {
-    for (final subscription
-    in _destinationSubscriptions.values) {
+    for (final subscription in _destinationSubscriptions.values) {
       _activateSubscription(subscription);
     }
   }
 
-  void _activateSubscription(
-      _DestinationSubscription subscription,
-      ) {
+  void _activateSubscription(_DestinationSubscription subscription) {
     if (_disposed ||
         !isConnected ||
         subscription.listeners.isEmpty ||
@@ -646,42 +573,25 @@ class PopqRealtimeClient extends ChangeNotifier {
     }
 
     try {
-      subscription.stompUnsubscribe =
-          client.subscribe(
-            destination: subscription.destination,
-            callback: (StompFrame frame) {
-              _handleSubscriptionFrame(
-                subscription.destination,
-                frame,
-              );
-            },
-          );
-
-      _log(
-        '구독 성공: ${subscription.destination}',
+      subscription.stompUnsubscribe = client.subscribe(
+        destination: subscription.destination,
+        callback: (StompFrame frame) {
+          _handleSubscriptionFrame(subscription.destination, frame);
+        },
       );
+
+      _log('구독 성공: ${subscription.destination}');
     } on Object catch (error) {
-      _notifySubscriptionError(
-        subscription,
-        error,
-      );
+      _notifySubscriptionError(subscription, error);
 
-      _handleConnectionLost(
-        _clientGeneration,
-        error,
-      );
+      _handleConnectionLost(_clientGeneration, error);
     }
   }
 
-  void _handleSubscriptionFrame(
-      String destination,
-      StompFrame frame,
-      ) {
-    final subscription =
-    _destinationSubscriptions[destination];
+  void _handleSubscriptionFrame(String destination, StompFrame frame) {
+    final subscription = _destinationSubscriptions[destination];
 
-    if (subscription == null ||
-        subscription.listeners.isEmpty) {
+    if (subscription == null || subscription.listeners.isEmpty) {
       return;
     }
 
@@ -690,9 +600,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     if (body == null || body.trim().isEmpty) {
       _notifySubscriptionError(
         subscription,
-        const FormatException(
-          '실시간 이벤트 본문이 비어 있습니다.',
-        ),
+        const FormatException('실시간 이벤트 본문이 비어 있습니다.'),
       );
 
       return;
@@ -702,48 +610,36 @@ class PopqRealtimeClient extends ChangeNotifier {
       final decoded = jsonDecode(body);
 
       if (decoded is! Map) {
-        throw const FormatException(
-          '실시간 이벤트는 JSON 객체여야 합니다.',
-        );
+        throw const FormatException('실시간 이벤트는 JSON 객체여야 합니다.');
       }
 
-      final event = PopqRealtimeEvent.fromJson(
-        Map<String, Object?>.from(decoded),
-      );
-
-      final listeners =
-      List<_RealtimeListener>.of(
+      final json = Map<String, Object?>.from(decoded);
+      final listeners = List<_RealtimeListener>.of(
         subscription.listeners.values,
       );
 
       for (final listener in listeners) {
         try {
-          listener.onEvent(event);
+          listener.onJson(json);
         } on Object catch (error) {
           listener.onError?.call(error);
         }
       }
     } on Object catch (error) {
-      _notifySubscriptionError(
-        subscription,
-        error,
-      );
+      _notifySubscriptionError(subscription, error);
     }
   }
 
   void _notifySubscriptionError(
-      _DestinationSubscription subscription,
-      Object error,
-      ) {
+    _DestinationSubscription subscription,
+    Object error,
+  ) {
     _log(
       '실시간 구독 오류: '
-          '${subscription.destination} / $error',
+      '${subscription.destination} / $error',
     );
 
-    final listeners =
-    List<_RealtimeListener>.of(
-      subscription.listeners.values,
-    );
+    final listeners = List<_RealtimeListener>.of(subscription.listeners.values);
 
     for (final listener in listeners) {
       listener.onError?.call(error);
@@ -767,28 +663,21 @@ class PopqRealtimeClient extends ChangeNotifier {
     try {
       client.send(
         destination: destination,
-        headers: const <String, String>{
-          'content-type': 'application/json',
-        },
+        headers: const <String, String>{'content-type': 'application/json'},
         body: jsonEncode(body),
       );
 
       return true;
     } on Object catch (error) {
-      _handleConnectionLost(
-        _clientGeneration,
-        error,
-      );
+      _handleConnectionLost(_clientGeneration, error);
 
       return false;
     }
   }
 
   void _unsubscribeAllUnderlyingSubscriptions() {
-    for (final subscription
-    in _destinationSubscriptions.values) {
-      final unsubscribe =
-          subscription.stompUnsubscribe;
+    for (final subscription in _destinationSubscriptions.values) {
+      final unsubscribe = subscription.stompUnsubscribe;
 
       subscription.stompUnsubscribe = null;
 
@@ -801,15 +690,14 @@ class PopqRealtimeClient extends ChangeNotifier {
       } on Object catch (error) {
         _log(
           '구독 해제 오류: '
-              '${subscription.destination} / $error',
+          '${subscription.destination} / $error',
         );
       }
     }
   }
 
   void _clearUnderlyingSubscriptionHandles() {
-    for (final subscription
-    in _destinationSubscriptions.values) {
+    for (final subscription in _destinationSubscriptions.values) {
       subscription.stompUnsubscribe = null;
     }
   }
@@ -835,15 +723,11 @@ class PopqRealtimeClient extends ChangeNotifier {
     try {
       client.deactivate();
     } on Object catch (error) {
-      _log(
-        'STOMP 연결 종료 중 오류: $error',
-      );
+      _log('STOMP 연결 종료 중 오류: $error');
     }
   }
 
-  void _setStatus(
-      PopqRealtimeConnectionStatus nextStatus,
-      ) {
+  void _setStatus(PopqRealtimeConnectionStatus nextStatus) {
     if (_status == nextStatus) {
       return;
     }
@@ -855,10 +739,7 @@ class PopqRealtimeClient extends ChangeNotifier {
     }
   }
 
-  String _requireNonEmptyValue(
-      String value,
-      String fieldName,
-      ) {
+  String _requireNonEmptyValue(String value, String fieldName) {
     final normalized = value.trim();
 
     if (normalized.isEmpty) {
@@ -874,9 +755,7 @@ class PopqRealtimeClient extends ChangeNotifier {
 
   void _checkNotDisposed() {
     if (_disposed) {
-      throw StateError(
-        '이미 dispose된 PopqRealtimeClient입니다.',
-      );
+      throw StateError('이미 dispose된 PopqRealtimeClient입니다.');
     }
   }
 
@@ -885,9 +764,7 @@ class PopqRealtimeClient extends ChangeNotifier {
       return;
     }
 
-    debugPrint(
-      '[POPQ Realtime] $message',
-    );
+    debugPrint('[POPQ Realtime] $message');
   }
 
   @override
@@ -911,24 +788,18 @@ class PopqRealtimeClient extends ChangeNotifier {
 }
 
 class _DestinationSubscription {
-  _DestinationSubscription({
-    required this.destination,
-  });
+  _DestinationSubscription({required this.destination});
 
   final String destination;
 
-  final Map<int, _RealtimeListener> listeners =
-  <int, _RealtimeListener>{};
+  final Map<int, _RealtimeListener> listeners = <int, _RealtimeListener>{};
 
   StompUnsubscribe? stompUnsubscribe;
 }
 
 class _RealtimeListener {
-  const _RealtimeListener({
-    required this.onEvent,
-    required this.onError,
-  });
+  const _RealtimeListener({required this.onJson, required this.onError});
 
-  final PopqRealtimeEventCallback onEvent;
+  final _PopqRealtimeJsonCallback onJson;
   final PopqRealtimeErrorCallback? onError;
 }

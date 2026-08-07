@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../realtime/seller_realtime_scope.dart';
 import '../../routing/seller_router.dart';
 import '../stores/seller_store_repository.dart';
 import '../stores/seller_store_selection_controller.dart';
@@ -26,7 +30,8 @@ class SellerOrderListScreen extends StatefulWidget {
 }
 
 class _SellerOrderListScreenState extends State<SellerOrderListScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const Duration _pollingInterval = Duration(seconds: 3);
   static const _currentStatuses = <String>[
     'PLACED',
     'ACCEPTED',
@@ -49,10 +54,21 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
   var _requestSerial = 0;
   var _loadedTabIndex = 0;
+  var _lastConnectionEpoch = 0;
+  var _isAppActive = true;
+
+  List<SellerOrder> _orderSnapshot = const <SellerOrder>[];
+  Timer? _pollingTimer;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _storeOrderSubscription;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _isAppActive =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _tabController = TabController(length: 2, vsync: this)
       ..addListener(_handleTabChanged);
     _currentFilter = widget.initialCurrentFilter;
@@ -61,6 +77,28 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     widget.selectionController.addListener(_handleSelectionChanged);
     _stores = _loadStores();
     _orders = _loadOrders();
+    _startPolling();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextRealtimeClient = SellerRealtimeScope.maybeOf(context);
+    if (identical(_realtimeClient, nextRealtimeClient)) {
+      return;
+    }
+
+    _realtimeClient?.removeListener(_handleRealtimeClientChanged);
+    _storeOrderSubscription?.cancel();
+    _storeOrderSubscription = null;
+
+    _realtimeClient = nextRealtimeClient;
+    _lastConnectionEpoch = nextRealtimeClient?.connectionEpoch ?? 0;
+    nextRealtimeClient?.addListener(_handleRealtimeClientChanged);
+
+    _subscribeToSelectedStore();
+    _updatePollingForConnection();
   }
 
   @override
@@ -72,15 +110,45 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     if (oldWidget.selectionController != widget.selectionController) {
       oldWidget.selectionController.removeListener(_handleSelectionChanged);
       widget.selectionController.addListener(_handleSelectionChanged);
+      _subscribeToSelectedStore();
       setState(() {
+        _orderSnapshot = const <SellerOrder>[];
         _stores = _loadStores();
         _orders = _loadOrders();
       });
+      _updatePollingForConnection();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _isAppActive = true;
+        _subscribeToSelectedStore();
+        _updatePollingForConnection();
+        unawaited(_refreshOrdersSilently());
+        return;
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        _isAppActive = false;
+        _stopPolling();
+        return;
     }
   }
 
   @override
   void dispose() {
+    _requestSerial++;
+    _stopPolling();
+    _storeOrderSubscription?.cancel();
+    _storeOrderSubscription = null;
+    _realtimeClient?.removeListener(_handleRealtimeClientChanged);
+    WidgetsBinding.instance.removeObserver(this);
     widget.selectionController.removeListener(_handleSelectionChanged);
     _tabController
       ..removeListener(_handleTabChanged)
@@ -97,7 +165,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
           builder: (context, snapshot) {
             final stores = snapshot.data ?? const <SellerStore>[];
             final selectedId = widget.selectionController.selectedStoreId;
-            final validValue = stores.any((store) => store.storeId == selectedId)
+            final validValue =
+                stores.any((store) => store.storeId == selectedId)
                 ? selectedId
                 : null;
             return Padding(
@@ -136,14 +205,13 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                     selectedItemBuilder: (context) => stores
                         .map((store) => _storeDropdownItem(store))
                         .toList(),
-                    onChanged:
-                        snapshot.connectionState == ConnectionState.done
-                            ? (storeId) {
-                                if (storeId != null) {
-                                  widget.selectionController.select(storeId);
-                                }
-                              }
-                            : null,
+                    onChanged: snapshot.connectionState == ConnectionState.done
+                        ? (storeId) {
+                            if (storeId != null) {
+                              widget.selectionController.select(storeId);
+                            }
+                          }
+                        : null,
                   ),
                 ),
               ),
@@ -159,8 +227,9 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
             return TabBar(
               controller: _tabController,
               labelColor: activeColor,
-              unselectedLabelColor:
-                  Theme.of(context).colorScheme.onSurfaceVariant,
+              unselectedLabelColor: Theme.of(
+                context,
+              ).colorScheme.onSurfaceVariant,
               indicatorColor: activeColor,
               dividerColor: Theme.of(context).colorScheme.outlineVariant,
               tabs: const [
@@ -187,7 +256,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                   ),
                 )
               : const SizedBox.shrink(),
-          ),
+        ),
         SizedBox(
           height: 56,
           child: AnimatedBuilder(
@@ -195,8 +264,18 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
             builder: (context, _) {
               final current = _tabController.index == 0;
               final filters = current
-                  ? const <String?>[null, 'PLACED', 'ACCEPTED_PREPARING', 'READY']
-                  : const <String?>[null, 'COMPLETED', 'CANCELED_FAMILY', 'REJECTED_FAMILY'];
+                  ? const <String?>[
+                      null,
+                      'PLACED',
+                      'ACCEPTED_PREPARING',
+                      'READY',
+                    ]
+                  : const <String?>[
+                      null,
+                      'COMPLETED',
+                      'CANCELED_FAMILY',
+                      'REJECTED_FAMILY',
+                    ];
               final selected = current ? _currentFilter : _recentFilter;
               return ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -303,7 +382,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       for (final summary in summaries) summary.storeId: summary,
     };
     final selectedId = widget.selectionController.selectedStoreId;
-    if (stores.isNotEmpty && !stores.any((store) => store.storeId == selectedId)) {
+    if (stores.isNotEmpty &&
+        !stores.any((store) => store.storeId == selectedId)) {
       await widget.selectionController.select(stores.first.storeId);
     }
     return stores;
@@ -326,6 +406,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     if (orders.any((order) => order.storeId != storeId)) {
       throw StateError('다른 사업장의 주문 응답이 포함되어 있습니다.');
     }
+    _orderSnapshot = List<SellerOrder>.unmodifiable(orders);
     return orders;
   }
 
@@ -347,7 +428,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     }).toList();
     filtered.sort((left, right) {
       final leftDate = left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final rightDate = right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final rightDate =
+          right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return rightDate.compareTo(leftDate);
     });
     return filtered;
@@ -365,12 +447,17 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
 
   void _handleSelectionChanged() {
     if (!mounted) return;
+    _requestSerial++;
+    _orderSnapshot = const <SellerOrder>[];
+    _subscribeToSelectedStore();
     setState(() => _orders = _loadOrders());
+    _updatePollingForConnection();
   }
 
   void _handleTabChanged() {
     if (!mounted || _loadedTabIndex == _tabController.index) return;
     _loadedTabIndex = _tabController.index;
+    _orderSnapshot = const <SellerOrder>[];
     setState(() => _orders = _loadOrders());
   }
 
@@ -408,11 +495,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     return Row(
       children: [
         Expanded(
-          child: Text(
-            store.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          child: Text(store.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         ),
         if (waiting > 0) ...[
           const SizedBox(width: PopqSpacing.xs),
@@ -450,8 +533,126 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     if (selected == null || !mounted) return;
     setState(() {
       _pastDate = DateTime(selected.year, selected.month, selected.day);
+      _orderSnapshot = const <SellerOrder>[];
       _orders = _loadOrders();
     });
+  }
+
+  void _handleRealtimeClientChanged() {
+    if (!mounted) return;
+
+    final client = _realtimeClient;
+    if (client == null) {
+      _updatePollingForConnection();
+      return;
+    }
+
+    final connectionEpoch = client.connectionEpoch;
+    if (client.isConnected && connectionEpoch != _lastConnectionEpoch) {
+      _lastConnectionEpoch = connectionEpoch;
+      unawaited(_refreshOrdersSilently());
+    }
+
+    _updatePollingForConnection();
+  }
+
+  void _subscribeToSelectedStore() {
+    _storeOrderSubscription?.cancel();
+    _storeOrderSubscription = null;
+
+    final client = _realtimeClient;
+    final storeId = widget.selectionController.selectedStoreId;
+    if (client == null || storeId == null) return;
+
+    _storeOrderSubscription = client.subscribeToStoreOrders(
+      storeId: storeId,
+      onEvent: _handleStoreOrderEvent,
+      onError: (error) {
+        debugPrint('판매자 주문 목록 실시간 구독 오류: $error');
+      },
+    );
+  }
+
+  void _handleStoreOrderEvent(PopqOrderRealtimeEvent event) {
+    if (!mounted) return;
+
+    final selectedStoreId = widget.selectionController.selectedStoreId;
+    if (selectedStoreId == null || event.storeId != selectedStoreId) {
+      return;
+    }
+
+    final index = _orderSnapshot.indexWhere(
+      (order) => order.orderPublicId == event.orderPublicId,
+    );
+
+    if (index >= 0) {
+      final current = _orderSnapshot[index];
+      if (event.isDuplicateOrOlderThan(current.version)) {
+        return;
+      }
+
+      final patched = List<SellerOrder>.of(_orderSnapshot);
+      patched[index] = current.copyWith(
+        status: event.currentStatus,
+        version: event.version,
+      );
+      _orderSnapshot = List<SellerOrder>.unmodifiable(patched);
+
+      setState(() {
+        _orders = Future<List<SellerOrder>>.value(_orderSnapshot);
+      });
+    }
+
+    // 신규 주문이거나 상태가 탭 경계를 넘는 경우까지 정확히 반영하기 위해
+    // 이벤트 적용 직후 REST 스냅샷으로 한 번 보정한다.
+    unawaited(_refreshOrdersSilently());
+  }
+
+  Future<void> _refreshOrdersSilently() async {
+    if (!mounted || !_isAppActive) return;
+
+    try {
+      final loaded = await _loadOrders();
+      if (!mounted) return;
+
+      setState(() {
+        _orders = Future<List<SellerOrder>>.value(
+          List<SellerOrder>.unmodifiable(loaded),
+        );
+      });
+    } catch (error) {
+      debugPrint('판매자 주문 목록 REST 동기화 오류: $error');
+    }
+  }
+
+  void _updatePollingForConnection() {
+    final shouldUseRestFallback =
+        _realtimeClient?.shouldUseRestFallback ?? true;
+
+    if (_isAppActive && shouldUseRestFallback) {
+      _startPolling();
+      return;
+    }
+
+    _stopPolling();
+  }
+
+  void _startPolling() {
+    if (!_isAppActive ||
+        !(_realtimeClient?.shouldUseRestFallback ?? true) ||
+        (_pollingTimer?.isActive ?? false)) {
+      return;
+    }
+
+    _pollingTimer = Timer.periodic(
+      _pollingInterval,
+      (_) => unawaited(_refreshOrdersSilently()),
+    );
+  }
+
+  void _stopPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = null;
   }
 
   String _dateLabel(DateTime date) =>
@@ -498,7 +699,9 @@ class _OrderCard extends StatelessWidget {
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 2),
-              Text('${sellerOrderTypeLabel(order.orderType)} · 총 ${order.totalQuantity}개'),
+              Text(
+                '${sellerOrderTypeLabel(order.orderType)} · 총 ${order.totalQuantity}개',
+              ),
             ],
           ),
         ),
