@@ -25,6 +25,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
   Object? _error;
   var _loading = true;
   final _updatingIds = <int>{};
+  var _requestSerial = 0;
 
   @override
   void initState() {
@@ -33,24 +34,27 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
   }
 
   @override
+  void didUpdateWidget(covariant SellerAnnouncementScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.storeId != widget.storeId) {
+      _announcements = null;
+      _updatingIds.clear();
+      _load();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
-    }
-    if (_error != null || _announcements == null) {
-      return PopqErrorView(
-        message: '공지사항을 불러오지 못했습니다.',
-        onRetry: _load,
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        key: const Key('announcement-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(PopqSpacing.md),
-        children: [
-          Row(
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PopqSpacing.md,
+            PopqSpacing.md,
+            PopqSpacing.md,
+            0,
+          ),
+          child: Row(
             children: [
               Expanded(
                 child: Text(
@@ -67,14 +71,50 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                 ),
             ],
           ),
-          const SizedBox(height: PopqSpacing.md),
+        ),
+        const SizedBox(height: PopqSpacing.sm),
+        Expanded(child: _buildBody()),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
+    }
+    if (_error != null || _announcements == null) {
+      return PopqErrorView(
+        message: '공지사항을 불러오지 못했습니다.',
+        onRetry: _load,
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        key: const Key('announcement-list'),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        children: [
           if (_announcements!.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 64),
-              child: PopqEmptyView(
-                icon: Icons.campaign_outlined,
-                title: '등록된 공지사항이 없어요.',
-                description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 64),
+              child: Column(
+                children: [
+                  const PopqEmptyView(
+                    icon: Icons.campaign_outlined,
+                    title: '등록된 공지사항이 없어요.',
+                    description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
+                  ),
+                  if (widget.canManage) ...[
+                    const SizedBox(height: PopqSpacing.md),
+                    FilledButton.icon(
+                      key: const Key('add-first-announcement'),
+                      onPressed: () => _edit(),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('첫 공지 작성'),
+                    ),
+                  ],
+                ],
               ),
             )
           else
@@ -173,19 +213,25 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
   }
 
   Future<void> _load() async {
+    final storeId = widget.storeId;
+    final requestSerial = ++_requestSerial;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final announcements = await widget.repository.findAll(widget.storeId);
-      if (!mounted) return;
+      final announcements = await widget.repository.findAll(storeId);
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.storeId != storeId) return;
       setState(() {
         _announcements = List.of(announcements);
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.storeId != storeId) return;
       setState(() {
         _error = error;
         _loading = false;
@@ -194,6 +240,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
   }
 
   Future<void> _edit([SellerAnnouncement? announcement]) async {
+    final storeId = widget.storeId;
     final draft = await showDialog<_AnnouncementDraft>(
       context: context,
       builder: (_) => _AnnouncementEditor(announcement: announcement),
@@ -202,28 +249,31 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     try {
       final saved = announcement == null
           ? await widget.repository.create(
-              widget.storeId,
+              storeId,
               title: draft.title,
               content: draft.content,
               notifyInterestedCustomers: draft.notifyInterestedCustomers,
             )
           : await widget.repository.update(
-              widget.storeId,
+              storeId,
               announcement,
               title: draft.title,
               content: draft.content,
               notifyInterestedCustomers: draft.notifyInterestedCustomers,
             );
-      if (!mounted) return;
+      if (!mounted || widget.storeId != storeId) return;
       setState(() {
-        final index = _announcements!.indexWhere(
+        final announcements = _announcements ?? <SellerAnnouncement>[];
+        final index = announcements.indexWhere(
           (item) => item.announcementId == saved.announcementId,
         );
         if (index < 0) {
-          _announcements!.insert(0, saved);
+          announcements.insert(0, saved);
         } else {
-          _announcements![index] = saved;
+          announcements[index] = saved;
         }
+        _announcements = announcements;
+        _error = null;
       });
       _showMessage('${saved.title} 공지를 저장했습니다.');
     } catch (_) {

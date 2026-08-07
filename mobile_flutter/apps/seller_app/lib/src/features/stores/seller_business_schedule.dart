@@ -196,6 +196,13 @@ class SellerBusinessSchedule {
     );
   }
 
+  factory SellerBusinessSchedule.standard() {
+    return SellerBusinessSchedule.legacy(
+      openTime: '10:00',
+      closeTime: '22:00',
+    );
+  }
+
   final List<SellerBusinessHour> businessHours;
   final List<SellerClosureRule> closureRules;
   final List<SellerScheduleException> scheduleExceptions;
@@ -227,6 +234,18 @@ class SellerBusinessSchedule {
     (value) => !value.closed && !value.open24Hours,
     orElse: () => businessHours.first,
   );
+
+  String get legacyOpenTimeForApi {
+    final value = legacyRepresentative;
+    if (value.open24Hours) return '00:00:00';
+    return _apiTime(value.openTime ?? const TimeOfDay(hour: 0, minute: 0))!;
+  }
+
+  String get legacyCloseTimeForApi {
+    final value = legacyRepresentative;
+    if (value.open24Hours) return '00:00:00';
+    return _apiTime(value.closeTime ?? const TimeOfDay(hour: 0, minute: 0))!;
+  }
 
   String? get validationMessage {
     for (final value in businessHours) {

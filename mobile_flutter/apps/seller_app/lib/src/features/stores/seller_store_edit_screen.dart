@@ -1281,11 +1281,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
 
       final _SelectedStoreLocation? location = _selectedLocation;
-      final SellerBusinessHour legacyHour = _schedule.legacyRepresentative;
-      final TimeOfDay legacyOpen =
-          legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
-      final TimeOfDay legacyClose =
-          legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
       final SellerStore updated = await widget.repository.update(
         widget.store.storeId,
         storeType: _storeType,
@@ -1298,12 +1293,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         phone: _phoneController.text.trim(),
         latitude: location?.latitude,
         longitude: location?.longitude,
-        openTime: legacyHour.open24Hours
-            ? '00:00:00'
-            : _toApiTime(legacyOpen),
-        closeTime: legacyHour.open24Hours
-            ? '00:00:00'
-            : _toApiTime(legacyClose),
+        openTime: _schedule.legacyOpenTimeForApi,
+        closeTime: _schedule.legacyCloseTimeForApi,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
         takeoutAvailable: _takeoutAvailable,
@@ -1341,11 +1332,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
 
   String? _requiredValidator(String? value, String message) {
     return value == null || value.trim().isEmpty ? message : null;
-  }
-
-  String _toApiTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}:00';
   }
 
   String _normalizeText(String value) {
