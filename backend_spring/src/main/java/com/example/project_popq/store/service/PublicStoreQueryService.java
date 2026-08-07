@@ -7,9 +7,11 @@ import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreTag;
 import com.example.project_popq.store.dto.PublicStoreResponse;
+import com.example.project_popq.store.dto.StoreScheduleResponse;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTagRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,9 +24,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class PublicStoreQueryService {
 
     private static final double EARTH_RADIUS_METERS = 6_371_000.0;
+    private static final List<BusinessStatus> DISCOVERABLE_BUSINESS_STATUSES =
+            List.of(BusinessStatus.PRE_OPEN, BusinessStatus.OPEN);
 
     private final StoreRepository storeRepository;
     private final StoreTagRepository storeTagRepository;
+    private final StoreScheduleService storeScheduleService;
 
     @Transactional(readOnly = true)
     public List<PublicStoreResponse> search(
@@ -40,13 +45,16 @@ public class PublicStoreQueryService {
                 normalize(tag)
         );
         Map<Long, List<String>> tagsByStore = findTags(stores);
-
+        Instant now = Instant.now();
+        Map<Long, StoreScheduleResponse> schedules =
+                storeScheduleService.findAllForEvaluation(stores, now);
         return stores.stream()
                 .map(store -> toResponse(
                         store,
                         tagsByStore.getOrDefault(store.getId(), List.of()),
                         latitude,
-                        longitude
+                        longitude,
+                        schedules.get(store.getId())
                 ))
                 .filter(response -> radiusKm == null
                         || response.distanceMeters() != null
@@ -60,18 +68,21 @@ public class PublicStoreQueryService {
 
     @Transactional(readOnly = true)
     public PublicStoreResponse findDetail(Long storeId) {
-        Store store = storeRepository.findByIdAndStatusAndBusinessStatus(
+        Store store = storeRepository.findByIdAndStatusAndBusinessStatusIn(
                         storeId,
                         StoreStatus.ACTIVE,
-                        BusinessStatus.OPEN
+                        DISCOVERABLE_BUSINESS_STATUSES
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
+        StoreScheduleResponse schedule = storeScheduleService.find(store);
         List<String> tags = storeTagRepository.findAllByStoreId(storeId)
                 .stream()
                 .map(storeTag -> storeTag.getTag().getName())
                 .sorted()
                 .toList();
-        return PublicStoreResponse.of(store, tags, null);
+        return PublicStoreResponse.of(
+                store, tags, null, schedule
+        );
     }
 
     private Map<Long, List<String>> findTags(List<Store> stores) {
@@ -97,7 +108,8 @@ public class PublicStoreQueryService {
             Store store,
             List<String> tags,
             BigDecimal latitude,
-            BigDecimal longitude
+            BigDecimal longitude,
+            StoreScheduleResponse schedule
     ) {
         Long distance = null;
         if (latitude != null && store.getLatitude() != null
@@ -109,7 +121,9 @@ public class PublicStoreQueryService {
                     store.getLongitude().doubleValue()
             ));
         }
-        return PublicStoreResponse.of(store, tags, distance);
+        return PublicStoreResponse.of(
+                store, tags, distance, schedule
+        );
     }
 
     private void validateLocation(

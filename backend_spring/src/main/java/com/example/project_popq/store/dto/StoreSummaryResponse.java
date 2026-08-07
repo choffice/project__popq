@@ -30,14 +30,17 @@ public record StoreSummaryResponse(
         boolean takeoutAvailable,
         boolean dineInAvailable,
         boolean orderAcceptingEnabled,
+        Integer defaultPreparationMinutes,
         StoreStatus status,
         BusinessStatus businessStatus,
-        StoreRole myRole
+        StoreRole myRole,
+        StoreScheduleResponse schedule
 ) {
 
     public static StoreSummaryResponse of(
             Store store,
-            StoreRole myRole
+            StoreRole myRole,
+            StoreScheduleResponse schedule
     ) {
         return new StoreSummaryResponse(
                 store.getId(),
@@ -57,9 +60,11 @@ public record StoreSummaryResponse(
                 store.isTakeoutAvailable(),
                 store.isDineInAvailable(),
                 store.isOrderAcceptingEnabled(),
+                store.getDefaultPreparationMinutes(),
                 store.getStatus(),
                 store.getBusinessStatus(),
-                myRole
+                myRole,
+                schedule
         );
     }
 

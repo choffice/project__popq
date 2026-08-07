@@ -11,6 +11,10 @@ class CustomerOrder {
     required this.totalAmount,
     required this.version,
     required this.items,
+    this.createdAt,
+    this.acceptedAt,
+    this.preparationMinutes,
+    this.estimatedReadyAt,
   });
 
   factory CustomerOrder.fromJson(Map<String, Object?> json) {
@@ -21,6 +25,10 @@ class CustomerOrder {
       status: json['status'] as String,
       totalAmount: (json['totalAmount'] as num).toInt(),
       version: (json['version'] as num).toInt(),
+      createdAt: _dateTime(json['createdAt']),
+      acceptedAt: _dateTime(json['acceptedAt']),
+      preparationMinutes: (json['preparationMinutes'] as num?)?.toInt(),
+      estimatedReadyAt: _dateTime(json['estimatedReadyAt']),
       items: (json['items'] as List<Object?>? ?? const [])
           .map(
             (item) => CustomerOrderItem.fromJson(
@@ -38,6 +46,14 @@ class CustomerOrder {
   final int totalAmount;
   final int version;
   final List<CustomerOrderItem> items;
+  final DateTime? createdAt;
+  final DateTime? acceptedAt;
+  final int? preparationMinutes;
+  final DateTime? estimatedReadyAt;
+
+  static DateTime? _dateTime(Object? value) {
+    return value is String ? DateTime.tryParse(value) : null;
+  }
 }
 
 class CustomerOrderItem {

@@ -1,5 +1,42 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+import 'seller_business_schedule.dart';
+
+class SellerDashboardSummary {
+  const SellerDashboardSummary({
+    required this.storeId,
+    required this.storeName,
+    required this.businessStatus,
+    required this.waitingOrderCount,
+    required this.activeOrderCount,
+    required this.readyOrderCount,
+    required this.unansweredReviewCount,
+    required this.unreadChatCount,
+  });
+
+  factory SellerDashboardSummary.fromJson(Map<String, Object?> json) {
+    return SellerDashboardSummary(
+      storeId: (json['storeId'] as num).toInt(),
+      storeName: json['storeName'] as String,
+      businessStatus: json['businessStatus'] as String,
+      waitingOrderCount: (json['waitingOrderCount'] as num).toInt(),
+      activeOrderCount: (json['activeOrderCount'] as num).toInt(),
+      readyOrderCount: (json['readyOrderCount'] as num).toInt(),
+      unansweredReviewCount: (json['unansweredReviewCount'] as num).toInt(),
+      unreadChatCount: (json['unreadChatCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final int storeId;
+  final String storeName;
+  final String businessStatus;
+  final int waitingOrderCount;
+  final int activeOrderCount;
+  final int readyOrderCount;
+  final int unansweredReviewCount;
+  final int unreadChatCount;
+}
+
 class SellerStore {
   const SellerStore({
     required this.storeId,
@@ -22,7 +59,9 @@ class SellerStore {
     this.takeoutAvailable = true,
     this.dineInAvailable = true,
     this.orderAcceptingEnabled = true,
+    this.defaultPreparationMinutes,
     this.tags = const [],
+    this.schedule,
   });
 
   factory SellerStore.fromJson(Map<String, Object?> json) {
@@ -50,8 +89,16 @@ class SellerStore {
       json['dineInAvailable'] as bool? ?? true,
       orderAcceptingEnabled:
       json['orderAcceptingEnabled'] as bool? ?? true,
+      defaultPreparationMinutes:
+      (json['defaultPreparationMinutes'] as num?)?.toInt(),
       tags: _readStringList(
         json['tags'],
+      ),
+      schedule: SellerBusinessSchedule.fromJson(
+        json['schedule'],
+        legacyOpenTime: json['openTime'] as String?,
+        legacyCloseTime: json['closeTime'] as String?,
+        legacyClosedDays: _readStringList(json['closedDays']),
       ),
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
@@ -76,7 +123,9 @@ class SellerStore {
   final bool takeoutAvailable;
   final bool dineInAvailable;
   final bool orderAcceptingEnabled;
+  final int? defaultPreparationMinutes;
   final List<String> tags;
+  final SellerBusinessSchedule? schedule;
   final String status;
   final String businessStatus;
   final String myRole;
@@ -98,8 +147,11 @@ class SellerStore {
     bool? takeoutAvailable,
     bool? dineInAvailable,
     bool? orderAcceptingEnabled,
+    int? defaultPreparationMinutes,
     List<String>? tags,
     String? businessStatus,
+    String? status,
+    SellerBusinessSchedule? schedule,
   }) {
     return SellerStore(
       storeId: storeId,
@@ -126,11 +178,14 @@ class SellerStore {
       orderAcceptingEnabled:
       orderAcceptingEnabled ??
           this.orderAcceptingEnabled,
+      defaultPreparationMinutes:
+      defaultPreparationMinutes ?? this.defaultPreparationMinutes,
       tags: tags ?? this.tags,
-      status: status,
+      status: status ?? this.status,
       businessStatus:
       businessStatus ?? this.businessStatus,
       myRole: myRole,
+      schedule: schedule ?? this.schedule,
     );
   }
 }
@@ -410,6 +465,10 @@ class SellerReverseGeocodeResult {
 abstract interface class SellerStoreRepository {
   Future<List<SellerStore>> findAll();
 
+  Future<List<SellerStore>> findInactive();
+
+  Future<List<SellerDashboardSummary>> findDashboardSummaries();
+
   Future<List<SellerAddressSearchResult>>
   searchAddresses(
       String query,
@@ -454,12 +513,17 @@ abstract interface class SellerStoreRepository {
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   });
 
   Future<SellerStore> changeBusinessStatus(
       int storeId,
       String status,
       );
+
+  Future<SellerStore> suspend(int storeId);
+
+  Future<SellerStore> reopen(int storeId);
 
   Future<SellerStore> update(
       int storeId, {
@@ -480,6 +544,7 @@ abstract interface class SellerStoreRepository {
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       });
 
   Future<void> delete(
@@ -511,6 +576,34 @@ class ApiSellerStoreRepository
         )
             .toList();
       },
+    );
+  }
+
+  @override
+  Future<List<SellerStore>> findInactive() {
+    return _apiClient.get(
+      '/api/v1/seller/stores/inactive',
+      decode: (Object? value) => (value as List<Object?>)
+          .map(
+            (item) => SellerStore.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<List<SellerDashboardSummary>> findDashboardSummaries() {
+    return _apiClient.get(
+      '/api/v1/seller/stores/dashboard-summary',
+      decode: (value) => (value as List<Object?>)
+          .map(
+            (item) => SellerDashboardSummary.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
     );
   }
 
@@ -701,6 +794,7 @@ class ApiSellerStoreRepository
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   }) {
     return _apiClient.post(
       '/api/v1/seller/stores',
@@ -724,6 +818,7 @@ class ApiSellerStoreRepository
         'orderAcceptingEnabled':
         orderAcceptingEnabled,
         'tags': tags,
+        'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
         return SellerStore.fromJson(
@@ -757,6 +852,26 @@ class ApiSellerStoreRepository
   }
 
   @override
+  Future<SellerStore> suspend(int storeId) {
+    return _apiClient.post(
+      '/api/v1/seller/stores/$storeId/suspend',
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerStore> reopen(int storeId) {
+    return _apiClient.post(
+      '/api/v1/seller/stores/$storeId/reopen',
+      decode: (value) => SellerStore.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
   Future<SellerStore> update(
       int storeId, {
         String? storeType,
@@ -776,6 +891,7 @@ class ApiSellerStoreRepository
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       }) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
@@ -799,6 +915,7 @@ class ApiSellerStoreRepository
         'orderAcceptingEnabled':
         orderAcceptingEnabled,
         'tags': tags,
+        'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
         return SellerStore.fromJson(
@@ -856,8 +973,34 @@ class MemorySellerStoreRepository
   @override
   Future<List<SellerStore>> findAll() async {
     return List<SellerStore>.unmodifiable(
-      _stores,
+      _stores.where((store) => store.status == 'ACTIVE'),
     );
+  }
+
+  @override
+  Future<List<SellerStore>> findInactive() async {
+    return List<SellerStore>.unmodifiable(
+      _stores.where((store) => store.status != 'ACTIVE'),
+    );
+  }
+
+  @override
+  Future<List<SellerDashboardSummary>> findDashboardSummaries() async {
+    return _stores
+        .where((store) => store.status == 'ACTIVE')
+        .map(
+          (store) => SellerDashboardSummary(
+            storeId: store.storeId,
+            storeName: store.name,
+            businessStatus: store.businessStatus,
+            waitingOrderCount: 0,
+            activeOrderCount: 0,
+            readyOrderCount: 0,
+            unansweredReviewCount: 0,
+            unreadChatCount: 0,
+          ),
+        )
+        .toList();
   }
 
   @override
@@ -983,6 +1126,7 @@ class MemorySellerStoreRepository
     bool dineInAvailable = true,
     bool orderAcceptingEnabled = true,
     List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
   }) async {
     final int nextStoreId = _stores.isEmpty
         ? 1
@@ -1026,6 +1170,7 @@ class MemorySellerStoreRepository
       status: 'ACTIVE',
       businessStatus: 'PRE_OPEN',
       myRole: 'OWNER',
+      schedule: schedule,
     );
 
     _stores.add(store);
@@ -1070,6 +1215,34 @@ class MemorySellerStoreRepository
   }
 
   @override
+  Future<SellerStore> suspend(int storeId) async {
+    final index = _stores.indexWhere((store) => store.storeId == storeId);
+    if (index < 0 || _stores[index].myRole != 'OWNER') {
+      throw StateError('store owner role is required');
+    }
+    final updated = _stores[index].copyWith(
+      status: 'SUSPENDED',
+      businessStatus: 'PRE_OPEN',
+    );
+    _stores[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<SellerStore> reopen(int storeId) async {
+    final index = _stores.indexWhere((store) => store.storeId == storeId);
+    if (index < 0 || _stores[index].myRole != 'OWNER') {
+      throw StateError('store owner role is required');
+    }
+    final updated = _stores[index].copyWith(
+      status: 'ACTIVE',
+      businessStatus: 'PRE_OPEN',
+    );
+    _stores[index] = updated;
+    return updated;
+  }
+
+  @override
   Future<SellerStore> update(
       int storeId, {
         String? storeType,
@@ -1089,6 +1262,7 @@ class MemorySellerStoreRepository
         bool? dineInAvailable,
         bool? orderAcceptingEnabled,
         List<String> tags = const [],
+        SellerBusinessSchedule? schedule,
       }) async {
     final int index = _stores.indexWhere(
           (SellerStore store) {
@@ -1154,6 +1328,7 @@ class MemorySellerStoreRepository
       businessStatus:
       store.businessStatus,
       myRole: store.myRole,
+      schedule: schedule ?? store.schedule,
     );
 
     _stores[index] = updated;
@@ -1185,7 +1360,11 @@ class MemorySellerStoreRepository
       );
     }
 
-    _stores.removeAt(index);
+    _stores[index] = store.copyWith(
+      status: 'CLOSED',
+      businessStatus: 'CLOSED',
+      orderAcceptingEnabled: false,
+    );
   }
 }
 

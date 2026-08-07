@@ -1,6 +1,7 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
 import '../permissions/customer_permission_gateway.dart';
+import 'customer_store_schedule.dart';
 
 class CustomerStore {
   const CustomerStore({
@@ -24,6 +25,7 @@ class CustomerStore {
     this.dineInAvailable = true,
     this.orderAcceptingEnabled = true,
     this.distanceMeters,
+    this.schedule,
   });
 
   factory CustomerStore.fromJson(
@@ -59,6 +61,14 @@ class CustomerStore {
           .whereType<String>()
           .toList(),
       distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
+      schedule: CustomerStoreSchedule.fromJson(
+        json['schedule'],
+        legacyOpenTime: json['openTime'] as String?,
+        legacyCloseTime: json['closeTime'] as String?,
+        legacyClosedDays: (json['closedDays'] as List<Object?>? ?? const [])
+            .whereType<String>()
+            .toList(growable: false),
+      ),
     );
   }
 
@@ -82,6 +92,14 @@ class CustomerStore {
   final bool orderAcceptingEnabled;
   final List<String> tags;
   final int? distanceMeters;
+  final CustomerStoreSchedule? schedule;
+
+  CustomerStoreSchedule get resolvedSchedule =>
+      schedule ?? CustomerStoreSchedule.legacy(
+        openTime: openTime,
+        closeTime: closeTime,
+        closedDays: closedDays,
+      );
 
   String get fullAddress {
     return <String?>[address, detailAddress]

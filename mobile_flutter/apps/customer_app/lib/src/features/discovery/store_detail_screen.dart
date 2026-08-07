@@ -73,6 +73,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
             );
           }
           final store = snapshot.requireData;
+          final schedule = store.resolvedSchedule;
           return ListView(
             padding: const EdgeInsets.all(PopqSpacing.lg),
             children: [
@@ -111,9 +112,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
               ],
               if (store.fullAddress.isNotEmpty ||
                   store.phone?.trim().isNotEmpty == true ||
-                  store.openTime != null ||
-                  store.closeTime != null ||
-                  store.closedDays.isNotEmpty) ...[
+                  schedule.businessHours.isNotEmpty) ...[
                 const SizedBox(height: PopqSpacing.lg),
                 Card(
                   child: Column(
@@ -133,26 +132,36 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                           subtitle: Text(store.phone!),
                         ),
                       ],
-                      if (store.openTime != null || store.closeTime != null) ...[
-                        if (store.fullAddress.isNotEmpty ||
-                            store.phone?.trim().isNotEmpty == true)
-                          const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.schedule_outlined),
-                          title: const Text('영업시간'),
-                          subtitle: Text(_businessHoursLabel(store)),
-                        ),
-                      ],
-                      if (store.closedDays.isNotEmpty ||
-                          store.openTime != null ||
-                          store.closeTime != null) ...[
+                      if (store.fullAddress.isNotEmpty ||
+                          store.phone?.trim().isNotEmpty == true)
                         const Divider(height: 1),
-                        ListTile(
-                          leading: const Icon(Icons.event_busy_outlined),
-                          title: const Text('정기 휴무일'),
-                          subtitle: Text(_closedDaysLabel(store.closedDays)),
+                      ListTile(
+                        leading: const Icon(Icons.today_outlined),
+                        title: const Text('오늘 영업시간'),
+                        subtitle: Text(schedule.todayLabel()),
+                      ),
+                      const Divider(height: 1),
+                      ExpansionTile(
+                        leading: const Icon(Icons.schedule_outlined),
+                        title: const Text('전체 영업시간'),
+                        childrenPadding: const EdgeInsets.fromLTRB(
+                          PopqSpacing.lg,
+                          0,
+                          PopqSpacing.lg,
+                          PopqSpacing.md,
                         ),
-                      ],
+                        children: schedule.summaryLines()
+                            .map((line) => Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(
+                                      bottom: PopqSpacing.xs,
+                                    ),
+                                    child: Text(line),
+                                  ),
+                                ))
+                            .toList(growable: false),
+                      ),
                     ],
                   ),
                 ),
@@ -183,7 +192,8 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                           ),
                           _AvailabilityChip(
                             label: '주문 접수',
-                            available: store.orderAcceptingEnabled,
+                            available: store.businessStatus == 'OPEN' &&
+                                store.orderAcceptingEnabled,
                           ),
                         ],
                       ),
@@ -339,46 +349,6 @@ String _businessStatusLabel(String status) {
   };
 }
 
-String _businessHoursLabel(CustomerStore store) {
-  final String? openTime = _displayTime(store.openTime);
-  final String? closeTime = _displayTime(store.closeTime);
-  if (openTime == null || closeTime == null) {
-    return '영업시간 정보 없음';
-  }
-  return '$openTime ~ $closeTime';
-}
-
-String? _displayTime(String? value) {
-  if (value == null || value.trim().isEmpty) {
-    return null;
-  }
-  final List<String> parts = value.split(':');
-  if (parts.length < 2) {
-    return value;
-  }
-  return '${parts[0].padLeft(2, '0')}:${parts[1].padLeft(2, '0')}';
-}
-
-String _closedDaysLabel(List<String> days) {
-  if (days.isEmpty) {
-    return '정기 휴무 없음';
-  }
-  return days.map(_dayLabel).join(', ');
-}
-
-String _dayLabel(String day) {
-  return switch (day) {
-    'MONDAY' => '월요일',
-    'TUESDAY' => '화요일',
-    'WEDNESDAY' => '수요일',
-    'THURSDAY' => '목요일',
-    'FRIDAY' => '금요일',
-    'SATURDAY' => '토요일',
-    'SUNDAY' => '일요일',
-    _ => day,
-  };
-}
-
 class _StoreReviewSection extends StatelessWidget {
   const _StoreReviewSection({required this.reviews});
 
@@ -418,9 +388,24 @@ class _StoreReviewSection extends StatelessWidget {
                       Text(List.filled(review.rating, '★').join()),
                     ],
                   ),
-                  subtitle: review.content == null
-                      ? null
-                      : Text(review.content!),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (review.content != null) Text(review.content!),
+                      if (review.sellerReply?.isNotEmpty ?? false) ...[
+                        const SizedBox(height: PopqSpacing.sm),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(PopqSpacing.sm),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text('사장님 답글\n${review.sellerReply!}'),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
           ],

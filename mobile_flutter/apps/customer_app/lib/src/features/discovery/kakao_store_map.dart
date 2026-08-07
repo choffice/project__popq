@@ -439,6 +439,7 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
             'storeId': store.storeId,
             'name': store.name,
             'storeType': store.storeType,
+            'businessStatus': store.businessStatus,
             'latitude': store.latitude,
             'longitude': store.longitude,
             'favorite': widget.favoriteStoreIds.contains(store.storeId),
@@ -540,6 +541,25 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
   background: #b7ff00;
   color: #08110e;
   transform: scale(1.06);
+}
+
+.store-label.pre-open {
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  background: #858c88;
+  color: rgba(255, 255, 255, 0.82);
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.14);
+  filter: saturate(0.38);
+  opacity: 0.76;
+}
+
+.store-label.pre-open.selected {
+  border-color: rgba(8, 17, 14, 0.16);
+  background: #d9e6c0;
+  color: #465044;
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.18);
+  opacity: 0.94;
 }
 
 .store-type-icon {
@@ -672,10 +692,19 @@ class _KakaoStoreMapState extends State<KakaoStoreMap> {
 
         button.type = 'button';
 
+        const markerClasses =
+          ['store-label'];
+
+        if (store.businessStatus === 'PRE_OPEN') {
+          markerClasses.push('pre-open');
+        }
+
+        if (store.storeId === selectedStoreId) {
+          markerClasses.push('selected');
+        }
+
         button.className =
-          store.storeId === selectedStoreId
-            ? 'store-label selected'
-            : 'store-label';
+          markerClasses.join(' ');
 
         const typeIcon =
   document.createElement('span');
@@ -1217,6 +1246,7 @@ window.focusStoreLocation =
               store.storeId,
               store.name,
               store.storeType,
+              store.businessStatus,
               store.latitude,
               store.longitude,
             ],
