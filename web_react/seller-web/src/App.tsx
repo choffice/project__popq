@@ -5,6 +5,7 @@ import {
   getSellerPaymentSummary,
   getSellerOrders,
   getSellerStores,
+  getSellerUnreadConversationCount,
   refundSellerOrder,
   transitionSellerOrder,
 } from './services/api'
@@ -15,7 +16,9 @@ import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
+import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
 import { SellerAuth } from './features/auth/SellerAuth'
+import { MessageManagement } from './features/messages/MessageManagement'
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -32,6 +35,8 @@ type SellerView =
   | 'products'
   | 'qr'
   | 'analytics'
+  | 'announcements'
+  | 'messages'
   | 'settings'
   | 'admin'
 type TransitionAction =
@@ -125,6 +130,8 @@ const VIEW_COPY: Record<
   products: { eyebrow: 'CATALOG CONTROL', title: '상품 관리' },
   qr: { eyebrow: 'TABLE ACCESS', title: 'QR 관리' },
   analytics: { eyebrow: 'SALES PULSE', title: '매출 분석' },
+  announcements: { eyebrow: 'STORE ANNOUNCEMENTS', title: '공지사항' },
+  messages: { eyebrow: 'CUSTOMER CONVERSATIONS', title: '고객 문의' },
   settings: { eyebrow: 'STORE OPERATIONS', title: '스토어 설정' },
   admin: { eyebrow: 'PLATFORM CONTROL', title: '관리자 운영' },
 }
@@ -232,11 +239,19 @@ function App() {
   const [accountStores, setAccountStores] = useState<StoreSummary[]>([])
   const [accountStoresLoading, setAccountStoresLoading] = useState(false)
   const [accountStoresError, setAccountStoresError] = useState<string | null>(null)
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   const seenEvents = useRef(new Set<string>())
   const accountRequestId = useRef(0)
   const activeConnectionScope = useRef(connectionScope(connection))
   const isDemo = authenticated && !connection
   const isAdmin = connection?.user?.role === 'ADMIN'
+  const resolvedStoreRole =
+    connection?.storeRole ??
+    accountStores.find((store) => store.storeId === connection?.storeId)?.myRole
+  const canManageStore =
+    isDemo ||
+    resolvedStoreRole === 'OWNER' ||
+    resolvedStoreRole === 'MANAGER'
   const storeScopeKey = isDemo ? 'demo' : `store-${connection?.storeId ?? 'none'}`
 
   const loadOrders = useCallback(async () => {
@@ -293,6 +308,53 @@ function App() {
       disconnect()
     }
   }, [connection, loadOrders])
+
+  useEffect(() => {
+    if (!connection || isAdmin) {
+      return
+    }
+    let active = true
+    const refreshAccount = async () => {
+      try {
+        const [stores, unread] = await Promise.all([
+          getSellerStores(connection),
+          getSellerUnreadConversationCount(connection),
+        ])
+        if (!active) return
+        setUnreadMessageCount(unread)
+        setAccountStores(stores)
+        const currentStore = stores.find(
+          (store) => store.storeId === connection.storeId,
+        )
+        if (
+          currentStore &&
+          (connection.storeRole !== currentStore.myRole ||
+            connection.storeName !== currentStore.name)
+        ) {
+          const next = {
+            ...connection,
+            storeName: currentStore.name,
+            storeRole: currentStore.myRole,
+          }
+          window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
+        }
+      } catch {
+        // Feature screens surface request failures when the user opens them.
+      }
+    }
+    void refreshAccount()
+    const timer = window.setInterval(() => {
+      void getSellerUnreadConversationCount(connection)
+        .then((count) => {
+          if (active) setUnreadMessageCount(count)
+        })
+        .catch(() => undefined)
+    }, 30_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [connection, isAdmin])
 
   function openAccount() {
     setShowConnection(true)
@@ -439,8 +501,16 @@ function App() {
     }
   }
 
-  async function refundOrder(order: SellerOrder, reason: string) {
-    if (!paymentSummary || paymentSummary.refundableAmount <= 0) return
+  async function refundOrder(
+    order: SellerOrder,
+    amount: number,
+    reason: string,
+  ) {
+    if (
+      !paymentSummary ||
+      amount <= 0 ||
+      amount > paymentSummary.refundableAmount
+    ) return
     setProcessing(true)
     try {
       let updated: SellerPaymentSummary
@@ -448,14 +518,17 @@ function App() {
         const completedAt = new Date().toISOString()
         updated = {
           ...paymentSummary,
-          paymentStatus: 'REFUNDED',
-          refundedAmount: paymentSummary.approvedAmount,
-          refundableAmount: 0,
+          paymentStatus:
+            amount === paymentSummary.refundableAmount
+              ? 'REFUNDED'
+              : 'PARTIALLY_REFUNDED',
+          refundedAmount: paymentSummary.refundedAmount + amount,
+          refundableAmount: paymentSummary.refundableAmount - amount,
           refunds: [
             ...paymentSummary.refunds,
             {
               refundId: paymentSummary.refunds.length + 1,
-              amount: paymentSummary.approvedAmount,
+              amount,
               reason,
               requesterType: 'SELLER',
               status: 'SUCCEEDED',
@@ -470,13 +543,22 @@ function App() {
         updated = await refundSellerOrder(
           connection!,
           order.orderPublicId,
-          paymentSummary.refundableAmount,
+          amount,
           reason,
         )
       }
       setPaymentSummary(updated)
       setError(null)
     } catch (caught) {
+      if (connection) {
+        try {
+          setPaymentSummary(
+            await getSellerPaymentSummary(connection, order.orderPublicId),
+          )
+        } catch {
+          // Preserve the original refund error if recovery refresh also fails.
+        }
+      }
       setError(
         caught instanceof Error
           ? caught.message
@@ -500,6 +582,7 @@ function App() {
     setOrders([])
     setSelectedId(null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
@@ -515,6 +598,7 @@ function App() {
     setOrders(demo)
     setSelectedId(demo[0]?.orderPublicId ?? null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
@@ -529,6 +613,7 @@ function App() {
     setOrders([])
     setSelectedId(null)
     setConnected(false)
+    setUnreadMessageCount(0)
     setError(null)
     setShowConnection(false)
   }
@@ -539,6 +624,7 @@ function App() {
       ...connection,
       storeId: store.storeId,
       storeName: store.name,
+      storeRole: store.myRole,
     }
     window.sessionStorage.setItem(
       CONNECTION_KEY,
@@ -554,11 +640,30 @@ function App() {
     setPaymentLoading(false)
     setProcessing(false)
     setConnected(false)
+    setUnreadMessageCount(0)
     setLoading(true)
     setBusinessStatus(store.businessStatus)
     setError(null)
     setShowConnection(false)
   }
+
+  const updateCurrentStore = useCallback((store: StoreSummary) => {
+    setConnection((current) => {
+      if (!current || current.storeId !== store.storeId) return current
+      if (
+        current.storeName === store.name &&
+        current.storeRole === store.myRole
+      ) return current
+      const next = {
+        ...current,
+        storeName: store.name,
+        storeRole: store.myRole,
+      }
+      window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
+      return next
+    })
+    setBusinessStatus(store.businessStatus)
+  }, [])
 
   if (!authenticated) {
     return (
@@ -626,6 +731,21 @@ function App() {
               >
                 <span>↗</span>
                 매출 분석
+              </button>
+              <button
+                className={activeView === 'announcements' ? 'active' : ''}
+                onClick={() => setActiveView('announcements')}
+              >
+                <span>📢</span>
+                공지사항
+              </button>
+              <button
+                className={activeView === 'messages' ? 'active' : ''}
+                onClick={() => setActiveView('messages')}
+              >
+                <span>💬</span>
+                고객 문의
+                {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
               </button>
               <button
                 className={activeView === 'settings' ? 'active' : ''}
@@ -855,6 +975,7 @@ function App() {
           <ProductManagement
             key={storeScopeKey}
             connection={connection}
+            storeRole={resolvedStoreRole}
             onError={setError}
           />
         )}
@@ -862,6 +983,7 @@ function App() {
           <QrManagement
             key={storeScopeKey}
             connection={connection}
+            storeRole={resolvedStoreRole}
             onError={setError}
           />
         )}
@@ -878,6 +1000,28 @@ function App() {
             connection={connection}
             onError={setError}
             onBusinessStatusChange={setBusinessStatus}
+            onStoreSelected={switchStore}
+            onStoreUpdated={updateCurrentStore}
+            onStoreDeleted={(remaining) => {
+              if (remaining.length > 0) switchStore(remaining[0])
+              else signOut()
+            }}
+          />
+        )}
+        {activeView === 'announcements' && (
+          <AnnouncementManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {activeView === 'messages' && (
+          <MessageManagement
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+            onUnreadChange={setUnreadMessageCount}
           />
         )}
         {isAdmin && activeView === 'admin' && (
@@ -899,7 +1043,10 @@ function App() {
             paymentSummary={paymentSummary}
             onClose={() => setSelectedId(null)}
             onAction={(action) => void changeStatus(selectedOrder, action)}
-            onRefund={(reason) => void refundOrder(selectedOrder, reason)}
+            canRefund={canManageStore}
+            onRefund={(amount, reason) =>
+              void refundOrder(selectedOrder, amount, reason)
+            }
           />
         )}
       </aside>
@@ -1039,6 +1186,7 @@ function OrderDetail({
   processing,
   paymentLoading,
   paymentSummary,
+  canRefund: canIssueRefund,
   onClose,
   onAction,
   onRefund,
@@ -1047,20 +1195,26 @@ function OrderDetail({
   processing: boolean
   paymentLoading: boolean
   paymentSummary: SellerPaymentSummary | null
+  canRefund: boolean
   onClose: () => void
   onAction: (action: TransitionAction) => void
-  onRefund: (reason: string) => void
+  onRefund: (amount: number, reason: string) => void
 }) {
   const [showRefundForm, setShowRefundForm] = useState(false)
   const [refundReason, setRefundReason] = useState('')
+  const [refundAmount, setRefundAmount] = useState('')
   const actions = ACTIONS[order.status]
   const canRefund =
+    canIssueRefund &&
     order.status === 'COMPLETED' &&
-    paymentSummary?.paymentStatus === 'PAID' &&
+    (paymentSummary?.paymentStatus === 'PAID' ||
+      paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED') &&
     paymentSummary.refundableAmount > 0
   const paymentStatus =
     paymentSummary?.paymentStatus === 'REFUNDED'
       ? '환불 완료'
+      : paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED'
+        ? '부분 환불'
       : paymentSummary?.paymentStatus === 'CANCELED'
         ? '결제 취소'
         : paymentSummary?.paymentStatus === 'PAID'
@@ -1170,6 +1324,18 @@ function OrderDetail({
                             : '처리 중'}
                       </span>
                     </p>
+                    {refund.status === 'FAILED' && (
+                      <div className="refund-failure-recovery">
+                        <small>{refund.failureMessage ?? '환불 처리에 실패했습니다.'}</small>
+                        {canRefund && (
+                          <button onClick={() => {
+                            setRefundAmount(String(Math.min(refund.amount, paymentSummary.refundableAmount)))
+                            setRefundReason(refund.reason)
+                            setShowRefundForm(true)
+                          }}>같은 내용으로 다시 시도</button>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -1177,13 +1343,27 @@ function OrderDetail({
             {canRefund && !showRefundForm && (
               <button
                 className="refund-open"
-                onClick={() => setShowRefundForm(true)}
+                onClick={() => {
+                  setRefundAmount(String(paymentSummary.refundableAmount))
+                  setShowRefundForm(true)
+                }}
               >
                 전액 환불
               </button>
             )}
             {canRefund && showRefundForm && (
               <div className="refund-form">
+                <label>
+                  환불 금액
+                  <input
+                    type="number"
+                    min={1}
+                    max={paymentSummary.refundableAmount}
+                    value={refundAmount}
+                    onChange={(event) => setRefundAmount(event.target.value)}
+                  />
+                  <small>환불 가능 {money(paymentSummary.refundableAmount)}</small>
+                </label>
                 <label>
                   환불 사유
                   <textarea
@@ -1193,10 +1373,7 @@ function OrderDetail({
                     onChange={(event) => setRefundReason(event.target.value)}
                   />
                 </label>
-                <p>
-                  {money(paymentSummary.refundableAmount)} 전액이 환불되며
-                  되돌릴 수 없습니다.
-                </p>
+                <p>입력한 금액만 환불됩니다. 승인 후에는 되돌릴 수 없습니다.</p>
                 <div>
                   <button
                     className="secondary-action"
@@ -1206,10 +1383,19 @@ function OrderDetail({
                   </button>
                   <button
                     className="refund-confirm"
-                    disabled={processing || !refundReason.trim()}
-                    onClick={() => onRefund(refundReason.trim())}
+                    disabled={
+                      processing ||
+                      !refundReason.trim() ||
+                      Number(refundAmount) <= 0 ||
+                      Number(refundAmount) > paymentSummary.refundableAmount
+                    }
+                    onClick={() => onRefund(Number(refundAmount), refundReason.trim())}
                   >
-                    {processing ? '환불 처리 중…' : '전액 환불 확정'}
+                    {processing
+                      ? '환불 처리 중…'
+                      : Number(refundAmount) === paymentSummary.refundableAmount
+                        ? '전액 환불 확정'
+                        : `${money(Number(refundAmount) || 0)} 부분 환불 확정`}
                   </button>
                 </div>
               </div>

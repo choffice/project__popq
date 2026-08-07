@@ -155,6 +155,11 @@ public class Payment extends BaseTimeEntity {
         this.status = PaymentStatus.REFUNDED;
     }
 
+    public void markPartiallyRefunded() {
+        this.canceledAt = null;
+        this.status = PaymentStatus.PARTIALLY_REFUNDED;
+    }
+
     public void addTransaction(PaymentTransaction transaction) {
         transactions.add(transaction);
     }

@@ -23,10 +23,12 @@ import type {
   SellerCategory,
   SellerConnection,
   SellerProduct,
+  StoreRole,
 } from '../../types'
 
 type Props = {
   connection: SellerConnection | null
+  storeRole?: StoreRole
   onError: (message: string | null) => void
 }
 
@@ -92,8 +94,9 @@ function toDraftGroups(detail: ProductDetail): DraftGroup[] {
   }))
 }
 
-export function ProductManagement({ connection, onError }: Props) {
+export function ProductManagement({ connection, storeRole, onError }: Props) {
   const isDemo = !connection
+  const canManage = isDemo || storeRole === 'OWNER' || storeRole === 'MANAGER'
   const [products, setProducts] = useState<SellerProduct[]>(() =>
     isDemo ? freshDemoProducts() : [],
   )
@@ -581,10 +584,12 @@ export function ProductManagement({ connection, onError }: Props) {
             <strong>{hiddenCount}</strong>
           </article>
         </div>
-        <button className="hero-action" onClick={openNewProductForm}>
+        {canManage && <button className="hero-action" onClick={openNewProductForm}>
           + 새 상품
-        </button>
+        </button>}
       </section>
+
+      {!canManage && <p className="permission-notice">STAFF 권한은 상품을 조회할 수 있지만 상품·옵션·판매 채널을 변경할 수 없습니다.</p>}
 
       <section className="catalog-toolbar">
         <div className="category-pills" aria-label="상품 카테고리">
@@ -597,12 +602,12 @@ export function ProductManagement({ connection, onError }: Props) {
               {item}
             </button>
           ))}
-          <button
+          {canManage && <button
             className="add-category"
             onClick={() => setShowCategoryForm(true)}
           >
             + 카테고리
-          </button>
+          </button>}
         </div>
         <label className="search-field">
           <span>⌕</span>
@@ -655,7 +660,7 @@ export function ProductManagement({ connection, onError }: Props) {
                 role="switch"
                 aria-checked={!product.soldOut}
                 aria-label={`${product.name} 품절 설정`}
-                disabled={updatingId === product.productId}
+                disabled={!canManage || updatingId === product.productId}
                 onClick={() =>
                   void update(product, { soldOut: !product.soldOut })
                 }
@@ -668,7 +673,7 @@ export function ProductManagement({ connection, onError }: Props) {
                 role="switch"
                 aria-checked={product.qrWebEnabled}
                 aria-label={`${product.name} QR 판매 설정`}
-                disabled={updatingId === product.productId}
+                disabled={!canManage || updatingId === product.productId}
                 onClick={() =>
                   void update(product, {
                     qrWebEnabled: !product.qrWebEnabled,
@@ -682,7 +687,7 @@ export function ProductManagement({ connection, onError }: Props) {
                 role="switch"
                 aria-checked={product.customerAppEnabled}
                 aria-label={`${product.name} 고객 앱 판매 설정`}
-                disabled={updatingId === product.productId}
+                disabled={!canManage || updatingId === product.productId}
                 onClick={() =>
                   void update(product, {
                     customerAppEnabled: !product.customerAppEnabled,
@@ -692,7 +697,7 @@ export function ProductManagement({ connection, onError }: Props) {
                 <span />
               </button>
               <div className="product-actions">
-                <button
+                {canManage ? <><button
                   className="product-edit-button"
                   aria-label={`${product.name} 상품 편집`}
                   disabled={updatingId === product.productId}
@@ -706,7 +711,7 @@ export function ProductManagement({ connection, onError }: Props) {
                   onClick={() => void openOptionEditor(product)}
                 >
                   옵션 편집
-                </button>
+                </button></> : <span>조회 전용</span>}
               </div>
             </article>
           ))}

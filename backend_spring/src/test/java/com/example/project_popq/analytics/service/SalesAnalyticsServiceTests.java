@@ -13,6 +13,7 @@ import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.domain.OrderStatusHistory;
 import com.example.project_popq.order.domain.OrderType;
 import com.example.project_popq.order.repository.OrderRepository;
+import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
@@ -25,8 +26,11 @@ class SalesAnalyticsServiceTests {
     private final OrderRepository orderRepository = mock(OrderRepository.class);
     private final StoreAuthorizationService authorizationService =
             mock(StoreAuthorizationService.class);
+    private final PaymentRepository paymentRepository =
+            mock(PaymentRepository.class);
     private final SalesAnalyticsService service = new SalesAnalyticsService(
             orderRepository,
+            paymentRepository,
             authorizationService
     );
 
@@ -64,6 +68,10 @@ class SalesAnalyticsServiceTests {
         );
 
         assertThat(result.netSales()).isEqualTo(20_000);
+        assertThat(result.grossSales()).isEqualTo(20_000);
+        assertThat(result.refundedAmount()).isZero();
+        assertThat(result.canceledOrderCount()).isEqualTo(1);
+        assertThat(result.canceledAmount()).isEqualTo(9_000);
         assertThat(result.completedOrderCount()).isEqualTo(2);
         assertThat(result.averageOrderAmount()).isEqualTo(10_000);
         assertThat(result.dineInSales()).isEqualTo(12_000);

@@ -44,6 +44,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       storeId: store.storeId,
       accessToken: auth.accessToken,
       storeName: store.name,
+      storeRole: store.myRole,
       user: auth.user,
     })
   }

@@ -6,7 +6,12 @@ import java.util.List;
 public record SalesSummaryResponse(
         LocalDate from,
         LocalDate to,
+        long grossSales,
         long netSales,
+        long refundedAmount,
+        int refundCount,
+        int canceledOrderCount,
+        long canceledAmount,
         int completedOrderCount,
         long averageOrderAmount,
         long dineInSales,

@@ -11,6 +11,7 @@ import com.example.project_popq.payment.domain.PaymentTransaction;
 import com.example.project_popq.payment.domain.PaymentTransactionType;
 import com.example.project_popq.payment.domain.Refund;
 import com.example.project_popq.payment.domain.RefundRequesterType;
+import com.example.project_popq.payment.domain.RefundStatus;
 import com.example.project_popq.payment.dto.CreateSellerRefundRequest;
 import com.example.project_popq.payment.dto.SellerPaymentSummaryResponse;
 import com.example.project_popq.payment.provider.PaymentCancellationCommand;
@@ -66,11 +67,17 @@ public class SellerRefundService {
 
         Payment payment = paymentRepository.findForUpdateByOrderId(order.getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.PAYMENT_NOT_FOUND));
-        if (payment.getStatus() != PaymentStatus.PAID
+        if ((payment.getStatus() != PaymentStatus.PAID
+                && payment.getStatus() != PaymentStatus.PARTIALLY_REFUNDED)
                 || payment.getApprovedAmount() == null) {
             throw new BusinessException(ErrorCode.REFUND_NOT_ALLOWED);
         }
-        if (request.amount() != payment.getApprovedAmount()) {
+        long alreadyRefunded = payment.getRefunds().stream()
+                .filter(existing -> existing.getStatus() == RefundStatus.SUCCEEDED)
+                .mapToLong(Refund::getAmount)
+                .sum();
+        long refundableAmount = payment.getApprovedAmount() - alreadyRefunded;
+        if (request.amount() > refundableAmount) {
             throw new BusinessException(ErrorCode.INVALID_REFUND_AMOUNT);
         }
 
@@ -111,7 +118,11 @@ public class SellerRefundService {
         }
 
         refund.markSucceeded(result.providerRefundKey(), processedAt);
-        payment.markRefunded(processedAt);
+        if (refund.getAmount() == refundableAmount) {
+            payment.markRefunded(processedAt);
+        } else {
+            payment.markPartiallyRefunded();
+        }
         payment.addTransaction(PaymentTransaction.succeeded(
                 payment,
                 PaymentTransactionType.CANCEL,
