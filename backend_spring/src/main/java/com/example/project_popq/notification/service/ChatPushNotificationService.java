@@ -54,7 +54,7 @@ public class ChatPushNotificationService {
         "targetId", orderPublicId,
         "orderPublicId", orderPublicId,
         "senderType", MessageSenderType.CUSTOMER.name(),
-        "deepLink", "/customers/" + orderPublicId
+        "deepLink", "/customers/" + orderPublicId + "?storeId=" + event.storeId()
     );
 
     storeMemberRepository
