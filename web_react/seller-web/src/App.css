@@ -326,7 +326,7 @@ button:disabled {
   margin-bottom: 22px;
   padding: 4px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-radius: 12px;
   background: #eceae2;
 }

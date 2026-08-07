@@ -122,7 +122,7 @@ export type SellerAuthResult = {
 }
 
 export type SellerConnection = {
-  storeId: number
+  storeId: number | null
   accessToken: string
   storeName?: string
   user?: SellerAuthUser

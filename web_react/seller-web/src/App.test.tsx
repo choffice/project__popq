@@ -207,17 +207,60 @@ describe('판매자 주문 운영', () => {
     expect(await screen.findByText('Window 08')).toBeVisible()
   })
 
-  it('판매자 웹 내부의 관리자 운영 화면으로 이동한다', async () => {
-    const user = userEvent.setup()
+  it('판매자 세션에는 관리자 메뉴를 노출하지 않는다', () => {
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /관리자/ }))
+    expect(screen.queryByRole('button', { name: /관리자/ })).not.toBeInTheDocument()
+  })
+
+  it('관리자 세션에는 관리자 화면만 노출하고 스토어 API를 호출하지 않는다', async () => {
+    window.sessionStorage.clear()
+    window.sessionStorage.setItem(
+      'popq:seller:connection',
+      JSON.stringify({
+        storeId: null,
+        accessToken: 'admin-token',
+        user: {
+          userId: 99,
+          email: 'admin@popq.test',
+          name: 'POPQ 관리자',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      }),
+    )
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async (input) => {
+        const path = String(input)
+        const data = path.endsWith('/overview')
+          ? {
+              totalUsers: 1,
+              activeUsers: 1,
+              totalSellers: 0,
+              pendingSellers: 0,
+              totalStores: 0,
+              activeStores: 0,
+              suspendedStores: 0,
+            }
+          : []
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+
+    render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: '플랫폼 운영 현황' }),
+      await screen.findByRole('heading', { name: '플랫폼 운영 현황' }),
     ).toBeVisible()
-    expect(screen.getByRole('tab', { name: '판매자 인증' })).toBeVisible()
-    expect(screen.getByRole('tab', { name: '스토어' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: '관리자 메뉴' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /주문 운영/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /상품 관리/ })).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes('/seller/stores/')),
+    ).toBe(false)
   })
   it('switches to dark mode and restores the preference', async () => {
     const user = userEvent.setup()

@@ -44,10 +44,14 @@ async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
   return envelope.data
 }
 
-export function loginSeller(email: string, password: string) {
+export function loginAccount(
+  email: string,
+  password: string,
+  role: 'SELLER' | 'ADMIN',
+) {
   return publicRequest<SellerAuthResult>('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, role }),
   })
 }
 

@@ -195,7 +195,9 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
 
 function App() {
   const { theme, toggleTheme } = useThemePreference()
-  const [activeView, setActiveView] = useState<SellerView>('orders')
+  const [activeView, setActiveView] = useState<SellerView>(() =>
+    readConnection()?.user?.role === 'ADMIN' ? 'admin' : 'orders',
+  )
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
   )
@@ -222,9 +224,10 @@ function App() {
   const [showConnection, setShowConnection] = useState(false)
   const seenEvents = useRef(new Set<string>())
   const isDemo = authenticated && !connection
+  const isAdmin = connection?.user?.role === 'ADMIN'
 
   const loadOrders = useCallback(async () => {
-    if (!connection) return
+    if (!connection || connection.user?.role === 'ADMIN') return
     setLoading(true)
     try {
       const nextOrders = await getSellerOrders(connection)
@@ -252,7 +255,7 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (!connection) return
+    if (!connection || connection.user?.role === 'ADMIN') return
     const initialLoad = window.setTimeout(() => void loadOrders(), 0)
     const disconnect = connectSellerRealtime(
       connection,
@@ -440,6 +443,7 @@ function App() {
     window.sessionStorage.removeItem(DEMO_KEY)
     setConnection(nextConnection)
     setAuthenticated(true)
+    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
@@ -452,6 +456,7 @@ function App() {
     window.sessionStorage.setItem(DEMO_KEY, 'true')
     setConnection(null)
     setAuthenticated(true)
+    setActiveView('orders')
     const demo = freshDemoOrders()
     setOrders(demo)
     setSelectedId(demo[0]?.orderPublicId ?? null)
@@ -465,6 +470,7 @@ function App() {
     window.sessionStorage.removeItem(DEMO_KEY)
     setConnection(null)
     setAuthenticated(false)
+    setActiveView('orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
@@ -499,60 +505,68 @@ function App() {
           <span className="brand-mark">P</span>
           <div>
             <strong>POPQ</strong>
-            <small>SELLER</small>
+            <small>{isAdmin ? 'ADMIN' : 'SELLER'}</small>
           </div>
         </div>
-        <nav aria-label="판매자 메뉴">
-          <button
-            className={activeView === 'orders' ? 'active' : ''}
-            onClick={() => setActiveView('orders')}
-          >
-            <span>⌁</span>
-            주문 운영
-            {newOrderCount > 0 && <b>{newOrderCount}</b>}
-          </button>
-          <button
-            className={activeView === 'products' ? 'active' : ''}
-            onClick={() => setActiveView('products')}
-          >
-            <span>□</span>
-            상품 관리
-          </button>
-          <button
-            className={activeView === 'qr' ? 'active' : ''}
-            onClick={() => setActiveView('qr')}
-          >
-            <span>⌗</span>
-            QR 관리
-          </button>
-          <button
-            className={activeView === 'analytics' ? 'active' : ''}
-            onClick={() => setActiveView('analytics')}
-          >
-            <span>↗</span>
-            매출 분석
-          </button>
-          <button
-            className={activeView === 'settings' ? 'active' : ''}
-            onClick={() => setActiveView('settings')}
-          >
-            <span>⚙</span>
-            스토어 설정
-          </button>
-          <button
-            className={activeView === 'admin' ? 'active' : ''}
-            onClick={() => setActiveView('admin')}
-          >
-            <span>◇</span>
-            관리자
-          </button>
+        <nav aria-label={isAdmin ? '관리자 메뉴' : '판매자 메뉴'}>
+          {isAdmin ? (
+            <button className="active" onClick={() => setActiveView('admin')}>
+              <span>◇</span>
+              관리자 운영
+            </button>
+          ) : (
+            <>
+              <button
+                className={activeView === 'orders' ? 'active' : ''}
+                onClick={() => setActiveView('orders')}
+              >
+                <span>⌁</span>
+                주문 운영
+                {newOrderCount > 0 && <b>{newOrderCount}</b>}
+              </button>
+              <button
+                className={activeView === 'products' ? 'active' : ''}
+                onClick={() => setActiveView('products')}
+              >
+                <span>□</span>
+                상품 관리
+              </button>
+              <button
+                className={activeView === 'qr' ? 'active' : ''}
+                onClick={() => setActiveView('qr')}
+              >
+                <span>⌗</span>
+                QR 관리
+              </button>
+              <button
+                className={activeView === 'analytics' ? 'active' : ''}
+                onClick={() => setActiveView('analytics')}
+              >
+                <span>↗</span>
+                매출 분석
+              </button>
+              <button
+                className={activeView === 'settings' ? 'active' : ''}
+                onClick={() => setActiveView('settings')}
+              >
+                <span>⚙</span>
+                스토어 설정
+              </button>
+            </>
+          )}
         </nav>
         <div className="sidebar-bottom">
           <button className="profile-button" onClick={() => setShowConnection(true)}>
-            <span>SL</span>
+            <span>{isAdmin ? 'AD' : 'SL'}</span>
             <div>
               <strong>{isDemo ? '데모 운영자' : connection?.user?.name ?? '판매자'}</strong>
-              <small>{isDemo ? '데모 스토어' : connection?.storeName ?? `스토어 ${connection?.storeId}`}</small>
+              <small>
+                {isDemo
+                  ? '데모 스토어'
+                  : isAdmin
+                    ? '플랫폼 관리자'
+                    : connection?.storeName ?? `스토어 ${connection?.storeId}`}
+              </small>
             </div>
             <b>···</b>
           </button>
@@ -575,24 +589,28 @@ function App() {
             >
               <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
             </button>
-            <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
-              <i />
-              {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}
-            </span>
-            <button
-              className={`store-toggle ${
-                businessStatus === 'OPEN' ? 'open' : ''
-              }`}
-              onClick={() => setActiveView('settings')}
-              aria-pressed={businessStatus === 'OPEN'}
-            >
-              <span />
-              {businessStatus === 'OPEN'
-                ? '영업 중'
-                : businessStatus === 'PRE_OPEN'
-                  ? '오픈 준비'
-                  : '영업 종료'}
-            </button>
+            {!isAdmin && (
+              <>
+                <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
+                  <i />
+                  {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}
+                </span>
+                <button
+                  className={`store-toggle ${
+                    businessStatus === 'OPEN' ? 'open' : ''
+                  }`}
+                  onClick={() => setActiveView('settings')}
+                  aria-pressed={businessStatus === 'OPEN'}
+                >
+                  <span />
+                  {businessStatus === 'OPEN'
+                    ? '영업 중'
+                    : businessStatus === 'PRE_OPEN'
+                      ? '오픈 준비'
+                      : '영업 종료'}
+                </button>
+              </>
+            )}
             <button
               className="icon-button"
               aria-label="계정 설정"
@@ -762,7 +780,7 @@ function App() {
             onBusinessStatusChange={setBusinessStatus}
           />
         )}
-        {activeView === 'admin' && (
+        {isAdmin && activeView === 'admin' && (
           <AdminManagement connection={connection} onError={setError} />
         )}
       </div>
@@ -802,11 +820,13 @@ function App() {
               ×
             </button>
             <p className="eyebrow">ACCOUNT</p>
-            <h2 id="connection-title">판매자 계정</h2>
+            <h2 id="connection-title">{isAdmin ? '관리자 계정' : '판매자 계정'}</h2>
             <p>
               {isDemo
                 ? '현재 데모 데이터로 판매자 웹을 체험하고 있습니다.'
-                : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
+                : isAdmin
+                  ? `${connection?.user?.email ?? '관리자 계정'} · 플랫폼 관리자`
+                  : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
             </p>
             <button className="primary-action" onClick={signOut}>
               {isDemo ? '로그인 화면으로 이동' : '로그아웃'}

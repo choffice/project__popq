@@ -34,6 +34,10 @@ public class AuthService {
 
     @Transactional
     public AuthTokenResponse signup(SignupRequest request) {
+        if (request.role() == PlatformRole.ADMIN) {
+            throw new BusinessException(ErrorCode.INVALID_SIGNUP_ROLE);
+        }
+
         String normalizedEmail = request.email().trim().toLowerCase();
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new BusinessException(ErrorCode.DUPLICATE_USER);
