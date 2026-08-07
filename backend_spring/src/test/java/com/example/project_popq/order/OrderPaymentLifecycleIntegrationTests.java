@@ -432,12 +432,16 @@ class OrderPaymentLifecycleIntegrationTests {
                     assertThat(refund.status()).isEqualTo(RefundStatus.SUCCEEDED);
                     assertThat(refund.reason()).isEqualTo("고객 요청 전액 환불");
                 });
-        assertThat(salesAnalyticsService.summarize(
+        var afterRefund = salesAnalyticsService.summarize(
                 fixture.seller(),
                 fixture.store().getId(),
                 today,
                 today
-        ).netSales()).isZero();
+        );
+        assertThat(afterRefund.grossSales()).isEqualTo(completed.totalAmount());
+        assertThat(afterRefund.refundedAmount()).isEqualTo(completed.totalAmount());
+        assertThat(afterRefund.refundCount()).isEqualTo(1);
+        assertThat(afterRefund.netSales()).isZero();
         assertErrorCode(
                 () -> sellerRefundService.refundCompletedOrder(
                         fixture.seller(),
@@ -450,6 +454,58 @@ class OrderPaymentLifecycleIntegrationTests {
                 ),
                 ErrorCode.REFUND_NOT_ALLOWED
         );
+    }
+
+    @Test
+    void ownerCanRefundCompletedOrderInMultiplePartialAmounts() {
+        Fixture fixture = createFixture();
+        OrderResponse order = createAndPay(
+                fixture,
+                "order-partial-refund-01",
+                "payment-partial-refund-01"
+        );
+        order = transition(fixture, order, OrderStatus.ACCEPTED);
+        order = transition(fixture, order, OrderStatus.PREPARING);
+        order = transition(fixture, order, OrderStatus.READY);
+        OrderResponse completed = transition(
+                fixture,
+                order,
+                OrderStatus.COMPLETED
+        );
+        long firstAmount = completed.totalAmount() / 2;
+
+        SellerPaymentSummaryResponse partial =
+                sellerRefundService.refundCompletedOrder(
+                        fixture.seller(),
+                        fixture.store().getId(),
+                        completed.orderPublicId(),
+                        new CreateSellerRefundRequest(
+                                firstAmount,
+                                "1차 부분 환불"
+                        )
+                );
+
+        assertThat(partial.paymentStatus())
+                .isEqualTo(PaymentStatus.PARTIALLY_REFUNDED);
+        assertThat(partial.refundedAmount()).isEqualTo(firstAmount);
+        assertThat(partial.refundableAmount())
+                .isEqualTo(completed.totalAmount() - firstAmount);
+
+        SellerPaymentSummaryResponse finished =
+                sellerRefundService.refundCompletedOrder(
+                        fixture.seller(),
+                        fixture.store().getId(),
+                        completed.orderPublicId(),
+                        new CreateSellerRefundRequest(
+                                partial.refundableAmount(),
+                                "잔액 환불"
+                        )
+                );
+
+        assertThat(finished.paymentStatus()).isEqualTo(PaymentStatus.REFUNDED);
+        assertThat(finished.refundedAmount()).isEqualTo(completed.totalAmount());
+        assertThat(finished.refundableAmount()).isZero();
+        assertThat(finished.refunds()).hasSize(2);
     }
 
     @Test

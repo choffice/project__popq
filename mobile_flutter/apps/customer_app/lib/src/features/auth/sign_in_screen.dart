@@ -164,33 +164,66 @@ class _SignInScreenState extends State<SignInScreen> {
             const SizedBox(height: PopqSpacing.md),
             const Divider(),
             const SizedBox(height: PopqSpacing.md),
-            _ProviderButton(
-              label: 'Google로 계속하기',
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFF1F1F1F),
-              borderColor: const Color(0xFFDADCE0),
-              onPressed: widget.onGoogleSignIn == null || _busy
-                  ? null
-                  : _handleGoogleSignIn,
-            ),
-            const SizedBox(height: PopqSpacing.sm),
-            _ProviderButton(
-              label: 'Kakao로 계속하기',
-              backgroundColor: const Color(0xFFFEE500),
-              foregroundColor: const Color(0xFF191919),
-              borderColor: const Color(0xFFFEE500),
-              onPressed: widget.onKakaoSignIn == null || _busy
-                  ? null
-                  : _handleKakaoSignIn,
-            ),
-            const SizedBox(height: PopqSpacing.sm),
-            _ProviderButton(
-              label: 'Naver로 계속하기',
-              backgroundColor: Color(0xFF03C75A),
-              foregroundColor: Colors.white,
-              borderColor: Color(0xFF03C75A),
-              onPressed: widget.onNaverSignIn == null || _busy
-              ? null : _handleNaverSignIn,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  tooltip: 'Google로 계속하기',
+                  onPressed: widget.onGoogleSignIn == null || _busy
+                      ? null
+                      : _handleGoogleSignIn,
+                  iconSize: 52,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 52,
+                    height: 52,
+                  ),
+                  icon: Image.asset(
+                    'assets/images/google_g.png',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.md),
+                IconButton(
+                  tooltip: 'Kakao로 계속하기',
+                  onPressed: widget.onKakaoSignIn == null || _busy
+                      ? null
+                      : _handleKakaoSignIn,
+                  iconSize: 52,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 52,
+                    height: 52,
+                  ),
+                  icon: Image.asset(
+                    'assets/images/kakao_k.png',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.md),
+                IconButton(
+                  tooltip: '네이버로 계속하기',
+                  onPressed: widget.onNaverSignIn == null || _busy
+                      ? null
+                      : _handleNaverSignIn,
+                  iconSize: 52,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 52,
+                    height: 52,
+                  ),
+                  icon: Image.asset(
+                    'assets/images/naver_n.png',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ],
             ),
             if (widget.onDevelopmentSignIn != null) ...[
               const SizedBox(height: PopqSpacing.lg),
@@ -430,34 +463,3 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-class _ProviderButton extends StatelessWidget {
-  const _ProviderButton({
-    required this.label,
-    required this.backgroundColor,
-    required this.foregroundColor,
-    required this.borderColor,
-    this.onPressed,
-  });
-
-  final String label;
-  final Color backgroundColor;
-  final Color foregroundColor;
-  final Color borderColor;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(52),
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        disabledBackgroundColor: backgroundColor.withValues(alpha: 0.55),
-        disabledForegroundColor: foregroundColor.withValues(alpha: 0.55),
-        side: BorderSide(color: borderColor),
-      ),
-      child: Text(label),
-    );
-  }
-}

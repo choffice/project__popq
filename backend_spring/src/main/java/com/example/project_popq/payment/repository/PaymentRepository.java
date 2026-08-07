@@ -3,6 +3,7 @@ package com.example.project_popq.payment.repository;
 import com.example.project_popq.payment.domain.Payment;
 import jakarta.persistence.LockModeType;
 import java.util.Optional;
+import java.util.List;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -43,4 +44,12 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             where p.order.id = :orderId
             """)
     Optional<Payment> findForUpdateByOrderId(@Param("orderId") Long orderId);
+
+    @EntityGraph(attributePaths = {"order", "refunds"})
+    @Query("""
+            select distinct p
+            from Payment p
+            where p.order.store.id = :storeId
+            """)
+    List<Payment> findAllForStoreAnalytics(@Param("storeId") Long storeId);
 }

@@ -207,17 +207,105 @@ describe('판매자 주문 운영', () => {
     expect(await screen.findByText('Window 08')).toBeVisible()
   })
 
-  it('판매자 웹 내부의 관리자 운영 화면으로 이동한다', async () => {
+  it('공지 초안을 작성하고 게시한다', async () => {
     const user = userEvent.setup()
     render(<App />)
 
-    await user.click(screen.getByRole('button', { name: /관리자/ }))
+    await user.click(screen.getByRole('button', { name: /공지사항/ }))
+    await user.click(screen.getByRole('button', { name: '+ 새 공지' }))
+    await user.type(screen.getByLabelText('제목'), '임시 휴무 안내')
+    await user.type(screen.getByLabelText('내용'), '8월 10일은 쉽니다.')
+    await user.click(screen.getByRole('button', { name: '초안 저장' }))
+
+    expect(await screen.findByText('임시 휴무 안내')).toBeVisible()
+    await user.click(screen.getAllByRole('button', { name: '게시' })[0])
+    expect(screen.getAllByText('게시 중').length).toBeGreaterThan(0)
+  })
+
+  it('주문 대화를 열고 고객에게 메시지를 보낸다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /고객 문의/ }))
+    expect(await screen.findByRole('heading', { name: '김고객' })).toBeVisible()
+    const input = screen.getByPlaceholderText('고객에게 보낼 메시지')
+    await user.type(input, '요청하신 포크를 함께 드릴게요.')
+    await user.click(screen.getByRole('button', { name: '전송' }))
+
+    expect(await screen.findByText('요청하신 포크를 함께 드릴게요.')).toBeVisible()
+  })
+
+  it('완료 주문의 일부 금액만 환불한다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '완료' }))
+    await user.click(screen.getByRole('button', { name: '주문 0037 상세 보기' }))
+    await user.click(await screen.findByRole('button', { name: '전액 환불' }))
+    const amount = screen.getByLabelText(/환불 금액/)
+    await user.clear(amount)
+    await user.type(amount, '1000')
+    await user.type(screen.getByLabelText('환불 사유'), '일부 메뉴 누락')
+    await user.click(screen.getByRole('button', { name: '1,000원 부분 환불 확정' }))
+
+    expect(await screen.findByText('부분 환불')).toBeVisible()
+    expect(screen.getAllByText('일부 메뉴 누락').length).toBeGreaterThan(0)
+  })
+
+  it('판매자 세션에는 관리자 메뉴를 노출하지 않는다', () => {
+    render(<App />)
+
+    expect(screen.queryByRole('button', { name: /관리자/ })).not.toBeInTheDocument()
+  })
+
+  it('관리자 세션에는 관리자 화면만 노출하고 스토어 API를 호출하지 않는다', async () => {
+    window.sessionStorage.clear()
+    window.sessionStorage.setItem(
+      'popq:seller:connection',
+      JSON.stringify({
+        storeId: null,
+        accessToken: 'admin-token',
+        user: {
+          userId: 99,
+          email: 'admin@popq.test',
+          name: 'POPQ 관리자',
+          role: 'ADMIN',
+          status: 'ACTIVE',
+        },
+      }),
+    )
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async (input) => {
+        const path = String(input)
+        const data = path.endsWith('/overview')
+          ? {
+              totalUsers: 1,
+              activeUsers: 1,
+              totalSellers: 0,
+              pendingSellers: 0,
+              totalStores: 0,
+              activeStores: 0,
+              suspendedStores: 0,
+            }
+          : []
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      },
+    )
+
+    render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: '플랫폼 운영 현황' }),
+      await screen.findByRole('heading', { name: '플랫폼 운영 현황' }),
     ).toBeVisible()
-    expect(screen.getByRole('tab', { name: '판매자 인증' })).toBeVisible()
-    expect(screen.getByRole('tab', { name: '스토어' })).toBeVisible()
+    expect(screen.getByRole('navigation', { name: '관리자 메뉴' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /주문 운영/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /상품 관리/ })).not.toBeInTheDocument()
+    expect(
+      fetchMock.mock.calls.some(([input]) => String(input).includes('/seller/stores/')),
+    ).toBe(false)
   })
   it('switches to dark mode and restores the preference', async () => {
     const user = userEvent.setup()

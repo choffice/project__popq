@@ -40,85 +40,91 @@ public class CustomerOrderController {
 
     @PostMapping("/stores/{storeId}")
     public ResponseEntity<ApiResponse<OrderResponse>> create(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable Long storeId,
-            @Valid @RequestBody CreateCustomerOrderRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable Long storeId,
+        @Valid @RequestBody
+        CreateCustomerOrderRequest request
     ) {
-        OrderResponse created = customerOrderService.create(
+        OrderResponse created =
+            customerOrderService.create(
                 currentUserService.getRequired(jwt),
                 storeId,
                 request
-        );
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success(created));
+            );
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(ApiResponse.success(created));
     }
 
     @GetMapping
     public ApiResponse<List<OrderResponse>> findAll(
-            @AuthenticationPrincipal Jwt jwt
+        @AuthenticationPrincipal Jwt jwt
     ) {
         return ApiResponse.success(
-                customerOrderService.findAll(
-                        currentUserService.getRequired(jwt)
-                )
+            customerOrderService.findAll(
+                currentUserService.getRequired(jwt)
+            )
         );
     }
 
     @GetMapping("/{orderPublicId}")
     public ApiResponse<OrderResponse> findOne(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId
     ) {
         return ApiResponse.success(
-                customerOrderService.findOne(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId
-                )
+            customerOrderService.findOne(
+                currentUserService.getRequired(jwt),
+                orderPublicId
+            )
         );
     }
 
     @GetMapping("/{orderPublicId}/sync")
     public ApiResponse<OrderSyncResponse> sync(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @RequestParam long knownVersion
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @RequestParam long knownVersion
     ) {
         return ApiResponse.success(
-                customerOrderService.sync(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        knownVersion
-                )
+            customerOrderService.sync(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                knownVersion
+            )
         );
     }
 
     @PostMapping("/{orderPublicId}/payments")
     public ApiResponse<PaymentResponse> confirmPayment(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @Valid @RequestBody ConfirmPaymentRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        ConfirmPaymentRequest request
     ) {
         return ApiResponse.success(
-                paymentService.confirmCustomer(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        request
-                )
+            paymentService.confirmCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request
+            )
         );
     }
 
     @PostMapping("/{orderPublicId}/cancel")
     public ApiResponse<OrderResponse> cancel(
-            @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String orderPublicId,
-            @Valid @RequestBody OrderCommandRequest request
+        @AuthenticationPrincipal Jwt jwt,
+        @PathVariable String orderPublicId,
+        @Valid @RequestBody
+        OrderCommandRequest request
     ) {
         return ApiResponse.success(
-                orderCommandService.cancelByCustomer(
-                        currentUserService.getRequired(jwt),
-                        orderPublicId,
-                        request.reasonOr("고객 주문 취소")
-                )
+            orderCommandService.cancelByCustomer(
+                currentUserService.getRequired(jwt),
+                orderPublicId,
+                request.reasonOr("고객 주문 취소")
+            )
         );
     }
 }

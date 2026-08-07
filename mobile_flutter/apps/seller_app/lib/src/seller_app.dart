@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +20,8 @@ import 'features/products/seller_product_repository.dart';
 import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
+import 'notifications/seller_push_device_repository.dart';
+import 'notifications/seller_push_notification_service.dart';
 import 'realtime/seller_realtime_scope.dart';
 import 'routing/seller_router.dart';
 import 'theme/seller_theme.dart';
@@ -68,7 +71,7 @@ class PopqSellerApp extends StatefulWidget {
 class _PopqSellerAppState extends State<PopqSellerApp>
     with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
-  GlobalKey<ScaffoldMessengerState>();
+      GlobalKey<ScaffoldMessengerState>();
 
   late final SessionStore _sessionStore;
   late final SessionController _sessionController;
@@ -102,12 +105,18 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   late final bool _ownsThemeController;
 
   late final PopqApiClient _apiClient;
+
+  late final SellerPushDeviceRepository _pushDeviceRepository;
+
   late final PopqRealtimeClient _realtimeClient;
+
   late final GoRouter _router;
 
   late final _SellerBackButtonDispatcher _backButtonDispatcher;
 
   bool _isAppActive = true;
+  String? _pendingPushDeepLink;
+  bool _openingPushDeepLink = false;
 
   @override
   void initState() {
@@ -117,24 +126,18 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     _isAppActive =
         WidgetsBinding.instance.lifecycleState == null ||
-            WidgetsBinding.instance.lifecycleState ==
-                AppLifecycleState.resumed;
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
 
     final useMemoryStorage =
-        kIsWeb &&
-            widget.environment.flavor == AppFlavor.development;
+        kIsWeb && widget.environment.flavor == AppFlavor.development;
 
     _sessionStore =
         widget.sessionStore ??
-            (useMemoryStorage
-                ? MemorySessionStore()
-                : SecureSessionStore(
-              storageKey: 'popq.seller.auth.session.v1',
-            ));
+        (useMemoryStorage
+            ? MemorySessionStore()
+            : SecureSessionStore(storageKey: 'popq.seller.auth.session.v1'));
 
-    _sessionController = SessionController(
-      sessionStore: _sessionStore,
-    );
+    _sessionController = SessionController(sessionStore: _sessionStore);
 
     _storeSelectionController = SellerStoreSelectionController(
       widget.storeSelectionStore ??
@@ -147,9 +150,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     _themeController =
         widget.themeController ??
-            PopqThemeController(
-              storageKey: 'popq.seller.theme.preference.v1',
-            );
+        PopqThemeController(storageKey: 'popq.seller.theme.preference.v1');
 
     _apiClient = PopqApiClient(
       baseUrl: widget.environment.apiBaseUrl,
@@ -160,6 +161,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       },
     );
 
+    _pushDeviceRepository = SellerPushDeviceRepository(_apiClient);
+
     _realtimeClient = PopqRealtimeClient(
       webSocketUri: widget.environment.realtimeWebSocketUri,
       accessTokenReader: () async {
@@ -168,51 +171,35 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       enableLogs: widget.environment.enableNetworkLogs,
     );
 
-    _sessionController.addListener(
-      _handleSessionChanged,
-    );
+    _sessionController.addListener(_handleSessionChanged);
 
-    _googleAuthService = GoogleAuthService(webClientId: '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com');
+    _googleAuthService = GoogleAuthService(
+      webClientId:
+          '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+    );
 
     _kakaoAuthService = KakaoAuthService();
 
     _naverAuthService = NaverAuthService();
 
     _storeRepository =
-        widget.storeRepository ??
-            ApiSellerStoreRepository(
-              _apiClient,
-            );
+        widget.storeRepository ?? ApiSellerStoreRepository(_apiClient);
 
     _announcementRepository =
         widget.announcementRepository ??
-            ApiSellerAnnouncementRepository(
-              _apiClient,
-            );
+        ApiSellerAnnouncementRepository(_apiClient);
 
     _orderRepository =
-        widget.orderRepository ??
-            ApiSellerOrderRepository(
-              _apiClient,
-            );
+        widget.orderRepository ?? ApiSellerOrderRepository(_apiClient);
 
     _productRepository =
-        widget.productRepository ??
-            ApiSellerProductRepository(
-              _apiClient,
-            );
+        widget.productRepository ?? ApiSellerProductRepository(_apiClient);
 
     _analyticsRepository =
-        widget.analyticsRepository ??
-            ApiSellerAnalyticsRepository(
-              _apiClient,
-            );
+        widget.analyticsRepository ?? ApiSellerAnalyticsRepository(_apiClient);
 
     _customerRepository =
-        widget.customerRepository ??
-            ApiSellerCustomerRepository(
-              _apiClient,
-            );
+        widget.customerRepository ?? ApiSellerCustomerRepository(_apiClient);
 
     final identityRepository =
         widget.identityRepository ??
@@ -222,16 +209,15 @@ class _PopqSellerAppState extends State<PopqSellerApp>
             );
 
     _authRepository =
-        widget.authRepository ??
-            ApiSellerAuthRepository(
-              _apiClient,
-            );
+        widget.authRepository ?? ApiSellerAuthRepository(_apiClient);
 
     _bootstrapController = SellerBootstrapController(
       sessionController: _sessionController,
       storeSelectionController: _storeSelectionController,
       identityRepository: identityRepository,
     );
+
+    _bootstrapController.addListener(_handleBootstrapChanged);
 
     _router = createSellerRouter(
       sessionController: _sessionController,
@@ -252,16 +238,16 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       onVerifyForPasswordReset: _verifyForPasswordReset,
       onResetPassword: _resetPassword,
       themeController: _themeController,
-      onDevelopmentSignIn:
-      widget.environment.flavor == AppFlavor.development
+      onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
       onGoogleSignIn: _googleSignIn,
       onKakaoSignIn: _kakaoSignIn,
       onNaverSignIn: _naverSignIn,
       minSplashDuration: widget.splashMinDuration,
-
     );
+
+    PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
 
     _backButtonDispatcher = _SellerBackButtonDispatcher(
       _router,
@@ -269,25 +255,17 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     );
 
     unawaited(
-      Future.wait([
-        _bootstrapController.restore(),
-        _themeController.restore(),
-      ]),
+      Future.wait([_bootstrapController.restore(), _themeController.restore()]),
     );
   }
 
-  Future<void> _signIn(
-      String email,
-      String password,
-      ) async {
+  Future<void> _signIn(String email, String password) async {
     final result = await _authRepository.logIn(
       email: email,
       password: password,
     );
 
-    await _completeSignIn(
-      result.session,
-    );
+    await _completeSignIn(result.session);
   }
 
   Future<void> _signUp({
@@ -321,9 +299,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _withdraw(String? confirmationPhrase) async {
-    await _authRepository.withdraw(
-      confirmationPhrase: confirmationPhrase,
-    );
+    await _authRepository.withdraw(confirmationPhrase: confirmationPhrase);
     await _bootstrapController.signOut();
   }
 
@@ -331,23 +307,17 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     return _authRepository.connectCustomerAccess();
   }
 
-  Future<void> _completeSignIn(
-      AuthSession session,
-      ) async {
+  Future<void> _completeSignIn(AuthSession session) async {
     await _storeSelectionController.clear();
 
-    await _sessionController.save(
-      session,
-    );
+    await _sessionController.save(session);
 
     _bootstrapController.acknowledgeSellerSignIn();
 
     final stores = await _storeRepository.findAll();
 
     if (stores.length == 1) {
-      await _storeSelectionController.select(
-        stores.single.storeId,
-      );
+      await _storeSelectionController.select(stores.single.storeId);
     }
   }
 
@@ -356,7 +326,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     debugPrint(
       '판매자 Google 로그인 성공: ID Token 수신 '
-          '(${idToken.length}자)',
+      '(${idToken.length}자)',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -368,12 +338,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _kakaoSignIn() async {
-    final accessToken =
-    await _kakaoAuthService.signInAndGetAccessToken();
+    final accessToken = await _kakaoAuthService.signInAndGetAccessToken();
 
     debugPrint(
       '판매자 Kakao 로그인 성공: Access Token 수신 '
-          '(${accessToken.length}자)',
+      '(${accessToken.length}자)',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -385,12 +354,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _naverSignIn() async {
-    final accessToken =
-    await _naverAuthService.signInAndGetAccessToken();
+    final accessToken = await _naverAuthService.signInAndGetAccessToken();
 
     debugPrint(
       '판매자 Naver 로그인 성공: Access Token 수신 '
-          '(${accessToken.length}자)',
+      '(${accessToken.length}자)',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -402,9 +370,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _developmentSignIn() async {
-    final response = await _apiClient.post<
-        Map<String, Object?>
-    >(
+    final response = await _apiClient.post<Map<String, Object?>>(
       '/api/v1/dev/auth/login',
       body: {
         'email': 'map-seed@popq.local',
@@ -412,20 +378,14 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         'role': 'SELLER',
       },
       decode: (value) {
-        return Map<String, Object?>.from(
-          value as Map,
-        );
+        return Map<String, Object?>.from(value as Map);
       },
     );
 
-    final user = Map<String, Object?>.from(
-      response['user'] as Map,
-    );
+    final user = Map<String, Object?>.from(response['user'] as Map);
 
     if (user['role'] != 'SELLER') {
-      throw StateError(
-        'seller role is required',
-      );
+      throw StateError('seller role is required');
     }
 
     final expiresIn = (response['expiresIn'] as num).toInt();
@@ -436,11 +396,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       AuthSession(
         accessToken: response['accessToken'] as String,
         refreshToken: '',
-        expiresAt: DateTime.now().toUtc().add(
-          Duration(
-            seconds: expiresIn,
-          ),
-        ),
+        expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
       ),
     );
 
@@ -449,43 +405,159 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final stores = await _storeRepository.findAll();
 
     if (stores.isEmpty) {
-      final created =
-      await _storeRepository.createDevelopmentStore();
+      final created = await _storeRepository.createDevelopmentStore();
 
-      await _storeSelectionController.select(
-        created.storeId,
-      );
+      await _storeSelectionController.select(created.storeId);
     } else if (stores.length == 1) {
-      await _storeSelectionController.select(
-        stores.single.storeId,
-      );
+      await _storeSelectionController.select(stores.single.storeId);
+    }
+  }
+
+  void _handlePushDeepLink(String deepLink) {
+    if (!_isSellerChatDeepLink(deepLink)) {
+      debugPrint('Seller 지원하지 않는 알림 경로: $deepLink');
+      return;
+    }
+
+    _pendingPushDeepLink = deepLink;
+
+    unawaited(_openPendingPushDeepLink());
+  }
+
+  bool _isSellerChatDeepLink(String deepLink) {
+    final uri = Uri.tryParse(deepLink);
+
+    if (uri == null) {
+      return false;
+    }
+
+    final segments = uri.pathSegments;
+
+    return segments.length == 2 &&
+        segments.first == 'customers' &&
+        segments[1].isNotEmpty &&
+        int.tryParse(uri.queryParameters['storeId'] ?? '') != null;
+  }
+
+  void _handleBootstrapChanged() {
+    unawaited(_openPendingPushDeepLink());
+  }
+
+  Future<void> _openPendingPushDeepLink() async {
+    if (_openingPushDeepLink) {
+      return;
+    }
+
+    final deepLink = _pendingPushDeepLink;
+
+    if (deepLink == null ||
+        !_sessionController.isSignedIn ||
+        _bootstrapController.status != SellerBootstrapStatus.ready) {
+      return;
+    }
+
+    final uri = Uri.tryParse(deepLink);
+    final storeId = int.tryParse(uri?.queryParameters['storeId'] ?? '');
+
+    if (uri == null || storeId == null) {
+      _pendingPushDeepLink = null;
+      return;
+    }
+
+    _openingPushDeepLink = true;
+
+    try {
+      if (_storeSelectionController.selectedStoreId != storeId) {
+        await _storeSelectionController.select(storeId);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _pendingPushDeepLink = null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        _router.go(uri.path);
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Seller 알림 채팅 이동 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _openingPushDeepLink = false;
     }
   }
 
   void _handleSessionChanged() {
-    if (_sessionController.status ==
-        SessionStatus.restoring) {
+    if (_sessionController.status == SessionStatus.restoring) {
       return;
     }
 
     if (!_sessionController.isSignedIn) {
-      _realtimeClient.disconnect(
-        clearSubscriptions: true,
-      );
+      _realtimeClient.disconnect(clearSubscriptions: true);
       return;
     }
 
+    unawaited(_registerPushDevice());
+    unawaited(_openPendingPushDeepLink());
+
     if (_isAppActive) {
-      unawaited(
-        _realtimeClient.connect(),
+      unawaited(_realtimeClient.connect());
+    }
+  }
+
+  Future<void> _registerPushDevice() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+
+      final settings = await messaging.getNotificationSettings();
+
+      if (settings.authorizationStatus == AuthorizationStatus.denied ||
+          settings.authorizationStatus == AuthorizationStatus.notDetermined) {
+        debugPrint(
+          'Seller 알림 권한이 없어 '
+          'FCM 기기를 등록하지 않습니다.',
+        );
+        return;
+      }
+
+      final token = await messaging.getToken();
+
+      if (token == null || token.trim().isEmpty) {
+        debugPrint(
+          'Seller FCM 토큰이 없어 '
+          '기기를 등록하지 않습니다.',
+        );
+        return;
+      }
+
+      final platform = switch (defaultTargetPlatform) {
+        TargetPlatform.iOS => 'IOS',
+        _ => 'ANDROID',
+      };
+
+      final device = await _pushDeviceRepository.registerDevice(
+        token: token.trim(),
+        platform: platform,
       );
+
+      debugPrint(
+        'Seller FCM 기기 등록 완료: '
+        'deviceId=${device.deviceId}, '
+        'platform=${device.platform}',
+      );
+    } catch (error, stackTrace) {
+      debugPrint('Seller FCM 기기 등록 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   @override
-  void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
     switch (state) {
@@ -493,9 +565,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         _isAppActive = true;
 
         if (_sessionController.isSignedIn) {
-          unawaited(
-            _realtimeClient.connect(),
-          );
+          unawaited(_realtimeClient.connect());
         }
 
         return;
@@ -517,10 +587,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
 
-    _sessionController.removeListener(
-      _handleSessionChanged,
-    );
+    _sessionController.removeListener(_handleSessionChanged);
 
+    _bootstrapController.removeListener(_handleBootstrapChanged);
+
+    PushNotificationService.clearDeepLinkHandler();
     _realtimeClient.dispose();
     _router.dispose();
     _apiClient.close();
@@ -544,16 +615,13 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         builder: (context, child) {
           return MaterialApp.router(
             title: 'POPQ Seller',
-            debugShowCheckedModeBanner:
-            !widget.environment.isProduction,
+            debugShowCheckedModeBanner: !widget.environment.isProduction,
             scaffoldMessengerKey: _scaffoldMessengerKey,
             theme: SellerTheme.light(),
             darkTheme: SellerTheme.dark(),
             themeMode: _themeController.themeMode,
-            routeInformationProvider:
-            _router.routeInformationProvider,
-            routeInformationParser:
-            _router.routeInformationParser,
+            routeInformationProvider: _router.routeInformationProvider,
+            routeInformationParser: _router.routeInformationParser,
             routerDelegate: _router.routerDelegate,
             backButtonDispatcher: _backButtonDispatcher,
           );
@@ -563,15 +631,10 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 }
 
-class _SellerBackButtonDispatcher
-    extends RootBackButtonDispatcher {
-  _SellerBackButtonDispatcher(
-      this._router,
-      this._scaffoldMessengerKey,
-      );
+class _SellerBackButtonDispatcher extends RootBackButtonDispatcher {
+  _SellerBackButtonDispatcher(this._router, this._scaffoldMessengerKey);
 
-  static const Duration _exitConfirmDuration =
-  Duration(seconds: 2);
+  static const Duration _exitConfirmDuration = Duration(seconds: 2);
 
   static const Set<String> _rootTabLocations = {
     SellerRoutes.dashboard,
@@ -583,18 +646,13 @@ class _SellerBackButtonDispatcher
 
   final GoRouter _router;
 
-  final GlobalKey<ScaffoldMessengerState>
-  _scaffoldMessengerKey;
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey;
 
   DateTime? _lastBackPressedAt;
 
   @override
-  Future<bool> invokeCallback(
-      Future<bool> defaultValue,
-      ) async {
-    final handledByRouter = await super.invokeCallback(
-      defaultValue,
-    );
+  Future<bool> invokeCallback(Future<bool> defaultValue) async {
+    final handledByRouter = await super.invokeCallback(defaultValue);
 
     if (handledByRouter) {
       _lastBackPressedAt = null;
@@ -615,9 +673,7 @@ class _SellerBackButtonDispatcher
     if (location != SellerRoutes.dashboard) {
       _lastBackPressedAt = null;
 
-      _router.go(
-        SellerRoutes.dashboard,
-      );
+      _router.go(SellerRoutes.dashboard);
 
       return true;
     }
@@ -628,8 +684,7 @@ class _SellerBackButtonDispatcher
 
     final shouldExit =
         previousPressedAt != null &&
-            now.difference(previousPressedAt) <=
-                _exitConfirmDuration;
+        now.difference(previousPressedAt) <= _exitConfirmDuration;
 
     if (shouldExit) {
       _lastBackPressedAt = null;
@@ -647,9 +702,7 @@ class _SellerBackButtonDispatcher
       ?..hideCurrentSnackBar()
       ..showSnackBar(
         const SnackBar(
-          content: Text(
-            '한 번 더 누르면 앱이 종료됩니다.',
-          ),
+          content: Text('한 번 더 누르면 앱이 종료됩니다.'),
           duration: _exitConfirmDuration,
         ),
       );
@@ -657,15 +710,9 @@ class _SellerBackButtonDispatcher
     return true;
   }
 
-  String _normalizeLocation(
-      String location,
-      ) {
-    if (location.length > 1 &&
-        location.endsWith('/')) {
-      return location.substring(
-        0,
-        location.length - 1,
-      );
+  String _normalizeLocation(String location) {
+    if (location.length > 1 && location.endsWith('/')) {
+      return location.substring(0, location.length - 1);
     }
 
     return location;
