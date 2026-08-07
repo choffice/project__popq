@@ -24,6 +24,7 @@ import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_engagement_repository.dart';
+import 'notifications/customer_push_notification_service.dart';
 import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
@@ -99,6 +100,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final NaverAuthService _naverAuthService;
 
   bool _isAppActive = true;
+  String? _pendingPushDeepLink;
 
   @override
   void initState() {
@@ -228,6 +230,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onKakaoSignIn: _kakaoSignIn,
       onNaverSignIn: _naverSignIn,
     );
+
+    PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
 
     _backButtonDispatcher = _CustomerBackButtonDispatcher(
       router: _router,
@@ -375,6 +379,34 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     await _sessionController.save(session);
   }
 
+  void _handlePushDeepLink(String deepLink) {
+    if (!_isCustomerChatDeepLink(deepLink)) {
+      debugPrint('Customer 지원하지 않는 알림 경로: $deepLink');
+      return;
+    }
+
+    if (!_sessionController.isSignedIn) {
+      _pendingPushDeepLink = deepLink;
+      return;
+    }
+
+    _openPushDeepLink(deepLink);
+  }
+
+  bool _isCustomerChatDeepLink(String deepLink) {
+    return deepLink.startsWith('/orders/') && deepLink.endsWith('/messages');
+  }
+
+  void _openPushDeepLink(String deepLink) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      _router.go(deepLink);
+    });
+  }
+
   void _handleSessionChanged() {
     if (_sessionController.status == SessionStatus.restoring) {
       return;
@@ -386,6 +418,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     }
 
     unawaited(_registerPushDevice());
+
+    final pendingPushDeepLink = _pendingPushDeepLink;
+
+    if (pendingPushDeepLink != null) {
+      _pendingPushDeepLink = null;
+      _openPushDeepLink(pendingPushDeepLink);
+    }
 
     if (_isAppActive) {
       unawaited(_realtimeClient.connect());
@@ -470,7 +509,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     WidgetsBinding.instance.removeObserver(this);
 
     _sessionController.removeListener(_handleSessionChanged);
-
+    PushNotificationService.clearDeepLinkHandler();
     _realtimeClient.dispose();
     _router.dispose();
     _apiClient.close();

@@ -96,16 +96,19 @@ abstract interface class CustomerOrderRepository {
   });
 
   Future<CustomerOrder> confirmPayment(
-      CustomerOrder order, {
-        required String idempotencyKey,
-        String? paymentKey,
-      });
+    CustomerOrder order, {
+    required String idempotencyKey,
+    String? paymentKey,
+  });
 
   Future<List<CustomerOrder>> findAll();
 
   Future<CustomerOrder> findOne(String orderPublicId);
 
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion);
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  );
 }
 
 class ApiCustomerOrderRepository implements CustomerOrderRepository {
@@ -136,17 +139,18 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
             )
             .toList(),
       },
-      decode: (value) =>
-          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerOrder.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
   @override
   Future<CustomerOrder> confirmPayment(
-      CustomerOrder order, {
-        required String idempotencyKey,
-        String? paymentKey,
-      }) async {
+    CustomerOrder order, {
+    required String idempotencyKey,
+    String? paymentKey,
+  }) async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/customer/orders/${order.orderPublicId}/payments',
       body: {
@@ -180,25 +184,32 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
   Future<CustomerOrder> findOne(String orderPublicId) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId',
-      decode: (value) =>
-          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerOrder.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
   @override
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) {
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  ) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId/sync',
       query: {'knownVersion': knownVersion},
       decode: (value) {
         final json = Map<String, Object?>.from(value as Map);
         final order = json['order'];
+
         return OrderSyncResult(
           refreshRequired: json['refreshRequired'] as bool,
           serverVersion: (json['serverVersion'] as num).toInt(),
           order: order == null
               ? null
-              : CustomerOrder.fromJson(Map<String, Object?>.from(order as Map)),
+              : CustomerOrder.fromJson(
+                  Map<String, Object?>.from(order as Map),
+                ),
         );
       },
     );
@@ -206,8 +217,9 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
 }
 
 class MemoryCustomerOrderRepository implements CustomerOrderRepository {
-  MemoryCustomerOrderRepository({List<CustomerOrder> orders = const []})
-    : _orders = List.of(orders);
+  MemoryCustomerOrderRepository({
+    List<CustomerOrder> orders = const [],
+  }) : _orders = List.of(orders);
 
   final List<CustomerOrder> _orders;
 
@@ -222,7 +234,10 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
       storeId: storeId,
       storeName: '성수 커피 연구소',
       status: 'CREATED',
-      totalAmount: items.fold(0, (sum, item) => sum + item.totalPrice),
+      totalAmount: items.fold(
+        0,
+        (sum, item) => sum + item.totalPrice,
+      ),
       version: 0,
       items: items
           .map(
@@ -234,47 +249,59 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
           )
           .toList(),
     );
+
     _orders.insert(0, order);
     return order;
   }
 
   @override
   Future<CustomerOrder> confirmPayment(
-      CustomerOrder order, {
-        required String idempotencyKey,
-        String? paymentKey,
-      }) async {
+    CustomerOrder order, {
+    required String idempotencyKey,
+    String? paymentKey,
+  }) async {
     final paid = CustomerOrder(
       orderPublicId: order.orderPublicId,
       storeId: order.storeId,
       storeName: order.storeName,
       status: 'PLACED',
       totalAmount: order.totalAmount,
-      version: 1,
+      version: order.version + 1,
       items: order.items,
     );
+
     final index = _orders.indexWhere(
       (candidate) => candidate.orderPublicId == order.orderPublicId,
     );
+
     if (index < 0) {
       _orders.insert(0, paid);
     } else {
       _orders[index] = paid;
     }
+
     return paid;
   }
 
   @override
-  Future<List<CustomerOrder>> findAll() async => List.unmodifiable(_orders);
-
-  @override
-  Future<CustomerOrder> findOne(String orderPublicId) async {
-    return _orders.firstWhere((order) => order.orderPublicId == orderPublicId);
+  Future<List<CustomerOrder>> findAll() async {
+    return List.unmodifiable(_orders);
   }
 
   @override
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) async {
+  Future<CustomerOrder> findOne(String orderPublicId) async {
+    return _orders.firstWhere(
+      (order) => order.orderPublicId == orderPublicId,
+    );
+  }
+
+  @override
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  ) async {
     final order = await findOne(orderPublicId);
+
     return OrderSyncResult(
       refreshRequired: order.version != knownVersion,
       serverVersion: order.version,

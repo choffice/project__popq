@@ -77,6 +77,27 @@ class AuthSignupLoginIntegrationTests {
     }
 
     @Test
+    void publicSignupRejectsAdminRole() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email": "public-admin@popq.test",
+                                  "password": "password1",
+                                  "name": "공개 관리자",
+                                  "phone": "010-1234-9876",
+                                  "role": "ADMIN"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.error.code").value("INVALID_SIGNUP_ROLE"));
+
+        assertThat(userRepository.findByEmailIgnoreCase("public-admin@popq.test"))
+                .isEmpty();
+    }
+
+    @Test
     void signUpRejectsDuplicateEmail() throws Exception {
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)

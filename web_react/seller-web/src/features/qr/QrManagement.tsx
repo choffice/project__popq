@@ -19,11 +19,13 @@ import type {
   QrCodeSummary,
   QrIssued,
   SellerConnection,
+  StoreRole,
   StoreTable,
 } from '../../types'
 
 type Props = {
   connection: SellerConnection | null
+  storeRole?: StoreRole
   onError: (message: string | null) => void
 }
 
@@ -47,8 +49,13 @@ const STATUS_LABEL = {
   EXPIRED: '만료됨',
 }
 
-export function QrManagement({ connection, onError }: Props) {
+function isFutureExpiration(expiresAt: string) {
+  return new Date(expiresAt).getTime() > Date.now()
+}
+
+export function QrManagement({ connection, storeRole, onError }: Props) {
   const isDemo = !connection
+  const canManage = isDemo || storeRole === 'OWNER' || storeRole === 'MANAGER'
   const [qrCodes, setQrCodes] = useState<QrCodeSummary[]>(() =>
     freshDemoQrCodes(),
   )
@@ -219,7 +226,7 @@ export function QrManagement({ connection, onError }: Props) {
       return
     }
     const expiration =
-      code.expiresAt && new Date(code.expiresAt).getTime() > Date.now()
+      code.expiresAt && isFutureExpiration(code.expiresAt)
         ? code.expiresAt
         : null
     setProcessingId(code.qrCodeId)
@@ -462,10 +469,12 @@ export function QrManagement({ connection, onError }: Props) {
             <strong>{inactiveCount}</strong>
           </article>
         </div>
-        <button className="hero-action" onClick={() => setShowIssue(true)}>
+        {canManage && <button className="hero-action" onClick={() => setShowIssue(true)}>
           + 새 QR 발급
-        </button>
+        </button>}
       </section>
+
+      {!canManage && <p className="permission-notice">STAFF 권한은 QR을 조회할 수 있지만 발급·상태 변경·재발급은 할 수 없습니다.</p>}
 
       <nav className="qr-list-tabs" aria-label="QR 목록 구분">
         <button
@@ -531,12 +540,12 @@ export function QrManagement({ connection, onError }: Props) {
                         QR 보기
                       </button>
                     )}
-                    <button
+                    {canManage && <button
                       disabled={processingId === code.qrCodeId}
                       onClick={() => void restoreCode(code)}
                     >
                       목록으로 복원
-                    </button>
+                    </button>}
                   </>
                 ) : (
                   <>
@@ -548,7 +557,7 @@ export function QrManagement({ connection, onError }: Props) {
                       >
                         QR 보기
                       </button>
-                    ) : (
+                    ) : canManage ? (
                       <button
                         className="vault-action needs-reissue"
                         disabled={processingId === code.qrCodeId}
@@ -556,8 +565,8 @@ export function QrManagement({ connection, onError }: Props) {
                       >
                         재발급 필요
                       </button>
-                    )}
-                    {code.status === 'ACTIVE' && (
+                    ) : null}
+                    {canManage && code.status === 'ACTIVE' && (
                       <button
                         disabled={processingId === code.qrCodeId}
                         onClick={() => void changeStatus(code, 'deactivate')}
@@ -565,7 +574,7 @@ export function QrManagement({ connection, onError }: Props) {
                         일시 중지
                       </button>
                     )}
-                    {code.status === 'INACTIVE' && (
+                    {canManage && code.status === 'INACTIVE' && (
                       <button
                         disabled={processingId === code.qrCodeId}
                         onClick={() => void changeStatus(code, 'activate')}
@@ -573,7 +582,7 @@ export function QrManagement({ connection, onError }: Props) {
                         다시 사용
                       </button>
                     )}
-                    {code.status === 'REVOKED' && (
+                    {canManage && code.status === 'REVOKED' && (
                       <button
                         className="archive-action"
                         disabled={processingId === code.qrCodeId}
@@ -582,7 +591,7 @@ export function QrManagement({ connection, onError }: Props) {
                         목록에서 제거
                       </button>
                     )}
-                    {!['REVOKED', 'EXPIRED'].includes(code.status) && (
+                    {canManage && !['REVOKED', 'EXPIRED'].includes(code.status) && (
                       <button
                         className="danger-text"
                         disabled={processingId === code.qrCodeId}

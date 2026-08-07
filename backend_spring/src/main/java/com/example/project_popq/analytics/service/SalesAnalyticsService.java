@@ -11,11 +11,15 @@ import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.domain.OrderStatusHistory;
 import com.example.project_popq.order.domain.OrderType;
 import com.example.project_popq.order.repository.OrderRepository;
-import com.example.project_popq.payment.domain.PaymentStatus;
+import com.example.project_popq.payment.domain.Payment;
+import com.example.project_popq.payment.domain.Refund;
+import com.example.project_popq.payment.domain.RefundStatus;
+import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -35,6 +39,7 @@ public class SalesAnalyticsService {
     private static final int MAX_RANGE_DAYS = 31;
 
     private final OrderRepository orderRepository;
+    private final PaymentRepository paymentRepository;
     private final StoreAuthorizationService storeAuthorizationService;
 
     @Transactional(readOnly = true)
@@ -53,14 +58,11 @@ public class SalesAnalyticsService {
                 StoreRole.STAFF
         );
 
-        List<Order> orders = orderRepository.findCompletedForAnalytics(
-                        storeId,
-                        OrderStatus.COMPLETED,
-                        PaymentStatus.PAID,
-                        from.atStartOfDay(BUSINESS_ZONE).toInstant(),
-                        to.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant()
-                );
-        return aggregate(from, to, orders);
+        List<Order> orders = orderRepository
+                .findAllByStoreIdOrderByCreatedAtAsc(storeId);
+        List<Payment> payments = paymentRepository
+                .findAllForStoreAnalytics(storeId);
+        return aggregate(from, to, orders, payments);
     }
 
     SalesSummaryResponse aggregate(
@@ -68,22 +70,47 @@ public class SalesAnalyticsService {
             LocalDate to,
             List<Order> orders
     ) {
+        return aggregate(from, to, orders, List.of());
+    }
+
+    SalesSummaryResponse aggregate(
+            LocalDate from,
+            LocalDate to,
+            List<Order> orders,
+            List<Payment> payments
+    ) {
         Map<LocalDate, DailyAccumulator> daily = new LinkedHashMap<>();
         from.datesUntil(to.plusDays(1))
                 .forEach(date -> daily.put(date, new DailyAccumulator()));
         Map<String, ProductAccumulator> products = new LinkedHashMap<>();
 
-        long netSales = 0;
+        long grossSales = 0;
+        long refundedAmount = 0;
+        int refundCount = 0;
+        int canceledOrderCount = 0;
+        long canceledAmount = 0;
         long dineInSales = 0;
         long takeoutSales = 0;
         int completedOrderCount = 0;
 
         for (Order order : orders) {
-            if (order.getStatus() != OrderStatus.COMPLETED) {
+            if (order.getStatus() == OrderStatus.CANCELED
+                    || order.getStatus() == OrderStatus.REJECTED) {
+                Instant canceledAt = statusChangedAt(order, order.getStatus());
+                if (isInRange(canceledAt, from, to)) {
+                    canceledOrderCount++;
+                    canceledAmount = Math.addExact(
+                            canceledAmount,
+                            order.getTotalAmount()
+                    );
+                }
+            }
+            if (order.getStatus() != OrderStatus.COMPLETED
+                    || !isInRange(completedAt(order), from, to)) {
                 continue;
             }
             long orderAmount = order.getTotalAmount();
-            netSales = Math.addExact(netSales, orderAmount);
+            grossSales = Math.addExact(grossSales, orderAmount);
             completedOrderCount++;
             if (order.getOrderType() == OrderType.DINE_IN) {
                 dineInSales = Math.addExact(dineInSales, orderAmount);
@@ -115,9 +142,33 @@ public class SalesAnalyticsService {
             }
         }
 
+        for (Payment payment : payments) {
+            for (Refund refund : payment.getRefunds()) {
+                if (refund.getStatus() != RefundStatus.SUCCEEDED
+                        || refund.getCompletedAt() == null
+                        || !isInRange(refund.getCompletedAt(), from, to)) {
+                    continue;
+                }
+                refundedAmount = Math.addExact(
+                        refundedAmount,
+                        refund.getAmount()
+                );
+                refundCount++;
+                LocalDate refundDate = refund.getCompletedAt()
+                        .atZone(BUSINESS_ZONE)
+                        .toLocalDate();
+                DailyAccumulator day = daily.get(refundDate);
+                if (day != null) {
+                    day.sales = Math.subtractExact(day.sales, refund.getAmount());
+                }
+            }
+        }
+
+        long netSales = Math.subtractExact(grossSales, refundedAmount);
+
         long averageOrderAmount = completedOrderCount == 0
                 ? 0
-                : netSales / completedOrderCount;
+                : grossSales / completedOrderCount;
         List<DailySalesResponse> dailySales = daily.entrySet().stream()
                 .map(entry -> new DailySalesResponse(
                         entry.getKey(),
@@ -142,7 +193,12 @@ public class SalesAnalyticsService {
         return new SalesSummaryResponse(
                 from,
                 to,
+                grossSales,
                 netSales,
+                refundedAmount,
+                refundCount,
+                canceledOrderCount,
+                canceledAmount,
                 completedOrderCount,
                 averageOrderAmount,
                 dineInSales,
@@ -168,13 +224,29 @@ public class SalesAnalyticsService {
     }
 
     private java.time.Instant completedAt(Order order) {
+        return statusChangedAt(order, OrderStatus.COMPLETED);
+    }
+
+    private Instant statusChangedAt(Order order, OrderStatus status) {
         return order.getStatusHistories().stream()
                 .filter(history ->
-                        history.getCurrentStatus() == OrderStatus.COMPLETED
+                        history.getCurrentStatus() == status
                 )
                 .map(OrderStatusHistory::getChangedAt)
                 .max(java.time.Instant::compareTo)
                 .orElse(order.getCreatedAt());
+    }
+
+    private boolean isInRange(
+            Instant instant,
+            LocalDate from,
+            LocalDate to
+    ) {
+        Instant fromInclusive = from.atStartOfDay(BUSINESS_ZONE).toInstant();
+        Instant toExclusive = to.plusDays(1)
+                .atStartOfDay(BUSINESS_ZONE)
+                .toInstant();
+        return !instant.isBefore(fromInclusive) && instant.isBefore(toExclusive);
     }
 
     private static final class DailyAccumulator {

@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react'
-import { getSellerStores, loginSeller, signUpSeller } from '../../services/api'
+import { getSellerStores, loginAccount, signUpSeller } from '../../services/api'
 import type {
   SellerAuthResult,
   SellerConnection,
   StoreSummary,
 } from '../../types'
 
-type AuthMode = 'login' | 'signup'
+type AuthMode = 'seller-login' | 'admin-login' | 'signup'
 
 type SellerAuthProps = {
   onAuthenticated: (connection: SellerConnection) => void
@@ -18,7 +18,7 @@ const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).+$/
 const PHONE_PATTERN = /^01[0-9]-?\d{3,4}-?\d{4}$/
 
 export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
-  const [mode, setMode] = useState<AuthMode>('login')
+  const [mode, setMode] = useState<AuthMode>('seller-login')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [passwordConfirm, setPasswordConfirm] = useState('')
@@ -44,6 +44,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       storeId: store.storeId,
       accessToken: auth.accessToken,
       storeName: store.name,
+      storeRole: store.myRole,
       user: auth.user,
     })
   }
@@ -64,11 +65,23 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
 
     setBusy(true)
     try {
-      const auth = await loginSeller(email.trim(), password)
-      if (auth.user.role !== 'SELLER') {
+      const expectedRole = mode === 'admin-login' ? 'ADMIN' : 'SELLER'
+      const auth = await loginAccount(email.trim(), password, expectedRole)
+      if (auth.user.role !== expectedRole) {
         throw new Error(
-          '일반 고객 계정은 판매자 웹에서 사용할 수 없습니다. 판매자 계정으로 로그인해 주세요.',
+          expectedRole === 'ADMIN'
+            ? '관리자 권한이 있는 계정만 관리자 화면에 로그인할 수 있습니다.'
+            : '판매자 권한이 있는 계정으로 로그인해 주세요.',
         )
+      }
+
+      if (expectedRole === 'ADMIN') {
+        onAuthenticated({
+          storeId: null,
+          accessToken: auth.accessToken,
+          user: auth.user,
+        })
+        return
       }
 
       const connection = { storeId: 0, accessToken: auth.accessToken }
@@ -141,7 +154,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
         name: normalizedName,
         phone: normalizedPhone,
       })
-      setMode('login')
+      setMode('seller-login')
       setPassword('')
       setPasswordConfirm('')
       setNotice('회원가입이 완료되었습니다. 로그인해 주세요.')
@@ -220,23 +233,42 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
 
       <section className="auth-card">
         <div className="auth-mobile-brand"><AuthBrand /></div>
-        <p className="eyebrow">SELLER ACCOUNT</p>
-        <h2>{mode === 'login' ? '판매자 로그인' : '판매자 회원가입'}</h2>
+        <p className="eyebrow">
+          {mode === 'admin-login' ? 'ADMIN ACCOUNT' : 'SELLER ACCOUNT'}
+        </p>
+        <h2>
+          {mode === 'seller-login'
+            ? '판매자 로그인'
+            : mode === 'admin-login'
+              ? '관리자 로그인'
+              : '판매자 회원가입'}
+        </h2>
         <p className="auth-description">
-          {mode === 'login'
+          {mode === 'seller-login'
             ? '판매자 앱에서 사용하던 계정으로 로그인할 수 있습니다.'
-            : '가입한 계정은 판매자 앱과 웹에서 함께 사용할 수 있습니다.'}
+            : mode === 'admin-login'
+              ? '플랫폼 관리자 권한이 있는 계정만 접근할 수 있습니다.'
+              : '가입한 계정은 판매자 앱과 웹에서 함께 사용할 수 있습니다.'}
         </p>
 
         <div className="auth-tabs" role="tablist" aria-label="인증 방식">
           <button
             type="button"
             role="tab"
-            aria-selected={mode === 'login'}
-            className={mode === 'login' ? 'active' : ''}
-            onClick={() => switchMode('login')}
+            aria-selected={mode === 'seller-login'}
+            className={mode === 'seller-login' ? 'active' : ''}
+            onClick={() => switchMode('seller-login')}
           >
-            로그인
+            판매자
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === 'admin-login'}
+            className={mode === 'admin-login' ? 'active' : ''}
+            onClick={() => switchMode('admin-login')}
+          >
+            관리자
           </button>
           <button
             type="button"
@@ -251,7 +283,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
 
         <form
           className="auth-form"
-          onSubmit={mode === 'login' ? handleLogin : handleSignup}
+          onSubmit={mode === 'signup' ? handleSignup : handleLogin}
           noValidate
         >
           <label>
@@ -259,7 +291,9 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
             <input
               type="email"
               autoComplete="email"
-              placeholder="seller@popq.kr"
+              placeholder={
+                mode === 'admin-login' ? 'admin@popq.kr' : 'seller@popq.kr'
+              }
               value={email}
               onChange={(event) => setEmail(event.target.value)}
               disabled={busy}
@@ -295,7 +329,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
             비밀번호
             <input
               type="password"
-              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
               placeholder={mode === 'signup' ? '영문·숫자 포함 8자 이상' : undefined}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
@@ -331,15 +365,17 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
 
           <button className="auth-submit" type="submit" disabled={busy}>
             {busy
-              ? mode === 'login' ? '로그인 중…' : '가입 처리 중…'
-              : mode === 'login' ? '로그인' : '회원가입'}
+              ? mode === 'signup' ? '가입 처리 중…' : '로그인 중…'
+              : mode === 'signup' ? '회원가입' : '로그인'}
           </button>
         </form>
 
-        <div className="auth-demo">
-          <span>백엔드 없이 화면을 둘러보고 싶다면</span>
-          <button type="button" onClick={onUseDemo}>데모로 체험하기</button>
-        </div>
+        {mode !== 'admin-login' && (
+          <div className="auth-demo">
+            <span>백엔드 없이 화면을 둘러보고 싶다면</span>
+            <button type="button" onClick={onUseDemo}>데모로 체험하기</button>
+          </div>
+        )}
       </section>
     </main>
   )

@@ -23,6 +23,7 @@ import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
 import 'notifications/seller_push_device_repository.dart';
+import 'notifications/seller_push_notification_service.dart';
 import 'realtime/seller_realtime_scope.dart';
 import 'routing/seller_router.dart';
 import 'theme/seller_theme.dart';
@@ -122,6 +123,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   late final _SellerBackButtonDispatcher _backButtonDispatcher;
 
   bool _isAppActive = true;
+  String? _pendingPushDeepLink;
+  bool _openingPushDeepLink = false;
 
   @override
   void initState() {
@@ -232,6 +235,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       identityRepository: identityRepository,
     );
 
+    _bootstrapController.addListener(_handleBootstrapChanged);
+
     _router = createSellerRouter(
       sessionController: _sessionController,
       bootstrapController: _bootstrapController,
@@ -261,6 +266,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       onNaverSignIn: _naverSignIn,
       minSplashDuration: widget.splashMinDuration,
     );
+
+    PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
 
     _backButtonDispatcher = _SellerBackButtonDispatcher(
       _router,
@@ -426,6 +433,85 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     }
   }
 
+  void _handlePushDeepLink(String deepLink) {
+    if (!_isSellerChatDeepLink(deepLink)) {
+      debugPrint('Seller 지원하지 않는 알림 경로: $deepLink');
+      return;
+    }
+
+    _pendingPushDeepLink = deepLink;
+
+    unawaited(_openPendingPushDeepLink());
+  }
+
+  bool _isSellerChatDeepLink(String deepLink) {
+    final uri = Uri.tryParse(deepLink);
+
+    if (uri == null) {
+      return false;
+    }
+
+    final segments = uri.pathSegments;
+
+    return segments.length == 2 &&
+        segments.first == 'customers' &&
+        segments[1].isNotEmpty &&
+        int.tryParse(uri.queryParameters['storeId'] ?? '') != null;
+  }
+
+  void _handleBootstrapChanged() {
+    unawaited(_openPendingPushDeepLink());
+  }
+
+  Future<void> _openPendingPushDeepLink() async {
+    if (_openingPushDeepLink) {
+      return;
+    }
+
+    final deepLink = _pendingPushDeepLink;
+
+    if (deepLink == null ||
+        !_sessionController.isSignedIn ||
+        _bootstrapController.status != SellerBootstrapStatus.ready) {
+      return;
+    }
+
+    final uri = Uri.tryParse(deepLink);
+    final storeId = int.tryParse(uri?.queryParameters['storeId'] ?? '');
+
+    if (uri == null || storeId == null) {
+      _pendingPushDeepLink = null;
+      return;
+    }
+
+    _openingPushDeepLink = true;
+
+    try {
+      if (_storeSelectionController.selectedStoreId != storeId) {
+        await _storeSelectionController.select(storeId);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
+      _pendingPushDeepLink = null;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+
+        _router.go(uri.path);
+      });
+    } catch (error, stackTrace) {
+      debugPrint('Seller 알림 채팅 이동 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _openingPushDeepLink = false;
+    }
+  }
+
   void _handleSessionChanged() {
     if (_sessionController.status == SessionStatus.restoring) {
       return;
@@ -437,6 +523,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     }
 
     unawaited(_registerPushDevice());
+    unawaited(_openPendingPushDeepLink());
 
     if (_isAppActive) {
       unawaited(_realtimeClient.connect());
@@ -526,6 +613,9 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     _sessionController.removeListener(_handleSessionChanged);
 
+    _bootstrapController.removeListener(_handleBootstrapChanged);
+
+    PushNotificationService.clearDeepLinkHandler();
     _realtimeClient.dispose();
     _router.dispose();
     _apiClient.close();

@@ -1,9 +1,58 @@
 import { Client } from '@stomp/stompjs'
-import type { OrderRealtimeEvent, SellerConnection } from '../types'
+import type {
+  OrderChatEvent,
+  OrderRealtimeEvent,
+  SellerConnection,
+} from '../types'
 
 function websocketUrl() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${protocol}//${window.location.host}/ws`
+}
+
+export type SellerChatRealtimeSession = {
+  disconnect: () => void
+  markRead: (orderPublicId: string, lastReadMessageId: number) => boolean
+}
+
+export function connectSellerChatRealtime(
+  connection: SellerConnection,
+  onEvent: (event: OrderChatEvent) => void,
+  onConnected?: () => void,
+  onDisconnected?: () => void,
+): SellerChatRealtimeSession {
+  const client = new Client({
+    brokerURL: websocketUrl(),
+    connectHeaders: {
+      Authorization: `Bearer ${connection.accessToken}`,
+    },
+    reconnectDelay: 3_000,
+    heartbeatIncoming: 10_000,
+    heartbeatOutgoing: 10_000,
+    onConnect: () => {
+      onConnected?.()
+      client.subscribe(
+        `/topic/stores/${connection.storeId}/chat`,
+        (message) => onEvent(JSON.parse(message.body) as OrderChatEvent),
+      )
+    },
+    onWebSocketClose: () => onDisconnected?.(),
+    onStompError: () => onDisconnected?.(),
+  })
+
+  client.activate()
+  return {
+    disconnect: () => { void client.deactivate() },
+    markRead: (orderPublicId, lastReadMessageId) => {
+      if (!client.connected) return false
+      client.publish({
+        destination: `/app/orders/${orderPublicId}/chat/read`,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ lastReadMessageId }),
+      })
+      return true
+    },
+  }
 }
 
 export function connectSellerRealtime(

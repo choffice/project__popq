@@ -3,6 +3,8 @@ import type {
   AdminSeller,
   AdminStore,
   AdminUser,
+  Announcement,
+  AnnouncementStatus,
   ApiEnvelope,
   BusinessStatus,
   OrderStatus,
@@ -18,6 +20,12 @@ import type {
   SellerOrder,
   SellerPaymentSummary,
   SellerProduct,
+  SellerConversationDetail,
+  SellerConversationSummary,
+  OrderMessage,
+  OrderMessagePage,
+  StoreDetail,
+  StoreSavePayload,
   StoreSummary,
   StoreTable,
 } from '../types'
@@ -44,10 +52,14 @@ async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
   return envelope.data
 }
 
-export function loginSeller(email: string, password: string) {
+export function loginAccount(
+  email: string,
+  password: string,
+  role: 'SELLER' | 'ADMIN',
+) {
   return publicRequest<SellerAuthResult>('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, role }),
   })
 }
 
@@ -490,6 +502,36 @@ export function getSellerStores(connection: SellerConnection) {
   return request<StoreSummary[]>('/api/v1/seller/stores', connection)
 }
 
+export function getSellerStoreDetail(connection: SellerConnection) {
+  return request<StoreDetail>(storePath(connection), connection)
+}
+
+export function createSellerStore(
+  connection: SellerConnection,
+  payload: StoreSavePayload,
+) {
+  return request<StoreSummary>('/api/v1/seller/stores', connection, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateSellerStore(
+  connection: SellerConnection,
+  payload: StoreSavePayload,
+) {
+  return request<StoreDetail>(storePath(connection), connection, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function deleteSellerStore(connection: SellerConnection) {
+  return request<boolean>(storePath(connection), connection, {
+    method: 'DELETE',
+  })
+}
+
 export function changeStoreBusinessStatus(
   connection: SellerConnection,
   businessStatus: BusinessStatus,
@@ -515,6 +557,115 @@ export function createStoreTable(
     {
       method: 'POST',
       body: JSON.stringify({ tableCode, name }),
+    },
+  )
+}
+
+export function getSellerAnnouncements(connection: SellerConnection) {
+  return request<Announcement[]>(
+    `${storePath(connection)}/announcements`,
+    connection,
+  )
+}
+
+export function createSellerAnnouncement(
+  connection: SellerConnection,
+  title: string,
+  content: string,
+) {
+  return request<Announcement>(
+    `${storePath(connection)}/announcements`,
+    connection,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title, content }),
+    },
+  )
+}
+
+export function updateSellerAnnouncement(
+  connection: SellerConnection,
+  announcementId: number,
+  title: string,
+  content: string,
+) {
+  return request<Announcement>(
+    `${storePath(connection)}/announcements/${announcementId}`,
+    connection,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ title, content }),
+    },
+  )
+}
+
+export function changeSellerAnnouncementStatus(
+  connection: SellerConnection,
+  announcementId: number,
+  status: AnnouncementStatus,
+) {
+  return request<Announcement>(
+    `${storePath(connection)}/announcements/${announcementId}/status`,
+    connection,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+  )
+}
+
+export function getSellerConversations(connection: SellerConnection) {
+  return request<SellerConversationSummary[]>(
+    `${storePath(connection)}/conversations`,
+    connection,
+  )
+}
+
+export function getSellerUnreadConversationCount(
+  connection: SellerConnection,
+) {
+  return request<number>(
+    `${storePath(connection)}/conversations/unread-count`,
+    connection,
+  )
+}
+
+export function getSellerConversation(
+  connection: SellerConnection,
+  orderPublicId: string,
+) {
+  return request<SellerConversationDetail>(
+    `${storePath(connection)}/orders/${orderPublicId}/messages`,
+    connection,
+  )
+}
+
+export function getSellerOrderMessages(
+  connection: SellerConnection,
+  orderPublicId: string,
+  beforeMessageId?: number,
+  size = 30,
+) {
+  const query = new URLSearchParams({ size: String(size) })
+  if (beforeMessageId) query.set('beforeMessageId', String(beforeMessageId))
+  return request<OrderMessagePage>(
+    `${storePath(connection)}/orders/${orderPublicId}/messages/page?${query.toString()}`,
+    connection,
+  )
+}
+
+export function sendSellerOrderMessage(
+  connection: SellerConnection,
+  orderPublicId: string,
+  content: string,
+  clientMessageId: string,
+) {
+  return request<OrderMessage>(
+    `${storePath(connection)}/orders/${orderPublicId}/messages`,
+    connection,
+    {
+      method: 'POST',
+      body: JSON.stringify({ content, clientMessageId }),
     },
   )
 }
