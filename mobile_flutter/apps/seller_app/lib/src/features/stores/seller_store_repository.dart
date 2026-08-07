@@ -102,7 +102,7 @@ class SellerStore {
       ),
       status: json['status'] as String,
       businessStatus: json['businessStatus'] as String,
-      myRole: json['myRole'] as String,
+      myRole: (json['myRole'] as String).trim().toUpperCase(),
     );
   }
 
@@ -129,6 +129,10 @@ class SellerStore {
   final String status;
   final String businessStatus;
   final String myRole;
+
+  bool get isOwner => myRole == 'OWNER';
+
+  bool get canManage => isOwner || myRole == 'MANAGER';
 
   SellerStore copyWith({
     String? storeType,
@@ -739,10 +743,15 @@ class ApiSellerStoreRepository
 
   @override
   Future<SellerStore> createDevelopmentStore() {
+    final schedule = SellerBusinessSchedule.standard();
     return create(
       storeType: 'LOCAL_STORE',
       name: 'POPQ 개발 스토어',
       description: '판매자 앱 개발용 자동 생성 스토어',
+      openTime: schedule.legacyOpenTimeForApi,
+      closeTime: schedule.legacyCloseTimeForApi,
+      closedDays: schedule.legacyClosedDays,
+      schedule: schedule,
     );
   }
 
@@ -1093,10 +1102,15 @@ class MemorySellerStoreRepository
 
   @override
   Future<SellerStore> createDevelopmentStore() {
+    final schedule = SellerBusinessSchedule.standard();
     return create(
       storeType: 'LOCAL_STORE',
       name: 'POPQ 개발 스토어',
       description: '판매자 앱 개발용 자동 생성 스토어',
+      openTime: schedule.legacyOpenTimeForApi,
+      closeTime: schedule.legacyCloseTimeForApi,
+      closedDays: schedule.legacyClosedDays,
+      schedule: schedule,
     );
   }
 

@@ -151,10 +151,7 @@ class _SellerStoreRegistrationScreenState
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
 
-  SellerBusinessSchedule _schedule = SellerBusinessSchedule.legacy(
-    openTime: '10:00',
-    closeTime: '22:00',
-  );
+  SellerBusinessSchedule _schedule = SellerBusinessSchedule.standard();
   final List<String> _tags = <String>[];
 
   bool _takeoutAvailable = true;
@@ -3315,11 +3312,6 @@ class _SellerStoreRegistrationScreenState
             representativeImageUrl;
       }
 
-      final SellerBusinessHour legacyHour = _schedule.legacyRepresentative;
-      final TimeOfDay legacyOpen =
-          legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
-      final TimeOfDay legacyClose =
-          legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
       final SellerStore created =
       await widget.repository.create(
         storeType: _storeType,
@@ -3343,12 +3335,8 @@ class _SellerStoreRegistrationScreenState
         longitude:
         _selectedStoreLocation?.longitude,
 
-        openTime: legacyHour.open24Hours
-            ? '00:00:00'
-            : _toApiTime(legacyOpen),
-        closeTime: legacyHour.open24Hours
-            ? '00:00:00'
-            : _toApiTime(legacyClose),
+        openTime: _schedule.legacyOpenTimeForApi,
+        closeTime: _schedule.legacyCloseTimeForApi,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
         takeoutAvailable:
@@ -3412,20 +3400,6 @@ class _SellerStoreRegistrationScreenState
         '사업장을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       );
     }
-  }
-
-  String _toApiTime(
-      TimeOfDay time,
-      ) {
-    final String hour = time.hour
-        .toString()
-        .padLeft(2, '0');
-
-    final String minute = time.minute
-        .toString()
-        .padLeft(2, '0');
-
-    return '$hour:$minute';
   }
 
   String? _emptyToNull(
