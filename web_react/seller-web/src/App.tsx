@@ -4,6 +4,7 @@ import { freshDemoOrders } from './data/demo'
 import {
   getSellerPaymentSummary,
   getSellerOrders,
+  getSellerStores,
   refundSellerOrder,
   transitionSellerOrder,
 } from './services/api'
@@ -22,6 +23,7 @@ import type {
   SellerConnection,
   SellerOrder,
   SellerPaymentSummary,
+  StoreSummary,
 } from './types'
 
 type OrderFilter = 'ACTIVE' | OrderStatus
@@ -148,6 +150,11 @@ function readDemoMode() {
   return window.sessionStorage.getItem(DEMO_KEY) === 'true'
 }
 
+function connectionScope(connection: SellerConnection | null) {
+  if (!connection) return null
+  return `${connection.user?.userId ?? 'anonymous'}:${connection.storeId ?? 'admin'}:${connection.accessToken}`
+}
+
 function lastChangedAt(order: SellerOrder) {
   const last = order.statusHistory.at(-1)?.changedAt
   return last ? new Date(last) : new Date()
@@ -222,15 +229,23 @@ function App() {
     useState<SellerPaymentSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showConnection, setShowConnection] = useState(false)
+  const [accountStores, setAccountStores] = useState<StoreSummary[]>([])
+  const [accountStoresLoading, setAccountStoresLoading] = useState(false)
+  const [accountStoresError, setAccountStoresError] = useState<string | null>(null)
   const seenEvents = useRef(new Set<string>())
+  const accountRequestId = useRef(0)
+  const activeConnectionScope = useRef(connectionScope(connection))
   const isDemo = authenticated && !connection
   const isAdmin = connection?.user?.role === 'ADMIN'
+  const storeScopeKey = isDemo ? 'demo' : `store-${connection?.storeId ?? 'none'}`
 
   const loadOrders = useCallback(async () => {
     if (!connection || connection.user?.role === 'ADMIN') return
+    const requestScope = connectionScope(connection)
     setLoading(true)
     try {
       const nextOrders = await getSellerOrders(connection)
+      if (activeConnectionScope.current !== requestScope) return
       setOrders(nextOrders)
       setSelectedId((current) =>
         current && nextOrders.some((order) => order.orderPublicId === current)
@@ -239,13 +254,16 @@ function App() {
       )
       setError(null)
     } catch (caught) {
+      if (activeConnectionScope.current !== requestScope) return
       setError(
         caught instanceof Error
           ? caught.message
           : '주문 목록을 불러오지 못했습니다.',
       )
     } finally {
-      setLoading(false)
+      if (activeConnectionScope.current === requestScope) {
+        setLoading(false)
+      }
     }
   }, [connection])
 
@@ -276,6 +294,32 @@ function App() {
     }
   }, [connection, loadOrders])
 
+  function openAccount() {
+    setShowConnection(true)
+    if (!connection || isAdmin) return
+    const requestId = accountRequestId.current + 1
+    accountRequestId.current = requestId
+    setAccountStoresLoading(true)
+    setAccountStoresError(null)
+    void getSellerStores(connection)
+      .then((stores) => {
+        if (accountRequestId.current === requestId) setAccountStores(stores)
+      })
+      .catch((caught: unknown) => {
+        if (accountRequestId.current !== requestId) return
+        setAccountStoresError(
+          caught instanceof Error
+            ? caught.message
+            : '스토어 목록을 불러오지 못했습니다.',
+        )
+      })
+      .finally(() => {
+        if (accountRequestId.current === requestId) {
+          setAccountStoresLoading(false)
+        }
+      })
+  }
+
   const visibleOrders = useMemo(() => {
     if (filter === 'ACTIVE') {
       return orders.filter((order) =>
@@ -289,6 +333,7 @@ function App() {
     orders.find((order) => order.orderPublicId === selectedId) ?? null
 
   useEffect(() => {
+    let active = true
     const timer = window.setTimeout(() => {
       if (!selectedOrder) {
         setPaymentSummary(null)
@@ -307,10 +352,12 @@ function App() {
       setPaymentLoading(true)
       void getSellerPaymentSummary(connection, selectedOrder.orderPublicId)
         .then((summary) => {
+          if (!active) return
           setPaymentSummary(summary)
           setError(null)
         })
         .catch((caught: unknown) => {
+          if (!active) return
           setPaymentSummary(null)
           setError(
             caught instanceof Error
@@ -318,9 +365,14 @@ function App() {
               : '결제 정보를 불러오지 못했습니다.',
           )
         })
-        .finally(() => setPaymentLoading(false))
+        .finally(() => {
+          if (active) setPaymentLoading(false)
+        })
     }, 0)
-    return () => window.clearTimeout(timer)
+    return () => {
+      active = false
+      window.clearTimeout(timer)
+    }
   }, [connection, selectedOrder])
 
   const openOrders = orders.filter((order) =>
@@ -441,6 +493,7 @@ function App() {
       JSON.stringify(nextConnection),
     )
     window.sessionStorage.removeItem(DEMO_KEY)
+    activeConnectionScope.current = connectionScope(nextConnection)
     setConnection(nextConnection)
     setAuthenticated(true)
     setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
@@ -454,6 +507,7 @@ function App() {
   function useDemo() {
     window.sessionStorage.removeItem(CONNECTION_KEY)
     window.sessionStorage.setItem(DEMO_KEY, 'true')
+    activeConnectionScope.current = null
     setConnection(null)
     setAuthenticated(true)
     setActiveView('orders')
@@ -468,12 +522,40 @@ function App() {
   function signOut() {
     window.sessionStorage.removeItem(CONNECTION_KEY)
     window.sessionStorage.removeItem(DEMO_KEY)
+    activeConnectionScope.current = null
     setConnection(null)
     setAuthenticated(false)
     setActiveView('orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
+    setError(null)
+    setShowConnection(false)
+  }
+
+  function switchStore(store: StoreSummary) {
+    if (!connection || connection.storeId === store.storeId) return
+    const nextConnection: SellerConnection = {
+      ...connection,
+      storeId: store.storeId,
+      storeName: store.name,
+    }
+    window.sessionStorage.setItem(
+      CONNECTION_KEY,
+      JSON.stringify(nextConnection),
+    )
+    activeConnectionScope.current = connectionScope(nextConnection)
+    seenEvents.current.clear()
+    setConnection(nextConnection)
+    setOrders([])
+    setSelectedId(null)
+    setFilter('ACTIVE')
+    setPaymentSummary(null)
+    setPaymentLoading(false)
+    setProcessing(false)
+    setConnected(false)
+    setLoading(true)
+    setBusinessStatus(store.businessStatus)
     setError(null)
     setShowConnection(false)
   }
@@ -556,7 +638,7 @@ function App() {
           )}
         </nav>
         <div className="sidebar-bottom">
-          <button className="profile-button" onClick={() => setShowConnection(true)}>
+          <button className="profile-button" onClick={openAccount}>
             <span>{isAdmin ? 'AD' : 'SL'}</span>
             <div>
               <strong>{isDemo ? '데모 운영자' : connection?.user?.name ?? '판매자'}</strong>
@@ -614,7 +696,7 @@ function App() {
             <button
               className="icon-button"
               aria-label="계정 설정"
-              onClick={() => setShowConnection(true)}
+              onClick={openAccount}
             >
               ⚙
             </button>
@@ -638,7 +720,12 @@ function App() {
                   minute: '2-digit',
                 })}
               </strong>
-              <p>성수 라운지의 주문 흐름이 안정적입니다.</p>
+              <p>
+                {isDemo
+                  ? '데모 스토어'
+                  : connection?.storeName ?? `스토어 ${connection?.storeId}`}
+                의 주문 흐름이 안정적입니다.
+              </p>
             </div>
             <article>
               <span className="metric-icon coral">↘</span>
@@ -765,16 +852,29 @@ function App() {
           </section>
         </main>}
         {activeView === 'products' && (
-          <ProductManagement connection={connection} onError={setError} />
+          <ProductManagement
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+          />
         )}
         {activeView === 'qr' && (
-          <QrManagement connection={connection} onError={setError} />
+          <QrManagement
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+          />
         )}
         {activeView === 'analytics' && (
-          <SalesAnalytics connection={connection} onError={setError} />
+          <SalesAnalytics
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+          />
         )}
         {activeView === 'settings' && (
           <StoreSettings
+            key={storeScopeKey}
             connection={connection}
             onError={setError}
             onBusinessStatusChange={setBusinessStatus}
@@ -828,6 +928,55 @@ function App() {
                   ? `${connection?.user?.email ?? '관리자 계정'} · 플랫폼 관리자`
                   : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
             </p>
+            {!isDemo && !isAdmin && (
+              <div className="account-store-switcher">
+                <div className="account-store-heading">
+                  <strong>운영 스토어</strong>
+                  <small>전환하면 스토어별 운영 데이터가 새로 연결됩니다.</small>
+                </div>
+                {accountStoresLoading ? (
+                  <p className="account-store-status">스토어를 불러오는 중…</p>
+                ) : accountStoresError ? (
+                  <p className="account-store-error" role="alert">
+                    {accountStoresError}
+                  </p>
+                ) : (
+                  <div className="account-store-list">
+                    {accountStores.map((store) => {
+                      const current = store.storeId === connection?.storeId
+                      return (
+                        <button
+                          key={store.storeId}
+                          type="button"
+                          className={current ? 'current' : ''}
+                          disabled={current}
+                          aria-label={
+                            current
+                              ? `${store.name} 현재 스토어`
+                              : `${store.name}로 전환`
+                          }
+                          onClick={() => switchStore(store)}
+                        >
+                          <span>{store.name.slice(0, 1)}</span>
+                          <div>
+                            <strong>{store.name}</strong>
+                            <small>
+                              {store.myRole} · {store.businessStatus}
+                            </small>
+                          </div>
+                          <b>{current ? '현재' : '전환'}</b>
+                        </button>
+                      )
+                    })}
+                    {accountStores.length === 0 && (
+                      <p className="account-store-status">
+                        전환할 수 있는 스토어가 없습니다.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <button className="primary-action" onClick={signOut}>
               {isDemo ? '로그인 화면으로 이동' : '로그아웃'}
             </button>

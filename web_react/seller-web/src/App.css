@@ -59,6 +59,7 @@
 
 :root[data-theme='dark'] .auth-tabs,
 :root[data-theme='dark'] .auth-store-list > button,
+:root[data-theme='dark'] .account-store-list > button,
 :root[data-theme='dark'] .order-card,
 :root[data-theme='dark'] .detail-panel,
 :root[data-theme='dark'] .connection-modal,
@@ -75,6 +76,10 @@
   background: #111c25;
   border-color: var(--line);
   color: var(--ink);
+}
+
+:root[data-theme='dark'] .account-store-list > button.current {
+  background: #1b2922;
 }
 
 :root[data-theme='dark'] .auth-tabs button.active,
@@ -1653,6 +1658,111 @@ main {
   background: #fff;
   color: var(--ink);
   resize: vertical;
+}
+
+.account-store-switcher {
+  margin: 4px 0 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.account-store-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.account-store-heading strong {
+  font-size: 12px;
+}
+
+.account-store-heading small,
+.account-store-status,
+.account-store-error {
+  color: #8a867d;
+  font-size: 9px;
+}
+
+.account-store-status,
+.account-store-error {
+  margin: 14px 0 0;
+}
+
+.account-store-error {
+  color: #b05b47;
+}
+
+.account-store-list {
+  max-height: 230px;
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+}
+
+.account-store-list > button {
+  width: 100%;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+}
+
+.account-store-list > button:hover:not(:disabled) {
+  border-color: var(--violet);
+}
+
+.account-store-list > button.current {
+  background: #f2f5ec;
+}
+
+.account-store-list > button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.account-store-list > button > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--violet-soft);
+  color: #6654ae;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.account-store-list > button > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.account-store-list > button strong,
+.account-store-list > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-store-list > button strong {
+  font-size: 11px;
+}
+
+.account-store-list > button small {
+  color: #8a867d;
+  font-size: 8px;
+}
+
+.account-store-list > button b {
+  color: #6557ad;
+  font-size: 9px;
 }
 
 .management-page {
