@@ -1,12 +1,14 @@
 package com.example.project_popq.announcement.service;
 
 import com.example.project_popq.announcement.domain.Announcement;
+import com.example.project_popq.announcement.domain.AnnouncementStatus;
 import com.example.project_popq.announcement.dto.AnnouncementResponse;
 import com.example.project_popq.announcement.dto.ChangeAnnouncementStatusRequest;
 import com.example.project_popq.announcement.dto.SaveAnnouncementRequest;
 import com.example.project_popq.announcement.repository.AnnouncementRepository;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
+import com.example.project_popq.notification.service.AnnouncementNotificationService;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.repository.StoreRepository;
@@ -25,6 +27,7 @@ public class AnnouncementService {
     private final AnnouncementRepository announcementRepository;
     private final StoreRepository storeRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final AnnouncementNotificationService announcementNotificationService;
 
     @Transactional(readOnly = true)
     public List<AnnouncementResponse> findAll(User user, Long storeId) {
@@ -52,6 +55,7 @@ public class AnnouncementService {
                         request.content().trim()
                 )
         );
+        publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
     }
 
@@ -68,6 +72,7 @@ public class AnnouncementService {
                 request.title().trim(),
                 request.content().trim()
         );
+        publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
     }
 
@@ -92,6 +97,25 @@ public class AnnouncementService {
                 ));
     }
 
+    private void publishAndNotifyIfRequested(
+            Announcement announcement,
+            SaveAnnouncementRequest request
+    ) {
+        if (!request.notifyInterestedCustomers()) {
+            return;
+        }
+        Instant now = Instant.now();
+        announcement.changeStatus(
+                AnnouncementStatus.PUBLISHED,
+                now
+        );
+        announcementRepository.flush();
+        announcementNotificationService.notifyInterestedCustomers(
+                announcement,
+                now
+        );
+    }
+
     private void requireStoreMember(User user, Long storeId) {
         storeAuthorizationService.requireAnyRole(
                 user.getId(),
@@ -111,4 +135,3 @@ public class AnnouncementService {
         );
     }
 }
-

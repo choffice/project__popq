@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -30,7 +32,10 @@ class SellerOrderDetailScreen extends StatefulWidget {
       _SellerOrderDetailScreenState();
 }
 
-class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
+class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
+    with WidgetsBindingObserver {
+  static const _orderPollingInterval = Duration(seconds: 3);
+
   SellerOrder? _order;
   SellerPaymentSummary? _payment;
   SellerReview? _review;
@@ -41,6 +46,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   var _paymentLoading = false;
   var _canRefund = false;
   var _defaultPreparationMinutes = 10;
+  var _backgroundSyncing = false;
+  var _isAppActive = true;
+  Timer? _orderPollingTimer;
 
   int get _storeId {
     final storeId = widget.storeId ?? widget.selectionController.selectedStoreId;
@@ -51,7 +59,30 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _isAppActive = WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
     _load();
+    _startOrderPolling();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    _isAppActive = state == AppLifecycleState.resumed;
+    if (_isAppActive) {
+      _startOrderPolling();
+      unawaited(_sync(showMessage: false));
+    } else {
+      _stopOrderPolling();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopOrderPolling();
+    super.dispose();
   }
 
   @override
@@ -464,14 +495,18 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     }
   }
 
-  Future<void> _sync() async {
+  Future<void> _sync({bool showMessage = true}) async {
     final current = _order;
 
-    if (current == null || _processing) {
+    if (current == null || _processing || _backgroundSyncing) {
       return;
     }
 
-    setState(() => _processing = true);
+    if (showMessage) {
+      setState(() => _processing = true);
+    } else {
+      _backgroundSyncing = true;
+    }
 
     try {
       final result = await widget.repository.sync(
@@ -484,28 +519,56 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         return;
       }
 
-      setState(() {
-        if (result.order != null) {
-          _order = result.order;
-        }
+      final updatedOrder = result.order;
+      final becameCompleted = updatedOrder?.status == 'COMPLETED' &&
+          current.status != 'COMPLETED';
+      if (updatedOrder != null || showMessage) {
+        setState(() {
+          if (updatedOrder != null) {
+            _order = updatedOrder;
+          }
+          if (showMessage) {
+            _processing = false;
+          }
+        });
+      }
 
-        _processing = false;
-      });
+      if (becameCompleted) {
+        await Future.wait(<Future<void>>[_loadPayment(), _loadReview()]);
+      }
 
-      _showMessage(
-        result.refreshRequired
-            ? '최신 주문 상태로 갱신했습니다.'
-            : '이미 최신 상태입니다.',
-      );
+      if (showMessage) {
+        _showMessage(
+          result.refreshRequired
+              ? '최신 주문 상태로 갱신했습니다.'
+              : '이미 최신 상태입니다.',
+        );
+      }
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      setState(() => _processing = false);
-
-      _showMessage('최신 상태를 확인하지 못했습니다.');
+      if (showMessage) {
+        setState(() => _processing = false);
+        _showMessage('최신 상태를 확인하지 못했습니다.');
+      }
+    } finally {
+      _backgroundSyncing = false;
     }
+  }
+
+  void _startOrderPolling() {
+    if (!_isAppActive || (_orderPollingTimer?.isActive ?? false)) return;
+    _orderPollingTimer = Timer.periodic(
+      _orderPollingInterval,
+      (_) => unawaited(_sync(showMessage: false)),
+    );
+  }
+
+  void _stopOrderPolling() {
+    _orderPollingTimer?.cancel();
+    _orderPollingTimer = null;
   }
 
   Future<void> _reject() async {
@@ -825,29 +888,87 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   }
 
   Future<void> _editReviewReply(SellerReview review) async {
+    List<SellerReviewReplyTemplate> templates;
+    try {
+      templates = await widget.reviewRepository.findReplyTemplates(_storeId);
+    } catch (_) {
+      templates = const <SellerReviewReplyTemplate>[];
+    }
+    if (!mounted) return;
+
     final controller = TextEditingController(text: review.sellerReply ?? '');
+    var selectedTemplateId = 0;
     final value = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('리뷰 답글'),
-        content: TextField(controller: controller, maxLength: 1000, maxLines: 5),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
-          FilledButton(
-            onPressed: () {
-              final reply = controller.text.trim();
-              if (reply.isNotEmpty) Navigator.pop(context, reply);
-            },
-            child: const Text('저장'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('리뷰 답글'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                DropdownButtonFormField<int>(
+                  initialValue: selectedTemplateId,
+                  decoration: const InputDecoration(labelText: '대표 답글 문구'),
+                  items: <DropdownMenuItem<int>>[
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('저장된 답글 없음'),
+                    ),
+                    ...templates.map(
+                      (template) => DropdownMenuItem<int>(
+                        value: template.templateId,
+                        child: Text(
+                          template.content,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (int? value) {
+                    if (value == null) return;
+                    setDialogState(() => selectedTemplateId = value);
+                    if (value == 0) return;
+                    controller.text = templates
+                        .firstWhere((item) => item.templateId == value)
+                        .content;
+                  },
+                ),
+                const SizedBox(height: PopqSpacing.sm),
+                TextField(
+                  controller: controller,
+                  maxLength: 1000,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: '답글 내용'),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final reply = controller.text.trim();
+                if (reply.isNotEmpty) Navigator.pop(context, reply);
+              },
+              child: const Text('작성 완료'),
+            ),
+          ],
+        ),
       ),
     );
     controller.dispose();
     if (value == null || !mounted) return;
     try {
-      await widget.reviewRepository.reply(_storeId, review.reviewId, value);
-      if (mounted) await _loadReview();
+      final saved =
+          await widget.reviewRepository.reply(_storeId, review.reviewId, value);
+      if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 저장하지 못했습니다.');
     }
@@ -866,8 +987,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     );
     if (confirmed != true) return;
     try {
-      await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
-      if (mounted) await _loadReview();
+      final saved =
+          await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
+      if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 삭제하지 못했습니다.');
     }

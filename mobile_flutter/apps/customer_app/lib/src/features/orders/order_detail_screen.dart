@@ -38,12 +38,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   PopqRealtimeClient? _realtimeClient;
   PopqRealtimeSubscription? _customerChatSubscription;
   Timer? _fallbackPollingTimer;
+  Timer? _orderPollingTimer;
 
   Object? _error;
 
   var _unreadCount = 0;
   var _loading = true;
   var _syncing = false;
+  var _backgroundSyncing = false;
   var _unreadRequestInProgress = false;
   var _requestGeneration = 0;
   var _observedConnectionEpoch = 0;
@@ -61,6 +63,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             AppLifecycleState.resumed;
 
     _load();
+    _startOrderPolling();
   }
 
   @override
@@ -122,6 +125,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     switch (state) {
       case AppLifecycleState.resumed:
         _isAppActive = true;
+        _startOrderPolling();
         _syncFallbackPollingWithRealtime();
 
         unawaited(
@@ -132,6 +136,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
       case AppLifecycleState.inactive:
         _isAppActive = false;
+        _stopOrderPolling();
         _stopFallbackPolling();
         return;
 
@@ -139,6 +144,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
         _isAppActive = false;
+        _stopOrderPolling();
         _stopFallbackPolling();
         return;
     }
@@ -151,6 +157,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     WidgetsBinding.instance.removeObserver(this);
 
     _stopFallbackPolling();
+    _stopOrderPolling();
 
     _customerChatSubscription?.cancel();
     _customerChatSubscription = null;
@@ -476,16 +483,18 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     }
   }
 
-  Future<void> _sync() async {
+  Future<void> _sync({bool showMessage = true}) async {
     final current = _order;
 
-    if (current == null || _syncing) {
+    if (current == null || _syncing || _backgroundSyncing) {
       return;
     }
 
-    setState(() {
-      _syncing = true;
-    });
+    if (showMessage) {
+      setState(() => _syncing = true);
+    } else {
+      _backgroundSyncing = true;
+    }
 
     try {
       final result = await widget.repository.sync(
@@ -500,44 +509,66 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         return;
       }
 
-      setState(() {
-        if (result.order != null) {
-          _order = result.order;
-        }
+      final hasChanges = result.order != null ||
+          unreadCount != null && unreadCount != _unreadCount;
+      if (hasChanges || showMessage) {
+        setState(() {
+          if (result.order != null) {
+            _order = result.order;
+          }
+          if (unreadCount != null) {
+            _unreadCount = unreadCount;
+          }
+          if (showMessage) {
+            _syncing = false;
+          }
+        });
+      }
 
-        if (unreadCount != null) {
-          _unreadCount = unreadCount;
-        }
-
-        _syncing = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.refreshRequired
-                ? '최신 주문 상태로 갱신했습니다.'
-                : '이미 최신 상태입니다.',
+      if (showMessage) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              result.refreshRequired
+                  ? '최신 주문 상태로 갱신했습니다.'
+                  : '이미 최신 상태입니다.',
+            ),
           ),
-        ),
-      );
+        );
+      }
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      setState(() {
-        _syncing = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            '최신 상태를 확인하지 못했습니다.',
+      if (showMessage) {
+        setState(() => _syncing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              '최신 상태를 확인하지 못했습니다.',
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } finally {
+      _backgroundSyncing = false;
     }
+  }
+
+  void _startOrderPolling() {
+    if (!_isAppActive || (_orderPollingTimer?.isActive ?? false)) {
+      return;
+    }
+    _orderPollingTimer = Timer.periodic(
+      _fallbackPollingInterval,
+      (_) => unawaited(_sync(showMessage: false)),
+    );
+  }
+
+  void _stopOrderPolling() {
+    _orderPollingTimer?.cancel();
+    _orderPollingTimer = null;
   }
 
   Future<void> _openInquiry() async {

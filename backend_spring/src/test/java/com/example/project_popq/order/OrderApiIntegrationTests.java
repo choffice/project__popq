@@ -87,7 +87,7 @@ class OrderApiIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+                .andExpect(jsonPath("$.data.status").value("PREPARING"));
 
         mockMvc.perform(get(
                         "/api/v1/seller/stores/{storeId}/orders/{orderId}",
@@ -96,7 +96,7 @@ class OrderApiIntegrationTests {
                 )
                         .header("Authorization", "Bearer " + sellerToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.data.status").value("PREPARING"))
                 .andExpect(jsonPath("$.data.version").value(2))
                 .andExpect(jsonPath("$.data.statusHistory.length()").value(3));
 
@@ -109,7 +109,7 @@ class OrderApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.refreshRequired").value(true))
                 .andExpect(jsonPath("$.data.serverVersion").value(2))
-                .andExpect(jsonPath("$.data.order.status").value("ACCEPTED"));
+                .andExpect(jsonPath("$.data.order.status").value("PREPARING"));
 
         mockMvc.perform(get(
                         "/api/v1/qr/orders/{orderId}/sync",

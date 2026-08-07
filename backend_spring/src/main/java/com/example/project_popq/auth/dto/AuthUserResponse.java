@@ -8,6 +8,7 @@ public record AuthUserResponse(
         Long userId,
         String email,
         String name,
+        String phone,
         PlatformRole role,
         UserStatus status
 ) {
@@ -16,6 +17,7 @@ public record AuthUserResponse(
             user.getId(),
             user.getEmail(),
             user.getName(),
+            user.getPhone(),
             user.getRole(),
             user.getStatus()
         );
@@ -29,6 +31,7 @@ public record AuthUserResponse(
             user.getId(),
             user.getEmail(),
             user.getName(),
+            user.getPhone(),
             activeRole,
             user.getStatus()
         );
