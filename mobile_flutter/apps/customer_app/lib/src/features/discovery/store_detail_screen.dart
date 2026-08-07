@@ -192,7 +192,8 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                           ),
                           _AvailabilityChip(
                             label: '주문 접수',
-                            available: store.orderAcceptingEnabled,
+                            available: store.businessStatus == 'OPEN' &&
+                                store.orderAcceptingEnabled,
                           ),
                         ],
                       ),

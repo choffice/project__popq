@@ -8,6 +8,7 @@ import com.example.project_popq.order.dto.OrderCommandRequest;
 import com.example.project_popq.order.dto.OrderResponse;
 import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.OrderCommandService;
+import com.example.project_popq.order.service.SellerOrderManagementService;
 import com.example.project_popq.payment.dto.CreateSellerRefundRequest;
 import com.example.project_popq.payment.dto.SellerPaymentSummaryResponse;
 import com.example.project_popq.payment.service.SellerRefundService;
@@ -34,6 +35,7 @@ public class SellerOrderController {
 
     private final CurrentUserService currentUserService;
     private final OrderCommandService orderCommandService;
+    private final SellerOrderManagementService sellerOrderManagementService;
     private final SellerRefundService sellerRefundService;
 
     @GetMapping
@@ -45,7 +47,7 @@ public class SellerOrderController {
             @RequestParam(required = false) LocalDate date
     ) {
         return ApiResponse.success(
-                orderCommandService.findSellerOrders(
+                sellerOrderManagementService.findSellerOrders(
                         currentUserService.getRequired(jwt),
                         storeId,
                         status,
@@ -95,7 +97,7 @@ public class SellerOrderController {
             @Valid @RequestBody AcceptOrderRequest request
     ) {
         return ApiResponse.success(
-                orderCommandService.acceptBySeller(
+                sellerOrderManagementService.acceptBySeller(
                         currentUserService.getRequired(jwt),
                         storeId,
                         orderPublicId,

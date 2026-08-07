@@ -372,9 +372,6 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         .where((store) {
           final nameMatches = store.name.toLowerCase().contains(query);
 
-          final descriptionMatches =
-              store.description?.toLowerCase().contains(query) ?? false;
-
           final addressMatches =
               store.address?.toLowerCase().contains(query) ?? false;
 
@@ -383,7 +380,6 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           );
 
           return nameMatches ||
-              descriptionMatches ||
               addressMatches ||
               tagMatches;
         })
@@ -1094,6 +1090,12 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
 
     if (decision == PermissionDecision.granted) {
+      await _focusCurrentLocationOnMap();
+
+      if (!mounted) {
+        return;
+      }
+
       _reloadWalkingRouteForSelectedStore();
       return;
     }
@@ -1120,11 +1122,27 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (decision == PermissionDecision.granted) {
+      await _focusCurrentLocationOnMap();
+
+      if (!mounted) {
+        return;
+      }
+
       _reloadWalkingRouteForSelectedStore();
       return;
     }
 
     _showLocationDecisionMessage(decision);
+  }
+
+  Future<void> _focusCurrentLocationOnMap() async {
+    final location = _controller.location;
+
+    if (location == null) {
+      return;
+    }
+
+    await _mapController.focusStoreLocation(location);
   }
 
   void _showLocationDecisionMessage(PermissionDecision decision) {
@@ -1971,6 +1989,7 @@ IconData _storeTypeIcon(String storeType) {
 String _businessStatusLabel(String businessStatus) {
   return switch (businessStatus) {
     'OPEN' => '영업 중',
+    'PRE_OPEN' => '영업 준비',
     'CLOSED' => '영업 종료',
     'TEMPORARILY_CLOSED' => '임시 휴무',
     _ => businessStatus,

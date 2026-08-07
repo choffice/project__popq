@@ -24,10 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PublicStoreQueryService {
 
     private static final double EARTH_RADIUS_METERS = 6_371_000.0;
+    private static final List<BusinessStatus> DISCOVERABLE_BUSINESS_STATUSES =
+            List.of(BusinessStatus.PRE_OPEN, BusinessStatus.OPEN);
 
     private final StoreRepository storeRepository;
     private final StoreTagRepository storeTagRepository;
-    private final StoreOperatingHoursPolicy operatingHoursPolicy;
     private final StoreScheduleService storeScheduleService;
 
     @Transactional(readOnly = true)
@@ -48,9 +49,6 @@ public class PublicStoreQueryService {
         Map<Long, StoreScheduleResponse> schedules =
                 storeScheduleService.findAllForEvaluation(stores, now);
         return stores.stream()
-                .filter(store -> operatingHoursPolicy.isWithinOperatingHours(
-                        store, now, schedules.get(store.getId())
-                ))
                 .map(store -> toResponse(
                         store,
                         tagsByStore.getOrDefault(store.getId(), List.of()),
@@ -70,18 +68,13 @@ public class PublicStoreQueryService {
 
     @Transactional(readOnly = true)
     public PublicStoreResponse findDetail(Long storeId) {
-        Store store = storeRepository.findByIdAndStatusAndBusinessStatus(
+        Store store = storeRepository.findByIdAndStatusAndBusinessStatusIn(
                         storeId,
                         StoreStatus.ACTIVE,
-                        BusinessStatus.OPEN
+                        DISCOVERABLE_BUSINESS_STATUSES
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         StoreScheduleResponse schedule = storeScheduleService.find(store);
-        if (!operatingHoursPolicy.isWithinOperatingHours(
-                store, Instant.now(), schedule
-        )) {
-            throw new BusinessException(ErrorCode.STORE_NOT_FOUND);
-        }
         List<String> tags = storeTagRepository.findAllByStoreId(storeId)
                 .stream()
                 .map(storeTag -> storeTag.getTag().getName())
