@@ -9,12 +9,7 @@ import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.CustomerOrderService;
 import com.example.project_popq.order.service.OrderCommandService;
 import com.example.project_popq.payment.dto.ConfirmPaymentRequest;
-import com.example.project_popq.payment.dto.KakaoPaymentApproveRequest;
-import com.example.project_popq.payment.dto.KakaoPaymentApproveResponse;
-import com.example.project_popq.payment.dto.KakaoPaymentPrepareRequest;
-import com.example.project_popq.payment.dto.KakaoPaymentPrepareResponse;
 import com.example.project_popq.payment.dto.PaymentResponse;
-import com.example.project_popq.payment.service.KakaoPaymentService;
 import com.example.project_popq.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -41,7 +36,6 @@ public class CustomerOrderController {
     private final CurrentUserService currentUserService;
     private final CustomerOrderService customerOrderService;
     private final PaymentService paymentService;
-    private final KakaoPaymentService kakaoPaymentService;
     private final OrderCommandService orderCommandService;
 
     @PostMapping("/stores/{storeId}")
@@ -111,44 +105,6 @@ public class CustomerOrderController {
     ) {
         return ApiResponse.success(
             paymentService.confirmCustomer(
-                currentUserService.getRequired(jwt),
-                orderPublicId,
-                request
-            )
-        );
-    }
-
-    @PostMapping(
-        "/{orderPublicId}/payments/kakao/prepare"
-    )
-    public ApiResponse<KakaoPaymentPrepareResponse>
-    prepareKakaoPayment(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String orderPublicId,
-        @Valid @RequestBody
-        KakaoPaymentPrepareRequest request
-    ) {
-        return ApiResponse.success(
-            kakaoPaymentService.prepareCustomer(
-                currentUserService.getRequired(jwt),
-                orderPublicId,
-                request.idempotencyKey()
-            )
-        );
-    }
-
-    @PostMapping(
-        "/{orderPublicId}/payments/kakao/approve"
-    )
-    public ApiResponse<KakaoPaymentApproveResponse>
-    approveKakaoPayment(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable String orderPublicId,
-        @Valid @RequestBody
-        KakaoPaymentApproveRequest request
-    ) {
-        return ApiResponse.success(
-            kakaoPaymentService.approveCustomer(
                 currentUserService.getRequired(jwt),
                 orderPublicId,
                 request

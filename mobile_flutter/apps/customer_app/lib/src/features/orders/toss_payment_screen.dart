@@ -6,6 +6,27 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+enum TossPaymentFlow {
+  integrated,
+  naverPayDirect,
+}
+
+extension TossPaymentFlowView on TossPaymentFlow {
+  String get title {
+    return switch (this) {
+      TossPaymentFlow.integrated => '카드·간편결제',
+      TossPaymentFlow.naverPayDirect => '네이버페이 결제',
+    };
+  }
+
+  String get loadingMessage {
+    return switch (this) {
+      TossPaymentFlow.integrated => '토스 결제창을 준비하고 있어요...',
+      TossPaymentFlow.naverPayDirect => '네이버페이 결제창을 준비하고 있어요...',
+    };
+  }
+}
+
 class TossPaymentResult {
   const TossPaymentResult.success({
     required this.paymentKey,
@@ -39,6 +60,7 @@ class TossPaymentScreen extends StatefulWidget {
     required this.orderId,
     required this.orderName,
     required this.amount,
+    this.flow = TossPaymentFlow.integrated,
     super.key,
   });
 
@@ -46,6 +68,7 @@ class TossPaymentScreen extends StatefulWidget {
   final String orderId;
   final String orderName;
   final int amount;
+  final TossPaymentFlow flow;
 
   @override
   State<TossPaymentScreen> createState() {
@@ -545,6 +568,24 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
   }
 
   String _buildPaymentHtml() {
+    final cardOptions = switch (widget.flow) {
+      TossPaymentFlow.integrated => '''
+          card: {
+            flowMode: "DEFAULT"
+          },
+      ''',
+      TossPaymentFlow.naverPayDirect => '''
+          card: {
+            flowMode: "DIRECT",
+            easyPay: "NAVERPAY"
+          },
+      ''',
+    };
+
+    final loadingMessage = jsonEncode(
+      widget.flow.loadingMessage,
+    );
+
     final clientKey = jsonEncode(
       widget.clientKey,
     );
@@ -608,7 +649,7 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
 
 <body>
   <div class="loading">
-    토스 결제창을 준비하고 있어요...
+    <span id="loading-message"></span>
   </div>
 
   <script>
@@ -622,6 +663,8 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
 
         await payment.requestPayment({
           method: "CARD",
+
+          $cardOptions
 
           amount: {
             currency: "KRW",
@@ -651,6 +694,9 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
       }
     }
 
+    document.getElementById("loading-message").textContent =
+      $loadingMessage;
+
     startPayment();
   </script>
 </body>
@@ -679,7 +725,7 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
     if (kIsWeb) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('토스 결제'),
+          title: Text(widget.flow.title),
         ),
         body: const Center(
           child: Padding(
@@ -698,7 +744,7 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('토스 결제'),
+        title: Text(widget.flow.title),
       ),
       body: Stack(
         children: [

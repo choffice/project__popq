@@ -6,8 +6,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @EnableConfigurationProperties({
     PaymentProperties.class,
-    TossPaymentProperties.class,
-    KakaoPaymentProperties.class
+    TossPaymentProperties.class
 })
 public class PaymentConfiguration {
 }
