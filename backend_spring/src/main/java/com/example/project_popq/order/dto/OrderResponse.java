@@ -21,6 +21,10 @@ public record OrderResponse(
         long serviceFeeAmount,
         long totalAmount,
         Instant expiresAt,
+        Instant createdAt,
+        Instant acceptedAt,
+        Integer preparationMinutes,
+        Instant estimatedReadyAt,
         long version,
         List<OrderItemResponse> items,
         List<OrderStatusHistoryResponse> statusHistory
@@ -38,6 +42,10 @@ public record OrderResponse(
                 order.getServiceFeeAmount(),
                 order.getTotalAmount(),
                 order.getExpiresAt(),
+                order.getCreatedAt(),
+                order.getAcceptedAt(),
+                order.getPreparationMinutes(),
+                order.getEstimatedReadyAt(),
                 order.getVersion(),
                 order.getItems().stream().map(OrderItemResponse::from).toList(),
                 order.getStatusHistories().stream()
@@ -108,4 +116,3 @@ public record OrderResponse(
         }
     }
 }
-

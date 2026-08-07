@@ -62,6 +62,9 @@ public record CreateStoreRequest(
 
         @Valid
         @Size(max = 10)
-        List<@NotBlank @Size(max = 30) String> tags
+        List<@NotBlank @Size(max = 30) String> tags,
+
+        @Valid
+        StoreScheduleRequest schedule
 ) {
 }

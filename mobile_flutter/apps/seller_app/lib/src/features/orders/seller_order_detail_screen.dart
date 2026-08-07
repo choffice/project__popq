@@ -5,6 +5,7 @@ import '../stores/seller_store_selection_controller.dart';
 import '../stores/seller_store_repository.dart';
 import 'seller_order_list_screen.dart';
 import 'seller_order_repository.dart';
+import '../reviews/seller_review_repository.dart';
 
 class SellerOrderDetailScreen extends StatefulWidget {
   const SellerOrderDetailScreen({
@@ -12,6 +13,8 @@ class SellerOrderDetailScreen extends StatefulWidget {
     required this.repository,
     required this.storeRepository,
     required this.selectionController,
+    required this.reviewRepository,
+    this.storeId,
     super.key,
   });
 
@@ -19,6 +22,8 @@ class SellerOrderDetailScreen extends StatefulWidget {
   final SellerOrderRepository repository;
   final SellerStoreRepository storeRepository;
   final SellerStoreSelectionController selectionController;
+  final SellerReviewRepository reviewRepository;
+  final int? storeId;
 
   @override
   State<SellerOrderDetailScreen> createState() =>
@@ -28,15 +33,17 @@ class SellerOrderDetailScreen extends StatefulWidget {
 class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
   SellerOrder? _order;
   SellerPaymentSummary? _payment;
+  SellerReview? _review;
   Object? _paymentError;
   Object? _error;
   var _loading = true;
   var _processing = false;
   var _paymentLoading = false;
   var _canRefund = false;
+  var _defaultPreparationMinutes = 10;
 
   int get _storeId {
-    final storeId = widget.selectionController.selectedStoreId;
+    final storeId = widget.storeId ?? widget.selectionController.selectedStoreId;
     if (storeId == null) throw StateError('selected store is missing');
     return storeId;
   }
@@ -87,9 +94,9 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: sellerOrderStatusColor(order.status),
-                  child: const Icon(
+                  child: Icon(
                     Icons.receipt_long_rounded,
-                    color: PopqPalette.ink,
+                    color: sellerOrderStatusForegroundColor(order.status),
                     size: 30,
                   ),
                 ),
@@ -167,9 +174,27 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
+          if (order.preparationMinutes != null) ...[
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.timer_outlined),
+              title: Text(
+                order.preparationMinutes == 0
+                    ? '준비 즉시 시작'
+                    : '준비시간 ${order.preparationMinutes}분',
+              ),
+              subtitle: order.estimatedReadyAt == null
+                  ? null
+                  : Text(
+                      '예상 완료 ${_formatDateTime(order.estimatedReadyAt!)}',
+                    ),
+            ),
+          ],
           if (order.status == 'COMPLETED') ...[
             const SizedBox(height: PopqSpacing.lg),
             _paymentSection(order),
+            const SizedBox(height: PopqSpacing.lg),
+            _reviewSection(),
           ],
           const SizedBox(height: PopqSpacing.lg),
           ..._actionButtons(order),
@@ -326,9 +351,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
           key: const Key('accept-order'),
           onPressed: _processing
               ? null
-              : () => _transition(
-            SellerOrderCommand.accept,
-          ),
+              : _accept,
           icon: const Icon(
             Icons.check_circle_outline_rounded,
           ),
@@ -420,11 +443,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         _canRefund =
             store.myRole == 'OWNER' ||
                 store.myRole == 'MANAGER';
+        _defaultPreparationMinutes =
+            store.defaultPreparationMinutes ?? 10;
         _loading = false;
       });
 
       if (order.status == 'COMPLETED') {
         await _loadPayment();
+        await _loadReview();
       }
     } catch (error) {
       if (!mounted) {
@@ -498,9 +524,72 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     );
   }
 
+  Future<void> _accept() async {
+    var minutes = const <int>[0, 5, 10, 15, 20, 30, 40, 50]
+            .contains(_defaultPreparationMinutes)
+        ? _defaultPreparationMinutes
+        : 10;
+    var applyAsDefault = false;
+    final result = await showModalBottomSheet<({int minutes, bool apply})>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(PopqSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('준비시간 선택', style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: PopqSpacing.sm),
+                Wrap(
+                  spacing: PopqSpacing.xs,
+                  runSpacing: PopqSpacing.xs,
+                  children: [
+                    for (final value in const <int>[0, 5, 10, 15, 20, 30, 40, 50])
+                      ChoiceChip(
+                        label: Text(value == 0 ? '즉시' : '$value분'),
+                        selected: minutes == value,
+                        onSelected: (_) => setSheetState(() => minutes = value),
+                      ),
+                  ],
+                ),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: applyAsDefault,
+                  title: const Text('이 시간을 사업장 기본 준비시간으로 사용'),
+                  onChanged: (value) => setSheetState(
+                    () => applyAsDefault = value ?? false,
+                  ),
+                ),
+                FilledButton(
+                  key: const Key('confirm-accept-order'),
+                  onPressed: () => Navigator.pop(
+                    context,
+                    (minutes: minutes, apply: applyAsDefault),
+                  ),
+                  child: const Text('주문 접수'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+    await _transition(
+      SellerOrderCommand.accept,
+      preparationMinutes: result.minutes,
+      applyAsStoreDefault: result.apply,
+    );
+  }
+
   Future<void> _transition(
       SellerOrderCommand command, {
         String? reason,
+        int? preparationMinutes,
+        bool applyAsStoreDefault = false,
       }) async {
     final current = _order;
 
@@ -516,6 +605,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
         current.orderPublicId,
         command,
         reason: reason,
+        preparationMinutes: preparationMinutes,
+        applyAsStoreDefault: applyAsStoreDefault,
       );
 
       if (!mounted) {
@@ -533,6 +624,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
 
       if (updated.status == 'COMPLETED') {
         await _loadPayment();
+        await _loadReview();
       }
     } catch (_) {
       if (!mounted) {
@@ -669,6 +761,122 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Widget _reviewSection() {
+    final review = _review;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: review == null
+            ? const Text('이 주문에는 아직 작성된 리뷰가 없습니다.')
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '고객 리뷰 ${List.filled(review.rating, '★').join()}',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  if (review.content?.isNotEmpty ?? false) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    Text(review.content!),
+                  ],
+                  if (review.sellerReply?.isNotEmpty ?? false) ...[
+                    const Divider(),
+                    Text('판매자 답글\n${review.sellerReply!}'),
+                  ],
+                  if (_canRefund) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => _editReviewReply(review),
+                          child: Text(
+                            review.sellerReply == null ? '답글 작성' : '답글 수정',
+                          ),
+                        ),
+                        if (review.sellerReply != null)
+                          TextButton(
+                            onPressed: () => _deleteReviewReply(review),
+                            child: const Text('답글 삭제'),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+      ),
+    );
+  }
+
+  Future<void> _loadReview() async {
+    final order = _order;
+    if (order == null || order.status != 'COMPLETED') return;
+    try {
+      final review = await widget.reviewRepository.findByOrder(
+        _storeId,
+        order.orderPublicId,
+      );
+      if (mounted) setState(() => _review = review);
+    } catch (_) {
+      if (mounted) setState(() => _review = null);
+    }
+  }
+
+  Future<void> _editReviewReply(SellerReview review) async {
+    final controller = TextEditingController(text: review.sellerReply ?? '');
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('리뷰 답글'),
+        content: TextField(controller: controller, maxLength: 1000, maxLines: 5),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
+          FilledButton(
+            onPressed: () {
+              final reply = controller.text.trim();
+              if (reply.isNotEmpty) Navigator.pop(context, reply);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (value == null || !mounted) return;
+    try {
+      await widget.reviewRepository.reply(_storeId, review.reviewId, value);
+      if (mounted) await _loadReview();
+    } catch (_) {
+      if (mounted) _showMessage('답글을 저장하지 못했습니다.');
+    }
+  }
+
+  Future<void> _deleteReviewReply(SellerReview review) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('답글을 삭제할까요?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
+      if (mounted) await _loadReview();
+    } catch (_) {
+      if (mounted) _showMessage('답글을 삭제하지 못했습니다.');
+    }
+  }
+
+  String _formatDateTime(DateTime value) {
+    final local = value.toLocal();
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${local.month}/${local.day} ${two(local.hour)}:${two(local.minute)}';
   }
 }
 

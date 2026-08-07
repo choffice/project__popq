@@ -826,6 +826,7 @@ class _BusinessStatusBadge
 
     final label = switch (businessStatus) {
       'OPEN' => '영업 중',
+      'PRE_OPEN' => '영업 준비',
       'CLOSED' => '영업 종료',
       'TEMPORARILY_CLOSED' => '임시 휴무',
       _ => businessStatus,

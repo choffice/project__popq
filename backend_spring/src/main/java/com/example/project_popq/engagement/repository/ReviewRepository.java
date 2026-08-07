@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 
 public interface ReviewRepository extends JpaRepository<Review, Long> {
 
@@ -23,5 +26,32 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
             ReviewStatus status
     );
 
+    @EntityGraph(attributePaths = {"order", "user", "store"})
+    Optional<Review> findByOrderOrderPublicIdAndStoreIdAndStatus(
+            String orderPublicId,
+            Long storeId,
+            ReviewStatus status
+    );
+
     long countByUserIdAndStatus(Long userId, ReviewStatus status);
+
+    @Query("""
+            select r.store.id, count(r)
+            from Review r
+            where r.store.id in :storeIds
+              and r.status = :status
+              and r.sellerReply is null
+            group by r.store.id
+            """)
+    List<Object[]> countUnansweredByStoreIds(
+            @Param("storeIds") List<Long> storeIds,
+            @Param("status") ReviewStatus status
+    );
+
+    @EntityGraph(attributePaths = {"order", "user", "store"})
+    List<Review> findAllByStoreIdInAndStatusAndSellerReplyIsNullOrderByCreatedAtDesc(
+            List<Long> storeIds,
+            ReviewStatus status,
+            Pageable pageable
+    );
 }

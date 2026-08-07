@@ -245,6 +245,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             orderPublicId: order.orderPublicId,
           ),
 
+          if (order.preparationMinutes != null) ...[
+            const SizedBox(height: PopqSpacing.sm),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.timer_outlined),
+                title: Text(
+                  order.preparationMinutes == 0
+                      ? '상품을 바로 준비해요'
+                      : '예상 준비시간 ${order.preparationMinutes}분',
+                ),
+                subtitle: order.estimatedReadyAt == null
+                    ? null
+                    : Text(
+                        '예상 완료 ${_formatEstimatedTime(order.estimatedReadyAt!)}',
+                      ),
+              ),
+            ),
+          ],
+
           const SizedBox(
             height: PopqSpacing.lg,
           ),
@@ -375,6 +394,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         ],
       ),
     );
+  }
+
+  String _formatEstimatedTime(DateTime value) {
+    final local = value.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '${local.month}/${local.day} $hour:$minute';
   }
 
   Future<void> _load() async {

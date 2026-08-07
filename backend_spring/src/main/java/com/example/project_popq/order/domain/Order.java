@@ -106,6 +106,15 @@ public class Order extends BaseTimeEntity {
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 
+    @Column(name = "preparation_minutes")
+    private Integer preparationMinutes;
+
+    @Column(name = "accepted_at")
+    private Instant acceptedAt;
+
+    @Column(name = "estimated_ready_at")
+    private Instant estimatedReadyAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -241,6 +250,28 @@ public class Order extends BaseTimeEntity {
                 )
         );
         return new OrderTransition(previous, nextStatus, now);
+    }
+
+    public OrderTransition accept(
+            int preparationMinutes,
+            OrderActorType actorType,
+            Long actorId,
+            String reason,
+            Instant now
+    ) {
+        OrderTransition transition = transitionTo(
+                OrderStatus.ACCEPTED,
+                actorType,
+                actorId,
+                reason,
+                now
+        );
+        this.preparationMinutes = preparationMinutes;
+        this.acceptedAt = now;
+        this.estimatedReadyAt = now.plusSeconds(
+                Math.multiplyExact((long) preparationMinutes, 60L)
+        );
+        return transition;
     }
 
     public boolean isPaymentExpired(Instant now) {

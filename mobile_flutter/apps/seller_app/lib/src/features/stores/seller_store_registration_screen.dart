@@ -7,9 +7,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
+import 'seller_business_schedule.dart';
 import 'seller_store_location_picker_screen.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
+import 'seller_tag_editor.dart';
 import 'package:geolocator/geolocator.dart';
 
 enum _ImportedValueChoice {
@@ -96,16 +98,6 @@ class _SellerStoreRegistrationScreenState
     '기타',
   ];
 
-  static const Map<String, String> _days = {
-    'MONDAY': '월',
-    'TUESDAY': '화',
-    'WEDNESDAY': '수',
-    'THURSDAY': '목',
-    'FRIDAY': '금',
-    'SATURDAY': '토',
-    'SUNDAY': '일',
-  };
-
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _nameController =
@@ -124,9 +116,6 @@ class _SellerStoreRegistrationScreenState
   TextEditingController();
 
   final TextEditingController _imageUrlController =
-  TextEditingController();
-
-  final TextEditingController _tagController =
   TextEditingController();
 
   final ImagePicker _imagePicker = ImagePicker();
@@ -158,10 +147,10 @@ class _SellerStoreRegistrationScreenState
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
 
-  TimeOfDay? _openTime;
-  TimeOfDay? _closeTime;
-
-  final Set<String> _closedDays = <String>{};
+  SellerBusinessSchedule _schedule = SellerBusinessSchedule.legacy(
+    openTime: '10:00',
+    closeTime: '22:00',
+  );
   final List<String> _tags = <String>[];
 
   bool _takeoutAvailable = true;
@@ -198,8 +187,6 @@ class _SellerStoreRegistrationScreenState
     _phoneController.dispose();
     _descriptionController.dispose();
     _imageUrlController.dispose();
-    _tagController.dispose();
-
     super.dispose();
   }
 
@@ -1175,106 +1162,10 @@ class _SellerStoreRegistrationScreenState
             const SizedBox(
               height: PopqSpacing.md,
             ),
-            Row(
-              children: [
-                Expanded(
-                  child:
-                  OutlinedButton.icon(
-                    onPressed: _submitting
-                        ? null
-                        : () {
-                      _selectTime(
-                        isOpenTime:
-                        true,
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.schedule_rounded,
-                    ),
-                    label: Text(
-                      _openTime == null
-                          ? '시작 시간'
-                          : _formatTime(
-                        _openTime!,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(
-                  width: PopqSpacing.sm,
-                ),
-                Expanded(
-                  child:
-                  OutlinedButton.icon(
-                    onPressed: _submitting
-                        ? null
-                        : () {
-                      _selectTime(
-                        isOpenTime:
-                        false,
-                      );
-                    },
-                    icon: const Icon(
-                      Icons.schedule_rounded,
-                    ),
-                    label: Text(
-                      _closeTime == null
-                          ? '종료 시간'
-                          : _formatTime(
-                        _closeTime!,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(
-              height: PopqSpacing.lg,
-            ),
-            Text(
-              '정기 휴무일',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
-            Wrap(
-              spacing: PopqSpacing.sm,
-              runSpacing: PopqSpacing.sm,
-              children: _days.entries.map(
-                    (
-                    MapEntry<String, String>
-                    entry,
-                    ) {
-                  final bool selected =
-                  _closedDays.contains(
-                    entry.key,
-                  );
-
-                  return FilterChip(
-                    label: Text(entry.value),
-                    selected: selected,
-                    onSelected: _submitting
-                        ? null
-                        : (bool value) {
-                      setState(() {
-                        if (value) {
-                          _closedDays.add(
-                            entry.key,
-                          );
-                        } else {
-                          _closedDays
-                              .remove(
-                            entry.key,
-                          );
-                        }
-                      });
-                    },
-                  );
-                },
-              ).toList(),
+            SellerBusinessScheduleEditor(
+              initialSchedule: _schedule,
+              enabled: !_submitting,
+              onChanged: (value) => setState(() => _schedule = value),
             ),
           ],
         ),
@@ -1371,96 +1262,14 @@ class _SellerStoreRegistrationScreenState
         padding: const EdgeInsets.all(
           PopqSpacing.md,
         ),
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Text(
-              '검색 키워드',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
-            Text(
-              '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall,
-            ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
-            Row(
-              crossAxisAlignment:
-              CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller:
-                    _tagController,
-                    enabled: !_submitting &&
-                        _tags.length < 8,
-                    maxLength: 30,
-                    textInputAction:
-                    TextInputAction.done,
-                    decoration:
-                    const InputDecoration(
-                      labelText: '키워드',
-                      hintText: '예: 떡볶이',
-                      prefixIcon: Icon(
-                        Icons.tag_rounded,
-                      ),
-                    ),
-                    onSubmitted:
-                        (String _) {
-                      _addTag();
-                    },
-                  ),
-                ),
-                const SizedBox(
-                  width: PopqSpacing.sm,
-                ),
-                IconButton.filled(
-                  tooltip: '키워드 추가',
-                  onPressed: _submitting ||
-                      _tags.length >= 8
-                      ? null
-                      : _addTag,
-                  icon: const Icon(
-                    Icons.add_rounded,
-                  ),
-                ),
-              ],
-            ),
-            if (_tags.isNotEmpty) ...[
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
-              Wrap(
-                spacing: PopqSpacing.sm,
-                runSpacing: PopqSpacing.sm,
-                children: _tags.map(
-                      (String tag) {
-                    return InputChip(
-                      label: Text('#$tag'),
-                      onDeleted: _submitting
-                          ? null
-                          : () {
-                        setState(() {
-                          _tags.remove(
-                            tag,
-                          );
-                        });
-                      },
-                    );
-                  },
-                ).toList(),
-              ),
-            ],
-          ],
+        child: SellerTagBlocks(
+          title: '검색 키워드',
+          description: '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
+          tags: _tags,
+          maxCount: 8,
+          enabled: !_submitting,
+          onAdd: _addTag,
+          onDeleted: (tag) => setState(() => _tags.remove(tag)),
         ),
       ),
     );
@@ -3429,38 +3238,7 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Future<void> _selectTime({
-    required bool isOpenTime,
-  }) async {
-    final TimeOfDay? currentValue =
-    isOpenTime
-        ? _openTime
-        : _closeTime;
-
-    final TimeOfDay? selected =
-    await showTimePicker(
-      context: context,
-      initialTime:
-      currentValue ?? TimeOfDay.now(),
-      helpText: isOpenTime
-          ? '영업 시작 시간'
-          : '영업 종료 시간',
-    );
-
-    if (selected == null || !mounted) {
-      return;
-    }
-
-    setState(() {
-      if (isOpenTime) {
-        _openTime = selected;
-      } else {
-        _closeTime = selected;
-      }
-    });
-  }
-
-  void _addTag() {
+  Future<void> _addTag() async {
     if (_submitting) {
       return;
     }
@@ -3473,48 +3251,11 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    final String tag = _tagController.text
-        .trim()
-        .replaceFirst(
-      RegExp(r'^#+'),
-      '',
-    )
-        .trim();
-
-    if (tag.isEmpty) {
-      _showMessage(
-        '추가할 검색 키워드를 입력해 주세요.',
-      );
-
-      return;
-    }
-
-    if (tag.length > 30) {
-      _showMessage(
-        '검색 키워드는 30자 이하로 입력해 주세요.',
-      );
-
-      return;
-    }
-
-    final bool duplicated = _tags.any(
-          (String existing) =>
-      existing.toLowerCase() ==
-          tag.toLowerCase(),
+    final String? tag = await showSellerTagInputDialog(
+      context,
+      existingTags: _tags,
     );
-
-    if (duplicated) {
-      _showMessage(
-        '이미 추가한 검색 키워드예요.',
-      );
-
-      return;
-    }
-
-    setState(() {
-      _tags.add(tag);
-      _tagController.clear();
-    });
+    if (tag != null && mounted) setState(() => _tags.add(tag));
   }
 
   Future<void> _submit() async {
@@ -3534,12 +3275,9 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    if (_openTime == null ||
-        _closeTime == null) {
-      _showMessage(
-        '영업 시작 시간과 종료 시간을 선택해 주세요.',
-      );
-
+    final String? scheduleError = _schedule.validationMessage;
+    if (scheduleError != null) {
+      _showMessage(scheduleError);
       return;
     }
 
@@ -3584,6 +3322,11 @@ class _SellerStoreRegistrationScreenState
             representativeImageUrl;
       }
 
+      final SellerBusinessHour legacyHour = _schedule.legacyRepresentative;
+      final TimeOfDay legacyOpen =
+          legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
+      final TimeOfDay legacyClose =
+          legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
       final SellerStore created =
       await widget.repository.create(
         storeType: _storeType,
@@ -3607,19 +3350,14 @@ class _SellerStoreRegistrationScreenState
         longitude:
         _selectedStoreLocation?.longitude,
 
-        openTime: _toApiTime(
-          _openTime!,
-        ),
-        closeTime: _toApiTime(
-          _closeTime!,
-        ),
-        closedDays: _days.keys
-            .where(
-          _closedDays.contains,
-        )
-            .toList(
-          growable: false,
-        ),
+        openTime: legacyHour.open24Hours
+            ? '00:00:00'
+            : _toApiTime(legacyOpen),
+        closeTime: legacyHour.open24Hours
+            ? '00:00:00'
+            : _toApiTime(legacyClose),
+        closedDays: _schedule.legacyClosedDays,
+        schedule: _schedule,
         takeoutAvailable:
         _takeoutAvailable,
         dineInAvailable:
@@ -3681,17 +3419,6 @@ class _SellerStoreRegistrationScreenState
         '사업장을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       );
     }
-  }
-
-  String _formatTime(
-      TimeOfDay time,
-      ) {
-    return MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(
-      time,
-      alwaysUse24HourFormat: true,
-    );
   }
 
   String _toApiTime(

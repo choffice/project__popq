@@ -63,7 +63,7 @@ class PublicStoreApiIntegrationTests {
     }
 
     @Test
-    void publicDetailOnlyExposesOpenActiveStore() throws Exception {
+    void publicDetailExposesPreparingAndOpenActiveStore() throws Exception {
         String accessToken = loginSeller();
         Long storeId = createStore(
                 accessToken,
@@ -75,7 +75,8 @@ class PublicStoreApiIntegrationTests {
         );
 
         mockMvc.perform(get("/api/v1/public/stores/{storeId}", storeId))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.businessStatus").value("PRE_OPEN"));
 
         openStore(accessToken, storeId);
 
@@ -95,6 +96,30 @@ class PublicStoreApiIntegrationTests {
                 .andExpect(jsonPath("$.data.dineInAvailable").value(false))
                 .andExpect(jsonPath("$.data.orderAcceptingEnabled").value(true))
                 .andExpect(jsonPath("$.data.tags[0]").value("dessert"));
+    }
+
+    @Test
+    void publicSearchIncludesPreparingActiveStore() throws Exception {
+        String accessToken = loginSeller();
+        Long storeId = createStore(
+                accessToken,
+                "Preparing Discovery Store",
+                "Busan",
+                35.1578,
+                129.0592,
+                "preparing-discovery"
+        );
+
+        mockMvc.perform(get("/api/v1/public/stores")
+                        .queryParam("query", "Preparing Discovery Store")
+                        .queryParam("tag", "preparing-discovery")
+                        .queryParam("latitude", "35.1578")
+                        .queryParam("longitude", "129.0592")
+                        .queryParam("radiusKm", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].storeId").value(storeId))
+                .andExpect(jsonPath("$.data[0].businessStatus").value("PRE_OPEN"));
     }
 
     @Test

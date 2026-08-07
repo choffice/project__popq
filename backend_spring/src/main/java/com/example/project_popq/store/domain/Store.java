@@ -76,6 +76,9 @@ public class Store extends BaseTimeEntity {
     @Column(name = "order_accepting_enabled", nullable = false)
     private boolean orderAcceptingEnabled = true;
 
+    @Column(name = "default_preparation_minutes")
+    private Integer defaultPreparationMinutes;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private StoreStatus status;
@@ -163,6 +166,20 @@ public class Store extends BaseTimeEntity {
 
     public void changeStatus(StoreStatus status) {
         this.status = status;
+    }
+
+    public void changeDefaultPreparationMinutes(Integer minutes) {
+        this.defaultPreparationMinutes = minutes;
+    }
+
+    public void suspend() {
+        this.status = StoreStatus.SUSPENDED;
+        this.businessStatus = BusinessStatus.PRE_OPEN;
+    }
+
+    public void reopen() {
+        this.status = StoreStatus.ACTIVE;
+        this.businessStatus = BusinessStatus.PRE_OPEN;
     }
 
     public boolean isActive() {

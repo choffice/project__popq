@@ -15,7 +15,10 @@ public record ReviewResponse(
         String content,
         ReviewStatus status,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        String sellerReply,
+        Instant sellerRepliedAt,
+        Long sellerRepliedByUserId
 ) {
     public static ReviewResponse from(Review review) {
         return new ReviewResponse(
@@ -29,7 +32,10 @@ public record ReviewResponse(
                 review.getContent(),
                 review.getStatus(),
                 review.getCreatedAt(),
-                review.getUpdatedAt()
+                review.getUpdatedAt(),
+                review.getSellerReply(),
+                review.getSellerRepliedAt(),
+                review.getSellerRepliedByUserId()
         );
     }
 }

@@ -30,16 +30,19 @@ public record SellerStoreDetailResponse(
         boolean takeoutAvailable,
         boolean dineInAvailable,
         boolean orderAcceptingEnabled,
+        Integer defaultPreparationMinutes,
         List<String> tags,
         StoreStatus status,
         BusinessStatus businessStatus,
-        StoreRole myRole
+        StoreRole myRole,
+        StoreScheduleResponse schedule
 ) {
 
     public static SellerStoreDetailResponse of(
             Store store,
             StoreRole myRole,
-            List<String> tags
+            List<String> tags,
+            StoreScheduleResponse schedule
     ) {
         return new SellerStoreDetailResponse(
                 store.getId(),
@@ -59,10 +62,12 @@ public record SellerStoreDetailResponse(
                 store.isTakeoutAvailable(),
                 store.isDineInAvailable(),
                 store.isOrderAcceptingEnabled(),
+                store.getDefaultPreparationMinutes(),
                 List.copyOf(tags),
                 store.getStatus(),
                 store.getBusinessStatus(),
-                myRole
+                myRole,
+                schedule
         );
     }
 

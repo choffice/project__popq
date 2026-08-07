@@ -3,15 +3,18 @@ package com.example.project_popq.order.controller;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.order.domain.OrderStatus;
+import com.example.project_popq.order.dto.AcceptOrderRequest;
 import com.example.project_popq.order.dto.OrderCommandRequest;
 import com.example.project_popq.order.dto.OrderResponse;
 import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.OrderCommandService;
+import com.example.project_popq.order.service.SellerOrderManagementService;
 import com.example.project_popq.payment.dto.CreateSellerRefundRequest;
 import com.example.project_popq.payment.dto.SellerPaymentSummaryResponse;
 import com.example.project_popq.payment.service.SellerRefundService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -32,19 +35,24 @@ public class SellerOrderController {
 
     private final CurrentUserService currentUserService;
     private final OrderCommandService orderCommandService;
+    private final SellerOrderManagementService sellerOrderManagementService;
     private final SellerRefundService sellerRefundService;
 
     @GetMapping
     public ApiResponse<List<OrderResponse>> findAll(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long storeId,
-            @RequestParam(required = false) OrderStatus status
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) List<OrderStatus> statuses,
+            @RequestParam(required = false) LocalDate date
     ) {
         return ApiResponse.success(
-                orderCommandService.findSellerOrders(
+                sellerOrderManagementService.findSellerOrders(
                         currentUserService.getRequired(jwt),
                         storeId,
-                        status
+                        status,
+                        statuses,
+                        date
                 )
         );
     }
@@ -86,14 +94,17 @@ public class SellerOrderController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable Long storeId,
             @PathVariable String orderPublicId,
-            @Valid @RequestBody OrderCommandRequest request
+            @Valid @RequestBody AcceptOrderRequest request
     ) {
-        return transition(
-                jwt,
-                storeId,
-                orderPublicId,
-                OrderStatus.ACCEPTED,
-                request.reasonOr("주문 접수")
+        return ApiResponse.success(
+                sellerOrderManagementService.acceptBySeller(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        orderPublicId,
+                        request.preparationMinutes(),
+                        request.applyAsStoreDefault(),
+                        request.reasonOr("주문 접수")
+                )
         );
     }
 

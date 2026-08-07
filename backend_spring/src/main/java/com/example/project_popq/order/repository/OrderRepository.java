@@ -41,6 +41,44 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findAllByStoreIdOrderByCreatedAtAsc(Long storeId);
 
+    List<Order> findAllByStoreIdAndStatusOrderByCreatedAtDesc(
+            Long storeId,
+            OrderStatus status
+    );
+
+    List<Order> findAllByStoreIdAndStatusInOrderByCreatedAtDesc(
+            Long storeId,
+            List<OrderStatus> statuses
+    );
+
+    List<Order> findAllByStoreIdOrderByCreatedAtDesc(Long storeId);
+
+    List<Order> findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            Long storeId,
+            List<OrderStatus> statuses,
+            Instant fromInclusive,
+            Instant toExclusive
+    );
+
+    @EntityGraph(attributePaths = {"store", "items"})
+    List<Order> findAllByStoreIdInAndStatusOrderByCreatedAtDesc(
+            List<Long> storeIds,
+            OrderStatus status,
+            org.springframework.data.domain.Pageable pageable
+    );
+
+    @Query("""
+            select o.store.id, o.status, count(o)
+            from Order o
+            where o.store.id in :storeIds
+              and o.status in :statuses
+            group by o.store.id, o.status
+            """)
+    List<Object[]> countByStoreIdsAndStatuses(
+            @Param("storeIds") List<Long> storeIds,
+            @Param("statuses") List<OrderStatus> statuses
+    );
+
     List<Order> findAllByUserIdOrderByCreatedAtDesc(Long userId);
 
     long countByUserId(Long userId);

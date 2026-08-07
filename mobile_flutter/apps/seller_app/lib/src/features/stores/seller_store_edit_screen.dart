@@ -6,8 +6,10 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'business_registration_ocr_service.dart';
+import 'seller_business_schedule.dart';
 import 'seller_store_location_picker_screen.dart';
 import 'seller_store_repository.dart';
+import 'seller_tag_editor.dart';
 
 enum _ImportedValueChoice { current, imported, manual }
 
@@ -61,16 +63,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     '기타',
   ];
 
-  static const Map<String, String> _days = <String, String>{
-    'MONDAY': '월',
-    'TUESDAY': '화',
-    'WEDNESDAY': '수',
-    'THURSDAY': '목',
-    'FRIDAY': '금',
-    'SATURDAY': '토',
-    'SUNDAY': '일',
-  };
-
   static const double _defaultLatitude = 35.157746;
   static const double _defaultLongitude = 129.059319;
 
@@ -84,7 +76,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _detailAddressController;
   late final TextEditingController _phoneController;
-  late final TextEditingController _tagsController;
+  late final List<String> _tags;
 
   late String _storeType;
   String? _representativeCategory;
@@ -93,9 +85,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   _RepresentativeImageAction _representativeImageAction =
       _RepresentativeImageAction.keep;
   _SelectedStoreLocation? _selectedLocation;
-  TimeOfDay? _openTime;
-  TimeOfDay? _closeTime;
-  late final Set<String> _closedDays;
+  late SellerBusinessSchedule _schedule;
   late bool _takeoutAvailable;
   late bool _dineInAvailable;
   late bool _orderAcceptingEnabled;
@@ -119,13 +109,15 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController = TextEditingController(text: store.address);
     _detailAddressController = TextEditingController(text: store.detailAddress);
     _phoneController = TextEditingController(text: store.phone);
-    _tagsController = TextEditingController(text: store.tags.join(', '));
+    _tags = List<String>.of(store.tags);
     _storeType = store.storeType;
     _representativeCategory = store.representativeCategory;
     _existingImageUrl = _emptyToNull(store.imageUrl);
-    _openTime = _parseTime(store.openTime);
-    _closeTime = _parseTime(store.closeTime);
-    _closedDays = <String>{...store.closedDays};
+    _schedule = store.schedule ?? SellerBusinessSchedule.legacy(
+      openTime: store.openTime,
+      closeTime: store.closeTime,
+      closedDays: store.closedDays,
+    );
     _takeoutAvailable = store.takeoutAvailable;
     _dineInAvailable = store.dineInAvailable;
     _orderAcceptingEnabled = store.orderAcceptingEnabled;
@@ -147,7 +139,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController.dispose();
     _detailAddressController.dispose();
     _phoneController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
@@ -291,17 +282,19 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               _buildSection(
                 context,
                 title: '검색 키워드',
+                titleAction: IconButton.filledTonal(
+                  tooltip: '검색 키워드 추가',
+                  onPressed: _busy || _tags.length >= 10 ? null : _addTag,
+                  icon: const Icon(Icons.add_rounded),
+                ),
                 children: <Widget>[
-                  TextFormField(
+                  SellerTagBlocks(
                     key: const Key('edit-store-tags'),
-                    controller: _tagsController,
+                    tags: _tags,
+                    maxCount: 10,
                     enabled: !_busy,
-                    maxLength: 310,
-                    decoration: const InputDecoration(
-                      labelText: '검색 키워드',
-                      hintText: '쉼표로 구분해 최대 10개까지 입력',
-                    ),
-                    validator: _validateTags,
+                    onAdd: _addTag,
+                    onDeleted: (tag) => setState(() => _tags.remove(tag)),
                   ),
                 ],
               ),
@@ -344,6 +337,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     BuildContext context, {
     required String title,
     required List<Widget> children,
+    Widget? titleAction,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: PopqSpacing.md),
@@ -353,7 +347,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  if (titleAction != null) titleAction,
+                ],
+              ),
               const SizedBox(height: PopqSpacing.md),
               ...children,
             ],
@@ -533,56 +537,10 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       context,
       title: '영업 정보',
       children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('edit-store-open-time'),
-                onPressed: _busy ? null : () => _selectTime(isOpenTime: true),
-                icon: const Icon(Icons.schedule_outlined),
-                label: Text(
-                  _openTime == null ? '시작 시간' : _formatTime(_openTime!),
-                ),
-              ),
-            ),
-            const SizedBox(width: PopqSpacing.sm),
-            Expanded(
-              child: OutlinedButton.icon(
-                key: const Key('edit-store-close-time'),
-                onPressed: _busy ? null : () => _selectTime(isOpenTime: false),
-                icon: const Icon(Icons.schedule_outlined),
-                label: Text(
-                  _closeTime == null ? '종료 시간' : _formatTime(_closeTime!),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: PopqSpacing.md),
-        const Text('휴무일'),
-        const SizedBox(height: PopqSpacing.sm),
-        Wrap(
-          spacing: PopqSpacing.sm,
-          runSpacing: PopqSpacing.sm,
-          children: _days.entries
-              .map((MapEntry<String, String> entry) {
-                return FilterChip(
-                  label: Text(entry.value),
-                  selected: _closedDays.contains(entry.key),
-                  onSelected: _busy
-                      ? null
-                      : (bool selected) {
-                          setState(() {
-                            if (selected) {
-                              _closedDays.add(entry.key);
-                            } else {
-                              _closedDays.remove(entry.key);
-                            }
-                          });
-                        },
-                );
-              })
-              .toList(growable: false),
+        SellerBusinessScheduleEditor(
+          initialSchedule: _schedule,
+          enabled: !_busy,
+          onChanged: (value) => setState(() => _schedule = value),
         ),
       ],
     );
@@ -1284,24 +1242,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     );
   }
 
-  Future<void> _selectTime({required bool isOpenTime}) async {
-    final TimeOfDay? selected = await showTimePicker(
-      context: context,
-      initialTime: (isOpenTime ? _openTime : _closeTime) ?? TimeOfDay.now(),
-      helpText: isOpenTime ? '영업 시작 시간' : '영업 종료 시간',
-    );
-    if (selected == null || !mounted) {
-      return;
-    }
-    setState(() {
-      if (isOpenTime) {
-        _openTime = selected;
-      } else {
-        _closeTime = selected;
-      }
-    });
-  }
-
   Future<void> _submit() async {
     if (_submitting) {
       return;
@@ -1310,8 +1250,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       _showMessage('필수 입력 항목을 확인해 주세요.');
       return;
     }
-    if (_openTime == null || _closeTime == null) {
-      _showMessage('영업 시작 시간과 종료 시간을 선택해 주세요.');
+    final String? scheduleError = _schedule.validationMessage;
+    if (scheduleError != null) {
+      _showMessage(scheduleError);
       return;
     }
     if (!_takeoutAvailable && !_dineInAvailable) {
@@ -1338,6 +1279,11 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
 
       final _SelectedStoreLocation? location = _selectedLocation;
+      final SellerBusinessHour legacyHour = _schedule.legacyRepresentative;
+      final TimeOfDay legacyOpen =
+          legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
+      final TimeOfDay legacyClose =
+          legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
       final SellerStore updated = await widget.repository.update(
         widget.store.storeId,
         storeType: _storeType,
@@ -1350,15 +1296,18 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         phone: _phoneController.text.trim(),
         latitude: location?.latitude,
         longitude: location?.longitude,
-        openTime: _toApiTime(_openTime!),
-        closeTime: _toApiTime(_closeTime!),
-        closedDays: _days.keys
-            .where(_closedDays.contains)
-            .toList(growable: false),
+        openTime: legacyHour.open24Hours
+            ? '00:00:00'
+            : _toApiTime(legacyOpen),
+        closeTime: legacyHour.open24Hours
+            ? '00:00:00'
+            : _toApiTime(legacyClose),
+        closedDays: _schedule.legacyClosedDays,
+        schedule: _schedule,
         takeoutAvailable: _takeoutAvailable,
         dineInAvailable: _dineInAvailable,
         orderAcceptingEnabled: _orderAcceptingEnabled,
-        tags: _parseTags(),
+        tags: List<String>.unmodifiable(_tags),
       );
       if (!mounted) {
         return;
@@ -1378,60 +1327,18 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     }
   }
 
-  List<String> _parseTags() {
-    final List<String> tags = <String>[];
-    for (final String raw in _tagsController.text.split(',')) {
-      final String tag = raw
-          .trim()
-          .replaceFirst(RegExp(r'^#+'), '')
-          .toLowerCase();
-      if (tag.isNotEmpty && !tags.contains(tag)) {
-        tags.add(tag);
-      }
+  Future<void> _addTag() async {
+    final String? tag = await showSellerTagInputDialog(
+      context,
+      existingTags: _tags,
+    );
+    if (tag != null && mounted) {
+      setState(() => _tags.add(tag));
     }
-    return List<String>.unmodifiable(tags);
-  }
-
-  String? _validateTags(String? value) {
-    final List<String> tags = _parseTags();
-    if (tags.length > 10) {
-      return '검색 키워드는 최대 10개까지 입력할 수 있습니다.';
-    }
-    if (tags.any((String tag) => tag.length > 30)) {
-      return '검색 키워드는 각각 30자 이하여야 합니다.';
-    }
-    return null;
   }
 
   String? _requiredValidator(String? value, String message) {
     return value == null || value.trim().isEmpty ? message : null;
-  }
-
-  TimeOfDay? _parseTime(String? value) {
-    if (value == null) {
-      return null;
-    }
-    final List<String> parts = value.split(':');
-    if (parts.length < 2) {
-      return null;
-    }
-    final int? hour = int.tryParse(parts[0]);
-    final int? minute = int.tryParse(parts[1]);
-    if (hour == null ||
-        minute == null ||
-        hour < 0 ||
-        hour > 23 ||
-        minute < 0 ||
-        minute > 59) {
-      return null;
-    }
-    return TimeOfDay(hour: hour, minute: minute);
-  }
-
-  String _formatTime(TimeOfDay time) {
-    return MaterialLocalizations.of(
-      context,
-    ).formatTimeOfDay(time, alwaysUse24HourFormat: true);
   }
 
   String _toApiTime(TimeOfDay time) {

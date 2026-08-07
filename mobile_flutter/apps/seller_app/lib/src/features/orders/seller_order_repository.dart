@@ -14,6 +14,10 @@ class SellerOrder {
     required this.totalAmount,
     required this.version,
     required this.items,
+    this.createdAt,
+    this.acceptedAt,
+    this.preparationMinutes,
+    this.estimatedReadyAt,
   });
 
   factory SellerOrder.fromJson(Map<String, Object?> json) {
@@ -29,6 +33,10 @@ class SellerOrder {
       serviceFeeAmount: (json['serviceFeeAmount'] as num).toInt(),
       totalAmount: (json['totalAmount'] as num).toInt(),
       version: (json['version'] as num).toInt(),
+      createdAt: _dateTime(json['createdAt']),
+      acceptedAt: _dateTime(json['acceptedAt']),
+      preparationMinutes: (json['preparationMinutes'] as num?)?.toInt(),
+      estimatedReadyAt: _dateTime(json['estimatedReadyAt']),
       items: (json['items'] as List<Object?>? ?? const [])
           .map(
             (item) => SellerOrderItem.fromJson(
@@ -51,11 +59,21 @@ class SellerOrder {
   final int totalAmount;
   final int version;
   final List<SellerOrderItem> items;
+  final DateTime? createdAt;
+  final DateTime? acceptedAt;
+  final int? preparationMinutes;
+  final DateTime? estimatedReadyAt;
 
   int get totalQuantity =>
       items.fold(0, (total, item) => total + item.quantity);
 
-  SellerOrder copyWith({String? status, int? version}) {
+  SellerOrder copyWith({
+    String? status,
+    int? version,
+    DateTime? acceptedAt,
+    int? preparationMinutes,
+    DateTime? estimatedReadyAt,
+  }) {
     return SellerOrder(
       orderPublicId: orderPublicId,
       storeId: storeId,
@@ -69,7 +87,15 @@ class SellerOrder {
       totalAmount: totalAmount,
       version: version ?? this.version,
       items: items,
+      createdAt: createdAt,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
+      preparationMinutes: preparationMinutes ?? this.preparationMinutes,
+      estimatedReadyAt: estimatedReadyAt ?? this.estimatedReadyAt,
     );
+  }
+
+  static DateTime? _dateTime(Object? value) {
+    return value is String ? DateTime.tryParse(value) : null;
   }
 }
 
@@ -229,7 +255,12 @@ class SellerOrderSyncResult {
 }
 
 abstract interface class SellerOrderRepository {
-  Future<List<SellerOrder>> findAll(int storeId, {String? status});
+  Future<List<SellerOrder>> findAll(
+    int storeId, {
+    String? status,
+    List<String>? statuses,
+    DateTime? date,
+  });
 
   Future<SellerOrder> findOne(int storeId, String orderPublicId);
 
@@ -244,6 +275,8 @@ abstract interface class SellerOrderRepository {
     String orderPublicId,
     SellerOrderCommand command, {
     String? reason,
+    int? preparationMinutes,
+    bool applyAsStoreDefault = false,
   });
 
   Future<SellerPaymentSummary> findPayment(
@@ -267,10 +300,21 @@ class ApiSellerOrderRepository implements SellerOrderRepository {
   String _basePath(int storeId) => '/api/v1/seller/stores/$storeId/orders';
 
   @override
-  Future<List<SellerOrder>> findAll(int storeId, {String? status}) {
+  Future<List<SellerOrder>> findAll(
+    int storeId, {
+    String? status,
+    List<String>? statuses,
+    DateTime? date,
+  }) {
+    final query = <String, Object?>{};
+    if (status != null) query['status'] = status;
+    if (status == null && statuses != null && statuses.isNotEmpty) {
+      query['statuses'] = statuses.join(',');
+    }
+    if (date != null) query['date'] = _calendarDate(date);
     return _apiClient.get(
       _basePath(storeId),
-      query: status == null ? const {} : {'status': status},
+      query: query,
       decode: (value) => (value as List<Object?>)
           .map(
             (item) =>
@@ -318,10 +362,19 @@ class ApiSellerOrderRepository implements SellerOrderRepository {
     String orderPublicId,
     SellerOrderCommand command, {
     String? reason,
+    int? preparationMinutes,
+    bool applyAsStoreDefault = false,
   }) {
+    final body = command == SellerOrderCommand.accept
+        ? <String, Object?>{
+            'preparationMinutes': preparationMinutes ?? 0,
+            'applyAsStoreDefault': applyAsStoreDefault,
+            'reason': reason,
+          }
+        : <String, Object?>{'reason': reason};
     return _apiClient.post(
       '${_basePath(storeId)}/$orderPublicId/${command.path}',
-      body: {'reason': reason},
+      body: body,
       decode: (value) =>
           SellerOrder.fromJson(Map<String, Object?>.from(value as Map)),
     );
@@ -368,14 +421,34 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
   final Map<String, SellerPaymentSummary> _payments;
 
   @override
-  Future<List<SellerOrder>> findAll(int storeId, {String? status}) async {
-    return List.unmodifiable(
+  Future<List<SellerOrder>> findAll(
+    int storeId, {
+    String? status,
+    List<String>? statuses,
+    DateTime? date,
+  }) async {
+    final DateTime? fromUtc = date == null
+        ? null
+        : DateTime.utc(date.year, date.month, date.day)
+            .subtract(const Duration(hours: 9));
+    final DateTime? toUtc = fromUtc?.add(const Duration(days: 1));
+    final values =
       _orders.where(
         (order) =>
             order.storeId == storeId &&
-            (status == null || order.status == status),
-      ),
-    );
+            (status == null || order.status == status) &&
+            (statuses == null || statuses.contains(order.status)) &&
+            (fromUtc == null ||
+                order.createdAt != null &&
+                    !order.createdAt!.toUtc().isBefore(fromUtc) &&
+                    order.createdAt!.toUtc().isBefore(toUtc!)),
+      ).toList()
+        ..sort((left, right) {
+          final leftDate = left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final rightDate = right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+          return rightDate.compareTo(leftDate);
+        });
+    return List.unmodifiable(values);
   }
 
   @override
@@ -406,6 +479,8 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
     String orderPublicId,
     SellerOrderCommand command, {
     String? reason,
+    int? preparationMinutes,
+    bool applyAsStoreDefault = false,
   }) async {
     final index = _findIndex(storeId, orderPublicId);
     if (index < 0) throw StateError('order not found in selected store');
@@ -419,9 +494,16 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
     if (order.status != expectedStatus) {
       throw StateError('invalid seller order transition');
     }
+    final now = DateTime.now().toUtc();
     final updated = order.copyWith(
       status: command.targetStatus,
       version: order.version + 1,
+      acceptedAt: command == SellerOrderCommand.accept ? now : null,
+      preparationMinutes:
+          command == SellerOrderCommand.accept ? preparationMinutes ?? 0 : null,
+      estimatedReadyAt: command == SellerOrderCommand.accept
+          ? now.add(Duration(minutes: preparationMinutes ?? 0))
+          : null,
     );
     _orders[index] = updated;
     return updated;
@@ -497,4 +579,10 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
           order.storeId == storeId && order.orderPublicId == orderPublicId,
     );
   }
+}
+
+String _calendarDate(DateTime date) {
+  return '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
 }
