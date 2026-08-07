@@ -4,6 +4,8 @@ import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.engagement.dto.ReviewResponse;
 import com.example.project_popq.engagement.dto.SellerReviewReplyRequest;
+import com.example.project_popq.engagement.dto.SellerReviewReplyTemplateRequest;
+import com.example.project_popq.engagement.dto.SellerReviewReplyTemplateResponse;
 import com.example.project_popq.engagement.service.ReviewService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -83,5 +87,51 @@ public class SellerReviewController {
                 storeId,
                 reviewId
         ));
+    }
+
+    @GetMapping("/reply-templates")
+    public ApiResponse<List<SellerReviewReplyTemplateResponse>> findTemplates(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId
+    ) {
+        return ApiResponse.success(reviewService.findReplyTemplates(
+                currentUserService.getRequired(jwt), storeId
+        ));
+    }
+
+    @PostMapping("/reply-templates")
+    public ApiResponse<SellerReviewReplyTemplateResponse> createTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @Valid @RequestBody SellerReviewReplyTemplateRequest request
+    ) {
+        return ApiResponse.success(reviewService.createReplyTemplate(
+                currentUserService.getRequired(jwt), storeId, request.content()
+        ));
+    }
+
+    @PatchMapping("/reply-templates/{templateId}")
+    public ApiResponse<SellerReviewReplyTemplateResponse> updateTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId,
+            @Valid @RequestBody SellerReviewReplyTemplateRequest request
+    ) {
+        return ApiResponse.success(reviewService.updateReplyTemplate(
+                currentUserService.getRequired(jwt), storeId,
+                templateId, request.content()
+        ));
+    }
+
+    @DeleteMapping("/reply-templates/{templateId}")
+    public ApiResponse<Void> deleteTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId
+    ) {
+        reviewService.deleteReplyTemplate(
+                currentUserService.getRequired(jwt), storeId, templateId
+        );
+        return ApiResponse.success(null);
     }
 }

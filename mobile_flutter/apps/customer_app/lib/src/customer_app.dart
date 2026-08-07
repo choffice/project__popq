@@ -380,7 +380,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   void _handlePushDeepLink(String deepLink) {
-    if (!_isCustomerChatDeepLink(deepLink)) {
+    if (!_isSupportedCustomerDeepLink(deepLink)) {
       debugPrint('Customer 지원하지 않는 알림 경로: $deepLink');
       return;
     }
@@ -393,8 +393,24 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _openPushDeepLink(deepLink);
   }
 
-  bool _isCustomerChatDeepLink(String deepLink) {
-    return deepLink.startsWith('/orders/') && deepLink.endsWith('/messages');
+  bool _isSupportedCustomerDeepLink(String deepLink) {
+    final uri = Uri.tryParse(deepLink);
+    if (uri == null) {
+      return false;
+    }
+    final segments = uri.pathSegments;
+    final isOrderDetail = segments.length == 2 &&
+        segments.first == 'orders' &&
+        segments[1].isNotEmpty;
+    final isOrderChat = segments.length == 3 &&
+        segments.first == 'orders' &&
+        segments[1].isNotEmpty &&
+        segments[2] == 'messages';
+    final isStoreDetail = segments.length == 2 &&
+        segments.first == 'stores' &&
+        int.tryParse(segments[1]) != null;
+
+    return isOrderDetail || isOrderChat || isStoreDetail;
   }
 
   void _openPushDeepLink(String deepLink) {

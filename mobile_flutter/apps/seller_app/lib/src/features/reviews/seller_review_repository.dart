@@ -1,5 +1,22 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+class SellerReviewReplyTemplate {
+  const SellerReviewReplyTemplate({
+    required this.templateId,
+    required this.content,
+  });
+
+  factory SellerReviewReplyTemplate.fromJson(Map<String, Object?> json) {
+    return SellerReviewReplyTemplate(
+      templateId: (json['templateId'] as num).toInt(),
+      content: json['content'] as String,
+    );
+  }
+
+  final int templateId;
+  final String content;
+}
+
 class SellerReview {
   const SellerReview({
     required this.reviewId,
@@ -66,6 +83,21 @@ abstract interface class SellerReviewRepository {
   Future<SellerReview> reply(int storeId, int reviewId, String reply);
 
   Future<SellerReview> deleteReply(int storeId, int reviewId);
+
+  Future<List<SellerReviewReplyTemplate>> findReplyTemplates(int storeId);
+
+  Future<SellerReviewReplyTemplate> createReplyTemplate(
+    int storeId,
+    String content,
+  );
+
+  Future<SellerReviewReplyTemplate> updateReplyTemplate(
+    int storeId,
+    int templateId,
+    String content,
+  );
+
+  Future<void> deleteReplyTemplate(int storeId, int templateId);
 }
 
 class ApiSellerReviewRepository implements SellerReviewRepository {
@@ -127,6 +159,57 @@ class ApiSellerReviewRepository implements SellerReviewRepository {
       ),
     );
   }
+
+  @override
+  Future<List<SellerReviewReplyTemplate>> findReplyTemplates(int storeId) {
+    return _apiClient.get(
+      '${_basePath(storeId)}/reply-templates',
+      decode: (value) => (value as List<Object?>)
+          .map(
+            (item) => SellerReviewReplyTemplate.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<SellerReviewReplyTemplate> createReplyTemplate(
+    int storeId,
+    String content,
+  ) {
+    return _apiClient.post(
+      '${_basePath(storeId)}/reply-templates',
+      body: {'content': content},
+      decode: (value) => SellerReviewReplyTemplate.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerReviewReplyTemplate> updateReplyTemplate(
+    int storeId,
+    int templateId,
+    String content,
+  ) {
+    return _apiClient.patch(
+      '${_basePath(storeId)}/reply-templates/$templateId',
+      body: {'content': content},
+      decode: (value) => SellerReviewReplyTemplate.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<void> deleteReplyTemplate(int storeId, int templateId) async {
+    await _apiClient.delete<Object?>(
+      '${_basePath(storeId)}/reply-templates/$templateId',
+      decode: (value) => value,
+    );
+  }
 }
 
 class MemorySellerReviewRepository implements SellerReviewRepository {
@@ -134,6 +217,10 @@ class MemorySellerReviewRepository implements SellerReviewRepository {
       : _reviews = List.of(reviews);
 
   final List<SellerReview> _reviews;
+  final Map<int, List<SellerReviewReplyTemplate>> _templatesByStore = {};
+
+  List<SellerReviewReplyTemplate> _templates(int storeId) =>
+      _templatesByStore.putIfAbsent(storeId, () => []);
 
   @override
   Future<List<SellerReview>> findAll(
@@ -172,5 +259,50 @@ class MemorySellerReviewRepository implements SellerReviewRepository {
     );
     if (index < 0) throw StateError('review not found');
     return _reviews[index] = _reviews[index].copyWith(clearReply: true);
+  }
+
+  @override
+  Future<List<SellerReviewReplyTemplate>> findReplyTemplates(int storeId) async {
+    return List.unmodifiable(_templates(storeId));
+  }
+
+  @override
+  Future<SellerReviewReplyTemplate> createReplyTemplate(
+    int storeId,
+    String content,
+  ) async {
+    final templates = _templates(storeId);
+    final nextId = templates.isEmpty
+        ? 1
+        : templates
+                .map((item) => item.templateId)
+                .reduce((a, b) => a > b ? a : b) +
+            1;
+    final created = SellerReviewReplyTemplate(
+      templateId: nextId,
+      content: content.trim(),
+    );
+    templates.add(created);
+    return created;
+  }
+
+  @override
+  Future<SellerReviewReplyTemplate> updateReplyTemplate(
+    int storeId,
+    int templateId,
+    String content,
+  ) async {
+    final templates = _templates(storeId);
+    final index = templates.indexWhere((item) => item.templateId == templateId);
+    if (index < 0) throw StateError('reply template not found');
+    return templates[index] = SellerReviewReplyTemplate(
+      templateId: templateId,
+      content: content.trim(),
+    );
+  }
+
+  @override
+  Future<void> deleteReplyTemplate(int storeId, int templateId) async {
+    _templates(storeId).removeWhere((item) => item.templateId == templateId);
   }
 }

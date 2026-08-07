@@ -6,6 +6,7 @@ class SellerIdentity {
     required this.email,
     required this.name,
     required this.role,
+    this.phone,
   });
 
   factory SellerIdentity.fromJson(Map<String, Object?> json) {
@@ -14,6 +15,7 @@ class SellerIdentity {
       email: json['email'] as String,
       name: json['name'] as String,
       role: json['role'] as String,
+      phone: json['phone'] as String?,
     );
   }
 
@@ -21,6 +23,7 @@ class SellerIdentity {
   final String email;
   final String name;
   final String role;
+  final String? phone;
 
   bool get isSeller => role == 'SELLER';
 }

@@ -377,8 +377,30 @@ class _StoreReviewSection extends StatelessWidget {
             ),
           );
         }
+        final average = items
+                .map((review) => review.rating)
+                .reduce((left, right) => left + right) /
+            items.length;
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(PopqSpacing.md),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, color: Color(0xFFFFB300)),
+                    const SizedBox(width: PopqSpacing.xs),
+                    Text(
+                      '전체 평점 ${average.toStringAsFixed(1)}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const Spacer(),
+                    Text('리뷰 ${items.length}개'),
+                  ],
+                ),
+              ),
+            ),
             for (final review in items)
               Card(
                 child: ListTile(

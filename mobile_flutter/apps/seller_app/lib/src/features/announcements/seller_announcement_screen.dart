@@ -205,12 +205,14 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
               widget.storeId,
               title: draft.title,
               content: draft.content,
+              notifyInterestedCustomers: draft.notifyInterestedCustomers,
             )
           : await widget.repository.update(
               widget.storeId,
               announcement,
               title: draft.title,
               content: draft.content,
+              notifyInterestedCustomers: draft.notifyInterestedCustomers,
             );
       if (!mounted) return;
       setState(() {
@@ -283,10 +285,15 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 }
 
 class _AnnouncementDraft {
-  const _AnnouncementDraft({required this.title, required this.content});
+  const _AnnouncementDraft({
+    required this.title,
+    required this.content,
+    required this.notifyInterestedCustomers,
+  });
 
   final String title;
   final String content;
+  final bool notifyInterestedCustomers;
 }
 
 class _AnnouncementEditor extends StatefulWidget {
@@ -301,6 +308,7 @@ class _AnnouncementEditor extends StatefulWidget {
 class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   late final TextEditingController _title;
   late final TextEditingController _content;
+  bool _notifyInterestedCustomers = false;
 
   @override
   void initState() {
@@ -341,6 +349,17 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 maxLines: 8,
                 decoration: const InputDecoration(labelText: '내용'),
               ),
+              CheckboxListTile(
+                key: const Key('notify-interested-customers'),
+                contentPadding: EdgeInsets.zero,
+                value: _notifyInterestedCustomers,
+                onChanged: (value) {
+                  setState(() => _notifyInterestedCustomers = value ?? false);
+                },
+                title: const Text('찜한 고객에게 알림 보내기'),
+                subtitle: const Text('저장과 동시에 공지를 게시하고 고객에게 알려요.'),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
             ],
           ),
         ),
@@ -358,7 +377,11 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
             if (title.isEmpty || content.isEmpty) return;
             Navigator.pop(
               context,
-              _AnnouncementDraft(title: title, content: content),
+              _AnnouncementDraft(
+                title: title,
+                content: content,
+                notifyInterestedCustomers: _notifyInterestedCustomers,
+              ),
             );
           },
           child: const Text('저장'),

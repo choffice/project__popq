@@ -23,11 +23,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   int? _rating;
   var _unanswered = false;
   late Future<List<SellerReview>> _reviews;
+  late Future<List<SellerReview>> _allReviews;
 
   @override
   void initState() {
     super.initState();
     _reviews = _load();
+    _allReviews = widget.repository.findAll(widget.storeId);
   }
 
   @override
@@ -40,6 +42,42 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   Widget build(BuildContext context) {
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            PopqSpacing.md,
+            PopqSpacing.md,
+            PopqSpacing.md,
+            0,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: FutureBuilder<List<SellerReview>>(
+                  future: _allReviews,
+                  builder: (context, snapshot) {
+                    final reviews = snapshot.data ?? const <SellerReview>[];
+                    final average = reviews.isEmpty
+                        ? null
+                        : reviews.map((item) => item.rating).reduce((a, b) => a + b) /
+                            reviews.length;
+                    return Text(
+                      average == null
+                          ? '전체 평점 - · 리뷰 0개'
+                          : '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    );
+                  },
+                ),
+              ),
+              if (widget.canReply)
+                OutlinedButton.icon(
+                  onPressed: _manageReplyTemplates,
+                  icon: const Icon(Icons.quickreply_outlined),
+                  label: const Text('대표 답글'),
+                ),
+            ],
+          ),
+        ),
         SizedBox(
           height: 56,
           child: ListView(
@@ -165,34 +203,98 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   }
 
   Future<void> _reload() async {
-    setState(() => _reviews = _load());
-    await _reviews;
+    setState(() {
+      _reviews = _load();
+      _allReviews = widget.repository.findAll(widget.storeId);
+    });
+    await Future.wait([_reviews, _allReviews]);
   }
 
   Future<void> _editReply(SellerReview review) async {
+    List<SellerReviewReplyTemplate> templates;
+    try {
+      templates = await widget.repository.findReplyTemplates(widget.storeId);
+    } catch (_) {
+      templates = const [];
+    }
+    if (!mounted) return;
+
     final controller = TextEditingController(text: review.sellerReply ?? '');
+    var selectedTemplateId = 0;
     final reply = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('리뷰 답글'),
-        content: TextField(controller: controller, maxLength: 1000, maxLines: 5),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('취소')),
-          FilledButton(
-            onPressed: () {
-              final value = controller.text.trim();
-              if (value.isNotEmpty) Navigator.pop(context, value);
-            },
-            child: const Text('저장'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('리뷰 답글'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: selectedTemplateId,
+                  decoration: const InputDecoration(labelText: '대표 답글 문구'),
+                  items: <DropdownMenuItem<int>>[
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('저장된 답글 없음'),
+                    ),
+                    ...templates.map(
+                      (template) => DropdownMenuItem<int>(
+                        value: template.templateId,
+                        child: Text(
+                          template.content,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setDialogState(() => selectedTemplateId = value);
+                    if (value == 0) return;
+                    controller.text = templates
+                        .firstWhere((item) => item.templateId == value)
+                        .content;
+                  },
+                ),
+                const SizedBox(height: PopqSpacing.sm),
+                TextField(
+                  controller: controller,
+                  maxLength: 1000,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(labelText: '답글 내용'),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = controller.text.trim();
+                if (value.isNotEmpty) Navigator.pop(context, value);
+              },
+              child: const Text('작성 완료'),
+            ),
+          ],
+        ),
       ),
     );
     controller.dispose();
     if (reply == null || !mounted) return;
     try {
-      await widget.repository.reply(widget.storeId, review.reviewId, reply);
-      if (mounted) await _reload();
+      final saved = await widget.repository.reply(
+        widget.storeId,
+        review.reviewId,
+        reply,
+      );
+      if (mounted) _replaceReview(saved);
     } catch (_) {
       if (mounted) _showError('답글을 저장하지 못했습니다.');
     }
@@ -212,8 +314,11 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     );
     if (confirmed != true) return;
     try {
-      await widget.repository.deleteReply(widget.storeId, review.reviewId);
-      if (mounted) await _reload();
+      final saved = await widget.repository.deleteReply(
+        widget.storeId,
+        review.reviewId,
+      );
+      if (mounted) _replaceReview(saved);
     } catch (_) {
       if (mounted) _showError('답글을 삭제하지 못했습니다.');
     }
@@ -221,5 +326,162 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _replaceReview(SellerReview saved) {
+    List<SellerReview> replace(List<SellerReview> reviews) => reviews
+        .map((item) => item.reviewId == saved.reviewId ? saved : item)
+        .toList(growable: false);
+    setState(() {
+      _reviews = _reviews.then(replace);
+      _allReviews = _allReviews.then(replace);
+    });
+  }
+
+  Future<void> _manageReplyTemplates() async {
+    List<SellerReviewReplyTemplate> templates;
+    try {
+      templates = List.of(
+        await widget.repository.findReplyTemplates(widget.storeId),
+      );
+    } catch (_) {
+      if (mounted) _showError('대표 답글을 불러오지 못했습니다.');
+      return;
+    }
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('대표 답글 문구'),
+          content: SizedBox(
+            width: 520,
+            child: templates.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: PopqSpacing.lg),
+                    child: Text('저장된 답글이 없습니다.'),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: templates.length,
+                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final template = templates[index];
+                      return ListTile(
+                        title: Text(template.content),
+                        trailing: Wrap(
+                          children: [
+                            IconButton(
+                              tooltip: '수정',
+                              icon: const Icon(Icons.edit_outlined),
+                              onPressed: () async {
+                                final value = await _promptTemplateText(
+                                  template.content,
+                                );
+                                if (value == null) return;
+                                try {
+                                  final saved = await widget.repository
+                                      .updateReplyTemplate(
+                                      widget.storeId,
+                                      template.templateId,
+                                      value,
+                                    );
+                                  setDialogState(() => templates[index] = saved);
+                                } catch (_) {
+                                  if (mounted) {
+                                    _showError('대표 답글을 수정하지 못했습니다.');
+                                  }
+                                }
+                              },
+                            ),
+                            IconButton(
+                              tooltip: '삭제',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () async {
+                                try {
+                                  await widget.repository.deleteReplyTemplate(
+                                    widget.storeId,
+                                    template.templateId,
+                                  );
+                                  setDialogState(
+                                    () => templates.removeAt(index),
+                                  );
+                                } catch (_) {
+                                  if (mounted) {
+                                    _showError('대표 답글을 삭제하지 못했습니다.');
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: templates.length >= 20
+                  ? null
+                  : () async {
+                      final value = await _promptTemplateText(null);
+                      if (value == null) return;
+                      try {
+                        final saved =
+                            await widget.repository.createReplyTemplate(
+                          widget.storeId,
+                          value,
+                        );
+                        setDialogState(() => templates.add(saved));
+                      } catch (_) {
+                        if (mounted) {
+                          _showError('대표 답글을 추가하지 못했습니다.');
+                        }
+                      }
+                    },
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('문구 추가'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('완료'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String?> _promptTemplateText(String? initialValue) async {
+    final controller = TextEditingController(text: initialValue);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(initialValue == null ? '대표 답글 추가' : '대표 답글 수정'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: 1000,
+          minLines: 3,
+          maxLines: 5,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty) Navigator.pop(context, text);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return value;
   }
 }

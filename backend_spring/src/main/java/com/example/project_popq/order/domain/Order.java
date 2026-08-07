@@ -43,6 +43,7 @@ public class Order extends BaseTimeEntity {
                     OrderStatus.PLACED,
                     EnumSet.of(
                             OrderStatus.ACCEPTED,
+                            OrderStatus.PREPARING,
                             OrderStatus.REJECTED,
                             OrderStatus.CANCELED
                     ),
@@ -260,7 +261,7 @@ public class Order extends BaseTimeEntity {
             Instant now
     ) {
         OrderTransition transition = transitionTo(
-                OrderStatus.ACCEPTED,
+                OrderStatus.PREPARING,
                 actorType,
                 actorId,
                 reason,
