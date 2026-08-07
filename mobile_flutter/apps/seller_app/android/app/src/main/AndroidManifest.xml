@@ -17,6 +17,14 @@
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false">
 
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_popq" />
+
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="popq_chat_messages" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
