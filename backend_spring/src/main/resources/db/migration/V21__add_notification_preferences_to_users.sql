@@ -1,3 +1,0 @@
-ALTER TABLE users
-    ADD COLUMN push_notification_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-    ADD COLUMN marketing_opt_in BOOLEAN NOT NULL DEFAULT FALSE;

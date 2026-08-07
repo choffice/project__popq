@@ -21,7 +21,6 @@ import '../features/orders/seller_order_list_screen.dart';
 import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
 import '../features/profile/seller_my_screen.dart';
-import '../features/profile/seller_profile_screen.dart';
 import '../features/settings/seller_settings_screen.dart';
 import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
@@ -42,7 +41,6 @@ abstract final class SellerRoutes {
   static const orders = '/orders';
   static const customers = '/customers';
   static const my = '/my';
-  static const myProfile = '/my/profile';
 
   @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
   static const sales = my;
@@ -252,14 +250,6 @@ GoRouter createSellerRouter({
           return SellerFindPasswordScreen(
             onVerify: onVerifyForPasswordReset,
             onResetPassword: onResetPassword,
-          );
-        },
-      ),
-      GoRoute(
-        path: SellerRoutes.myProfile,
-        builder: (context, state) {
-          return SellerProfileScreen(
-            identityRepository: bootstrapController.identityRepository,
           );
         },
       ),

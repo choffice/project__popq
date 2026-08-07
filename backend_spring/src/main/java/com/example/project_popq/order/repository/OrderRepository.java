@@ -2,7 +2,6 @@ package com.example.project_popq.order.repository;
 
 import com.example.project_popq.order.domain.Order;
 import com.example.project_popq.order.domain.OrderStatus;
-import com.example.project_popq.order.dto.VisitedStoreResponse;
 import com.example.project_popq.payment.domain.PaymentStatus;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -83,29 +82,5 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             """)
     Optional<Order> findForUpdateByOrderPublicId(
             @Param("orderPublicId") String orderPublicId
-    );
-
-    /**
-     * 고객이 결제까지 완료한 주문이 있는 매장을 매장별로 묶어,
-     * 가장 최근 결제 시각순으로 반환합니다. ("방문 기록")
-     */
-    @Query("""
-            select new com.example.project_popq.order.dto.VisitedStoreResponse(
-                o.store.id,
-                o.store.name,
-                o.store.representativeCategory,
-                o.store.imageUrl,
-                max(p.approvedAt)
-            )
-            from Order o
-            join Payment p on p.order = o
-            where o.user.id = :userId
-              and p.status = :paymentStatus
-            group by o.store.id, o.store.name, o.store.representativeCategory, o.store.imageUrl
-            order by max(p.approvedAt) desc
-            """)
-    List<VisitedStoreResponse> findVisitedStoresByUserId(
-            @Param("userId") Long userId,
-            @Param("paymentStatus") PaymentStatus paymentStatus
     );
 }

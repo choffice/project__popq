@@ -526,24 +526,9 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
     });
   }
 
-  // "마이" 탭 안에서 열리는 하위 화면들입니다.
-  // 이 화면들에 있을 때도 하단 탭은 "마이"로 유지되어야 합니다.
-  static const List<String> _profileSubRoutes = <String>[
-    CustomerRoutes.myInfo,
-    CustomerRoutes.myReviews,
-    CustomerRoutes.visitHistory,
-    CustomerRoutes.notificationSettings,
-  ];
-
   int _routeIndexForLocation(
     String value,
   ) {
-    if (_profileSubRoutes.any(
-      (String candidate) => value.startsWith(candidate),
-    )) {
-      return _locations.indexOf(CustomerRoutes.profile);
-    }
-
     final index = _locations.indexWhere(
       (String candidate) => value.startsWith(candidate),
     );
