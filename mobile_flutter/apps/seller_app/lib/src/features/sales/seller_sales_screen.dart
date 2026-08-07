@@ -21,8 +21,7 @@ class SellerSalesScreen extends StatefulWidget {
   final SellerStoreSelectionController selectionController;
 
   @override
-  State<SellerSalesScreen> createState() =>
-      _SellerSalesScreenState();
+  State<SellerSalesScreen> createState() => _SellerSalesScreenState();
 }
 
 class _SellerSalesScreenState extends State<SellerSalesScreen> {
@@ -38,47 +37,32 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
   void initState() {
     super.initState();
 
-    _lastSelectedStoreId =
-        widget.selectionController.selectedStoreId;
+    _lastSelectedStoreId = widget.selectionController.selectedStoreId;
 
-    widget.selectionController.addListener(
-      _handleSelectionChanged,
-    );
+    widget.selectionController.addListener(_handleSelectionChanged);
 
     _load();
   }
 
   @override
-  void didUpdateWidget(
-      covariant SellerSalesScreen oldWidget,
-      ) {
+  void didUpdateWidget(covariant SellerSalesScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (oldWidget.selectionController ==
-        widget.selectionController) {
+    if (oldWidget.selectionController == widget.selectionController) {
       return;
     }
 
-    oldWidget.selectionController.removeListener(
-      _handleSelectionChanged,
-    );
+    oldWidget.selectionController.removeListener(_handleSelectionChanged);
+    widget.selectionController.addListener(_handleSelectionChanged);
 
-    widget.selectionController.addListener(
-      _handleSelectionChanged,
-    );
-
-    _lastSelectedStoreId =
-        widget.selectionController.selectedStoreId;
+    _lastSelectedStoreId = widget.selectionController.selectedStoreId;
 
     _load();
   }
 
   @override
   void dispose() {
-    widget.selectionController.removeListener(
-      _handleSelectionChanged,
-    );
-
+    widget.selectionController.removeListener(_handleSelectionChanged);
     super.dispose();
   }
 
@@ -121,9 +105,12 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
     final summary = storeSales.summary;
 
     final menus = summary.topProducts.toList()
-      ..sort(
-            (left, right) => right.sales.compareTo(left.sales),
-      );
+      ..sort((left, right) => right.sales.compareTo(left.sales));
+
+    final dailySales = summary.dailySales.toList()
+      ..sort((left, right) => right.date.compareTo(left.date));
+
+    final todaySales = _findTodaySales(summary);
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -145,9 +132,7 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
                 label: Text('월 매출'),
               ),
             ],
-            selected: {
-              _period,
-            },
+            selected: {_period},
             onSelectionChanged: (selection) {
               setState(() {
                 _period = selection.single;
@@ -164,7 +149,7 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
           const SizedBox(height: PopqSpacing.xs),
           Text(
             '${_storeTypeLabel(store.storeType)} · '
-                '${_businessStatusLabel(store.businessStatus)}',
+            '${_businessStatusLabel(store.businessStatus)}',
             style: theme.textTheme.bodyMedium,
           ),
           const SizedBox(height: PopqSpacing.sm),
@@ -176,10 +161,11 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '선택 사업장 총 매출',
+                    _period == _SalesPeriod.day ? '오늘 순매출' : '이번 달 순매출',
                     style: TextStyle(
-                      color: colorScheme.onInverseSurface
-                          .withValues(alpha: 0.72),
+                      color: colorScheme.onInverseSurface.withValues(
+                        alpha: 0.72,
+                      ),
                     ),
                   ),
                   const SizedBox(height: PopqSpacing.xs),
@@ -191,18 +177,103 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const SizedBox(height: PopqSpacing.xs),
+                  const SizedBox(height: PopqSpacing.sm),
                   Text(
-                    '완료 주문 ${summary.completedOrderCount}건',
+                    '${_periodLabel(summary)} · 완료 주문 '
+                    '${summary.completedOrderCount}건',
                     style: TextStyle(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onInverseSurface.withValues(
+                        alpha: 0.78,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+          const SizedBox(height: PopqSpacing.lg),
+          Text(
+            '결제 정산',
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _SalesMetricCard(
+                  icon: Icons.payments_outlined,
+                  label: '결제 완료 금액',
+                  value: sellerWon(summary.grossSales),
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.sm),
+              Expanded(
+                child: _SalesMetricCard(
+                  icon: Icons.undo_rounded,
+                  label: '환불 금액',
+                  value: sellerWon(summary.refundedAmount),
+                  description: summary.refundCount > 0
+                      ? '${summary.refundCount}건 환불·취소'
+                      : '환불·취소 없음',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _SalesMetricCard(
+                  icon: Icons.account_balance_wallet_outlined,
+                  label: '순매출',
+                  value: sellerWon(summary.netSales),
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.sm),
+              Expanded(
+                child: _SalesMetricCard(
+                  icon: Icons.today_outlined,
+                  label: '오늘 매출',
+                  value: sellerWon(todaySales),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PopqSpacing.xs),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: PopqSpacing.xs),
+            child: Text(
+              '결제 완료 금액은 승인된 원결제 금액이며, 환불 금액은 성공한 부분환불·전액취소 금액을 포함합니다.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(height: PopqSpacing.lg),
+          Text(
+            '기간별 매출',
+            style: theme.textTheme.titleLarge,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          if (dailySales.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(PopqSpacing.lg),
+                child: Text('해당 기간에 집계된 매출이 없습니다.'),
+              ),
+            )
+          else
+            Card(
+              child: Column(
+                children: [
+                  for (var index = 0; index < dailySales.length; index++) ...[
+                    _DailySalesTile(item: dailySales[index]),
+                    if (index != dailySales.length - 1)
+                      const Divider(height: 1),
+                  ],
+                ],
+              ),
+            ),
           const SizedBox(height: PopqSpacing.lg),
           Text(
             '주문 유형별 매출',
@@ -238,25 +309,17 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(PopqSpacing.lg),
-                child: Text(
-                  '해당 기간에 집계된 메뉴 매출이 없습니다.',
-                ),
+                child: Text('해당 기간에 집계된 메뉴 매출이 없습니다.'),
               ),
             )
           else
             for (final item in menus.take(10))
               Card(
                 child: ListTile(
-                  leading: const Icon(
-                    Icons.restaurant_menu_rounded,
-                  ),
+                  leading: const Icon(Icons.restaurant_menu_rounded),
                   title: Text(item.name),
-                  subtitle: Text(
-                    '${item.quantity}개 판매',
-                  ),
-                  trailing: Text(
-                    sellerWon(item.sales),
-                  ),
+                  subtitle: Text('${item.quantity}개 판매'),
+                  trailing: Text(sellerWon(item.sales)),
                 ),
               ),
         ],
@@ -265,8 +328,7 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
   }
 
   void _handleSelectionChanged() {
-    final selectedStoreId =
-        widget.selectionController.selectedStoreId;
+    final selectedStoreId = widget.selectionController.selectedStoreId;
 
     if (_lastSelectedStoreId == selectedStoreId) {
       return;
@@ -286,8 +348,7 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
       _error = null;
     });
 
-    final selectedStoreId =
-        widget.selectionController.selectedStoreId;
+    final selectedStoreId = widget.selectionController.selectedStoreId;
 
     if (selectedStoreId == null) {
       setState(() {
@@ -302,44 +363,29 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
       final now = DateTime.now();
 
       final from = _period == _SalesPeriod.day
-          ? DateTime(
-        now.year,
-        now.month,
-        now.day,
-      )
-          : DateTime(
-        now.year,
-        now.month,
-      );
+          ? DateTime(now.year, now.month, now.day)
+          : DateTime(now.year, now.month);
 
-      final store = await widget.storeRepository.findOne(
-        selectedStoreId,
-      );
+      final store = await widget.storeRepository.findOne(selectedStoreId);
 
-      final summary =
-      await widget.analyticsRepository.findSales(
+      final summary = await widget.analyticsRepository.findSales(
         selectedStoreId,
         from: from,
         to: now,
       );
 
       if (!mounted ||
-          widget.selectionController.selectedStoreId !=
-              selectedStoreId) {
+          widget.selectionController.selectedStoreId != selectedStoreId) {
         return;
       }
 
       setState(() {
-        _storeSales = _StoreSales(
-          store,
-          summary,
-        );
+        _storeSales = _StoreSales(store, summary);
         _loading = false;
       });
     } catch (error) {
       if (!mounted ||
-          widget.selectionController.selectedStoreId !=
-              selectedStoreId) {
+          widget.selectionController.selectedStoreId != selectedStoreId) {
         return;
       }
 
@@ -349,6 +395,27 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
       });
     }
   }
+
+  int _findTodaySales(SellerSalesSummary summary) {
+    final now = DateTime.now();
+    final today = _dateKey(now);
+
+    for (final item in summary.dailySales) {
+      if (item.date == today) {
+        return item.sales;
+      }
+    }
+
+    return 0;
+  }
+
+  String _periodLabel(SellerSalesSummary summary) {
+    if (summary.from == summary.to) {
+      return _displayDate(summary.from);
+    }
+
+    return '${_displayDate(summary.from)} ~ ${_displayDate(summary.to)}';
+  }
 }
 
 class _SalesMetricCard extends StatelessWidget {
@@ -356,14 +423,19 @@ class _SalesMetricCard extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.description,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(PopqSpacing.md),
@@ -374,18 +446,28 @@ class _SalesMetricCard extends StatelessWidget {
             const SizedBox(height: PopqSpacing.sm),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodySmall,
+              style: theme.textTheme.bodySmall,
             ),
             const SizedBox(height: PopqSpacing.xs),
-            Text(
-              value,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(
-                fontWeight: FontWeight.w800,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
+            if (description != null) ...[
+              const SizedBox(height: PopqSpacing.xs),
+              Text(
+                description!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -393,20 +475,38 @@ class _SalesMetricCard extends StatelessWidget {
   }
 }
 
+class _DailySalesTile extends StatelessWidget {
+  const _DailySalesTile({required this.item});
+
+  final SellerDailySales item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return ListTile(
+      leading: const Icon(Icons.calendar_today_outlined),
+      title: Text(_displayDate(item.date)),
+      subtitle: Text('결제 승인 ${item.orderCount}건'),
+      trailing: Text(
+        sellerWon(item.sales),
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
 class _StoreSales {
-  const _StoreSales(
-      this.store,
-      this.summary,
-      );
+  const _StoreSales(this.store, this.summary);
 
   final SellerStore store;
   final SellerSalesSummary summary;
 }
 
 String _storeTypeLabel(String storeType) {
-  return storeType == 'EVENT_COMMERCE'
-      ? '행사·팝업 판매점'
-      : '일반 매장';
+  return storeType == 'EVENT_COMMERCE' ? '행사·팝업 판매점' : '일반 매장';
 }
 
 String _businessStatusLabel(String status) {
@@ -416,4 +516,20 @@ String _businessStatusLabel(String status) {
     'CLOSED' => '영업 종료',
     _ => status,
   };
+}
+
+String _dateKey(DateTime value) {
+  final local = value.toLocal();
+  return '${local.year.toString().padLeft(4, '0')}-'
+      '${local.month.toString().padLeft(2, '0')}-'
+      '${local.day.toString().padLeft(2, '0')}';
+}
+
+String _displayDate(String value) {
+  final parsed = DateTime.tryParse(value);
+  if (parsed == null) {
+    return value;
+  }
+
+  return '${parsed.month}월 ${parsed.day}일';
 }

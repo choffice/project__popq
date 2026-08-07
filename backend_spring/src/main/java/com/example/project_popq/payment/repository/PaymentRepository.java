@@ -2,8 +2,8 @@ package com.example.project_popq.payment.repository;
 
 import com.example.project_popq.payment.domain.Payment;
 import jakarta.persistence.LockModeType;
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,7 +24,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             where p.idempotencyKey = :idempotencyKey
             """)
     Optional<Payment> findForUpdateByIdempotencyKey(
-            @Param("idempotencyKey") String idempotencyKey
+        @Param("idempotencyKey") String idempotencyKey
     );
 
     @EntityGraph(attributePaths = "order")
@@ -32,8 +32,8 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
     @EntityGraph(attributePaths = {"order", "refunds"})
     Optional<Payment> findByOrderOrderPublicIdAndOrderStoreId(
-            String orderPublicId,
-            Long storeId
+        String orderPublicId,
+        Long storeId
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -45,7 +45,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             """)
     Optional<Payment> findForUpdateByOrderId(@Param("orderId") Long orderId);
 
-    @EntityGraph(attributePaths = {"order", "refunds"})
+    @EntityGraph(attributePaths = {"order", "order.items", "refunds"})
     @Query("""
             select distinct p
             from Payment p
