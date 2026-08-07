@@ -2,6 +2,7 @@ package com.example.project_popq.notification.push;
 
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.google.firebase.messaging.Message;
@@ -26,6 +27,25 @@ public class FirebasePushNotificationGateway
 
   @Override
   public void send(PushMessage pushMessage) {
+    String androidChannelId = pushMessage.data().get("androidChannelId");
+    String androidSound = pushMessage.data().get("androidSound");
+    boolean hasCustomAndroidSound = androidChannelId != null
+        && !androidChannelId.isBlank()
+        && androidSound != null
+        && !androidSound.isBlank();
+
+    AndroidConfig.Builder androidConfig = AndroidConfig.builder()
+        .setPriority(AndroidConfig.Priority.HIGH);
+
+    if (hasCustomAndroidSound) {
+      androidConfig.setNotification(
+          AndroidNotification.builder()
+              .setChannelId(androidChannelId)
+              .setSound(androidSound)
+              .build()
+      );
+    }
+
     Message firebaseMessage = Message.builder()
         .setToken(pushMessage.token())
         .setNotification(
@@ -36,9 +56,7 @@ public class FirebasePushNotificationGateway
         )
         .putAllData(pushMessage.data())
         .setAndroidConfig(
-            AndroidConfig.builder()
-                .setPriority(AndroidConfig.Priority.HIGH)
-                .build()
+            androidConfig.build()
         )
         .build();
 
