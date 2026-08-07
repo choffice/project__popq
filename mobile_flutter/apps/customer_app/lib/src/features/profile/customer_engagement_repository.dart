@@ -108,6 +108,7 @@ class CustomerReview {
     required this.status,
     required this.createdAt,
     this.content,
+    this.storeCategory,
     this.sellerReply,
     this.sellerRepliedAt,
   });
@@ -118,6 +119,7 @@ class CustomerReview {
       orderPublicId: json['orderPublicId'] as String,
       storeId: (json['storeId'] as num).toInt(),
       storeName: json['storeName'] as String,
+      storeCategory: json['storeCategory'] as String?,
       authorName: json['authorName'] as String,
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
@@ -134,6 +136,7 @@ class CustomerReview {
   final String orderPublicId;
   final int storeId;
   final String storeName;
+  final String? storeCategory;
   final String authorName;
   final int rating;
   final String? content;
@@ -150,6 +153,7 @@ class CustomerReview {
       orderPublicId: orderPublicId,
       storeId: storeId,
       storeName: storeName,
+      storeCategory: storeCategory,
       authorName: authorName,
       rating: rating ?? this.rating,
       content: content ?? this.content,

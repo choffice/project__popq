@@ -436,11 +436,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       return;
     }
 
-    //오창
-    if (!(kIsWeb &&
-        widget.environment.flavor == AppFlavor.development)) {
-      unawaited(_registerPushDevice());
-    }
+    unawaited(_registerPushDevice());
 
     if (_isAppActive) {
       unawaited(_realtimeClient.connect());
@@ -448,6 +444,10 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   }
 
   Future<void> _registerPushDevice() async {
+    if (kIsWeb && widget.environment.flavor == AppFlavor.development) {
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 
