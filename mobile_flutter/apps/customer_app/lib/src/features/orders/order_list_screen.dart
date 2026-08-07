@@ -35,10 +35,12 @@ class _OrderListScreenState extends State<OrderListScreen>
   _OrderListData? _data;
   PopqRealtimeClient? _realtimeClient;
   PopqRealtimeSubscription? _customerChatSubscription;
+  PopqRealtimeSubscription? _customerOrderSubscription;
   Timer? _fallbackPollingTimer;
 
   var _initialLoading = true;
   var _unreadRefreshInProgress = false;
+  var _orderRefreshInProgress = false;
   var _requestGeneration = 0;
   var _observedConnectionEpoch = 0;
   var _isAppActive = true;
@@ -72,6 +74,9 @@ class _OrderListScreenState extends State<OrderListScreen>
     _customerChatSubscription?.cancel();
     _customerChatSubscription = null;
 
+    _customerOrderSubscription?.cancel();
+    _customerOrderSubscription = null;
+
     _realtimeClient?.removeListener(
       _handleRealtimeClientChanged,
     );
@@ -87,6 +92,12 @@ class _OrderListScreenState extends State<OrderListScreen>
         nextRealtimeClient.subscribeToCustomerChat(
       onEvent: _handleCustomerChatEvent,
       onError: _handleCustomerChatError,
+    );
+
+    _customerOrderSubscription =
+        nextRealtimeClient.subscribeToCustomerOrders(
+      onEvent: _handleCustomerOrderEvent,
+      onError: _handleCustomerOrderError,
     );
 
     _syncFallbackPollingWithRealtime();
@@ -118,7 +129,7 @@ class _OrderListScreenState extends State<OrderListScreen>
         _syncFallbackPollingWithRealtime();
 
         unawaited(
-          _refreshUnreadCounts(),
+          _recoverLatestState(),
         );
 
         return;
@@ -147,6 +158,9 @@ class _OrderListScreenState extends State<OrderListScreen>
 
     _customerChatSubscription?.cancel();
     _customerChatSubscription = null;
+
+    _customerOrderSubscription?.cancel();
+    _customerOrderSubscription = null;
 
     _realtimeClient?.removeListener(
       _handleRealtimeClientChanged,
@@ -256,7 +270,10 @@ class _OrderListScreenState extends State<OrderListScreen>
 
       setState(() {
         _data = _OrderListData(
-          orders: orders,
+          orders: _mergeServerOrders(
+            currentOrders: _data?.orders ?? const <CustomerOrder>[],
+            serverOrders: orders,
+          ),
           unreadCounts: <String, int>{
             for (final item in unreadCounts)
               item.orderPublicId: item.unreadCount,
@@ -280,6 +297,131 @@ class _OrderListScreenState extends State<OrderListScreen>
         _initialLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshOrdersFromServer() async {
+    if (!mounted || _orderRefreshInProgress) {
+      return;
+    }
+
+    if (_data == null) {
+      await _loadAll(showLoading: false);
+      return;
+    }
+
+    final generation = _requestGeneration;
+    _orderRefreshInProgress = true;
+
+    try {
+      final orders = await widget.repository.findAll();
+
+      if (!mounted || generation != _requestGeneration) {
+        return;
+      }
+
+      final currentData = _data;
+
+      if (currentData == null) {
+        return;
+      }
+
+      final mergedOrders = _mergeServerOrders(
+        currentOrders: currentData.orders,
+        serverOrders: orders,
+      );
+
+      setState(() {
+        _data = currentData.copyWith(
+          orders: mergedOrders,
+        );
+      });
+    } catch (error, stackTrace) {
+      debugPrint(
+        '주문 목록 최신 상태를 갱신하지 못했습니다: $error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _orderRefreshInProgress = false;
+    }
+  }
+
+  Future<void> _syncOrderAfterRealtimeEvent({
+    required String orderPublicId,
+    required int knownVersion,
+  }) async {
+    final generation = _requestGeneration;
+
+    try {
+      final result = await widget.repository.sync(
+        orderPublicId,
+        knownVersion,
+      );
+      final serverOrder = result.order;
+
+      if (!mounted ||
+          generation != _requestGeneration ||
+          serverOrder == null) {
+        return;
+      }
+
+      final currentData = _data;
+
+      if (currentData == null) {
+        return;
+      }
+
+      final index = currentData.orders.indexWhere(
+        (order) => order.orderPublicId == orderPublicId,
+      );
+
+      if (index < 0) {
+        unawaited(
+          _refreshOrdersFromServer(),
+        );
+        return;
+      }
+
+      final currentOrder = currentData.orders[index];
+
+      if (serverOrder.version < currentOrder.version) {
+        return;
+      }
+
+      final nextOrders = List<CustomerOrder>.of(
+        currentData.orders,
+      );
+      nextOrders[index] = serverOrder;
+
+      setState(() {
+        _data = currentData.copyWith(
+          orders: nextOrders,
+        );
+      });
+    } catch (error, stackTrace) {
+      // 실시간 이벤트로 status/version은 이미 반영했습니다.
+      // 전체 스냅샷 복구는 다음 이벤트, 재연결 또는 fallback에서
+      // 다시 시도합니다.
+      debugPrint(
+        '실시간 주문 이벤트 후 REST 동기화에 실패했습니다: $error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _recoverLatestState() async {
+    if (_data == null) {
+      await _loadAll(showLoading: false);
+      return;
+    }
+
+    await Future.wait<void>(<Future<void>>[
+      _refreshOrdersFromServer(),
+      _refreshUnreadCounts(),
+    ]);
   }
 
   Future<void> _refreshUnreadCounts() async {
@@ -352,13 +494,73 @@ class _OrderListScreenState extends State<OrderListScreen>
     if (_observedConnectionEpoch != realtimeClient.connectionEpoch) {
       _observedConnectionEpoch = realtimeClient.connectionEpoch;
 
-      // 재연결 직후 누락된 배지 변화를 REST로 한 번 복구합니다.
+      // 재연결 직후 WebSocket이 끊긴 동안 놓친 주문 상태와
+      // 문의 배지를 REST로 한 번 복구합니다.
       unawaited(
-        _refreshUnreadCounts(),
+        _recoverLatestState(),
       );
     }
 
     _syncFallbackPollingWithRealtime();
+  }
+
+  void _handleCustomerOrderEvent(
+    PopqOrderRealtimeEvent event,
+  ) {
+    final currentData = _data;
+
+    if (currentData == null) {
+      unawaited(
+        _refreshOrdersFromServer(),
+      );
+      return;
+    }
+
+    final index = currentData.orders.indexWhere(
+      (order) => order.orderPublicId == event.orderPublicId,
+    );
+
+    if (index < 0) {
+      unawaited(
+        _refreshOrdersFromServer(),
+      );
+      return;
+    }
+
+    final currentOrder = currentData.orders[index];
+
+    if (event.isDuplicateOrOlderThan(currentOrder.version)) {
+      return;
+    }
+
+    final knownVersion = currentOrder.version;
+    final nextOrders = List<CustomerOrder>.of(
+      currentData.orders,
+    );
+    nextOrders[index] = currentOrder.applyRealtimeEvent(event);
+
+    setState(() {
+      _data = currentData.copyWith(
+        orders: nextOrders,
+      );
+    });
+
+    // status/version은 즉시 반영하고, 준비시간 등 이벤트에 없는
+    // 전체 주문 데이터는 REST sync로 보정합니다.
+    unawaited(
+      _syncOrderAfterRealtimeEvent(
+        orderPublicId: event.orderPublicId,
+        knownVersion: knownVersion,
+      ),
+    );
+  }
+
+  void _handleCustomerOrderError(
+    Object error,
+  ) {
+    debugPrint(
+      '주문 목록 실시간 상태 이벤트를 처리하지 못했습니다: $error',
+    );
   }
 
   void _handleCustomerChatEvent(
@@ -411,7 +613,7 @@ class _OrderListScreenState extends State<OrderListScreen>
       _fallbackPollingInterval,
       (_) {
         unawaited(
-          _refreshUnreadCounts(),
+          _recoverLatestState(),
         );
       },
     );
@@ -454,6 +656,41 @@ class _OrderListScreenState extends State<OrderListScreen>
     // 채팅 화면 진입 시 판매자 메시지가 읽음 처리되므로,
     // 화면 복귀 직후 읽지 않은 답변 배지를 다시 조회합니다.
     await _refreshUnreadCounts();
+  }
+
+  List<CustomerOrder> _mergeServerOrders({
+    required List<CustomerOrder> currentOrders,
+    required List<CustomerOrder> serverOrders,
+  }) {
+    final currentById = <String, CustomerOrder>{
+      for (final order in currentOrders)
+        order.orderPublicId: order,
+    };
+    final serverIds = <String>{};
+    final merged = <CustomerOrder>[];
+
+    for (final serverOrder in serverOrders) {
+      serverIds.add(serverOrder.orderPublicId);
+
+      final currentOrder = currentById[serverOrder.orderPublicId];
+
+      if (currentOrder != null &&
+          currentOrder.version > serverOrder.version) {
+        merged.add(currentOrder);
+      } else {
+        merged.add(serverOrder);
+      }
+    }
+
+    // 더 오래 걸린 REST 요청이 방금 생성되거나 갱신된 로컬 주문을
+    // 누락한 경우에도 최신 화면을 지우지 않습니다.
+    for (final currentOrder in currentOrders) {
+      if (!serverIds.contains(currentOrder.orderPublicId)) {
+        merged.add(currentOrder);
+      }
+    }
+
+    return List<CustomerOrder>.unmodifiable(merged);
   }
 
   bool _sameUnreadCounts(
