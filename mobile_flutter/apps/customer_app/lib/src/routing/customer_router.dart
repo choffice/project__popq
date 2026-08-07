@@ -38,6 +38,7 @@ import '../features/profile/customer_my_info_screen.dart';
 import '../features/profile/customer_my_reviews_screen.dart';
 import '../features/profile/customer_notification_settings_screen.dart';
 import '../features/profile/customer_profile_screen.dart';
+import '../features/profile/customer_visit_history_screen.dart';
 import '../features/profile/review_editor_screen.dart';
 import '../features/qr/customer_qr_scanner_screen.dart';
 
@@ -62,6 +63,7 @@ abstract final class CustomerRoutes {
   static const profile = '/profile';
   static const myReviews = '/my-reviews';
   static const myInfo = '/my-info';
+  static const visitHistory = '/visit-history';
   static const notifications = '/notifications';
   static const notificationSettings = '/notification-settings';
 
@@ -122,6 +124,9 @@ GoRouter createCustomerRouter({
   Future<void> Function()? onGoogleSignIn,
   Future<void> Function()? onKakaoSignIn,
   Future<void> Function()? onNaverSignIn,
+  Future<void> Function()? onGoogleLink,
+  Future<void> Function()? onKakaoLink,
+  Future<void> Function()? onNaverLink,
   Duration minSplashDuration = const Duration(seconds: 3),
 }) {
   final splashStartedAt = DateTime.now();
@@ -226,6 +231,8 @@ GoRouter createCustomerRouter({
                   CustomerRoutes.myReviews ||
               location ==
                   CustomerRoutes.myInfo ||
+              location ==
+                  CustomerRoutes.visitHistory ||
               location ==
                   CustomerRoutes.notifications ||
               location ==
@@ -626,6 +633,23 @@ GoRouter createCustomerRouter({
             path: CustomerRoutes.myInfo,
             builder: (context, state) {
               return CustomerMyInfoScreen(
+                repository:
+                engagementRepository,
+                onSignOut:
+                sessionController.signOut,
+                onGoogleLink:
+                onGoogleLink,
+                onKakaoLink:
+                onKakaoLink,
+                onNaverLink:
+                onNaverLink,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.visitHistory,
+            builder: (context, state) {
+              return CustomerVisitHistoryScreen(
                 repository:
                 engagementRepository,
               );

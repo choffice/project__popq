@@ -285,6 +285,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       _kakaoSignIn,
       onNaverSignIn:
       _naverSignIn,
+      onGoogleLink:
+      _googleLink,
+      onKakaoLink:
+      _kakaoLink,
+      onNaverLink:
+      _naverLink,
     );
 
     _backButtonDispatcher =
@@ -482,6 +488,35 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+  }
+
+  Future<void> _googleLink() async {
+    final idToken = await _googleAuthService.signInAndGetIdToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'GOOGLE',
+      providerToken: idToken,
+    );
+  }
+
+  Future<void> _kakaoLink() async {
+    final accessToken =
+        await _kakaoAuthService.signInAndGetAccessToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+  }
+
+  Future<void> _naverLink() async {
+    final accessToken =
+        await _naverAuthService.signInAndGetAccessToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
   }
 
   void _handleSessionChanged() {

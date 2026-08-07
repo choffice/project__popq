@@ -119,12 +119,24 @@ public class User extends BaseTimeEntity {
         this.passwordHash = passwordHash;
     }
 
+    /**
+     * 지정한 시각 이전에 발급된 액세스 토큰을 모두 무효화합니다.
+     * 비밀번호 변경 등으로 기존에 로그인된 모든 기기를 강제 로그아웃시킬 때 사용합니다.
+     */
+    public void invalidateTokensIssuedBefore(Instant now) {
+        this.tokenValidAfter = now;
+    }
+
     public void changeProfileImageUrl(String profileImageUrl) {
         this.profileImageUrl = profileImageUrl;
     }
 
     public void changePhone(String phone) {
         this.phone = phone;
+    }
+
+    public void changeName(String name) {
+        this.name = name;
     }
 
     public void changeNotificationPreferences(

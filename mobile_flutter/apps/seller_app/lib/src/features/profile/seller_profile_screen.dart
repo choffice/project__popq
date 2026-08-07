@@ -31,7 +31,9 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
 
   Future<void> _reload() async {
     final nextIdentity = widget.identityRepository.getCurrent();
-    setState(() => _identity = nextIdentity);
+    setState(() {
+      _identity = nextIdentity;
+    });
     await nextIdentity;
   }
 

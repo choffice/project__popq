@@ -41,7 +41,9 @@ class _CustomerNotificationSettingsScreenState
         marketingOptIn: marketingOptIn,
       );
       if (!mounted) return;
-      setState(() => _preference = Future.value(updated));
+      setState(() {
+        _preference = Future.value(updated);
+      });
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

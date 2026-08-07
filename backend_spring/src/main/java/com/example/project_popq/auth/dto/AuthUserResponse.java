@@ -3,6 +3,7 @@ package com.example.project_popq.auth.dto;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.domain.UserStatus;
+import java.time.Instant;
 
 public record AuthUserResponse(
         Long userId,
@@ -11,7 +12,8 @@ public record AuthUserResponse(
         String phone,
         PlatformRole role,
         UserStatus status,
-        String profileImageUrl
+        String profileImageUrl,
+        Instant joinedAt
 ) {
     public static AuthUserResponse from(User user) {
         return new AuthUserResponse(
@@ -21,7 +23,8 @@ public record AuthUserResponse(
             user.getPhone(),
             user.getRole(),
             user.getStatus(),
-            user.getProfileImageUrl()
+            user.getProfileImageUrl(),
+            user.getCreatedAt()
         );
     }
 
@@ -36,7 +39,8 @@ public record AuthUserResponse(
             user.getPhone(),
             activeRole,
             user.getStatus(),
-            user.getProfileImageUrl()
+            user.getProfileImageUrl(),
+            user.getCreatedAt()
         );
     }
 }

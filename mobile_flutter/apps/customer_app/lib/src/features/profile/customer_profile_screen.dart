@@ -13,15 +13,24 @@ import 'customer_engagement_repository.dart';
 
 /// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
 ///
-/// 레벨, 함께한 일수, 방문 횟수, 보유 포인트는 아직 백엔드에
+/// 레벨, 방문 횟수, 보유 포인트는 아직 백엔드에
 /// 관련 API가 없어 화면 디자인 확인용 임시값입니다.
 /// 실제 API가 준비되면 [CustomerProfile]에 필드를 추가해 교체합니다.
 abstract final class _ProfileTemporaryStats {
   static const levelLabel = 'Lv.12';
-  static const daysTogetherLabel = '포포와 함께한지 128일째';
   static const visitCount = 37;
   static const pointLabel = '2,450P';
   static const locationLabel = '위치 정보를 설정해 보세요';
+}
+
+/// 가입일부터 오늘까지의 일수를 "팝큐와 함께한지 n일째"로 표시합니다.
+/// 가입일 정보가 없으면(예: 메모리 저장소) 일반적인 문구로 대체합니다.
+String _daysTogetherLabel(CustomerProfile profile) {
+  final days = profile.daysSinceJoined;
+  if (days == null) {
+    return '팝큐와 함께하고 있어요';
+  }
+  return '팝큐와 함께한지 $days일째';
 }
 
 const _dangerColor = Color(0xFFE5484D);
@@ -255,22 +264,15 @@ class _CustomerProfileScreenState
                     },
                   ),
                   _MenuRowData(
-                    icon: Icons.favorite_border_rounded,
-                    title: '찜한 이벤트',
+                    icon: Icons.history_rounded,
+                    title: '방문 기록',
                     subtitle:
-                    '관심 있는 이벤트를 모아봤어요',
+                    '방문했던 매장 기록을 확인해요',
                     onTap: () {
-                      context.go(
-                        CustomerRoutes.favorites,
+                      context.push(
+                        CustomerRoutes.visitHistory,
                       );
                     },
-                  ),
-                  _MenuRowData(
-                    icon: Icons.history_rounded,
-                    title: '최근 본 이벤트',
-                    subtitle:
-                    '최근에 본 이벤트를 확인해요',
-                    onTap: _showComingSoon,
                   ),
                   _MenuRowData(
                     icon: Icons.edit_note_rounded,
@@ -288,13 +290,6 @@ class _CustomerProfileScreenState
                     title: '포인트 내역',
                     subtitle:
                     '포인트 적립 및 사용 내역을 확인해요',
-                    onTap: _showComingSoon,
-                  ),
-                  _MenuRowData(
-                    icon: Icons.card_giftcard_rounded,
-                    title: '이벤트 참여 내역',
-                    subtitle:
-                    '참여한 이벤트와 당첨 내역을 확인해요',
                     onTap: _showComingSoon,
                   ),
                   _MenuRowData(
@@ -335,7 +330,7 @@ class _CustomerProfileScreenState
                   _MenuRowData(
                     icon: Icons.logout_rounded,
                     title: '로그아웃',
-                    subtitle: '포포 계정에서 로그아웃해요',
+                    subtitle: '팝큐 계정에서 로그아웃해요',
                     color: _dangerColor,
                     onTap: _signOut,
                   ),
@@ -958,8 +953,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                             height: PopqSpacing.xs,
                           ),
                           Text(
-                            _ProfileTemporaryStats
-                                .daysTogetherLabel,
+                            _daysTogetherLabel(profile),
                             style: theme
                                 .textTheme.bodySmall
                                 ?.copyWith(

@@ -10,6 +10,7 @@ class CustomerProfile {
     required this.orderCount,
     this.profileImageUrl,
     this.phone,
+    this.joinedAt,
   });
 
   factory CustomerProfile.fromJson(
@@ -29,6 +30,9 @@ class CustomerProfile {
         imageBaseUrl,
       ),
       phone: user['phone'] as String?,
+      joinedAt: user['joinedAt'] == null
+          ? null
+          : DateTime.parse(user['joinedAt'] as String),
     );
   }
 
@@ -40,8 +44,22 @@ class CustomerProfile {
   final int orderCount;
   final String? profileImageUrl;
   final String? phone;
+  final DateTime? joinedAt;
+
+  /// 가입한 날을 1일째로 세어, 오늘까지 팝큐와 함께한 일수를 계산합니다.
+  int? get daysSinceJoined {
+    final joined = joinedAt;
+    if (joined == null) return null;
+
+    final today = DateTime.now();
+    final joinedDate = DateTime(joined.year, joined.month, joined.day);
+    final todayDate = DateTime(today.year, today.month, today.day);
+
+    return todayDate.difference(joinedDate).inDays + 1;
+  }
 
   CustomerProfile copyWith({
+    String? name,
     int? interestCount,
     int? reviewCount,
     int? orderCount,
@@ -51,12 +69,13 @@ class CustomerProfile {
     return CustomerProfile(
       userId: userId,
       email: email,
-      name: name,
+      name: name ?? this.name,
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
+      joinedAt: joinedAt,
     );
   }
 }
@@ -76,6 +95,38 @@ class NotificationPreference {
 
   final bool pushNotificationEnabled;
   final bool marketingOptIn;
+}
+
+class VisitedStore {
+  const VisitedStore({
+    required this.storeId,
+    required this.storeName,
+    required this.lastVisitedAt,
+    this.storeCategory,
+    this.storeImageUrl,
+  });
+
+  factory VisitedStore.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
+    return VisitedStore(
+      storeId: (json['storeId'] as num).toInt(),
+      storeName: json['storeName'] as String,
+      storeCategory: json['storeCategory'] as String?,
+      storeImageUrl: _resolveImageUrl(
+        json['storeImageUrl'] as String?,
+        imageBaseUrl,
+      ),
+      lastVisitedAt: DateTime.parse(json['lastVisitedAt'] as String),
+    );
+  }
+
+  final int storeId;
+  final String storeName;
+  final String? storeCategory;
+  final String? storeImageUrl;
+  final DateTime lastVisitedAt;
 }
 
 class InterestedStore {
@@ -141,6 +192,7 @@ class CustomerReview {
     required this.status,
     required this.createdAt,
     this.content,
+    this.storeCategory,
   });
 
   factory CustomerReview.fromJson(Map<String, Object?> json) {
@@ -149,6 +201,7 @@ class CustomerReview {
       orderPublicId: json['orderPublicId'] as String,
       storeId: (json['storeId'] as num).toInt(),
       storeName: json['storeName'] as String,
+      storeCategory: json['storeCategory'] as String?,
       authorName: json['authorName'] as String,
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
@@ -161,6 +214,7 @@ class CustomerReview {
   final String orderPublicId;
   final int storeId;
   final String storeName;
+  final String? storeCategory;
   final String authorName;
   final int rating;
   final String? content;
@@ -175,6 +229,7 @@ class CustomerReview {
       orderPublicId: orderPublicId,
       storeId: storeId,
       storeName: storeName,
+      storeCategory: storeCategory,
       authorName: authorName,
       rating: rating ?? this.rating,
       content: content ?? this.content,
@@ -188,6 +243,8 @@ abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
   Future<String> uploadProfileImage(String filePath);
+
+  Future<bool> updateName(String name);
 
   Future<bool> updatePhone(String phone);
 
@@ -204,6 +261,8 @@ abstract interface class CustomerEngagementRepository {
   });
 
   Future<List<String>> getLinkedSocialProviders();
+
+  Future<List<VisitedStore>> findVisitedStores();
 
   Future<List<InterestedStore>> findInterests();
 
@@ -262,6 +321,15 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
         final json = Map<String, Object?>.from(value as Map);
         return json['imageUrl'] as String;
       },
+    );
+  }
+
+  @override
+  Future<bool> updateName(String name) {
+    return _apiClient.patch<bool>(
+      '/api/v1/users/me/name',
+      body: {'name': name},
+      decode: _decodeAck,
     );
   }
 
@@ -332,6 +400,21 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   bool _decodeAck(Object? value) {
     final json = Map<String, Object?>.from(value as Map);
     return json['success'] as bool;
+  }
+
+  @override
+  Future<List<VisitedStore>> findVisitedStores() {
+    return _apiClient.get(
+      '/api/v1/customer/visited-stores',
+      decode: (value) => (value as List<Object?>)
+          .map(
+            (item) => VisitedStore.fromJson(
+              Map<String, Object?>.from(item as Map),
+              imageBaseUrl: _imageBaseUrl,
+            ),
+          )
+          .toList(),
+    );
   }
 
   @override
@@ -502,6 +585,12 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<bool> updateName(String name) async {
+    _profile = _profile.copyWith(name: name);
+    return true;
+  }
+
+  @override
   Future<bool> updatePhone(String phone) async {
     _profile = _profile.copyWith(phone: phone);
     return true;
@@ -534,6 +623,11 @@ class MemoryCustomerEngagementRepository
 
   @override
   Future<List<String>> getLinkedSocialProviders() async {
+    return const [];
+  }
+
+  @override
+  Future<List<VisitedStore>> findVisitedStores() async {
     return const [];
   }
 

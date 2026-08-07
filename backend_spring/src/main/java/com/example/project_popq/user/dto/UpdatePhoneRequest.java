@@ -6,8 +6,8 @@ import jakarta.validation.constraints.Pattern;
 public record UpdatePhoneRequest(
         @NotBlank
         @Pattern(
-                regexp = "^01[0-9]-?\\d{3,4}-?\\d{4}$",
-                message = "전화번호 형식이 올바르지 않습니다."
+                regexp = "^010-?\\d{4}-?\\d{4}$",
+                message = "전화번호를 다시 확인해 주세요."
         )
         String phone
 ) {
