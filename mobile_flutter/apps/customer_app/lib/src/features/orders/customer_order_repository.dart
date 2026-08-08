@@ -68,25 +68,18 @@ class CustomerOrder {
       items: items,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
-      preparationMinutes:
-          preparationMinutes ?? this.preparationMinutes,
-      estimatedReadyAt:
-          estimatedReadyAt ?? this.estimatedReadyAt,
+      preparationMinutes: preparationMinutes ?? this.preparationMinutes,
+      estimatedReadyAt: estimatedReadyAt ?? this.estimatedReadyAt,
     );
   }
 
-  CustomerOrder applyRealtimeEvent(
-    PopqOrderRealtimeEvent event,
-  ) {
+  CustomerOrder applyRealtimeEvent(PopqOrderRealtimeEvent event) {
     if (event.orderPublicId != orderPublicId ||
         event.isDuplicateOrOlderThan(version)) {
       return this;
     }
 
-    return copyWith(
-      status: event.currentStatus,
-      version: event.version,
-    );
+    return copyWith(status: event.currentStatus, version: event.version);
   }
 
   static DateTime? _dateTime(Object? value) {
@@ -126,6 +119,50 @@ class OrderSyncResult {
   final CustomerOrder? order;
 }
 
+class CustomerPaymentRecovery {
+  const CustomerPaymentRecovery({
+    required this.orderPublicId,
+    required this.status,
+    required this.requestedAmount,
+    this.approvedAmount,
+    this.providerPaymentKey,
+    this.failureCode,
+    this.failureMessage,
+    this.orderStatus,
+  });
+
+  factory CustomerPaymentRecovery.fromJson(Map<String, Object?> json) {
+    return CustomerPaymentRecovery(
+      orderPublicId: json['orderPublicId'] as String,
+      status: json['status'] as String,
+      requestedAmount: (json['requestedAmount'] as num).toInt(),
+      approvedAmount: (json['approvedAmount'] as num?)?.toInt(),
+      providerPaymentKey: json['providerPaymentKey'] as String?,
+      failureCode: json['failureCode'] as String?,
+      failureMessage: json['failureMessage'] as String?,
+      orderStatus: json['orderStatus'] as String?,
+    );
+  }
+
+  final String orderPublicId;
+  final String status;
+  final int requestedAmount;
+  final int? approvedAmount;
+  final String? providerPaymentKey;
+  final String? failureCode;
+  final String? failureMessage;
+  final String? orderStatus;
+
+  bool get isPaid => status == 'PAID';
+
+  bool get isPending => status == 'READY' || status == 'IN_PROGRESS';
+
+  bool get isTerminalFailure => status == 'FAILED' || status == 'CANCELED';
+
+  bool get requiresManualReview =>
+      status == 'PARTIALLY_REFUNDED' || status == 'REFUNDED';
+}
+
 abstract interface class CustomerOrderRepository {
   Future<CustomerOrder> create({
     required int storeId,
@@ -139,14 +176,13 @@ abstract interface class CustomerOrderRepository {
     String? paymentKey,
   });
 
+  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId);
+
   Future<List<CustomerOrder>> findAll();
 
   Future<CustomerOrder> findOne(String orderPublicId);
 
-  Future<OrderSyncResult> sync(
-    String orderPublicId,
-    int knownVersion,
-  );
+  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion);
 }
 
 class ApiCustomerOrderRepository implements CustomerOrderRepository {
@@ -177,9 +213,8 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
             )
             .toList(),
       },
-      decode: (value) => CustomerOrder.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -203,6 +238,16 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
   }
 
   @override
+  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId) {
+    return _apiClient.post(
+      '/api/v1/customer/orders/$orderPublicId/payments/recover',
+      decode: (value) => CustomerPaymentRecovery.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
   Future<List<CustomerOrder>> findAll() {
     return _apiClient.get(
       '/api/v1/customer/orders',
@@ -222,17 +267,13 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
   Future<CustomerOrder> findOne(String orderPublicId) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId',
-      decode: (value) => CustomerOrder.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
   @override
-  Future<OrderSyncResult> sync(
-    String orderPublicId,
-    int knownVersion,
-  ) {
+  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId/sync',
       query: {'knownVersion': knownVersion},
@@ -245,9 +286,7 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
           serverVersion: (json['serverVersion'] as num).toInt(),
           order: order == null
               ? null
-              : CustomerOrder.fromJson(
-                  Map<String, Object?>.from(order as Map),
-                ),
+              : CustomerOrder.fromJson(Map<String, Object?>.from(order as Map)),
         );
       },
     );
@@ -255,9 +294,8 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
 }
 
 class MemoryCustomerOrderRepository implements CustomerOrderRepository {
-  MemoryCustomerOrderRepository({
-    List<CustomerOrder> orders = const [],
-  }) : _orders = List.of(orders);
+  MemoryCustomerOrderRepository({List<CustomerOrder> orders = const []})
+    : _orders = List.of(orders);
 
   final List<CustomerOrder> _orders;
 
@@ -272,10 +310,7 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
       storeId: storeId,
       storeName: '성수 커피 연구소',
       status: 'CREATED',
-      totalAmount: items.fold(
-        0,
-        (sum, item) => sum + item.totalPrice,
-      ),
+      totalAmount: items.fold(0, (sum, item) => sum + item.totalPrice),
       version: 0,
       items: items
           .map(
@@ -322,22 +357,31 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
   }
 
   @override
+  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId) async {
+    final order = await findOne(orderPublicId);
+    final paid = order.status != 'CREATED';
+
+    return CustomerPaymentRecovery(
+      orderPublicId: order.orderPublicId,
+      status: paid ? 'PAID' : 'IN_PROGRESS',
+      requestedAmount: order.totalAmount,
+      approvedAmount: paid ? order.totalAmount : null,
+      orderStatus: order.status,
+    );
+  }
+
+  @override
   Future<List<CustomerOrder>> findAll() async {
     return List.unmodifiable(_orders);
   }
 
   @override
   Future<CustomerOrder> findOne(String orderPublicId) async {
-    return _orders.firstWhere(
-      (order) => order.orderPublicId == orderPublicId,
-    );
+    return _orders.firstWhere((order) => order.orderPublicId == orderPublicId);
   }
 
   @override
-  Future<OrderSyncResult> sync(
-    String orderPublicId,
-    int knownVersion,
-  ) async {
+  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) async {
     final order = await findOne(orderPublicId);
 
     return OrderSyncResult(
