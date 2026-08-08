@@ -77,6 +77,7 @@ public class CustomerOrderService {
                 user,
                 store,
                 request.orderType(),
+                request.requestMessage(),
                 request.idempotencyKey(),
                 requestHash,
                 now.plus(properties.paymentDeadline()),

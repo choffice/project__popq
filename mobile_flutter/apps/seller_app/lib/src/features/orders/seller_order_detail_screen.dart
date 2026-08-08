@@ -154,6 +154,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
     }
 
     final order = _order!;
+    final requestMessage = order.requestMessage;
 
     return RefreshIndicator(
       onRefresh: _sync,
@@ -214,6 +215,48 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ),
               trailing: Text(sellerWon(item.itemTotalPrice)),
             ),
+          const SizedBox(height: PopqSpacing.sm),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(PopqSpacing.lg),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: PopqSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '요청사항',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: PopqSpacing.xs),
+                        Text(
+                          requestMessage ?? '요청사항 없음',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: requestMessage == null
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant
+                                    : null,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: PopqSpacing.sm),
           const Divider(),
           _AmountRow(label: '상품 금액', amount: order.subtotalAmount),
           if (order.discountAmount != 0)

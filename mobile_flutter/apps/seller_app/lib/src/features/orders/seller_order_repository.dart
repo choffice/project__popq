@@ -7,6 +7,7 @@ class SellerOrder {
     required this.storeName,
     required this.orderType,
     required this.status,
+    this.requestMessage,
     required this.subtotalAmount,
     required this.discountAmount,
     required this.taxAmount,
@@ -27,6 +28,7 @@ class SellerOrder {
       storeName: json['storeName'] as String,
       orderType: json['orderType'] as String,
       status: json['status'] as String,
+      requestMessage: _nullableString(json['requestMessage']),
       subtotalAmount: (json['subtotalAmount'] as num).toInt(),
       discountAmount: (json['discountAmount'] as num).toInt(),
       taxAmount: (json['taxAmount'] as num).toInt(),
@@ -52,6 +54,7 @@ class SellerOrder {
   final String storeName;
   final String orderType;
   final String status;
+  final String? requestMessage;
   final int subtotalAmount;
   final int discountAmount;
   final int taxAmount;
@@ -80,6 +83,7 @@ class SellerOrder {
       storeName: storeName,
       orderType: orderType,
       status: status ?? this.status,
+      requestMessage: requestMessage,
       subtotalAmount: subtotalAmount,
       discountAmount: discountAmount,
       taxAmount: taxAmount,
@@ -96,6 +100,15 @@ class SellerOrder {
 
   static DateTime? _dateTime(Object? value) {
     return value is String ? DateTime.tryParse(value) : null;
+  }
+
+  static String? _nullableString(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
   }
 }
 

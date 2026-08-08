@@ -11,6 +11,7 @@ class CustomerOrder {
     required this.totalAmount,
     required this.version,
     required this.items,
+    this.requestMessage,
     this.createdAt,
     this.acceptedAt,
     this.preparationMinutes,
@@ -25,6 +26,7 @@ class CustomerOrder {
       status: json['status'] as String,
       totalAmount: (json['totalAmount'] as num).toInt(),
       version: (json['version'] as num).toInt(),
+      requestMessage: json['requestMessage'] as String?,
       createdAt: _dateTime(json['createdAt']),
       acceptedAt: _dateTime(json['acceptedAt']),
       preparationMinutes: (json['preparationMinutes'] as num?)?.toInt(),
@@ -46,6 +48,7 @@ class CustomerOrder {
   final int totalAmount;
   final int version;
   final List<CustomerOrderItem> items;
+  final String? requestMessage;
   final DateTime? createdAt;
   final DateTime? acceptedAt;
   final int? preparationMinutes;
@@ -54,6 +57,7 @@ class CustomerOrder {
   CustomerOrder copyWith({
     String? status,
     int? version,
+    String? requestMessage,
     DateTime? acceptedAt,
     int? preparationMinutes,
     DateTime? estimatedReadyAt,
@@ -66,20 +70,28 @@ class CustomerOrder {
       totalAmount: totalAmount,
       version: version ?? this.version,
       items: items,
+      requestMessage: requestMessage ?? this.requestMessage,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
-      preparationMinutes: preparationMinutes ?? this.preparationMinutes,
-      estimatedReadyAt: estimatedReadyAt ?? this.estimatedReadyAt,
+      preparationMinutes:
+          preparationMinutes ?? this.preparationMinutes,
+      estimatedReadyAt:
+          estimatedReadyAt ?? this.estimatedReadyAt,
     );
   }
 
-  CustomerOrder applyRealtimeEvent(PopqOrderRealtimeEvent event) {
+  CustomerOrder applyRealtimeEvent(
+    PopqOrderRealtimeEvent event,
+  ) {
     if (event.orderPublicId != orderPublicId ||
         event.isDuplicateOrOlderThan(version)) {
       return this;
     }
 
-    return copyWith(status: event.currentStatus, version: event.version);
+    return copyWith(
+      status: event.currentStatus,
+      version: event.version,
+    );
   }
 
   static DateTime? _dateTime(Object? value) {
@@ -131,7 +143,9 @@ class CustomerPaymentRecovery {
     this.orderStatus,
   });
 
-  factory CustomerPaymentRecovery.fromJson(Map<String, Object?> json) {
+  factory CustomerPaymentRecovery.fromJson(
+    Map<String, Object?> json,
+  ) {
     return CustomerPaymentRecovery(
       orderPublicId: json['orderPublicId'] as String,
       status: json['status'] as String,
@@ -155,12 +169,15 @@ class CustomerPaymentRecovery {
 
   bool get isPaid => status == 'PAID';
 
-  bool get isPending => status == 'READY' || status == 'IN_PROGRESS';
+  bool get isPending =>
+      status == 'READY' || status == 'IN_PROGRESS';
 
-  bool get isTerminalFailure => status == 'FAILED' || status == 'CANCELED';
+  bool get isTerminalFailure =>
+      status == 'FAILED' || status == 'CANCELED';
 
   bool get requiresManualReview =>
-      status == 'PARTIALLY_REFUNDED' || status == 'REFUNDED';
+      status == 'PARTIALLY_REFUNDED' ||
+      status == 'REFUNDED';
 }
 
 abstract interface class CustomerOrderRepository {
@@ -168,6 +185,7 @@ abstract interface class CustomerOrderRepository {
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   });
 
   Future<CustomerOrder> confirmPayment(
@@ -176,13 +194,18 @@ abstract interface class CustomerOrderRepository {
     String? paymentKey,
   });
 
-  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId);
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  );
 
   Future<List<CustomerOrder>> findAll();
 
   Future<CustomerOrder> findOne(String orderPublicId);
 
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion);
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  );
 }
 
 class ApiCustomerOrderRepository implements CustomerOrderRepository {
@@ -195,12 +218,19 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   }) {
+    final normalizedRequestMessage = requestMessage?.trim();
+
     return _apiClient.post(
       '/api/v1/customer/orders/stores/$storeId',
       body: {
         'idempotencyKey': idempotencyKey,
         'orderType': 'TAKEOUT',
+        'requestMessage': normalizedRequestMessage == null ||
+                normalizedRequestMessage.isEmpty
+            ? null
+            : normalizedRequestMessage,
         'items': items
             .map(
               (item) => {
@@ -213,8 +243,9 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
             )
             .toList(),
       },
-      decode: (value) =>
-          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerOrder.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
@@ -238,7 +269,9 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
   }
 
   @override
-  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId) {
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  ) {
     return _apiClient.post(
       '/api/v1/customer/orders/$orderPublicId/payments/recover',
       decode: (value) => CustomerPaymentRecovery.fromJson(
@@ -267,13 +300,17 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
   Future<CustomerOrder> findOne(String orderPublicId) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId',
-      decode: (value) =>
-          CustomerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => CustomerOrder.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
   @override
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) {
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  ) {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId/sync',
       query: {'knownVersion': knownVersion},
@@ -286,7 +323,9 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
           serverVersion: (json['serverVersion'] as num).toInt(),
           order: order == null
               ? null
-              : CustomerOrder.fromJson(Map<String, Object?>.from(order as Map)),
+              : CustomerOrder.fromJson(
+                  Map<String, Object?>.from(order as Map),
+                ),
         );
       },
     );
@@ -294,8 +333,9 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
 }
 
 class MemoryCustomerOrderRepository implements CustomerOrderRepository {
-  MemoryCustomerOrderRepository({List<CustomerOrder> orders = const []})
-    : _orders = List.of(orders);
+  MemoryCustomerOrderRepository({
+    List<CustomerOrder> orders = const [],
+  }) : _orders = List.of(orders);
 
   final List<CustomerOrder> _orders;
 
@@ -304,14 +344,21 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   }) async {
     final order = CustomerOrder(
       orderPublicId: 'memory-order-${_orders.length + 1}',
       storeId: storeId,
       storeName: '성수 커피 연구소',
       status: 'CREATED',
-      totalAmount: items.fold(0, (sum, item) => sum + item.totalPrice),
+      totalAmount: items.fold(
+        0,
+        (sum, item) => sum + item.totalPrice,
+      ),
       version: 0,
+      requestMessage: requestMessage?.trim().isEmpty == true
+          ? null
+          : requestMessage?.trim(),
       items: items
           .map(
             (item) => CustomerOrderItem(
@@ -341,6 +388,7 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
       totalAmount: order.totalAmount,
       version: order.version + 1,
       items: order.items,
+      requestMessage: order.requestMessage,
     );
 
     final index = _orders.indexWhere(
@@ -357,7 +405,9 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
   }
 
   @override
-  Future<CustomerPaymentRecovery> recoverPayment(String orderPublicId) async {
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  ) async {
     final order = await findOne(orderPublicId);
     final paid = order.status != 'CREATED';
 
@@ -377,11 +427,16 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
 
   @override
   Future<CustomerOrder> findOne(String orderPublicId) async {
-    return _orders.firstWhere((order) => order.orderPublicId == orderPublicId);
+    return _orders.firstWhere(
+      (order) => order.orderPublicId == orderPublicId,
+    );
   }
 
   @override
-  Future<OrderSyncResult> sync(String orderPublicId, int knownVersion) async {
+  Future<OrderSyncResult> sync(
+    String orderPublicId,
+    int knownVersion,
+  ) async {
     final order = await findOne(orderPublicId);
 
     return OrderSyncResult(

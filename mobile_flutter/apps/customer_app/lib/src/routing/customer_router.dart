@@ -468,6 +468,8 @@ GoRouter createCustomerRouter({
             cartController,
             orderRepository:
             orderRepository,
+            storeDiscoveryRepository:
+            storeDiscoveryRepository,
             tossClientKey:
             tossClientKey,
           );
