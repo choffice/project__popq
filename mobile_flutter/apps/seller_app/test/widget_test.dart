@@ -865,6 +865,7 @@ void main() {
         foreign,
         title: '침범',
         content: '허용되지 않음',
+        notifyInterestedCustomers: false,
       ),
       throwsStateError,
     );
