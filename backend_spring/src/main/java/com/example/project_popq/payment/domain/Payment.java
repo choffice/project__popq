@@ -253,6 +253,15 @@ public class Payment extends BaseTimeEntity {
         this.status = PaymentStatus.PAID;
     }
 
+    public void markUncertain(
+        String failureCode,
+        String failureMessage
+    ) {
+        this.failureCode = failureCode;
+        this.failureMessage = failureMessage;
+        this.status = PaymentStatus.IN_PROGRESS;
+    }
+
     public void markFailed(
         String failureCode,
         String failureMessage
@@ -260,6 +269,32 @@ public class Payment extends BaseTimeEntity {
         this.failureCode = failureCode;
         this.failureMessage = failureMessage;
         this.status = PaymentStatus.FAILED;
+    }
+
+    public void restartAfterFailure(
+        String newIdempotencyKey,
+        String newProviderPaymentKey
+    ) {
+        if (status != PaymentStatus.FAILED) {
+            throw new IllegalStateException(
+                "실패한 결제만 새 승인 요청으로 재시도할 수 있습니다."
+            );
+        }
+
+        this.idempotencyKey = newIdempotencyKey;
+        this.providerPaymentKey = newProviderPaymentKey;
+
+        this.providerRedirectUrl = null;
+        this.providerExpiresAt = null;
+
+        this.approvedAmount = null;
+        this.approvedAt = null;
+        this.canceledAt = null;
+
+        this.failureCode = null;
+        this.failureMessage = null;
+
+        this.status = PaymentStatus.IN_PROGRESS;
     }
 
     public void markCanceled(

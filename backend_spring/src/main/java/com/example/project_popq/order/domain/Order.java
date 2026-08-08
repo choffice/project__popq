@@ -79,6 +79,9 @@ public class Order extends BaseTimeEntity {
     @Column(name = "order_type", nullable = false, length = 30)
     private OrderType orderType;
 
+    @Column(name = "request_message", length = 100)
+    private String requestMessage;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private OrderStatus status;
@@ -142,6 +145,7 @@ public class Order extends BaseTimeEntity {
             GuestSession guestSession,
             Store store,
             OrderType orderType,
+            String requestMessage,
             String idempotencyKey,
             String requestHash,
             Instant expiresAt,
@@ -154,6 +158,7 @@ public class Order extends BaseTimeEntity {
         this.guestSession = guestSession;
         this.store = store;
         this.orderType = orderType;
+        this.requestMessage = normalizeRequestMessage(requestMessage);
         this.status = OrderStatus.CREATED;
         this.idempotencyKey = idempotencyKey;
         this.requestHash = requestHash;
@@ -179,6 +184,7 @@ public class Order extends BaseTimeEntity {
                 guestSession,
                 store,
                 orderType,
+                null,
                 idempotencyKey,
                 requestHash,
                 expiresAt,
@@ -193,6 +199,7 @@ public class Order extends BaseTimeEntity {
             User user,
             Store store,
             OrderType orderType,
+            String requestMessage,
             String idempotencyKey,
             String requestHash,
             Instant expiresAt,
@@ -204,6 +211,7 @@ public class Order extends BaseTimeEntity {
                 null,
                 store,
                 orderType,
+                requestMessage,
                 idempotencyKey,
                 requestHash,
                 expiresAt,
@@ -285,6 +293,15 @@ public class Order extends BaseTimeEntity {
 
     public boolean belongsToUser(Long userId) {
         return user != null && user.getId().equals(userId);
+    }
+
+    private static String normalizeRequestMessage(String requestMessage) {
+        if (requestMessage == null) {
+            return null;
+        }
+
+        String normalized = requestMessage.trim();
+        return normalized.isEmpty() ? null : normalized;
     }
 
     private void recalculateAmounts() {

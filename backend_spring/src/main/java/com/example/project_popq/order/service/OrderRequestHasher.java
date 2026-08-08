@@ -1,7 +1,7 @@
 package com.example.project_popq.order.service;
 
-import com.example.project_popq.order.dto.CreateGuestOrderRequest;
 import com.example.project_popq.order.dto.CreateCustomerOrderRequest;
+import com.example.project_popq.order.dto.CreateGuestOrderRequest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -14,6 +14,7 @@ public class OrderRequestHasher {
 
     public String hash(CreateGuestOrderRequest request) {
         StringBuilder normalized = new StringBuilder(request.orderType().name());
+
         request.items().stream()
                 .map(item -> {
                     String options = item.optionIds().stream()
@@ -21,6 +22,7 @@ public class OrderRequestHasher {
                             .map(String::valueOf)
                             .reduce((left, right) -> left + "," + right)
                             .orElse("");
+
                     return item.productId()
                             + ":"
                             + item.quantity()
@@ -29,17 +31,27 @@ public class OrderRequestHasher {
                 })
                 .sorted(Comparator.naturalOrder())
                 .forEach(item -> normalized.append("|").append(item));
+
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(normalized.toString().getBytes(StandardCharsets.UTF_8));
+                    .digest(
+                            normalized.toString()
+                                    .getBytes(StandardCharsets.UTF_8)
+                    );
+
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is not available", exception);
+            throw new IllegalStateException(
+                    "SHA-256 is not available",
+                    exception
+            );
         }
     }
 
     public String hash(CreateCustomerOrderRequest request) {
-        StringBuilder normalized = new StringBuilder(request.orderType().name());
+        StringBuilder normalized =
+                new StringBuilder(request.orderType().name());
+
         request.items().stream()
                 .map(item -> normalizeItem(
                         item.productId(),
@@ -47,7 +59,19 @@ public class OrderRequestHasher {
                         item.optionIds()
                 ))
                 .sorted(Comparator.naturalOrder())
-                .forEach(item -> normalized.append("|").append(item));
+                .forEach(item ->
+                        normalized.append("|").append(item)
+                );
+
+        String requestMessage =
+                normalizeRequestMessage(request.requestMessage());
+
+        normalized
+                .append("|request:")
+                .append(requestMessage.length())
+                .append(":")
+                .append(requestMessage);
+
         return sha256(normalized.toString());
     }
 
@@ -61,16 +85,35 @@ public class OrderRequestHasher {
                 .map(String::valueOf)
                 .reduce((left, right) -> left + "," + right)
                 .orElse("");
-        return productId + ":" + quantity + ":" + options;
+
+        return productId
+                + ":"
+                + quantity
+                + ":"
+                + options;
+    }
+
+    private String normalizeRequestMessage(String requestMessage) {
+        if (requestMessage == null) {
+            return "";
+        }
+
+        return requestMessage.trim();
     }
 
     private String sha256(String value) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
-                    .digest(value.getBytes(StandardCharsets.UTF_8));
+                    .digest(
+                            value.getBytes(StandardCharsets.UTF_8)
+                    );
+
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is not available", exception);
+            throw new IllegalStateException(
+                    "SHA-256 is not available",
+                    exception
+            );
         }
     }
 }
