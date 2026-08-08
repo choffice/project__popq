@@ -176,13 +176,43 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     super.dispose();
   }
 
+  void _goBack() {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go(CustomerRoutes.orders);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('주문 상세'),
+    return PopScope<Object?>(
+      canPop: context.canPop(),
+      onPopInvokedWithResult: (
+        bool didPop,
+        Object? result,
+      ) {
+        if (didPop) {
+          return;
+        }
+
+        _goBack();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            tooltip: '뒤로가기',
+            onPressed: _goBack,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+            ),
+          ),
+          title: const Text('주문 상세'),
+        ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
