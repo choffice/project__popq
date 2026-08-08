@@ -46,6 +46,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   var _unreadCount = 0;
   var _loading = true;
   var _syncing = false;
+  var _canceling = false;
   var _unreadRequestInProgress = false;
   var _requestGeneration = 0;
   var _observedConnectionEpoch = 0;
@@ -379,6 +380,16 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             onPressed: _openInquiry,
           ),
 
+          if (order.status == 'PLACED') ...[
+            const SizedBox(
+              height: PopqSpacing.lg,
+            ),
+            _CustomerCancelSection(
+              canceling: _canceling,
+              onPressed: _cancelOrder,
+            ),
+          ],
+
           const SizedBox(
             height: PopqSpacing.lg,
           ),
@@ -695,6 +706,232 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
           ),
         ),
       );
+    }
+  }
+
+  Future<void> _cancelOrder() async {
+    final order = _order;
+
+    if (order == null ||
+        order.status != 'PLACED' ||
+        _canceling) {
+      return;
+    }
+
+    final reason = await _showCancelReasonSheet();
+
+    if (!mounted || reason == null) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('주문을 취소하시겠어요?'),
+          content: Text(
+            '취소 사유: $reason\n\n'
+            '판매자가 아직 접수하지 않은 주문만 취소할 수 있으며, '
+            '취소가 완료되면 결제 금액도 전액 환불 처리됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('돌아가기'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('주문 취소'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      _canceling = true;
+    });
+
+    try {
+      final canceled = await widget.repository.cancel(
+        order.orderPublicId,
+        reason: reason,
+      );
+      final paymentSummary = await _findPaymentSummary(canceled);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _order = _newerOrder(
+          current: _order,
+          candidate: canceled,
+        );
+
+        if (paymentSummary != null) {
+          _paymentSummary = paymentSummary;
+        }
+
+        _canceling = false;
+        _error = null;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '주문을 취소했고 결제 금액도 환불 처리했어요.',
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('고객 주문 취소에 실패했습니다: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _canceling = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            '주문을 취소하지 못했습니다. 판매자가 이미 접수했거나 환불 처리에 실패했을 수 있어요.',
+          ),
+        ),
+      );
+
+      await _refresh();
+    }
+  }
+
+  Future<String?> _showCancelReasonSheet() async {
+    const otherValue = '__OTHER__';
+    const reasons = <String>[
+      '주문을 잘못했어요',
+      '다른 메뉴로 변경하고 싶어요',
+      '기다리기 어려워요',
+    ];
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PopqSpacing.lg,
+              PopqSpacing.sm,
+              PopqSpacing.lg,
+              PopqSpacing.lg,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '취소 사유를 선택해주세요',
+                  style: Theme.of(sheetContext)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: PopqSpacing.sm),
+                Text(
+                  '선택한 사유는 판매자에게도 표시됩니다.',
+                  style: Theme.of(sheetContext)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(
+                        color: Theme.of(sheetContext)
+                            .colorScheme
+                            .onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: PopqSpacing.md),
+                for (final reason in reasons)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.circle_outlined),
+                    title: Text(reason),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => Navigator.of(sheetContext).pop(reason),
+                  ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('기타'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.of(sheetContext).pop(otherValue),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || selected == null) {
+      return null;
+    }
+
+    if (selected != otherValue) {
+      return selected;
+    }
+
+    return _showCustomCancelReasonDialog();
+  }
+
+  Future<String?> _showCustomCancelReasonDialog() async {
+    final controller = TextEditingController();
+
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('취소 사유 입력'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 100,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                hintText: '취소 사유를 입력해주세요.',
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('닫기'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final value = controller.text.trim();
+
+                  if (value.isEmpty) {
+                    return;
+                  }
+
+                  Navigator.of(dialogContext).pop(value);
+                },
+                child: const Text('선택'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      controller.dispose();
     }
   }
 
@@ -1495,6 +1732,87 @@ class _InquirySection extends StatelessWidget {
                 hasUnreadMessage
                     ? '새 답변 확인하기'
                     : '문의하기',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerCancelSection extends StatelessWidget {
+  const _CustomerCancelSection({
+    required this.canceling,
+    required this.onPressed,
+  });
+
+  final bool canceling;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.error.withValues(alpha: 0.20),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                color: colorScheme.error,
+              ),
+              const SizedBox(width: PopqSpacing.sm),
+              Expanded(
+                child: Text(
+                  '주문 취소',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          Text(
+            '판매자가 주문을 접수하기 전까지만 취소할 수 있어요. '
+            '취소가 완료되면 결제 금액은 전액 환불됩니다.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: PopqSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: canceling ? null : onPressed,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colorScheme.error,
+                side: BorderSide(color: colorScheme.error),
+              ),
+              icon: canceling
+                  ? SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colorScheme.error,
+                      ),
+                    )
+                  : const Icon(Icons.cancel_outlined),
+              label: Text(
+                canceling ? '취소 처리 중...' : '주문 취소',
               ),
             ),
           ),

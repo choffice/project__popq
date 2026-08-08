@@ -67,6 +67,7 @@ class CustomerOrder {
   CustomerOrder copyWith({
     String? status,
     int? version,
+    List<CustomerOrderStatusHistory>? statusHistory,
     String? requestMessage,
     DateTime? acceptedAt,
     int? preparationMinutes,
@@ -80,7 +81,7 @@ class CustomerOrder {
       totalAmount: totalAmount,
       version: version ?? this.version,
       items: items,
-      statusHistory: statusHistory,
+      statusHistory: statusHistory ?? this.statusHistory,
       requestMessage: requestMessage ?? this.requestMessage,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
@@ -337,6 +338,11 @@ abstract interface class CustomerOrderRepository {
     String orderPublicId,
   );
 
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
+  });
+
   Future<List<CustomerOrder>> findAll();
 
   Future<CustomerOrder> findOne(String orderPublicId);
@@ -426,6 +432,22 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
     return _apiClient.get(
       '/api/v1/customer/orders/$orderPublicId/payment',
       decode: (value) => CustomerPaymentSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
+  }) {
+    return _apiClient.post(
+      '/api/v1/customer/orders/$orderPublicId/cancel',
+      body: {
+        'reason': reason.trim(),
+      },
+      decode: (value) => CustomerOrder.fromJson(
         Map<String, Object?>.from(value as Map),
       ),
     );
@@ -577,15 +599,82 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
   ) async {
     final order = await findOne(orderPublicId);
     final paid = order.status != 'CREATED';
+    final canceled = order.status == 'CANCELED';
+    CustomerOrderStatusHistory? cancellationHistory;
+
+    for (final history in order.statusHistory.reversed) {
+      if (history.currentStatus == 'CANCELED') {
+        cancellationHistory = history;
+        break;
+      }
+    }
+
+    final refundRequestedAt = cancellationHistory?.changedAt ??
+        DateTime.now().toUtc();
 
     return CustomerPaymentSummary(
       orderPublicId: order.orderPublicId,
-      paymentStatus: paid ? 'PAID' : 'IN_PROGRESS',
+      paymentStatus: canceled
+          ? 'REFUNDED'
+          : paid
+              ? 'PAID'
+              : 'IN_PROGRESS',
       paymentMethod: 'TEST',
       approvedAmount: paid ? order.totalAmount : 0,
-      refundedAmount: 0,
-      refunds: const [],
+      refundedAmount: canceled ? order.totalAmount : 0,
+      canceledAt: canceled ? refundRequestedAt : null,
+      refunds: canceled
+          ? [
+              CustomerRefundHistory(
+                refundId: 1,
+                amount: order.totalAmount,
+                reason: cancellationHistory?.reason ?? '고객 주문 취소',
+                requesterType: 'CUSTOMER',
+                status: 'SUCCEEDED',
+                requestedAt: refundRequestedAt,
+                completedAt: refundRequestedAt,
+              ),
+            ]
+          : const [],
     );
+  }
+
+  @override
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
+  }) async {
+    final order = await findOne(orderPublicId);
+
+    if (order.status != 'PLACED') {
+      throw StateError('접수 대기 주문만 취소할 수 있습니다.');
+    }
+
+    final changedAt = DateTime.now().toUtc();
+    final canceled = order.copyWith(
+      status: 'CANCELED',
+      version: order.version + 1,
+      statusHistory: [
+        ...order.statusHistory,
+        CustomerOrderStatusHistory(
+          previousStatus: order.status,
+          currentStatus: 'CANCELED',
+          actorType: 'CUSTOMER',
+          reason: reason.trim(),
+          changedAt: changedAt,
+        ),
+      ],
+    );
+
+    final index = _orders.indexWhere(
+      (candidate) => candidate.orderPublicId == orderPublicId,
+    );
+
+    if (index >= 0) {
+      _orders[index] = canceled;
+    }
+
+    return canceled;
   }
 
   @override
