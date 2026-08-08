@@ -6,6 +6,7 @@ import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
 import 'customer_order_repository.dart';
 import 'pending_payment_store.dart';
+import 'pending_payment_recovery_service.dart';
 import 'toss_payment_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -30,10 +31,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   final PendingPaymentStore _pendingPaymentStore = PendingPaymentStore();
 
+  late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
+
   CustomerOrder? _createdOrder;
 
   var _busy = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pendingPaymentRecoveryService = PendingPaymentRecoveryService(
+      repository: widget.orderRepository,
+      store: _pendingPaymentStore,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -300,74 +313,66 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return true;
     }
 
-    if (pending.orderPublicId != created.orderPublicId) {
-      final resolvedOtherOrder = await _tryRecoverPendingPayment(
-        pending,
-        navigateWhenPaid: true,
-      );
-
-      if (resolvedOtherOrder) {
-        return false;
+    if (pending.orderPublicId == created.orderPublicId) {
+      if (pending.amount != created.totalAmount) {
+        throw StateError(
+          '저장된 결제 금액과 현재 주문 금액이 다릅니다. '
+          '새 결제를 진행하지 않고 결제 내역을 확인해주세요.',
+        );
       }
 
-      throw StateError(
-        '이전에 진행한 결제 결과를 아직 확인하고 있습니다. '
-        '잠시 후 다시 시도해주세요.',
-      );
-    }
-
-    if (pending.amount != created.totalAmount) {
-      throw StateError(
-        '저장된 결제 금액과 현재 주문 금액이 다릅니다. '
-        '새 결제를 진행하지 않고 결제 내역을 확인해주세요.',
-      );
-    }
-
-    /*
-     * pending에 저장된 멱등키를 그대로 되살립니다.
-     * 앱이 종료되기 전 같은 화면에서 다시 시도하는 경우에도
-     * 기존 결제 요청의 식별자가 바뀌지 않습니다.
-     */
-    _paymentIdempotencyKey = pending.idempotencyKey;
-
-    final recovery = await widget.orderRepository.recoverPayment(
-      pending.orderPublicId,
-    );
-
-    _validateRecoveryMatchesPending(pending, recovery);
-
-    if (recovery.isPaid) {
-      await _finishRecoveredPayment(pending);
-      return false;
-    }
-
-    if (recovery.isTerminalFailure) {
-      await _pendingPaymentStore.clearIfMatches(
-        orderPublicId: pending.orderPublicId,
-        paymentKey: pending.paymentKey,
-      );
-
       /*
-       * 실패가 확정됐을 때만 새 멱등키를 발급합니다.
-       * 다음 토스 인증에서 받은 새 paymentKey와 이전 요청이 섞이지 않습니다.
+       * 이전 미확정 결제를 이어갈 때는 저장된 멱등키를 그대로 사용합니다.
        */
-      _paymentIdempotencyKey = _key('payment');
-      return true;
+      _paymentIdempotencyKey = pending.idempotencyKey;
     }
 
-    if (recovery.requiresManualReview) {
-      throw StateError(
-        recovery.failureMessage ??
-            '결제 금액이 이미 일부 또는 전부 취소된 상태입니다. '
-                '결제 내역을 확인해주세요.',
-      );
-    }
+    final outcome = await _pendingPaymentRecoveryService.recover();
 
-    throw StateError(
-      recovery.failureMessage ??
-          '이전 결제 승인 결과를 확인하고 있습니다. '
-              '새 결제를 진행하지 않고 잠시 후 다시 확인해주세요.',
-    );
+    switch (outcome.kind) {
+      case PendingPaymentRecoveryKind.none:
+        return true;
+
+      case PendingPaymentRecoveryKind.paid:
+        if (outcome.orderPublicId != null) {
+          await _finishRecoveredOrder(
+            outcome.orderPublicId!,
+            clearCart: outcome.orderPublicId == created.orderPublicId,
+          );
+        }
+        return false;
+
+      case PendingPaymentRecoveryKind.retryAllowed:
+        /*
+         * 확실한 실패가 확인된 경우에만 새 멱등키를 발급합니다.
+         * 이전 주문의 실패가 정리된 경우에도 현재 주문은 그대로
+         * 새 결제를 진행할 수 있습니다.
+         */
+        _paymentIdempotencyKey = _key('payment');
+        return true;
+
+      case PendingPaymentRecoveryKind.pending:
+        throw StateError(
+          outcome.message ??
+              '이전 결제 승인 결과를 확인하고 있습니다. '
+                  '새 결제를 진행하지 않고 잠시 후 다시 확인해주세요.',
+        );
+
+      case PendingPaymentRecoveryKind.manualReview:
+      case PendingPaymentRecoveryKind.inconsistent:
+        throw StateError(
+          outcome.message ??
+              '결제 상태를 자동으로 확정할 수 없습니다. '
+                  '새 결제를 진행하지 말고 주문 내역을 확인해주세요.',
+        );
+
+      case PendingPaymentRecoveryKind.unavailable:
+        throw StateError(
+          outcome.message ??
+              '결제 상태를 확인하지 못했습니다. '
+                  '네트워크 연결 후 다시 시도해주세요.',
+        );
+    }
   }
 
   Future<bool> _tryRecoverPendingPayment(
@@ -375,92 +380,75 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     bool navigateWhenPaid = true,
   }) async {
     try {
-      final recovery = await widget.orderRepository.recoverPayment(
-        pending.orderPublicId,
-      );
+      final outcome = await _pendingPaymentRecoveryService.recover();
 
-      _validateRecoveryMatchesPending(pending, recovery);
-
-      if (recovery.isPaid) {
-        if (navigateWhenPaid) {
-          await _finishRecoveredPayment(pending);
-        }
-        return true;
+      if (outcome.orderPublicId != null &&
+          outcome.orderPublicId != pending.orderPublicId) {
+        throw StateError('복구된 주문 번호가 저장된 결제 정보와 일치하지 않습니다.');
       }
 
-      if (recovery.isTerminalFailure) {
-        await _pendingPaymentStore.clearIfMatches(
-          orderPublicId: pending.orderPublicId,
-          paymentKey: pending.paymentKey,
-        );
+      switch (outcome.kind) {
+        case PendingPaymentRecoveryKind.none:
+          return false;
 
-        _paymentIdempotencyKey = _key('payment');
+        case PendingPaymentRecoveryKind.paid:
+          if (navigateWhenPaid && outcome.orderPublicId != null) {
+            await _finishRecoveredOrder(outcome.orderPublicId!);
+          }
+          return true;
 
-        if (mounted) {
-          setState(() {
-            _busy = false;
-            _errorMessage =
-                recovery.failureMessage ?? '결제 승인이 실패했습니다. 다시 결제해주세요.';
-          });
-        }
+        case PendingPaymentRecoveryKind.retryAllowed:
+          _paymentIdempotencyKey = _key('payment');
 
-        return true;
+          if (mounted) {
+            setState(() {
+              _busy = false;
+              _errorMessage = outcome.message ?? '결제 승인이 실패했습니다. 다시 결제해주세요.';
+            });
+          }
+
+          return true;
+
+        case PendingPaymentRecoveryKind.pending:
+        case PendingPaymentRecoveryKind.manualReview:
+        case PendingPaymentRecoveryKind.inconsistent:
+        case PendingPaymentRecoveryKind.unavailable:
+          if (mounted) {
+            setState(() {
+              _busy = false;
+              _errorMessage =
+                  outcome.message ??
+                  '결제 결과를 아직 확정하지 못했습니다. '
+                      '새 결제를 진행하지 말고 다시 확인해주세요.';
+            });
+          }
+
+          return true;
       }
-
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _errorMessage =
-              recovery.failureMessage ??
-              '결제 결과를 확인하고 있습니다. '
-                  '새 결제를 진행하지 말고 잠시 후 다시 확인해주세요.';
-        });
-      }
-
-      return true;
     } catch (error, stackTrace) {
       debugPrint('결제 복구 확인 오류: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       /*
-       * 복구 API 자체가 네트워크 오류라면 성공/실패를 알 수 없습니다.
-       * pending 정보를 유지한 채 상위 오류 처리로 넘깁니다.
+       * 성공/실패가 불명확하므로 pending은 지우지 않습니다.
        */
       return false;
     }
   }
 
-  void _validateRecoveryMatchesPending(
-    PendingPayment pending,
-    CustomerPaymentRecovery recovery,
-  ) {
-    final providerPaymentKey = recovery.providerPaymentKey;
-
-    if (recovery.orderPublicId != pending.orderPublicId ||
-        recovery.requestedAmount != pending.amount ||
-        (providerPaymentKey != null &&
-            providerPaymentKey.isNotEmpty &&
-            providerPaymentKey != pending.paymentKey)) {
-      throw StateError(
-        '저장된 결제 정보와 서버 결제 정보가 일치하지 않습니다. '
-        '새 결제를 진행하지 말고 주문 내역을 확인해주세요.',
-      );
+  Future<void> _finishRecoveredOrder(
+    String orderPublicId, {
+    bool clearCart = true,
+  }) async {
+    if (clearCart) {
+      widget.cartController.clear();
     }
-  }
-
-  Future<void> _finishRecoveredPayment(PendingPayment pending) async {
-    await _pendingPaymentStore.clearIfMatches(
-      orderPublicId: pending.orderPublicId,
-      paymentKey: pending.paymentKey,
-    );
-
-    widget.cartController.clear();
 
     if (!mounted) {
       return;
     }
 
-    context.go('${CustomerRoutes.orders}/${pending.orderPublicId}');
+    context.go('${CustomerRoutes.orders}/$orderPublicId');
   }
 
   String _buildOrderName(CustomerOrder order) {
