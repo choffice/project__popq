@@ -11,6 +11,7 @@ class CustomerOrder {
     required this.totalAmount,
     required this.version,
     required this.items,
+    this.statusHistory = const [],
     this.requestMessage,
     this.createdAt,
     this.acceptedAt,
@@ -38,6 +39,14 @@ class CustomerOrder {
             ),
           )
           .toList(),
+      statusHistory:
+          (json['statusHistory'] as List<Object?>? ?? const [])
+              .map(
+                (item) => CustomerOrderStatusHistory.fromJson(
+                  Map<String, Object?>.from(item as Map),
+                ),
+              )
+              .toList(),
     );
   }
 
@@ -48,6 +57,7 @@ class CustomerOrder {
   final int totalAmount;
   final int version;
   final List<CustomerOrderItem> items;
+  final List<CustomerOrderStatusHistory> statusHistory;
   final String? requestMessage;
   final DateTime? createdAt;
   final DateTime? acceptedAt;
@@ -70,6 +80,7 @@ class CustomerOrder {
       totalAmount: totalAmount,
       version: version ?? this.version,
       items: items,
+      statusHistory: statusHistory,
       requestMessage: requestMessage ?? this.requestMessage,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
@@ -97,6 +108,40 @@ class CustomerOrder {
   static DateTime? _dateTime(Object? value) {
     return value is String ? DateTime.tryParse(value) : null;
   }
+}
+
+class CustomerOrderStatusHistory {
+  const CustomerOrderStatusHistory({
+    required this.currentStatus,
+    required this.actorType,
+    this.previousStatus,
+    this.actorId,
+    this.reason,
+    this.changedAt,
+  });
+
+  factory CustomerOrderStatusHistory.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerOrderStatusHistory(
+      previousStatus: json['previousStatus'] as String?,
+      currentStatus: json['currentStatus'] as String,
+      actorType: json['actorType'] as String,
+      actorId: (json['actorId'] as num?)?.toInt(),
+      reason: json['reason'] as String?,
+      changedAt: CustomerOrder._dateTime(json['changedAt']),
+    );
+  }
+
+  final String? previousStatus;
+  final String currentStatus;
+  final String actorType;
+  final int? actorId;
+  final String? reason;
+  final DateTime? changedAt;
+
+  bool get isCancellationOrRejection =>
+      currentStatus == 'CANCELED' || currentStatus == 'REJECTED';
 }
 
 class CustomerOrderItem {
@@ -180,6 +225,96 @@ class CustomerPaymentRecovery {
       status == 'REFUNDED';
 }
 
+class CustomerPaymentSummary {
+  const CustomerPaymentSummary({
+    required this.orderPublicId,
+    required this.paymentStatus,
+    required this.paymentMethod,
+    required this.approvedAmount,
+    required this.refundedAmount,
+    required this.refunds,
+    this.approvedAt,
+    this.canceledAt,
+  });
+
+  factory CustomerPaymentSummary.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerPaymentSummary(
+      orderPublicId: json['orderPublicId'] as String,
+      paymentStatus: json['paymentStatus'] as String,
+      paymentMethod: json['paymentMethod'] as String,
+      approvedAmount: (json['approvedAmount'] as num).toInt(),
+      refundedAmount: (json['refundedAmount'] as num).toInt(),
+      approvedAt: _dateTime(json['approvedAt']),
+      canceledAt: _dateTime(json['canceledAt']),
+      refunds: (json['refunds'] as List<Object?>? ?? const [])
+          .map(
+            (item) => CustomerRefundHistory.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String orderPublicId;
+  final String paymentStatus;
+  final String paymentMethod;
+  final int approvedAmount;
+  final int refundedAmount;
+  final DateTime? approvedAt;
+  final DateTime? canceledAt;
+  final List<CustomerRefundHistory> refunds;
+
+  int get refundableAmount {
+    final remaining = approvedAmount - refundedAmount;
+    return remaining < 0 ? 0 : remaining;
+  }
+}
+
+class CustomerRefundHistory {
+  const CustomerRefundHistory({
+    required this.refundId,
+    required this.amount,
+    required this.reason,
+    required this.requesterType,
+    required this.status,
+    required this.requestedAt,
+    this.completedAt,
+    this.failureMessage,
+  });
+
+  factory CustomerRefundHistory.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerRefundHistory(
+      refundId: (json['refundId'] as num).toInt(),
+      amount: (json['amount'] as num).toInt(),
+      reason: json['reason'] as String? ?? '',
+      requesterType: json['requesterType'] as String,
+      status: json['status'] as String,
+      requestedAt: _dateTime(json['requestedAt']) ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      completedAt: _dateTime(json['completedAt']),
+      failureMessage: json['failureMessage'] as String?,
+    );
+  }
+
+  final int refundId;
+  final int amount;
+  final String reason;
+  final String requesterType;
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? completedAt;
+  final String? failureMessage;
+}
+
+DateTime? _dateTime(Object? value) {
+  return value is String ? DateTime.tryParse(value) : null;
+}
+
 abstract interface class CustomerOrderRepository {
   Future<CustomerOrder> create({
     required int storeId,
@@ -195,6 +330,10 @@ abstract interface class CustomerOrderRepository {
   });
 
   Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  );
+
+  Future<CustomerPaymentSummary> findPaymentSummary(
     String orderPublicId,
   );
 
@@ -275,6 +414,18 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
     return _apiClient.post(
       '/api/v1/customer/orders/$orderPublicId/payments/recover',
       decode: (value) => CustomerPaymentRecovery.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<CustomerPaymentSummary> findPaymentSummary(
+    String orderPublicId,
+  ) {
+    return _apiClient.get(
+      '/api/v1/customer/orders/$orderPublicId/payment',
+      decode: (value) => CustomerPaymentSummary.fromJson(
         Map<String, Object?>.from(value as Map),
       ),
     );
@@ -417,6 +568,23 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
       requestedAmount: order.totalAmount,
       approvedAmount: paid ? order.totalAmount : null,
       orderStatus: order.status,
+    );
+  }
+
+  @override
+  Future<CustomerPaymentSummary> findPaymentSummary(
+    String orderPublicId,
+  ) async {
+    final order = await findOne(orderPublicId);
+    final paid = order.status != 'CREATED';
+
+    return CustomerPaymentSummary(
+      orderPublicId: order.orderPublicId,
+      paymentStatus: paid ? 'PAID' : 'IN_PROGRESS',
+      paymentMethod: 'TEST',
+      approvedAmount: paid ? order.totalAmount : 0,
+      refundedAmount: 0,
+      refunds: const [],
     );
   }
 

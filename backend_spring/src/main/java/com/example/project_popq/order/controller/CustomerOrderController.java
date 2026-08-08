@@ -9,7 +9,9 @@ import com.example.project_popq.order.dto.OrderSyncResponse;
 import com.example.project_popq.order.service.CustomerOrderService;
 import com.example.project_popq.order.service.OrderCommandService;
 import com.example.project_popq.payment.dto.ConfirmPaymentRequest;
+import com.example.project_popq.payment.dto.CustomerPaymentSummaryResponse;
 import com.example.project_popq.payment.dto.PaymentResponse;
+import com.example.project_popq.payment.service.CustomerPaymentQueryService;
 import com.example.project_popq.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -36,6 +38,7 @@ public class CustomerOrderController {
     private final CurrentUserService currentUserService;
     private final CustomerOrderService customerOrderService;
     private final PaymentService paymentService;
+    private final CustomerPaymentQueryService customerPaymentQueryService;
     private final OrderCommandService orderCommandService;
 
     @PostMapping("/stores/{storeId}")
@@ -92,6 +95,19 @@ public class CustomerOrderController {
                         currentUserService.getRequired(jwt),
                         orderPublicId,
                         knownVersion
+                )
+        );
+    }
+
+    @GetMapping("/{orderPublicId}/payment")
+    public ApiResponse<CustomerPaymentSummaryResponse> findPayment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String orderPublicId
+    ) {
+        return ApiResponse.success(
+                customerPaymentQueryService.findSummary(
+                        currentUserService.getRequired(jwt),
+                        orderPublicId
                 )
         );
     }

@@ -155,6 +155,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
     final order = _order!;
     final requestMessage = order.requestMessage;
+    final terminalHistory = _terminalStatusHistory(order);
 
     return RefreshIndicator(
       onRefresh: _sync,
@@ -256,6 +257,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ),
             ),
           ),
+          if (terminalHistory != null) ...[
+            const SizedBox(height: PopqSpacing.sm),
+            _cancellationSection(order, terminalHistory),
+          ],
           const SizedBox(height: PopqSpacing.sm),
           const Divider(),
           _AmountRow(label: '상품 금액', amount: order.subtotalAmount),
@@ -290,9 +295,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                   : Text('예상 완료 ${_formatDateTime(order.estimatedReadyAt!)}'),
             ),
           ],
-          if (order.status == 'COMPLETED') ...[
+          if (_shouldLoadPayment(order)) ...[
             const SizedBox(height: PopqSpacing.lg),
             _paymentSection(order),
+          ],
+          if (order.status == 'COMPLETED') ...[
             const SizedBox(height: PopqSpacing.lg),
             _reviewSection(),
           ],
@@ -393,20 +400,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: PopqSpacing.xs),
-              for (final refund in payment.refunds)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(
-                    refund.status == 'SUCCEEDED'
-                        ? Icons.check_circle_outline
-                        : Icons.error_outline,
-                  ),
-                  title: Text(refund.reason),
-                  subtitle: Text(
-                    '${_refundRequesterLabel(refund.requesterType)} · '
-                    '${_refundStatusLabel(refund.status)}',
-                  ),
-                  trailing: Text(sellerWon(refund.amount)),
+              for (var index = 0; index < payment.refunds.length; index++)
+                _refundHistoryCard(
+                  payment.refunds[index],
+                  index + 1,
                 ),
             ],
             if (canRequestRefund) ...[
@@ -579,8 +576,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       }
 
       final latest = _order;
-      if (latest?.status == 'COMPLETED') {
+      if (latest != null && _shouldLoadPayment(latest)) {
         await _loadPayment();
+      }
+      if (latest?.status == 'COMPLETED') {
         await _loadReview();
       }
     } catch (error) {
@@ -617,8 +616,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       }
 
       final latest = _order;
-      if (latest?.status == 'COMPLETED') {
+      if (latest != null && _shouldLoadPayment(latest)) {
         await _loadPayment();
+      }
+      if (latest?.status == 'COMPLETED') {
         await _loadReview();
       }
     } catch (error) {
@@ -686,8 +687,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       });
 
       final latestOrder = _order;
-      if (latestOrder?.status == 'COMPLETED') {
+      if (latestOrder != null && _shouldLoadPayment(latestOrder)) {
         await _loadPayment();
+      }
+      if (latestOrder?.status == 'COMPLETED') {
         await _loadReview();
       }
     } catch (error) {
@@ -734,8 +737,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
         _processing = false;
       });
 
-      if (_order?.status == 'COMPLETED') {
-        await Future.wait(<Future<void>>[_loadPayment(), _loadReview()]);
+      final latestOrder = _order;
+      if (latestOrder != null && _shouldLoadPayment(latestOrder)) {
+        await _loadPayment();
+      }
+      if (latestOrder?.status == 'COMPLETED') {
+        await _loadReview();
       }
 
       _showMessage(
@@ -882,8 +889,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       final latestOrder = _order ?? updated;
       _showMessage('${sellerOrderStatusLabel(latestOrder.status)} 상태로 변경했습니다.');
 
-      if (latestOrder.status == 'COMPLETED') {
+      if (_shouldLoadPayment(latestOrder)) {
         await _loadPayment();
+      }
+      if (latestOrder.status == 'COMPLETED') {
         await _loadReview();
       }
     } catch (_) {
@@ -900,7 +909,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
   Future<void> _loadPayment() async {
     final order = _order;
 
-    if (order == null || order.status != 'COMPLETED') {
+    if (order == null || !_shouldLoadPayment(order)) {
       return;
     }
 
@@ -980,6 +989,157 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
       _showMessage('환불을 처리하지 못했습니다.');
     }
+  }
+
+  bool _shouldLoadPayment(SellerOrder order) {
+    return switch (order.status) {
+      'COMPLETED' || 'CANCELED' || 'REJECTED' => true,
+      _ => false,
+    };
+  }
+
+  SellerOrderStatusHistory? _terminalStatusHistory(SellerOrder order) {
+    for (final history in order.statusHistory.reversed) {
+      if (history.currentStatus == 'CANCELED' ||
+          history.currentStatus == 'REJECTED') {
+        return history;
+      }
+    }
+    return null;
+  }
+
+  Widget _cancellationSection(
+    SellerOrder order,
+    SellerOrderStatusHistory history,
+  ) {
+    final isRejected = history.currentStatus == 'REJECTED';
+    final reason = history.reason?.trim();
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isRejected
+                      ? Icons.block_rounded
+                      : Icons.cancel_outlined,
+                  color: Theme.of(context).colorScheme.error,
+                ),
+                const SizedBox(width: PopqSpacing.sm),
+                Text(
+                  isRejected ? '주문 거절 정보' : '주문 취소 정보',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            _PaymentRow(
+              label: isRejected ? '거절 주체' : '취소 주체',
+              value: _orderActorLabel(history.actorType),
+            ),
+            _PaymentRow(
+              label: isRejected ? '거절 사유' : '취소 사유',
+              value: reason == null || reason.isEmpty ? '사유 없음' : reason,
+            ),
+            _PaymentRow(
+              label: isRejected ? '거절 시간' : '취소 시간',
+              value: _formatDateTime(history.changedAt),
+            ),
+            if (order.status == 'CANCELED' || order.status == 'REJECTED') ...[
+              const SizedBox(height: PopqSpacing.xs),
+              Text(
+                '결제된 주문은 아래 결제·환불 영역에서 환불 처리 결과를 확인할 수 있습니다.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _refundHistoryCard(SellerRefund refund, int index) {
+    final succeeded = refund.status == 'SUCCEEDED';
+    final failed = refund.status == 'FAILED';
+
+    return Container(
+      margin: const EdgeInsets.only(top: PopqSpacing.sm),
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(
+                succeeded
+                    ? Icons.check_circle_outline_rounded
+                    : failed
+                        ? Icons.error_outline_rounded
+                        : Icons.schedule_rounded,
+                size: 20,
+              ),
+              const SizedBox(width: PopqSpacing.xs),
+              Expanded(
+                child: Text(
+                  '환불 $index',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+              Chip(label: Text(_refundStatusLabel(refund.status))),
+            ],
+          ),
+          const SizedBox(height: PopqSpacing.xs),
+          _PaymentRow(label: '환불 금액', value: sellerWon(refund.amount)),
+          _PaymentRow(
+            label: '처리 주체',
+            value: _refundRequesterLabel(refund.requesterType),
+          ),
+          _PaymentRow(label: '환불 사유', value: refund.reason),
+          _PaymentRow(
+            label: '요청 시간',
+            value: _formatDateTime(refund.requestedAt),
+          ),
+          if (refund.completedAt != null)
+            _PaymentRow(
+              label: '완료 시간',
+              value: _formatDateTime(refund.completedAt!),
+            ),
+          if (failed &&
+              (refund.failureMessage?.trim().isNotEmpty ?? false))
+            _PaymentRow(
+              label: '실패 사유',
+              value: refund.failureMessage!.trim(),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _orderActorLabel(String actorType) {
+    return switch (actorType) {
+      'SELLER' => '판매자',
+      'CUSTOMER' => '구매자',
+      'ADMIN' => '관리자',
+      'SYSTEM' => '시스템',
+      'GUEST' => '비회원 구매자',
+      _ => actorType,
+    };
   }
 
   String _paymentStatusLabel(String status) {
@@ -1237,9 +1397,18 @@ class _PaymentRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(child: Text(label)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(width: PopqSpacing.md),
+          Expanded(
+            flex: 2,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );
