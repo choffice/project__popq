@@ -6,7 +6,6 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" filepath="$PROJECT_DIR$/.idea/modules/backend_spring.test.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.example.backend_spring.main.iml" filepath="$PROJECT_DIR$/.idea/modules/com.example.backend_spring.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/com.example.backend_spring.test.iml" filepath="$PROJECT_DIR$/.idea/modules/com.example.backend_spring.test.iml" />
-      <module fileurl="file://$PROJECT_DIR$/mobile_flutter/mobile_flutter.iml" filepath="$PROJECT_DIR$/mobile_flutter/mobile_flutter.iml" />
     </modules>
   </component>
 </project>
