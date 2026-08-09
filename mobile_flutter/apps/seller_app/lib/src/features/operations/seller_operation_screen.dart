@@ -68,6 +68,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     '주점',
     '푸드트럭',
     '팝업·행사',
+    '플리마켓·행사',
     '기타',
   ];
   var _section = 0;
@@ -164,10 +165,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           child: switch (_section) {
             0 => _operationInfo(),
             1 => SellerAnnouncementScreen(
+              key: ValueKey<int>(_storeId),
               storeId: _storeId,
-              canManage:
-              _store!.myRole == 'OWNER' ||
-                  _store!.myRole == 'MANAGER',
+              canManage: _store!.canManage,
               repository: widget.announcementRepository,
             ),
             2 => SellerProductListScreen(
@@ -181,8 +181,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             ),
             _ => SellerReviewSection(
               storeId: _storeId,
-              canReply: _store!.myRole == 'OWNER' ||
-                  _store!.myRole == 'MANAGER',
+              canReply: _store!.canManage,
               repository: widget.reviewRepository,
             ),
           },
@@ -246,7 +245,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     final store = _store!;
     final theme = Theme.of(context);
     final bool canManage = _canManage(store);
-    final bool canChangeType = store.myRole == 'OWNER';
+    final bool canChangeType = store.isOwner;
     final bool operationEnded =
         store.businessStatus == 'CLOSED' || store.status != 'ACTIVE';
 
@@ -470,7 +469,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
             '전체 정보 수정',
           ),
         ),
-        if (store.myRole == 'OWNER') ...<Widget>[
+        if (store.isOwner) ...<Widget>[
           const SizedBox(height: PopqSpacing.lg),
           const Divider(),
           TextButton.icon(
@@ -681,7 +680,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
   }
 
   bool _canManage(SellerStore store) {
-    return store.myRole == 'OWNER' || store.myRole == 'MANAGER';
+    return store.canManage;
   }
 
   String _displayValue(String? value) {
@@ -1596,12 +1595,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       ),
     );
     if (result == null || !mounted) return;
-    final legacyHour = result.legacyRepresentative;
-    final legacyOpen = legacyHour.openTime ?? const TimeOfDay(hour: 0, minute: 0);
-    final legacyClose = legacyHour.closeTime ?? const TimeOfDay(hour: 0, minute: 0);
     await _saveQuickEdit(
-      openTime: legacyHour.open24Hours ? '00:00:00' : _toApiTime(legacyOpen),
-      closeTime: legacyHour.open24Hours ? '00:00:00' : _toApiTime(legacyClose),
+      openTime: result.legacyOpenTimeForApi,
+      closeTime: result.legacyCloseTimeForApi,
       closedDays: result.legacyClosedDays,
       schedule: result,
       successMessage: '영업시간을 수정했습니다.',
@@ -1632,11 +1628,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
           : orderAcceptingEnabled,
       successMessage: '주문 운영 설정을 수정했습니다.',
     );
-  }
-
-  String _toApiTime(TimeOfDay value) {
-    return '${value.hour.toString().padLeft(2, '0')}:'
-        '${value.minute.toString().padLeft(2, '0')}:00';
   }
 
   String _normalizeText(String value) {
@@ -1769,7 +1760,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
 
   Future<void> _confirmEndOperation() async {
     final SellerStore? store = _store;
-    if (store == null || store.myRole != 'OWNER' || _endingOperation) {
+    if (store == null || !store.isOwner || _endingOperation) {
       return;
     }
 
@@ -1898,7 +1889,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
 
   Future<void> _confirmSuspendOperation() async {
     final store = _store;
-    if (store == null || store.myRole != 'OWNER' || _endingOperation) return;
+    if (store == null || !store.isOwner || _endingOperation) return;
     final _SuspensionSummary summary;
     try {
       summary = await _loadSuspensionSummary(store.storeId);

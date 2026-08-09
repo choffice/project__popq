@@ -3,6 +3,9 @@ package com.example.project_popq.payment.provider;
 import com.example.project_popq.payment.config.TossPaymentProperties;
 import com.example.project_popq.payment.domain.PaymentProviderType;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -129,6 +132,95 @@ public class TossPaymentProvider implements PaymentProvider {
       return createApprovalFailure(exception);
     } catch (RestClientException exception) {
       return PaymentApprovalResult.failure(
+              "TOSS_COMMUNICATION_ERROR",
+              "토스페이먼츠 서버와 통신하지 못했습니다."
+      );
+    }
+  }
+
+  @Override
+  public PaymentLookupResult lookup(
+          String providerPaymentKey
+  ) {
+    if (isBlank(properties.secretKey())) {
+      return PaymentLookupResult.failure(
+              "TOSS_SECRET_KEY_MISSING",
+              "토스페이먼츠 시크릿 키가 설정되지 않았습니다."
+      );
+    }
+
+    if (isBlank(providerPaymentKey)) {
+      return PaymentLookupResult.failure(
+              "TOSS_PAYMENT_KEY_MISSING",
+              "조회할 토스페이먼츠 paymentKey가 없습니다."
+      );
+    }
+
+    try {
+      Map<String, Object> response = restClient
+              .get()
+              .uri(
+                      "/v1/payments/{paymentKey}",
+                      providerPaymentKey
+              )
+              .retrieve()
+              .body(
+                      new ParameterizedTypeReference<>() {
+                      }
+              );
+
+      if (response == null) {
+        return PaymentLookupResult.failure(
+                "TOSS_EMPTY_RESPONSE",
+                "토스페이먼츠 결제 조회 응답이 비어 있습니다."
+        );
+      }
+
+      String responsePaymentKey = getString(
+              response,
+              "paymentKey"
+      );
+      String orderPublicId = getString(
+              response,
+              "orderId"
+      );
+      Long totalAmount = getLong(
+              response,
+              "totalAmount"
+      );
+      String providerStatus = getString(
+              response,
+              "status"
+      );
+
+      if (isBlank(responsePaymentKey)
+              || isBlank(orderPublicId)
+              || totalAmount == null
+              || isBlank(providerStatus)) {
+        return PaymentLookupResult.failure(
+                "TOSS_INVALID_LOOKUP_RESPONSE",
+                "토스페이먼츠 결제 조회 응답 형식이 올바르지 않습니다."
+        );
+      }
+
+      return PaymentLookupResult.success(
+              responsePaymentKey,
+              orderPublicId,
+              totalAmount,
+              mapLookupStatus(providerStatus),
+              parseInstant(
+                      getString(response, "approvedAt")
+              )
+      );
+    } catch (RestClientResponseException exception) {
+      TossError tossError = extractError(exception);
+
+      return PaymentLookupResult.failure(
+              tossError.code(),
+              tossError.message()
+      );
+    } catch (RestClientException exception) {
+      return PaymentLookupResult.failure(
               "TOSS_COMMUNICATION_ERROR",
               "토스페이먼츠 서버와 통신하지 못했습니다."
       );
@@ -297,6 +389,37 @@ public class TossPaymentProvider implements PaymentProvider {
     return transactionKey instanceof String value
             ? value
             : null;
+  }
+
+  private PaymentLookupResult.Status mapLookupStatus(
+          String providerStatus
+  ) {
+    return switch (providerStatus) {
+      case "READY" -> PaymentLookupResult.Status.READY;
+      case "IN_PROGRESS", "WAITING_FOR_DEPOSIT" ->
+              PaymentLookupResult.Status.IN_PROGRESS;
+      case "DONE" -> PaymentLookupResult.Status.PAID;
+      case "CANCELED" -> PaymentLookupResult.Status.CANCELED;
+      case "PARTIAL_CANCELED" ->
+              PaymentLookupResult.Status.PARTIALLY_REFUNDED;
+      case "ABORTED" -> PaymentLookupResult.Status.FAILED;
+      case "EXPIRED" -> PaymentLookupResult.Status.EXPIRED;
+      default -> PaymentLookupResult.Status.UNKNOWN;
+    };
+  }
+
+  private Instant parseInstant(
+          String value
+  ) {
+    if (isBlank(value)) {
+      return null;
+    }
+
+    try {
+      return OffsetDateTime.parse(value).toInstant();
+    } catch (DateTimeParseException ignored) {
+      return null;
+    }
   }
 
   private String createAuthorizationValue(

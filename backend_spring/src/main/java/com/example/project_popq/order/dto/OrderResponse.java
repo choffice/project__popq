@@ -14,6 +14,7 @@ public record OrderResponse(
         Long storeId,
         String storeName,
         OrderType orderType,
+        String requestMessage,
         OrderStatus status,
         long subtotalAmount,
         long discountAmount,
@@ -35,6 +36,7 @@ public record OrderResponse(
                 order.getStore().getId(),
                 order.getStore().getName(),
                 order.getOrderType(),
+                order.getRequestMessage(),
                 order.getStatus(),
                 order.getSubtotalAmount(),
                 order.getDiscountAmount(),
@@ -47,7 +49,9 @@ public record OrderResponse(
                 order.getPreparationMinutes(),
                 order.getEstimatedReadyAt(),
                 order.getVersion(),
-                order.getItems().stream().map(OrderItemResponse::from).toList(),
+                order.getItems().stream()
+                        .map(OrderItemResponse::from)
+                        .toList(),
                 order.getStatusHistories().stream()
                         .map(OrderStatusHistoryResponse::from)
                         .toList()
@@ -86,7 +90,9 @@ public record OrderResponse(
             String optionName,
             long optionPrice
     ) {
-        private static OrderItemOptionResponse from(OrderItemOption option) {
+        private static OrderItemOptionResponse from(
+                OrderItemOption option
+        ) {
             return new OrderItemOptionResponse(
                     option.getProductOption().getId(),
                     option.getOptionGroupNameSnapshot(),
@@ -104,7 +110,9 @@ public record OrderResponse(
             String reason,
             Instant changedAt
     ) {
-        private static OrderStatusHistoryResponse from(OrderStatusHistory history) {
+        private static OrderStatusHistoryResponse from(
+                OrderStatusHistory history
+        ) {
             return new OrderStatusHistoryResponse(
                     history.getPreviousStatus(),
                     history.getCurrentStatus(),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -12,15 +13,24 @@ import 'customer_engagement_repository.dart';
 
 /// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
 ///
-/// 레벨, 함께한 일수, 방문 횟수, 보유 포인트는 아직 백엔드에
+/// 레벨, 방문 횟수, 보유 포인트는 아직 백엔드에
 /// 관련 API가 없어 화면 디자인 확인용 임시값입니다.
 /// 실제 API가 준비되면 [CustomerProfile]에 필드를 추가해 교체합니다.
 abstract final class _ProfileTemporaryStats {
   static const levelLabel = 'Lv.12';
-  static const daysTogetherLabel = '포포와 함께한지 128일째';
   static const visitCount = 37;
   static const pointLabel = '2,450P';
   static const locationLabel = '위치 정보를 설정해 보세요';
+}
+
+/// 가입일부터 오늘까지의 일수를 "팝큐와 함께한지 n일째"로 표시합니다.
+/// 가입일 정보가 없으면(예: 메모리 저장소) 일반적인 문구로 대체합니다.
+String _daysTogetherLabel(CustomerProfile profile) {
+  final days = profile.daysSinceJoined;
+  if (days == null) {
+    return '팝큐와 함께하고 있어요';
+  }
+  return '팝큐와 함께한지 $days일째';
 }
 
 const _dangerColor = Color(0xFFE5484D);
@@ -53,6 +63,9 @@ class _CustomerProfileScreenState
   Duration(seconds: 3);
 
   late Future<CustomerProfile> _profile;
+
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _uploadingProfileImage = false;
 
   Timer? _unreadPollingTimer;
   PopqRealtimeClient? _realtimeClient;
@@ -214,7 +227,8 @@ class _CustomerProfileScreenState
             children: [
               _ProfileHeaderCard(
                 profile: profile,
-                onEditProfile: _showComingSoon,
+                onEditProfile: _editProfileImage,
+                isUploadingImage: _uploadingProfileImage,
               ),
 
               const SizedBox(
@@ -227,8 +241,12 @@ class _CustomerProfileScreenState
                     icon: Icons.person_outline_rounded,
                     title: '내 정보',
                     subtitle:
-                    '개인 정보 및 알림 설정을 관리해요',
-                    onTap: _showComingSoon,
+                    '프로필 사진, 연락처, 비밀번호를 관리해요',
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.myInfo,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon:
@@ -246,22 +264,15 @@ class _CustomerProfileScreenState
                     },
                   ),
                   _MenuRowData(
-                    icon: Icons.favorite_border_rounded,
-                    title: '찜한 이벤트',
+                    icon: Icons.history_rounded,
+                    title: '방문 기록',
                     subtitle:
-                    '관심 있는 이벤트를 모아봤어요',
+                    '방문했던 매장 기록을 확인해요',
                     onTap: () {
-                      context.go(
-                        CustomerRoutes.favorites,
+                      context.push(
+                        CustomerRoutes.visitHistory,
                       );
                     },
-                  ),
-                  _MenuRowData(
-                    icon: Icons.history_rounded,
-                    title: '최근 본 이벤트',
-                    subtitle:
-                    '최근에 본 이벤트를 확인해요',
-                    onTap: _showComingSoon,
                   ),
                   _MenuRowData(
                     icon: Icons.edit_note_rounded,
@@ -282,19 +293,16 @@ class _CustomerProfileScreenState
                     onTap: _showComingSoon,
                   ),
                   _MenuRowData(
-                    icon: Icons.card_giftcard_rounded,
-                    title: '이벤트 참여 내역',
-                    subtitle:
-                    '참여한 이벤트와 당첨 내역을 확인해요',
-                    onTap: _showComingSoon,
-                  ),
-                  _MenuRowData(
                     icon:
                     Icons.notifications_none_rounded,
                     title: '알림 설정',
                     subtitle:
                     '푸시 알림 및 마케팅 수신 설정을 관리해요',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.notificationSettings,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon: Icons.help_outline_rounded,
@@ -322,7 +330,7 @@ class _CustomerProfileScreenState
                   _MenuRowData(
                     icon: Icons.logout_rounded,
                     title: '로그아웃',
-                    subtitle: '포포 계정에서 로그아웃해요',
+                    subtitle: '팝큐 계정에서 로그아웃해요',
                     color: _dangerColor,
                     onTap: _signOut,
                   ),
@@ -545,6 +553,78 @@ class _CustomerProfileScreenState
     }
   }
 
+  Future<void> _editProfileImage() async {
+    if (_uploadingProfileImage) return;
+
+    final PopqImageSource? source =
+        await showPopqImageSourceSheet(context);
+    if (source == null || !mounted) return;
+
+    final ImageSource pickerSource = source == PopqImageSource.camera
+        ? ImageSource.camera
+        : ImageSource.gallery;
+
+    XFile? image;
+    try {
+      image = await _imagePicker.pickImage(
+        source: pickerSource,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+        requestFullMetadata: false,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              pickerSource == ImageSource.camera
+                  ? '카메라를 실행하지 못했습니다.'
+                  : '갤러리에서 사진을 불러오지 못했습니다.',
+            ),
+          ),
+        );
+      return;
+    }
+
+    if (image == null || !mounted) return;
+
+    setState(() => _uploadingProfileImage = true);
+    try {
+      await widget.repository.uploadProfileImage(image.path);
+
+      if (!mounted) return;
+      await _reload();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
+        );
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(failure.message)),
+        );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _uploadingProfileImage = false);
+      }
+    }
+  }
+
   void _showComingSoon() {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -706,10 +786,12 @@ class _ProfileHeaderCard extends StatelessWidget {
   const _ProfileHeaderCard({
     required this.profile,
     required this.onEditProfile,
+    this.isUploadingImage = false,
   });
 
   final CustomerProfile profile;
   final VoidCallback onEditProfile;
+  final bool isUploadingImage;
 
   @override
   Widget build(BuildContext context) {
@@ -738,13 +820,41 @@ class _ProfileHeaderCard extends StatelessWidget {
                   children: [
                     Stack(
                       children: [
-                        const CircleAvatar(
+                        CircleAvatar(
                           radius: 32,
-                          child: Icon(
-                            Icons.person_rounded,
-                            size: 34,
-                          ),
+                          backgroundImage: profile.profileImageUrl != null
+                              ? NetworkImage(
+                                  profile.profileImageUrl!,
+                                )
+                              : null,
+                          child: profile.profileImageUrl == null
+                              ? const Icon(
+                                  Icons.person_rounded,
+                                  size: 34,
+                                )
+                              : null,
                         ),
+                        if (isUploadingImage)
+                          Positioned.fill(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withValues(
+                                  alpha: 0.4,
+                                ),
+                              ),
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                         Positioned(
                           right: -2,
                           bottom: -2,
@@ -843,8 +953,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                             height: PopqSpacing.xs,
                           ),
                           Text(
-                            _ProfileTemporaryStats
-                                .daysTogetherLabel,
+                            _daysTogetherLabel(profile),
                             style: theme
                                 .textTheme.bodySmall
                                 ?.copyWith(
@@ -884,16 +993,6 @@ class _ProfileHeaderCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(
-                  height: PopqSpacing.md,
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: onEditProfile,
-                    child: const Text('내 프로필'),
-                  ),
                 ),
               ],
             ),

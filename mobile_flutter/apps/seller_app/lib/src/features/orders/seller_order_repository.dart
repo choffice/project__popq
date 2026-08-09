@@ -7,6 +7,8 @@ class SellerOrder {
     required this.storeName,
     required this.orderType,
     required this.status,
+    this.requestMessage,
+    this.statusHistory = const [],
     required this.subtotalAmount,
     required this.discountAmount,
     required this.taxAmount,
@@ -27,6 +29,14 @@ class SellerOrder {
       storeName: json['storeName'] as String,
       orderType: json['orderType'] as String,
       status: json['status'] as String,
+      requestMessage: _nullableString(json['requestMessage']),
+      statusHistory: (json['statusHistory'] as List<Object?>? ?? const [])
+          .map(
+            (item) => SellerOrderStatusHistory.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
       subtotalAmount: (json['subtotalAmount'] as num).toInt(),
       discountAmount: (json['discountAmount'] as num).toInt(),
       taxAmount: (json['taxAmount'] as num).toInt(),
@@ -52,6 +62,8 @@ class SellerOrder {
   final String storeName;
   final String orderType;
   final String status;
+  final String? requestMessage;
+  final List<SellerOrderStatusHistory> statusHistory;
   final int subtotalAmount;
   final int discountAmount;
   final int taxAmount;
@@ -70,6 +82,7 @@ class SellerOrder {
   SellerOrder copyWith({
     String? status,
     int? version,
+    List<SellerOrderStatusHistory>? statusHistory,
     DateTime? acceptedAt,
     int? preparationMinutes,
     DateTime? estimatedReadyAt,
@@ -80,6 +93,8 @@ class SellerOrder {
       storeName: storeName,
       orderType: orderType,
       status: status ?? this.status,
+      requestMessage: requestMessage,
+      statusHistory: statusHistory ?? this.statusHistory,
       subtotalAmount: subtotalAmount,
       discountAmount: discountAmount,
       taxAmount: taxAmount,
@@ -97,6 +112,44 @@ class SellerOrder {
   static DateTime? _dateTime(Object? value) {
     return value is String ? DateTime.tryParse(value) : null;
   }
+
+  static String? _nullableString(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+
+    final normalized = value.trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+}
+
+class SellerOrderStatusHistory {
+  const SellerOrderStatusHistory({
+    this.previousStatus,
+    required this.currentStatus,
+    required this.actorType,
+    this.actorId,
+    this.reason,
+    required this.changedAt,
+  });
+
+  factory SellerOrderStatusHistory.fromJson(Map<String, Object?> json) {
+    return SellerOrderStatusHistory(
+      previousStatus: SellerOrder._nullableString(json['previousStatus']),
+      currentStatus: json['currentStatus'] as String,
+      actorType: json['actorType'] as String,
+      actorId: (json['actorId'] as num?)?.toInt(),
+      reason: SellerOrder._nullableString(json['reason']),
+      changedAt: DateTime.parse(json['changedAt'] as String),
+    );
+  }
+
+  final String? previousStatus;
+  final String currentStatus;
+  final String actorType;
+  final int? actorId;
+  final String? reason;
+  final DateTime changedAt;
 }
 
 class SellerOrderItem {
@@ -498,6 +551,16 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
     final updated = order.copyWith(
       status: command.targetStatus,
       version: order.version + 1,
+      statusHistory: [
+        ...order.statusHistory,
+        SellerOrderStatusHistory(
+          previousStatus: order.status,
+          currentStatus: command.targetStatus,
+          actorType: 'SELLER',
+          reason: reason == null || reason.trim().isEmpty ? null : reason.trim(),
+          changedAt: now,
+        ),
+      ],
       acceptedAt: command == SellerOrderCommand.accept ? now : null,
       preparationMinutes:
           command == SellerOrderCommand.accept ? preparationMinutes ?? 0 : null,
@@ -517,20 +580,62 @@ class MemorySellerOrderRepository implements SellerOrderRepository {
     final order = await findOne(storeId, orderPublicId);
     final existing = _payments[orderPublicId];
     if (existing != null) return existing;
-    if (order.status != 'COMPLETED') {
-      throw StateError('payment is only available for a completed order');
+
+    if (order.status == 'COMPLETED') {
+      final created = SellerPaymentSummary(
+        orderPublicId: orderPublicId,
+        paymentStatus: 'PAID',
+        paymentMethod: 'CARD',
+        approvedAmount: order.totalAmount,
+        refundedAmount: 0,
+        refundableAmount: order.totalAmount,
+        refunds: const [],
+      );
+      _payments[orderPublicId] = created;
+      return created;
     }
-    final created = SellerPaymentSummary(
-      orderPublicId: orderPublicId,
-      paymentStatus: 'PAID',
-      paymentMethod: 'CARD',
-      approvedAmount: order.totalAmount,
-      refundedAmount: 0,
-      refundableAmount: order.totalAmount,
-      refunds: const [],
-    );
-    _payments[orderPublicId] = created;
-    return created;
+
+    if (order.status == 'CANCELED' || order.status == 'REJECTED') {
+      SellerOrderStatusHistory? terminalHistory;
+      for (final history in order.statusHistory.reversed) {
+        if (history.currentStatus == order.status) {
+          terminalHistory = history;
+          break;
+        }
+      }
+
+      final processedAt = terminalHistory?.changedAt ?? DateTime.now().toUtc();
+      final reason = terminalHistory?.reason ?? '주문 취소 환불';
+      final requesterType = switch (terminalHistory?.actorType) {
+        'CUSTOMER' => 'CUSTOMER',
+        'ADMIN' => 'ADMIN',
+        'GUEST' => 'GUEST',
+        _ => 'SELLER',
+      };
+      final created = SellerPaymentSummary(
+        orderPublicId: orderPublicId,
+        paymentStatus: 'REFUNDED',
+        paymentMethod: 'CARD',
+        approvedAmount: order.totalAmount,
+        refundedAmount: order.totalAmount,
+        refundableAmount: 0,
+        refunds: [
+          SellerRefund(
+            refundId: 1,
+            amount: order.totalAmount,
+            reason: reason,
+            requesterType: requesterType,
+            status: 'SUCCEEDED',
+            requestedAt: processedAt,
+            completedAt: processedAt,
+          ),
+        ],
+      );
+      _payments[orderPublicId] = created;
+      return created;
+    }
+
+    throw StateError('payment summary is unavailable for this order');
   }
 
   @override

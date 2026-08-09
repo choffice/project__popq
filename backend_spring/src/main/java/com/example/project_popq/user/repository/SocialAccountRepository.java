@@ -2,6 +2,7 @@ package com.example.project_popq.user.repository;
 
 import com.example.project_popq.user.domain.SocialAccount;
 import com.example.project_popq.user.domain.SocialProvider;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,5 +12,7 @@ public interface SocialAccountRepository extends JpaRepository<SocialAccount, Lo
             SocialProvider provider,
             String providerUserId
     );
+
+    List<SocialAccount> findAllByUserId(Long userId);
 }
 

@@ -22,6 +22,7 @@ import 'features/notifications/customer_notification_repository.dart';
 import 'features/onboarding/onboarding_controller.dart';
 import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
+import 'features/orders/pending_payment_recovery_service.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_engagement_repository.dart';
 import 'notifications/customer_push_notification_service.dart';
@@ -86,6 +87,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final SessionStore _sessionStore;
   late final PopqApiClient _apiClient;
   late final CustomerNotificationRepository _notificationRepository;
+  late final CustomerOrderRepository _orderRepository;
+  late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
   late final CustomerHomeController _homeController;
@@ -99,8 +102,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final KakaoAuthService _kakaoAuthService;
   late final NaverAuthService _naverAuthService;
 
+  final DateTime _appStartedAt = DateTime.now();
+
   bool _isAppActive = true;
+  bool _isRecoveringPendingPayment = false;
   String? _pendingPushDeepLink;
+  String? _lastPaymentRecoveryNotice;
 
   @override
   void initState() {
@@ -168,8 +175,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final catalogRepository =
         widget.catalogRepository ?? ApiCatalogRepository(_apiClient);
 
-    final orderRepository =
+    _orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
+
+    _pendingPaymentRecoveryService = PendingPaymentRecoveryService(
+      repository: _orderRepository,
+    );
 
     final orderMessageRepository =
         widget.orderMessageRepository ??
@@ -193,7 +204,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     _homeController = CustomerHomeController(
       storeDiscoveryRepository,
-      orderRepository,
+      _orderRepository,
       _sessionController,
       permissionGateway,
       locationRepository,
@@ -211,7 +222,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onboardingController: _onboardingController,
       storeDiscoveryRepository: storeDiscoveryRepository,
       catalogRepository: catalogRepository,
-      orderRepository: orderRepository,
+      orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
       engagementRepository: engagementRepository,
       notificationRepository: _notificationRepository,
@@ -229,6 +240,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onGoogleSignIn: _googleSignIn,
       onKakaoSignIn: _kakaoSignIn,
       onNaverSignIn: _naverSignIn,
+      onGoogleLink: _googleLink,
+      onKakaoLink: _kakaoLink,
+      onNaverLink: _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -379,6 +393,33 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     await _sessionController.save(session);
   }
 
+  Future<void> _googleLink() async {
+    final idToken = await _googleAuthService.signInAndGetIdToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'GOOGLE',
+      providerToken: idToken,
+    );
+  }
+
+  Future<void> _kakaoLink() async {
+    final accessToken = await _kakaoAuthService.signInAndGetAccessToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'KAKAO',
+      providerToken: accessToken,
+    );
+  }
+
+  Future<void> _naverLink() async {
+    final accessToken = await _naverAuthService.signInAndGetAccessToken();
+
+    await _authRepository.linkSocialAccount(
+      provider: 'NAVER',
+      providerToken: accessToken,
+    );
+  }
+
   void _handlePushDeepLink(String deepLink) {
     if (!_isSupportedCustomerDeepLink(deepLink)) {
       debugPrint('Customer 지원하지 않는 알림 경로: $deepLink');
@@ -399,14 +440,17 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       return false;
     }
     final segments = uri.pathSegments;
-    final isOrderDetail = segments.length == 2 &&
+    final isOrderDetail =
+        segments.length == 2 &&
         segments.first == 'orders' &&
         segments[1].isNotEmpty;
-    final isOrderChat = segments.length == 3 &&
+    final isOrderChat =
+        segments.length == 3 &&
         segments.first == 'orders' &&
         segments[1].isNotEmpty &&
         segments[2] == 'messages';
-    final isStoreDetail = segments.length == 2 &&
+    final isStoreDetail =
+        segments.length == 2 &&
         segments.first == 'stores' &&
         int.tryParse(segments[1]) != null;
 
@@ -442,9 +486,132 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       _openPushDeepLink(pendingPushDeepLink);
     }
 
+    unawaited(
+      _recoverPendingPaymentIfNeeded(
+        navigateWhenPaid: pendingPushDeepLink == null,
+      ),
+    );
+
     if (_isAppActive) {
       unawaited(_realtimeClient.connect());
     }
+  }
+
+  Future<void> _recoverPendingPaymentIfNeeded({
+    bool navigateWhenPaid = true,
+  }) async {
+    if (_isRecoveringPendingPayment || !_sessionController.isSignedIn) {
+      return;
+    }
+
+    _isRecoveringPendingPayment = true;
+
+    try {
+      final outcome = await _pendingPaymentRecoveryService.recover();
+
+      if (!mounted || !_sessionController.isSignedIn) {
+        return;
+      }
+
+      switch (outcome.kind) {
+        case PendingPaymentRecoveryKind.none:
+          return;
+
+        case PendingPaymentRecoveryKind.paid:
+          _cartController.clear();
+
+          _showPaymentRecoveryNotice(outcome.message ?? '결제가 정상적으로 확인되었습니다.');
+
+          final orderPublicId = outcome.orderPublicId;
+
+          if (navigateWhenPaid &&
+              orderPublicId != null &&
+              orderPublicId.isNotEmpty) {
+            unawaited(_openRecoveredOrderAfterBootstrap(orderPublicId));
+          }
+
+          return;
+
+        case PendingPaymentRecoveryKind.retryAllowed:
+          _showPaymentRecoveryNotice(
+            outcome.message ??
+                '이전 결제는 완료되지 않았습니다. '
+                    '다시 결제할 수 있습니다.',
+          );
+          return;
+
+        case PendingPaymentRecoveryKind.pending:
+          _showPaymentRecoveryNotice(
+            outcome.message ??
+                '결제 결과를 확인하고 있습니다. '
+                    '잠시 후 자동으로 다시 확인합니다.',
+          );
+          return;
+
+        case PendingPaymentRecoveryKind.manualReview:
+        case PendingPaymentRecoveryKind.inconsistent:
+          _showPaymentRecoveryNotice(
+            outcome.message ??
+                '결제 상태를 자동으로 확정할 수 없습니다. '
+                    '주문·결제 내역을 확인해주세요.',
+          );
+          return;
+
+        case PendingPaymentRecoveryKind.unavailable:
+          _showPaymentRecoveryNotice(
+            outcome.message ??
+                '결제 상태를 확인하지 못했습니다. '
+                    '네트워크 연결 후 다시 확인합니다.',
+          );
+          return;
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Customer pending 결제 자동 복구 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _isRecoveringPendingPayment = false;
+    }
+  }
+
+  Future<void> _openRecoveredOrderAfterBootstrap(String orderPublicId) async {
+    final elapsed = DateTime.now().difference(_appStartedAt);
+
+    final remaining = widget.splashMinDuration - elapsed;
+
+    if (remaining > Duration.zero) {
+      await Future<void>.delayed(remaining);
+    }
+
+    if (!mounted || !_sessionController.isSignedIn) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sessionController.isSignedIn) {
+        return;
+      }
+
+      _router.go('${CustomerRoutes.orders}/$orderPublicId');
+    });
+  }
+
+  void _showPaymentRecoveryNotice(String message) {
+    if (message.trim().isEmpty || _lastPaymentRecoveryNotice == message) {
+      return;
+    }
+
+    _lastPaymentRecoveryNotice = message;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      final messenger = _scaffoldMessengerKey.currentState;
+
+      messenger?.hideCurrentSnackBar();
+      messenger?.showSnackBar(SnackBar(content: Text(message)));
+    });
   }
 
   Future<void> _registerPushDevice() async {
@@ -503,6 +670,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
         if (_sessionController.isSignedIn) {
           unawaited(_realtimeClient.connect());
+          unawaited(_recoverPendingPaymentIfNeeded());
         }
 
         return;

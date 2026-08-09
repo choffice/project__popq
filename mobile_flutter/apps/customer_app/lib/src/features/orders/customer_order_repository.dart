@@ -11,6 +11,8 @@ class CustomerOrder {
     required this.totalAmount,
     required this.version,
     required this.items,
+    this.statusHistory = const [],
+    this.requestMessage,
     this.createdAt,
     this.acceptedAt,
     this.preparationMinutes,
@@ -25,6 +27,7 @@ class CustomerOrder {
       status: json['status'] as String,
       totalAmount: (json['totalAmount'] as num).toInt(),
       version: (json['version'] as num).toInt(),
+      requestMessage: json['requestMessage'] as String?,
       createdAt: _dateTime(json['createdAt']),
       acceptedAt: _dateTime(json['acceptedAt']),
       preparationMinutes: (json['preparationMinutes'] as num?)?.toInt(),
@@ -36,6 +39,14 @@ class CustomerOrder {
             ),
           )
           .toList(),
+      statusHistory:
+          (json['statusHistory'] as List<Object?>? ?? const [])
+              .map(
+                (item) => CustomerOrderStatusHistory.fromJson(
+                  Map<String, Object?>.from(item as Map),
+                ),
+              )
+              .toList(),
     );
   }
 
@@ -46,6 +57,8 @@ class CustomerOrder {
   final int totalAmount;
   final int version;
   final List<CustomerOrderItem> items;
+  final List<CustomerOrderStatusHistory> statusHistory;
+  final String? requestMessage;
   final DateTime? createdAt;
   final DateTime? acceptedAt;
   final int? preparationMinutes;
@@ -54,6 +67,8 @@ class CustomerOrder {
   CustomerOrder copyWith({
     String? status,
     int? version,
+    List<CustomerOrderStatusHistory>? statusHistory,
+    String? requestMessage,
     DateTime? acceptedAt,
     int? preparationMinutes,
     DateTime? estimatedReadyAt,
@@ -66,6 +81,8 @@ class CustomerOrder {
       totalAmount: totalAmount,
       version: version ?? this.version,
       items: items,
+      statusHistory: statusHistory ?? this.statusHistory,
+      requestMessage: requestMessage ?? this.requestMessage,
       createdAt: createdAt,
       acceptedAt: acceptedAt ?? this.acceptedAt,
       preparationMinutes:
@@ -92,6 +109,40 @@ class CustomerOrder {
   static DateTime? _dateTime(Object? value) {
     return value is String ? DateTime.tryParse(value) : null;
   }
+}
+
+class CustomerOrderStatusHistory {
+  const CustomerOrderStatusHistory({
+    required this.currentStatus,
+    required this.actorType,
+    this.previousStatus,
+    this.actorId,
+    this.reason,
+    this.changedAt,
+  });
+
+  factory CustomerOrderStatusHistory.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerOrderStatusHistory(
+      previousStatus: json['previousStatus'] as String?,
+      currentStatus: json['currentStatus'] as String,
+      actorType: json['actorType'] as String,
+      actorId: (json['actorId'] as num?)?.toInt(),
+      reason: json['reason'] as String?,
+      changedAt: CustomerOrder._dateTime(json['changedAt']),
+    );
+  }
+
+  final String? previousStatus;
+  final String currentStatus;
+  final String actorType;
+  final int? actorId;
+  final String? reason;
+  final DateTime? changedAt;
+
+  bool get isCancellationOrRejection =>
+      currentStatus == 'CANCELED' || currentStatus == 'REJECTED';
 }
 
 class CustomerOrderItem {
@@ -126,17 +177,170 @@ class OrderSyncResult {
   final CustomerOrder? order;
 }
 
+class CustomerPaymentRecovery {
+  const CustomerPaymentRecovery({
+    required this.orderPublicId,
+    required this.status,
+    required this.requestedAmount,
+    this.approvedAmount,
+    this.providerPaymentKey,
+    this.failureCode,
+    this.failureMessage,
+    this.orderStatus,
+  });
+
+  factory CustomerPaymentRecovery.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerPaymentRecovery(
+      orderPublicId: json['orderPublicId'] as String,
+      status: json['status'] as String,
+      requestedAmount: (json['requestedAmount'] as num).toInt(),
+      approvedAmount: (json['approvedAmount'] as num?)?.toInt(),
+      providerPaymentKey: json['providerPaymentKey'] as String?,
+      failureCode: json['failureCode'] as String?,
+      failureMessage: json['failureMessage'] as String?,
+      orderStatus: json['orderStatus'] as String?,
+    );
+  }
+
+  final String orderPublicId;
+  final String status;
+  final int requestedAmount;
+  final int? approvedAmount;
+  final String? providerPaymentKey;
+  final String? failureCode;
+  final String? failureMessage;
+  final String? orderStatus;
+
+  bool get isPaid => status == 'PAID';
+
+  bool get isPending =>
+      status == 'READY' || status == 'IN_PROGRESS';
+
+  bool get isTerminalFailure =>
+      status == 'FAILED' || status == 'CANCELED';
+
+  bool get requiresManualReview =>
+      status == 'PARTIALLY_REFUNDED' ||
+      status == 'REFUNDED';
+}
+
+class CustomerPaymentSummary {
+  const CustomerPaymentSummary({
+    required this.orderPublicId,
+    required this.paymentStatus,
+    required this.paymentMethod,
+    required this.approvedAmount,
+    required this.refundedAmount,
+    required this.refunds,
+    this.approvedAt,
+    this.canceledAt,
+  });
+
+  factory CustomerPaymentSummary.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerPaymentSummary(
+      orderPublicId: json['orderPublicId'] as String,
+      paymentStatus: json['paymentStatus'] as String,
+      paymentMethod: json['paymentMethod'] as String,
+      approvedAmount: (json['approvedAmount'] as num).toInt(),
+      refundedAmount: (json['refundedAmount'] as num).toInt(),
+      approvedAt: _dateTime(json['approvedAt']),
+      canceledAt: _dateTime(json['canceledAt']),
+      refunds: (json['refunds'] as List<Object?>? ?? const [])
+          .map(
+            (item) => CustomerRefundHistory.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  final String orderPublicId;
+  final String paymentStatus;
+  final String paymentMethod;
+  final int approvedAmount;
+  final int refundedAmount;
+  final DateTime? approvedAt;
+  final DateTime? canceledAt;
+  final List<CustomerRefundHistory> refunds;
+
+  int get refundableAmount {
+    final remaining = approvedAmount - refundedAmount;
+    return remaining < 0 ? 0 : remaining;
+  }
+}
+
+class CustomerRefundHistory {
+  const CustomerRefundHistory({
+    required this.refundId,
+    required this.amount,
+    required this.reason,
+    required this.requesterType,
+    required this.status,
+    required this.requestedAt,
+    this.completedAt,
+    this.failureMessage,
+  });
+
+  factory CustomerRefundHistory.fromJson(
+    Map<String, Object?> json,
+  ) {
+    return CustomerRefundHistory(
+      refundId: (json['refundId'] as num).toInt(),
+      amount: (json['amount'] as num).toInt(),
+      reason: json['reason'] as String? ?? '',
+      requesterType: json['requesterType'] as String,
+      status: json['status'] as String,
+      requestedAt: _dateTime(json['requestedAt']) ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      completedAt: _dateTime(json['completedAt']),
+      failureMessage: json['failureMessage'] as String?,
+    );
+  }
+
+  final int refundId;
+  final int amount;
+  final String reason;
+  final String requesterType;
+  final String status;
+  final DateTime requestedAt;
+  final DateTime? completedAt;
+  final String? failureMessage;
+}
+
+DateTime? _dateTime(Object? value) {
+  return value is String ? DateTime.tryParse(value) : null;
+}
+
 abstract interface class CustomerOrderRepository {
   Future<CustomerOrder> create({
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   });
 
   Future<CustomerOrder> confirmPayment(
     CustomerOrder order, {
     required String idempotencyKey,
     String? paymentKey,
+  });
+
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  );
+
+  Future<CustomerPaymentSummary> findPaymentSummary(
+    String orderPublicId,
+  );
+
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
   });
 
   Future<List<CustomerOrder>> findAll();
@@ -159,12 +363,19 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   }) {
+    final normalizedRequestMessage = requestMessage?.trim();
+
     return _apiClient.post(
       '/api/v1/customer/orders/stores/$storeId',
       body: {
         'idempotencyKey': idempotencyKey,
         'orderType': 'TAKEOUT',
+        'requestMessage': normalizedRequestMessage == null ||
+                normalizedRequestMessage.isEmpty
+            ? null
+            : normalizedRequestMessage,
         'items': items
             .map(
               (item) => {
@@ -200,6 +411,46 @@ class ApiCustomerOrderRepository implements CustomerOrderRepository {
     );
 
     return findOne(order.orderPublicId);
+  }
+
+  @override
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  ) {
+    return _apiClient.post(
+      '/api/v1/customer/orders/$orderPublicId/payments/recover',
+      decode: (value) => CustomerPaymentRecovery.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<CustomerPaymentSummary> findPaymentSummary(
+    String orderPublicId,
+  ) {
+    return _apiClient.get(
+      '/api/v1/customer/orders/$orderPublicId/payment',
+      decode: (value) => CustomerPaymentSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
+  }) {
+    return _apiClient.post(
+      '/api/v1/customer/orders/$orderPublicId/cancel',
+      body: {
+        'reason': reason.trim(),
+      },
+      decode: (value) => CustomerOrder.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
   }
 
   @override
@@ -266,6 +517,7 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
     required int storeId,
     required List<CartItem> items,
     required String idempotencyKey,
+    String? requestMessage,
   }) async {
     final order = CustomerOrder(
       orderPublicId: 'memory-order-${_orders.length + 1}',
@@ -277,6 +529,9 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
         (sum, item) => sum + item.totalPrice,
       ),
       version: 0,
+      requestMessage: requestMessage?.trim().isEmpty == true
+          ? null
+          : requestMessage?.trim(),
       items: items
           .map(
             (item) => CustomerOrderItem(
@@ -306,6 +561,7 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
       totalAmount: order.totalAmount,
       version: order.version + 1,
       items: order.items,
+      requestMessage: order.requestMessage,
     );
 
     final index = _orders.indexWhere(
@@ -319,6 +575,106 @@ class MemoryCustomerOrderRepository implements CustomerOrderRepository {
     }
 
     return paid;
+  }
+
+  @override
+  Future<CustomerPaymentRecovery> recoverPayment(
+    String orderPublicId,
+  ) async {
+    final order = await findOne(orderPublicId);
+    final paid = order.status != 'CREATED';
+
+    return CustomerPaymentRecovery(
+      orderPublicId: order.orderPublicId,
+      status: paid ? 'PAID' : 'IN_PROGRESS',
+      requestedAmount: order.totalAmount,
+      approvedAmount: paid ? order.totalAmount : null,
+      orderStatus: order.status,
+    );
+  }
+
+  @override
+  Future<CustomerPaymentSummary> findPaymentSummary(
+    String orderPublicId,
+  ) async {
+    final order = await findOne(orderPublicId);
+    final paid = order.status != 'CREATED';
+    final canceled = order.status == 'CANCELED';
+    CustomerOrderStatusHistory? cancellationHistory;
+
+    for (final history in order.statusHistory.reversed) {
+      if (history.currentStatus == 'CANCELED') {
+        cancellationHistory = history;
+        break;
+      }
+    }
+
+    final refundRequestedAt = cancellationHistory?.changedAt ??
+        DateTime.now().toUtc();
+
+    return CustomerPaymentSummary(
+      orderPublicId: order.orderPublicId,
+      paymentStatus: canceled
+          ? 'REFUNDED'
+          : paid
+              ? 'PAID'
+              : 'IN_PROGRESS',
+      paymentMethod: 'TEST',
+      approvedAmount: paid ? order.totalAmount : 0,
+      refundedAmount: canceled ? order.totalAmount : 0,
+      canceledAt: canceled ? refundRequestedAt : null,
+      refunds: canceled
+          ? [
+              CustomerRefundHistory(
+                refundId: 1,
+                amount: order.totalAmount,
+                reason: cancellationHistory?.reason ?? '고객 주문 취소',
+                requesterType: 'CUSTOMER',
+                status: 'SUCCEEDED',
+                requestedAt: refundRequestedAt,
+                completedAt: refundRequestedAt,
+              ),
+            ]
+          : const [],
+    );
+  }
+
+  @override
+  Future<CustomerOrder> cancel(
+    String orderPublicId, {
+    required String reason,
+  }) async {
+    final order = await findOne(orderPublicId);
+
+    if (order.status != 'PLACED') {
+      throw StateError('접수 대기 주문만 취소할 수 있습니다.');
+    }
+
+    final changedAt = DateTime.now().toUtc();
+    final canceled = order.copyWith(
+      status: 'CANCELED',
+      version: order.version + 1,
+      statusHistory: [
+        ...order.statusHistory,
+        CustomerOrderStatusHistory(
+          previousStatus: order.status,
+          currentStatus: 'CANCELED',
+          actorType: 'CUSTOMER',
+          reason: reason.trim(),
+          changedAt: changedAt,
+        ),
+      ],
+    );
+
+    final index = _orders.indexWhere(
+      (candidate) => candidate.orderPublicId == orderPublicId,
+    );
+
+    if (index >= 0) {
+      _orders[index] = canceled;
+    }
+
+    return canceled;
   }
 
   @override

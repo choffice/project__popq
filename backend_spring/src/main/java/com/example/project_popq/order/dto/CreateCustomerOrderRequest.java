@@ -14,6 +14,7 @@ public record CreateCustomerOrderRequest(
         @Pattern(regexp = "^[A-Za-z0-9_-]{8,100}$")
         String idempotencyKey,
         @NotNull OrderType orderType,
+        @Size(max = 100) String requestMessage,
         @NotNull @Size(min = 1, max = 50) @Valid List<OrderItemRequest> items
 ) {
     public record OrderItemRequest(
