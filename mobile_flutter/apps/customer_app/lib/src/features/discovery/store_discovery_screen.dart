@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
@@ -17,6 +18,9 @@ import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
+
+import 'kakao_store_map_web_stub.dart'
+if (dart.library.js_interop) 'kakao_store_map_web.dart';
 
 class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
@@ -394,6 +398,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        if (!kIsWeb)
         KakaoStoreMap(
           controller: _mapController,
           stores: stores,
@@ -403,8 +408,13 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           selectedStoreId: _selectedStore?.storeId,
           onStoreSelected: _selectStore,
           onViewportIdle: _onMapViewportIdle,
-        ),
-
+        )
+        else
+          KakaoStoreMapWeb(
+            stores: stores,
+            currentLocation: _controller.location,
+            searchCenter: _controller.searchCenter,
+          ),
         _buildStatusOverlay(stores),
 
         Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
