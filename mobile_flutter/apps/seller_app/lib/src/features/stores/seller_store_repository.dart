@@ -55,6 +55,8 @@ class SellerStore {
     this.longitude,
     this.openTime,
     this.closeTime,
+    this.operationStartDate,
+    this.operationEndDate,
     this.closedDays = const [],
     this.takeoutAvailable = true,
     this.dineInAvailable = true,
@@ -80,6 +82,8 @@ class SellerStore {
       longitude: (json['longitude'] as num?)?.toDouble(),
       openTime: json['openTime'] as String?,
       closeTime: json['closeTime'] as String?,
+      operationStartDate: _readDate(json['operationStartDate']),
+      operationEndDate: _readDate(json['operationEndDate']),
       closedDays: _readStringList(
         json['closedDays'],
       ),
@@ -119,6 +123,8 @@ class SellerStore {
   final double? longitude;
   final String? openTime;
   final String? closeTime;
+  final DateTime? operationStartDate;
+  final DateTime? operationEndDate;
   final List<String> closedDays;
   final bool takeoutAvailable;
   final bool dineInAvailable;
@@ -147,6 +153,8 @@ class SellerStore {
     double? longitude,
     String? openTime,
     String? closeTime,
+    DateTime? operationStartDate,
+    DateTime? operationEndDate,
     List<String>? closedDays,
     bool? takeoutAvailable,
     bool? dineInAvailable,
@@ -174,6 +182,8 @@ class SellerStore {
       longitude: longitude ?? this.longitude,
       openTime: openTime ?? this.openTime,
       closeTime: closeTime ?? this.closeTime,
+      operationStartDate: operationStartDate ?? this.operationStartDate,
+      operationEndDate: operationEndDate ?? this.operationEndDate,
       closedDays: closedDays ?? this.closedDays,
       takeoutAvailable:
       takeoutAvailable ?? this.takeoutAvailable,
@@ -512,6 +522,8 @@ abstract interface class SellerStoreRepository {
     double? longitude,
     String? openTime,
     String? closeTime,
+    DateTime? operationStartDate,
+    DateTime? operationEndDate,
     List<String> closedDays = const [],
     bool takeoutAvailable = true,
     bool dineInAvailable = true,
@@ -543,6 +555,8 @@ abstract interface class SellerStoreRepository {
         double? longitude,
         String? openTime,
         String? closeTime,
+        required DateTime? operationStartDate,
+        required DateTime? operationEndDate,
         List<String>? closedDays,
         bool? takeoutAvailable,
         bool? dineInAvailable,
@@ -798,6 +812,8 @@ class ApiSellerStoreRepository
     double? longitude,
     String? openTime,
     String? closeTime,
+    DateTime? operationStartDate,
+    DateTime? operationEndDate,
     List<String> closedDays = const [],
     bool takeoutAvailable = true,
     bool dineInAvailable = true,
@@ -821,6 +837,8 @@ class ApiSellerStoreRepository
         'longitude': longitude,
         'openTime': openTime,
         'closeTime': closeTime,
+        'operationStartDate': _dateToApi(operationStartDate),
+        'operationEndDate': _dateToApi(operationEndDate),
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
@@ -895,6 +913,8 @@ class ApiSellerStoreRepository
         double? longitude,
         String? openTime,
         String? closeTime,
+        required DateTime? operationStartDate,
+        required DateTime? operationEndDate,
         List<String>? closedDays,
         bool? takeoutAvailable,
         bool? dineInAvailable,
@@ -905,7 +925,7 @@ class ApiSellerStoreRepository
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
       body: {
-        'storeType': ?storeType,
+        'storeType': storeType,
         'name': name,
         'description': description,
         'address': address,
@@ -918,6 +938,8 @@ class ApiSellerStoreRepository
         'longitude': longitude,
         'openTime': openTime,
         'closeTime': closeTime,
+        'operationStartDate': _dateToApi(operationStartDate),
+        'operationEndDate': _dateToApi(operationEndDate),
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
@@ -1135,6 +1157,8 @@ class MemorySellerStoreRepository
     double? longitude,
     String? openTime,
     String? closeTime,
+    DateTime? operationStartDate,
+    DateTime? operationEndDate,
     List<String> closedDays = const [],
     bool takeoutAvailable = true,
     bool dineInAvailable = true,
@@ -1170,6 +1194,8 @@ class MemorySellerStoreRepository
       longitude: longitude,
       openTime: openTime,
       closeTime: closeTime,
+      operationStartDate: operationStartDate,
+      operationEndDate: operationEndDate,
       closedDays:
       List<String>.unmodifiable(
         closedDays,
@@ -1271,6 +1297,8 @@ class MemorySellerStoreRepository
         double? longitude,
         String? openTime,
         String? closeTime,
+        required DateTime? operationStartDate,
+        required DateTime? operationEndDate,
         List<String>? closedDays,
         bool? takeoutAvailable,
         bool? dineInAvailable,
@@ -1322,6 +1350,8 @@ class MemorySellerStoreRepository
       openTime ?? store.openTime,
       closeTime:
       closeTime ?? store.closeTime,
+      operationStartDate: operationStartDate,
+      operationEndDate: operationEndDate,
       closedDays:
       List<String>.unmodifiable(
         closedDays ?? store.closedDays,
@@ -1409,4 +1439,20 @@ String? _readNullableString(
   return text.isEmpty
       ? null
       : text;
+}
+
+DateTime? _readDate(Object? value) {
+  if (value is! String || value.trim().isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value.trim());
+}
+
+String? _dateToApi(DateTime? value) {
+  if (value == null) {
+    return null;
+  }
+  final String month = value.month.toString().padLeft(2, '0');
+  final String day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
 }

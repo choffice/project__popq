@@ -130,7 +130,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
     final String suffix = current.contains('-')
         ? current.substring(current.indexOf('-') + 1)
         : '';
-    widget.controller.text = suffix.isEmpty ? '$prefix-' : '$prefix-$suffix';
+    widget.controller.text = suffix.isEmpty ? '$prefix' : '$prefix$suffix';
     widget.controller.selection = TextSelection.collapsed(
       offset: widget.controller.text.length,
     );

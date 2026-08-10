@@ -14,6 +14,7 @@ import 'features/auth/kakao_auth_service.dart';
 import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
+import 'features/announcements/public_announcement_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
 import 'features/home/customer_home_controller.dart';
 import 'features/home/customer_location_repository.dart';
@@ -36,6 +37,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.onboardingStore,
     this.storeDiscoveryRepository,
     this.catalogRepository,
+    this.announcementRepository,
     this.orderRepository,
     this.orderMessageRepository,
     this.engagementRepository,
@@ -55,6 +57,7 @@ class PopqCustomerApp extends StatefulWidget {
   final OnboardingStore? onboardingStore;
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
+  final PublicAnnouncementRepository? announcementRepository;
   final CustomerOrderRepository? orderRepository;
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
@@ -175,6 +178,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final catalogRepository =
         widget.catalogRepository ?? ApiCatalogRepository(_apiClient);
 
+    final announcementRepository = widget.announcementRepository ??
+        ApiPublicAnnouncementRepository(_apiClient);
+
     _orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
 
@@ -222,6 +228,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onboardingController: _onboardingController,
       storeDiscoveryRepository: storeDiscoveryRepository,
       catalogRepository: catalogRepository,
+      announcementRepository: announcementRepository,
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
       engagementRepository: engagementRepository,

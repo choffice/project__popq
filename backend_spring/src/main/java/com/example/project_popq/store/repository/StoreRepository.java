@@ -30,6 +30,7 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
               and (
                 :query is null
                 or lower(store.name) like lower(concat('%', :query, '%'))
+                or lower(coalesce(store.representativeCategory, '')) like lower(concat('%', :query, '%'))
                 or lower(coalesce(store.address, '')) like lower(concat('%', :query, '%'))
                 or lower(coalesce(tag.name, '')) like lower(concat('%', :query, '%'))
               )

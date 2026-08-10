@@ -20,6 +20,8 @@ class CustomerStore {
     this.longitude,
     this.openTime,
     this.closeTime,
+    this.operationStartDate,
+    this.operationEndDate,
     this.closedDays = const [],
     this.takeoutAvailable = true,
     this.dineInAvailable = true,
@@ -50,6 +52,8 @@ class CustomerStore {
       longitude: (json['longitude'] as num?)?.toDouble(),
       openTime: json['openTime'] as String?,
       closeTime: json['closeTime'] as String?,
+      operationStartDate: _readDate(json['operationStartDate']),
+      operationEndDate: _readDate(json['operationEndDate']),
       closedDays: (json['closedDays'] as List<Object?>? ?? const [])
           .whereType<String>()
           .toList(growable: false),
@@ -86,6 +90,8 @@ class CustomerStore {
   final double? longitude;
   final String? openTime;
   final String? closeTime;
+  final DateTime? operationStartDate;
+  final DateTime? operationEndDate;
   final List<String> closedDays;
   final bool takeoutAvailable;
   final bool dineInAvailable;
@@ -276,6 +282,13 @@ String? _resolveImageUrl(String? value, String? baseUrl) {
   return path.startsWith('/') ? '$base$path' : '$base/$path';
 }
 
+DateTime? _readDate(Object? value) {
+  if (value is! String || value.trim().isEmpty) {
+    return null;
+  }
+  return DateTime.tryParse(value.trim());
+}
+
 class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
   MemoryStoreDiscoveryRepository({List<CustomerStore>? stores})
     : _stores = stores ?? sampleStores;
@@ -368,6 +381,10 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
           normalizedQuery == null ||
           normalizedQuery.isEmpty ||
           store.name.toLowerCase().contains(normalizedQuery) ||
+          (store.representativeCategory
+                  ?.toLowerCase()
+                  .contains(normalizedQuery) ??
+              false) ||
           (store.address?.toLowerCase().contains(normalizedQuery) ?? false) ||
           store.tags.any(
             (String value) => value.trim().toLowerCase().contains(

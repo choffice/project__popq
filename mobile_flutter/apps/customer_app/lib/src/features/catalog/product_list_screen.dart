@@ -5,6 +5,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
+import '../discovery/store_section_widgets.dart';
 import 'catalog_repository.dart';
 
 class ProductListScreen extends StatefulWidget {
@@ -28,6 +29,7 @@ class ProductListScreen extends StatefulWidget {
 class _ProductListScreenState extends State<ProductListScreen> {
   late Future<List<CatalogProduct>> _products;
   late Future<CustomerStore> _store;
+  int? _selectedCategoryId;
 
   @override
   void initState() {
@@ -40,6 +42,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const StoreBackButton(),
         title: const Text('상품'),
         actions: [_CartButton(cartController: widget.cartController)],
       ),
@@ -57,83 +60,142 @@ class _ProductListScreenState extends State<ProductListScreen> {
               }),
             );
           }
-          if (snapshot.requireData.isEmpty) {
-            return const PopqEmptyView(
-              icon: Icons.inventory_2_outlined,
-              title: '판매 중인 상품이 없어요.',
-              description: '새 상품이 준비되면 이곳에서 확인할 수 있습니다.',
-            );
-          }
+          final List<CatalogProduct> products = snapshot.requireData;
+          final Map<int, String> categories = <int, String>{
+            for (final CatalogProduct item in products)
+              item.categoryId: item.categoryName,
+          };
+          final List<CatalogProduct> visibleProducts =
+              _selectedCategoryId == null
+              ? products
+              : products
+                    .where(
+                      (CatalogProduct item) =>
+                          item.categoryId == _selectedCategoryId,
+                    )
+                    .toList(growable: false);
           return Column(
             children: [
               FutureBuilder<CustomerStore>(
                 future: _store,
                 builder: (context, storeSnapshot) {
                   final store = storeSnapshot.data;
-                  if (store == null || store.orderAcceptingEnabled) {
-                    return const SizedBox.shrink();
-                  }
-
-                  return const Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      PopqSpacing.md,
-                      PopqSpacing.md,
-                      PopqSpacing.md,
-                      0,
-                    ),
-                    child: _OrderPausedBanner(),
+                  return Column(
+                    children: <Widget>[
+                      if (store != null)
+                        StoreSectionTopBar(
+                          store: store,
+                          selected: StoreSection.products,
+                        )
+                      else
+                        StoreSectionTabs(
+                          storeId: widget.storeId,
+                          selected: StoreSection.products,
+                        ),
+                      if (store != null && !store.orderAcceptingEnabled)
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(
+                            PopqSpacing.md,
+                            PopqSpacing.md,
+                            PopqSpacing.md,
+                            0,
+                          ),
+                          child: _OrderPausedBanner(),
+                        ),
+                    ],
                   );
                 },
               ),
-              Expanded(
-                child: RefreshIndicator(
-                  onRefresh: () async {
-                    setState(() {
-                      _products = widget.repository.findProducts(widget.storeId);
-                      _store = widget.storeDiscoveryRepository.findDetail(
-                        widget.storeId,
-                      );
-                    });
-                    await Future.wait<Object?>([_products, _store]);
-                  },
-                  child: ListView.separated(
-                    padding: const EdgeInsets.all(PopqSpacing.md),
-                    itemCount: snapshot.requireData.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: PopqSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final product = snapshot.requireData[index];
-                      return Card(
-                        child: ListTile(
-                          enabled: !product.soldOut,
-                          contentPadding: const EdgeInsets.all(PopqSpacing.md),
-                          leading: CircleAvatar(
-                            backgroundColor: PopqPalette.lime,
-                            child: Icon(
-                              product.soldOut
-                                  ? Icons.remove_shopping_cart_outlined
-                                  : Icons.local_cafe_outlined,
-                              color: PopqPalette.forest,
-                            ),
+              if (categories.isNotEmpty)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(
+                    PopqSpacing.md,
+                    PopqSpacing.sm,
+                    PopqSpacing.md,
+                    0,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      ChoiceChip(
+                        label: const Text('전체'),
+                        selected: _selectedCategoryId == null,
+                        onSelected: (_) =>
+                            setState(() => _selectedCategoryId = null),
+                      ),
+                      for (final MapEntry<int, String> category
+                          in categories.entries) ...<Widget>[
+                        const SizedBox(width: PopqSpacing.xs),
+                        ChoiceChip(
+                          label: Text(category.value),
+                          selected: _selectedCategoryId == category.key,
+                          onSelected: (_) => setState(
+                            () => _selectedCategoryId = category.key,
                           ),
-                          title: Text(product.name),
-                          subtitle: Text(
-                            product.soldOut
-                                ? '${product.categoryName} · 품절'
-                                : product.categoryName,
-                          ),
-                          trailing: Text(_won(product.basePrice)),
-                          onTap: product.soldOut
-                              ? null
-                              : () => context.push(
-                                  '${CustomerRoutes.stores}/${widget.storeId}'
-                                  '/products/${product.productId}',
-                                ),
                         ),
-                      );
-                    },
+                      ],
+                    ],
                   ),
                 ),
+              Expanded(
+                child: visibleProducts.isEmpty
+                    ? const PopqEmptyView(
+                        icon: Icons.inventory_2_outlined,
+                        title: '해당 카테고리의 상품이 없어요.',
+                        description: '다른 카테고리를 선택해 주세요.',
+                      )
+                    : RefreshIndicator(
+                        onRefresh: () async {
+                          setState(() {
+                            _products = widget.repository.findProducts(
+                              widget.storeId,
+                            );
+                            _store = widget.storeDiscoveryRepository.findDetail(
+                              widget.storeId,
+                            );
+                          });
+                          await Future.wait<Object?>([_products, _store]);
+                        },
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(PopqSpacing.md),
+                          itemCount: visibleProducts.length,
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: PopqSpacing.sm),
+                          itemBuilder: (context, index) {
+                            final product = visibleProducts[index];
+                            return Card(
+                              child: ListTile(
+                                enabled: !product.soldOut,
+                                contentPadding: const EdgeInsets.all(
+                                  PopqSpacing.md,
+                                ),
+                                leading: CircleAvatar(
+                                  backgroundColor: PopqPalette.lime,
+                                  child: Icon(
+                                    product.soldOut
+                                        ? Icons.remove_shopping_cart_outlined
+                                        : Icons.local_cafe_outlined,
+                                    color: PopqPalette.forest,
+                                  ),
+                                ),
+                                title: Text(product.name),
+                                subtitle: Text(
+                                  product.soldOut
+                                      ? '${product.categoryName} · 품절'
+                                      : product.categoryName,
+                                ),
+                                trailing: Text(_won(product.basePrice)),
+                                onTap: product.soldOut
+                                    ? null
+                                    : () => context.push(
+                                        '${CustomerRoutes.stores}/${widget.storeId}'
+                                        '/products/${product.productId}',
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
               ),
             ],
           );
@@ -142,7 +204,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 }
-
 
 class _OrderPausedBanner extends StatelessWidget {
   const _OrderPausedBanner();
@@ -170,9 +231,9 @@ class _OrderPausedBanner extends StatelessWidget {
             child: Text(
               '현재 신규 주문 접수가 중지되어 있어요. 메뉴는 둘러볼 수 있습니다.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onErrorContainer,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: colorScheme.onErrorContainer,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
