@@ -22,6 +22,12 @@ class KakaoStoreMapController {
       CustomerLocation location,
       )? _focusStoreLocation;
 
+  void bindFocusStoreLocation(
+      Future<void> Function(CustomerLocation location)? callback,
+      ) {
+    _focusStoreLocation = callback;
+  }
+
   Future<void> focusStoreLocation(
       CustomerLocation location,
       ) async {
