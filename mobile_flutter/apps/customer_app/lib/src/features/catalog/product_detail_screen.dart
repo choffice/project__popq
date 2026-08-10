@@ -5,6 +5,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
+import '../discovery/store_section_widgets.dart';
 import 'catalog_repository.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -45,6 +46,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: const StoreBackButton(),
         title: const Text('상품 선택'),
         actions: [
           IconButton(
@@ -78,11 +80,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               final store = storeSnapshot.data;
               final checkingStore =
                   storeSnapshot.connectionState != ConnectionState.done;
-              final storeLoadFailed = storeSnapshot.hasError ||
+              final storeLoadFailed =
+                  storeSnapshot.hasError ||
                   (storeSnapshot.connectionState == ConnectionState.done &&
                       store == null);
-              final orderPaused =
-                  store != null && !store.orderAcceptingEnabled;
+              final orderPaused = store != null && !store.orderAcceptingEnabled;
 
               return Column(
                 children: [
@@ -104,91 +106,91 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           const SizedBox(height: PopqSpacing.md),
                         ],
-                    Container(
-                      height: 180,
-                      decoration: BoxDecoration(
-                        color: PopqPalette.lime,
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: const Icon(
-                        Icons.local_cafe_rounded,
-                        size: 72,
-                        color: PopqPalette.forest,
-                      ),
-                    ),
-                    const SizedBox(height: PopqSpacing.lg),
-                    Text(
-                      product.name,
-                      style: Theme.of(context).textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: PopqSpacing.xs),
-                    Text(_won(product.basePrice)),
-                    if (product.description != null) ...[
-                      const SizedBox(height: PopqSpacing.md),
-                      Text(product.description!),
-                    ],
-                    for (final group in product.optionGroups) ...[
-                      const SizedBox(height: PopqSpacing.lg),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              group.name,
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
+                        Container(
+                          height: 180,
+                          decoration: BoxDecoration(
+                            color: PopqPalette.lime,
+                            borderRadius: BorderRadius.circular(28),
                           ),
-                          Text(
-                            group.required
-                                ? '필수 ${group.minSelect}개'
-                                : '최대 ${group.maxSelect}개',
+                          child: const Icon(
+                            Icons.local_cafe_rounded,
+                            size: 72,
+                            color: PopqPalette.forest,
                           ),
+                        ),
+                        const SizedBox(height: PopqSpacing.lg),
+                        Text(
+                          product.name,
+                          style: Theme.of(context).textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: PopqSpacing.xs),
+                        Text(_won(product.basePrice)),
+                        if (product.description != null) ...[
+                          const SizedBox(height: PopqSpacing.md),
+                          Text(product.description!),
                         ],
-                      ),
-                      for (final option in group.options)
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          value:
-                              _selected[group.optionGroupId]?.contains(
-                                option.optionId,
-                              ) ??
-                              false,
-                          title: Text(option.name),
-                          subtitle: option.additionalPrice == 0
-                              ? null
-                              : Text('+${_won(option.additionalPrice)}'),
-                          onChanged: (_) => _toggle(group, option),
-                        ),
-                    ],
-                    const SizedBox(height: PopqSpacing.lg),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton.filledTonal(
-                          onPressed: _quantity > 1
-                              ? () => setState(() => _quantity--)
-                              : null,
-                          icon: const Icon(Icons.remove),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: PopqSpacing.lg,
+                        for (final group in product.optionGroups) ...[
+                          const SizedBox(height: PopqSpacing.lg),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  group.name,
+                                  style: Theme.of(context).textTheme.titleLarge,
+                                ),
+                              ),
+                              Text(
+                                group.required
+                                    ? '필수 ${group.minSelect}개'
+                                    : '최대 ${group.maxSelect}개',
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            '$_quantity',
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                        ),
-                        IconButton.filledTonal(
-                          onPressed: _quantity < 99
-                              ? () => setState(() => _quantity++)
-                              : null,
-                          icon: const Icon(Icons.add),
+                          for (final option in group.options)
+                            CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              value:
+                                  _selected[group.optionGroupId]?.contains(
+                                    option.optionId,
+                                  ) ??
+                                  false,
+                              title: Text(option.name),
+                              subtitle: option.additionalPrice == 0
+                                  ? null
+                                  : Text('+${_won(option.additionalPrice)}'),
+                              onChanged: (_) => _toggle(group, option),
+                            ),
+                        ],
+                        const SizedBox(height: PopqSpacing.lg),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton.filledTonal(
+                              onPressed: _quantity > 1
+                                  ? () => setState(() => _quantity--)
+                                  : null,
+                              icon: const Icon(Icons.remove),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: PopqSpacing.lg,
+                              ),
+                              child: Text(
+                                '$_quantity',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                            ),
+                            IconButton.filledTonal(
+                              onPressed: _quantity < 99
+                                  ? () => setState(() => _quantity++)
+                                  : null,
+                              icon: const Icon(Icons.add),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
                   SafeArea(
                     top: false,
                     child: Padding(
@@ -196,7 +198,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       child: SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: !checkingStore &&
+                          onPressed:
+                              !checkingStore &&
                                   !storeLoadFailed &&
                                   !orderPaused &&
                                   !_addingToCart &&
@@ -208,12 +211,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             checkingStore
                                 ? '주문 가능 여부 확인 중...'
                                 : storeLoadFailed
-                                    ? '주문 상태를 확인해주세요'
-                                    : orderPaused
-                                        ? '현재 주문 접수 중지'
-                                        : _addingToCart
-                                            ? '주문 상태 확인 중...'
-                                            : '${_won(_total(product))} · 장바구니 담기',
+                                ? '주문 상태를 확인해주세요'
+                                : orderPaused
+                                ? '현재 주문 접수 중지'
+                                : _addingToCart
+                                ? '주문 상태 확인 중...'
+                                : '${_won(_total(product))} · 장바구니 담기',
                           ),
                         ),
                       ),
@@ -284,9 +287,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       if (!store.orderAcceptingEnabled) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
-          ),
+          const SnackBar(content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.')),
         );
         return;
       }
@@ -294,39 +295,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final options = _selectedOptions(product);
       try {
         widget.cartController.add(
-        targetStoreId: widget.storeId,
-        product: product,
-        options: options,
-        quantity: _quantity,
-      );
-    } on CartStoreConflict {
-      final replace = await showDialog<bool>(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('다른 스토어 상품이 있어요.'),
-            content: const Text('기존 장바구니를 비우고 이 상품을 담을까요?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('비우고 담기'),
-              ),
-            ],
-          );
-        },
-      );
-      if (replace != true) return;
-      widget.cartController.replaceWith(
-        targetStoreId: widget.storeId,
-        product: product,
-        options: options,
-        quantity: _quantity,
-      );
-    }
+          targetStoreId: widget.storeId,
+          product: product,
+          options: options,
+          quantity: _quantity,
+        );
+      } on CartStoreConflict {
+        final replace = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('다른 스토어 상품이 있어요.'),
+              content: const Text('기존 장바구니를 비우고 이 상품을 담을까요?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('비우고 담기'),
+                ),
+              ],
+            );
+          },
+        );
+        if (replace != true) return;
+        widget.cartController.replaceWith(
+          targetStoreId: widget.storeId,
+          product: product,
+          options: options,
+          quantity: _quantity,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -342,9 +343,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.'),
-        ),
+        const SnackBar(content: Text('주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.')),
       );
     } finally {
       if (mounted) {
@@ -355,7 +354,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 }
-
 
 class _OrderPausedBanner extends StatelessWidget {
   const _OrderPausedBanner();
@@ -386,16 +384,16 @@ class _OrderPausedBanner extends StatelessWidget {
                 Text(
                   '현재 주문 접수가 잠시 중단되었어요.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onErrorContainer,
-                        fontWeight: FontWeight.w800,
-                      ),
+                    color: colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
                   '접수가 다시 시작되면 장바구니에 담을 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onErrorContainer,
-                      ),
+                    color: colorScheme.onErrorContainer,
+                  ),
                 ),
               ],
             ),
@@ -420,13 +418,8 @@ class _StoreStatusError extends StatelessWidget {
           children: [
             const Icon(Icons.wifi_off_rounded),
             const SizedBox(width: PopqSpacing.sm),
-            const Expanded(
-              child: Text('현재 주문 가능 여부를 확인하지 못했어요.'),
-            ),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('다시 확인'),
-            ),
+            const Expanded(child: Text('현재 주문 가능 여부를 확인하지 못했어요.')),
+            TextButton(onPressed: onRetry, child: const Text('다시 확인')),
           ],
         ),
       ),

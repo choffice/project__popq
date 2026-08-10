@@ -764,6 +764,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         closeTime: identical(closeTime, _unchanged)
             ? current.closeTime
             : closeTime as String?,
+        operationStartDate: current.operationStartDate,
+        operationEndDate: current.operationEndDate,
         closedDays: identical(closedDays, _unchanged)
             ? current.closedDays
             : closedDays as List<String>,

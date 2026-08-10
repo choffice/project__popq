@@ -1,6 +1,7 @@
 package com.example.project_popq.announcement.repository;
 
 import com.example.project_popq.announcement.domain.Announcement;
+import com.example.project_popq.announcement.domain.AnnouncementStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,5 +12,15 @@ public interface AnnouncementRepository
     List<Announcement> findAllByStoreIdOrderByCreatedAtDescIdDesc(Long storeId);
 
     Optional<Announcement> findByIdAndStoreId(Long id, Long storeId);
-}
 
+    List<Announcement> findAllByStoreIdAndStatusOrderByPublishedAtDescIdDesc(
+            Long storeId,
+            AnnouncementStatus status
+    );
+
+    Optional<Announcement> findByIdAndStoreIdAndStatus(
+            Long id,
+            Long storeId,
+            AnnouncementStatus status
+    );
+}

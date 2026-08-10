@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -49,6 +50,10 @@ public record UpdateStoreRequest(
         LocalTime openTime,
 
         LocalTime closeTime,
+
+        LocalDate operationStartDate,
+
+        LocalDate operationEndDate,
 
         @Size(max = 7)
         List<@NotNull DayOfWeek> closedDays,

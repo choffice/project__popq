@@ -380,11 +380,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           final addressMatches =
               store.address?.toLowerCase().contains(query) ?? false;
 
+          final categoryMatches = store.representativeCategory
+                  ?.toLowerCase()
+                  .contains(query) ??
+              false;
+
           final tagMatches = store.tags.any(
             (tag) => tag.toLowerCase().contains(query),
           );
 
           return nameMatches ||
+              categoryMatches ||
               addressMatches ||
               tagMatches;
         })
@@ -492,7 +498,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         SearchBar(
           controller: _queryController,
           focusNode: _searchFocusNode,
-          hintText: '업체명, 메뉴, 주소 검색',
+          hintText: '업체명, 업종, 주소, 태그 검색',
           leading: const Icon(Icons.search_rounded),
           trailing: [
             if (_queryController.text.isNotEmpty)
@@ -676,6 +682,43 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     await _controller.search(query: value);
 
     if (!mounted) {
+      return;
+    }
+
+    if (value.trim().isNotEmpty &&
+        _controller.status == DiscoveryStatus.empty &&
+        _controller.error == null) {
+      Timer? dismissTimer;
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          dismissTimer ??= Timer(const Duration(seconds: 3), () {
+            if (dialogContext.mounted && Navigator.of(dialogContext).canPop()) {
+              Navigator.of(dialogContext).pop();
+            }
+          });
+          return AlertDialog(
+            title: const Text('검색 결과가 없습니다'),
+            content: const Text('다른 검색어로 다시 찾아보세요.'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('확인'),
+              ),
+            ],
+          );
+        },
+      );
+      dismissTimer?.cancel();
+      if (!mounted) return;
+      _queryController.clear();
+      _controller.selectedTag = null;
+      setState(() {
+        _selectedFilter = _StoreFilterType.all;
+        _showSuggestions = false;
+        _clearSelectedStoreState();
+      });
+      await _controller.search();
       return;
     }
 
@@ -1620,7 +1663,7 @@ class _SelectedStoreCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            store.resolvedSchedule.todayLabel(),
+                            _mapStoreHoursLabel(store),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -2028,6 +2071,23 @@ String _storeTypeLabel(String storeType) {
     'EVENT_COMMERCE' => '행사·이벤트',
     _ => '등록 업체',
   };
+}
+
+String _mapStoreHoursLabel(CustomerStore store) {
+  final String hours = store.resolvedSchedule.todayLabel();
+  final DateTime? start = store.operationStartDate;
+  final DateTime? end = store.operationEndDate;
+  if (start == null && end == null) return hours;
+  final String startLabel = start == null
+      ? ''
+      : '${start.month}/${start.day}';
+  final String endLabel = end == null ? '' : '${end.month}/${end.day}';
+  final String period = start != null && end != null
+      ? '$startLabel~$endLabel'
+      : start != null
+          ? '${store.storeType == 'EVENT_COMMERCE' ? '행사' : '영업'} $startLabel 시작'
+          : '$endLabel까지';
+  return '$hours · $period';
 }
 
 IconData _storeTypeIcon(String storeType) {

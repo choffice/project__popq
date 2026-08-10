@@ -656,6 +656,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         longitude: store.longitude,
         openTime: store.openTime,
         closeTime: store.closeTime,
+        operationStartDate: store.operationStartDate,
+        operationEndDate: store.operationEndDate,
         closedDays: store.closedDays,
         takeoutAvailable: store.takeoutAvailable,
         dineInAvailable: store.dineInAvailable,

@@ -20,16 +20,16 @@ class SellerReviewSection extends StatefulWidget {
 }
 
 class _SellerReviewSectionState extends State<SellerReviewSection> {
+  static const Duration _loadTimeout = Duration(seconds: 15);
+
   int? _rating;
   var _unanswered = false;
-  late Future<List<SellerReview>> _reviews;
   late Future<List<SellerReview>> _allReviews;
 
   @override
   void initState() {
     super.initState();
-    _reviews = _load();
-    _allReviews = widget.repository.findAll(widget.storeId);
+    _allReviews = _loadAll();
   }
 
   @override
@@ -58,8 +58,10 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                     final reviews = snapshot.data ?? const <SellerReview>[];
                     final average = reviews.isEmpty
                         ? null
-                        : reviews.map((item) => item.rating).reduce((a, b) => a + b) /
-                            reviews.length;
+                        : reviews
+                                  .map((item) => item.rating)
+                                  .reduce((a, b) => a + b) /
+                              reviews.length;
                     return Text(
                       average == null
                           ? '전체 평점 - · 리뷰 0개'
@@ -102,10 +104,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                 label: const Text('미답변'),
                 selected: _unanswered,
                 onSelected: (value) {
-                  setState(() {
-                    _unanswered = value;
-                    _reviews = _load();
-                  });
+                  setState(() => _unanswered = value);
                 },
               ),
             ],
@@ -113,15 +112,23 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         ),
         Expanded(
           child: FutureBuilder<List<SellerReview>>(
-            future: _reviews,
+            future: _allReviews,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
                 return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
               }
               if (snapshot.hasError) {
-                return PopqErrorView(message: '리뷰를 불러오지 못했습니다.', onRetry: _reload);
+                return PopqErrorView(
+                  message: '리뷰를 불러오지 못했습니다.',
+                  onRetry: _reload,
+                );
               }
-              final reviews = snapshot.data ?? const <SellerReview>[];
+              final reviews = (snapshot.data ?? const <SellerReview>[])
+                  .where(
+                    (review) => _rating == null || review.rating == _rating,
+                  )
+                  .where((review) => !_unanswered || review.sellerReply == null)
+                  .toList(growable: false);
               if (reviews.isEmpty) {
                 return const PopqEmptyView(
                   icon: Icons.reviews_outlined,
@@ -134,7 +141,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                 child: ListView.separated(
                   padding: const EdgeInsets.all(PopqSpacing.md),
                   itemCount: reviews.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(height: PopqSpacing.sm),
                   itemBuilder: (context, index) => _reviewCard(reviews[index]),
                 ),
               );
@@ -154,7 +162,12 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           children: [
             Row(
               children: [
-                Expanded(child: Text(review.authorName, style: const TextStyle(fontWeight: FontWeight.w800))),
+                Expanded(
+                  child: Text(
+                    review.authorName,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
                 Text(List.filled(review.rating, '★').join()),
               ],
             ),
@@ -189,25 +202,22 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     );
   }
 
-  Future<List<SellerReview>> _load() => widget.repository.findAll(
-        widget.storeId,
-        rating: _rating,
-        unanswered: _unanswered,
-      );
+  Future<List<SellerReview>> _loadAll() =>
+      widget.repository.findAll(widget.storeId).timeout(_loadTimeout);
 
   void _changeFilter(int? value) {
-    setState(() {
-      _rating = value;
-      _reviews = _load();
-    });
+    setState(() => _rating = value);
   }
 
   Future<void> _reload() async {
     setState(() {
-      _reviews = _load();
-      _allReviews = widget.repository.findAll(widget.storeId);
+      _allReviews = _loadAll();
     });
-    await Future.wait([_reviews, _allReviews]);
+    try {
+      await _allReviews;
+    } catch (_) {
+      // FutureBuilder가 오류 상태와 재시도 UI를 표시한다.
+    }
   }
 
   Future<void> _editReply(SellerReview review) async {
@@ -307,8 +317,14 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         title: const Text('답글을 삭제할까요?'),
         content: const Text('삭제한 답글은 고객 화면에서도 보이지 않습니다.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
         ],
       ),
     );
@@ -325,7 +341,9 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _replaceReview(SellerReview saved) {
@@ -333,7 +351,6 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         .map((item) => item.reviewId == saved.reviewId ? saved : item)
         .toList(growable: false);
     setState(() {
-      _reviews = _reviews.then(replace);
       _allReviews = _allReviews.then(replace);
     });
   }
@@ -383,11 +400,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                                 try {
                                   final saved = await widget.repository
                                       .updateReplyTemplate(
-                                      widget.storeId,
-                                      template.templateId,
-                                      value,
-                                    );
-                                  setDialogState(() => templates[index] = saved);
+                                        widget.storeId,
+                                        template.templateId,
+                                        value,
+                                      );
+                                  setDialogState(
+                                    () => templates[index] = saved,
+                                  );
                                 } catch (_) {
                                   if (mounted) {
                                     _showError('대표 답글을 수정하지 못했습니다.');
@@ -428,11 +447,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                       final value = await _promptTemplateText(null);
                       if (value == null) return;
                       try {
-                        final saved =
-                            await widget.repository.createReplyTemplate(
-                          widget.storeId,
-                          value,
-                        );
+                        final saved = await widget.repository
+                            .createReplyTemplate(widget.storeId, value);
                         setDialogState(() => templates.add(saved));
                       } catch (_) {
                         if (mounted) {

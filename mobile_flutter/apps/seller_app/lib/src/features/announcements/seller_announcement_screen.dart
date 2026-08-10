@@ -21,6 +21,8 @@ class SellerAnnouncementScreen extends StatefulWidget {
 }
 
 class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
+  static const Duration _loadTimeout = Duration(seconds: 15);
+
   List<SellerAnnouncement>? _announcements;
   Object? _error;
   var _loading = true;
@@ -38,6 +40,8 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.storeId != widget.storeId) {
       _announcements = null;
+      _error = null;
+      _loading = true;
       _updatingIds.clear();
       _load();
     }
@@ -45,90 +49,101 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            PopqSpacing.md,
-            PopqSpacing.md,
-            PopqSpacing.md,
-            0,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '사업장 공지',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              if (widget.canManage)
-                FilledButton.icon(
-                  key: const Key('add-announcement'),
-                  onPressed: () => _edit(),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('공지 작성'),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: PopqSpacing.sm),
-        Expanded(child: _buildBody()),
-      ],
-    );
-  }
-
-  Widget _buildBody() {
-    if (_loading) {
-      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
-    }
-    if (_error != null || _announcements == null) {
-      return PopqErrorView(
-        message: '공지사항을 불러오지 못했습니다.',
-        onRetry: _load,
-      );
-    }
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
+      child: CustomScrollView(
         key: const Key('announcement-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(PopqSpacing.md),
-        children: [
-          if (_announcements!.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 64),
-              child: Column(
-                children: [
-                  const PopqEmptyView(
-                    icon: Icons.campaign_outlined,
-                    title: '등록된 공지사항이 없어요.',
-                    description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
-                  ),
-                  if (widget.canManage) ...[
-                    const SizedBox(height: PopqSpacing.md),
-                    FilledButton.icon(
-                      key: const Key('add-first-announcement'),
-                      onPressed: () => _edit(),
-                      icon: const Icon(Icons.add_rounded),
-                      label: const Text('첫 공지 작성'),
+        slivers: <Widget>[
+          SliverToBoxAdapter(child: _buildHeader(context)),
+          if (_loading)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.'),
+            )
+          else if (_error != null || _announcements == null)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqErrorView(
+                message: '공지사항을 불러오지 못했습니다.',
+                onRetry: _load,
+              ),
+            )
+          else if (_announcements!.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Padding(
+                padding: const EdgeInsets.all(PopqSpacing.lg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    const PopqEmptyView(
+                      icon: Icons.campaign_outlined,
+                      title: '등록된 공지사항이 없어요.',
+                      description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
                     ),
+                    if (widget.canManage) ...<Widget>[
+                      const SizedBox(height: PopqSpacing.md),
+                      FilledButton.icon(
+                        key: const Key('add-first-announcement'),
+                        onPressed: () => _edit(),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('첫 공지 작성'),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             )
           else
-            for (final announcement in _announcements!) ...[
-              _announcementCard(announcement),
-              const SizedBox(height: PopqSpacing.sm),
-            ],
-          if (!widget.canManage)
-            const Padding(
-              padding: EdgeInsets.only(top: PopqSpacing.sm),
-              child: Text(
-                'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
-                textAlign: TextAlign.center,
+            SliverPadding(
+              padding: const EdgeInsets.all(PopqSpacing.md),
+              sliver: SliverList.builder(
+                itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
+                itemBuilder: (BuildContext context, int index) {
+                  if (index == _announcements!.length) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: PopqSpacing.sm),
+                      child: Text(
+                        'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
+                        textAlign: TextAlign.center,
+                      ),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
+                    child: _announcementCard(_announcements![index]),
+                  );
+                },
               ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        PopqSpacing.md,
+        PopqSpacing.md,
+        PopqSpacing.md,
+        PopqSpacing.sm,
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Text(
+              '사업장 공지',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+          ),
+          if (widget.canManage)
+            FilledButton.icon(
+              key: const Key('add-announcement'),
+              onPressed: () => _edit(),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('공지 작성'),
             ),
         ],
       ),
@@ -176,7 +191,9 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                 alignment: WrapAlignment.end,
                 children: [
                   TextButton.icon(
-                    key: Key('edit-announcement-${announcement.announcementId}'),
+                    key: Key(
+                      'edit-announcement-${announcement.announcementId}',
+                    ),
                     onPressed: updating ? null : () => _edit(announcement),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('수정'),
@@ -220,10 +237,13 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       _error = null;
     });
     try {
-      final announcements = await widget.repository.findAll(storeId);
+      final announcements = await widget.repository
+          .findAll(storeId)
+          .timeout(_loadTimeout);
       if (!mounted ||
           requestSerial != _requestSerial ||
-          widget.storeId != storeId) return;
+          widget.storeId != storeId)
+        return;
       setState(() {
         _announcements = List.of(announcements);
         _loading = false;
@@ -231,7 +251,8 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     } catch (error) {
       if (!mounted ||
           requestSerial != _requestSerial ||
-          widget.storeId != storeId) return;
+          widget.storeId != storeId)
+        return;
       setState(() {
         _error = error;
         _loading = false;
