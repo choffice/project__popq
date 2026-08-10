@@ -259,6 +259,31 @@ export type SalesSummary = {
     quantity: number
     sales: number
   }[]
+  orderHistory: {
+    orderPublicId: string
+    orderType: OrderType
+    approvedAmount: number
+    refundedAmount: number
+    netSales: number
+    completedAt: string
+    itemCount: number
+    itemSummary: string
+  }[]
+  refundHistory: {
+    refundId: number
+    orderPublicId: string
+    amount: number
+    reason: string
+    requesterType: 'GUEST' | 'CUSTOMER' | 'SELLER' | 'ADMIN' | 'SYSTEM' | 'UNKNOWN'
+    completedAt: string | null
+  }[]
+  cancellationHistory: {
+    orderPublicId: string
+    status: 'CANCELED' | 'REJECTED'
+    amount: number
+    reason: string | null
+    canceledAt: string
+  }[]
 }
 
 export type BusinessStatus = 'PRE_OPEN' | 'OPEN' | 'CLOSED'
