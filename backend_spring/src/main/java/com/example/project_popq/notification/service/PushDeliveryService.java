@@ -4,6 +4,7 @@ import com.example.project_popq.notification.domain.UserNotification;
 import com.example.project_popq.notification.push.PushMessage;
 import com.example.project_popq.notification.push.PushNotificationGateway;
 import com.example.project_popq.notification.repository.PushDeviceRepository;
+import com.example.project_popq.user.repository.UserRepository;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import org.springframework.stereotype.Service;
 public class PushDeliveryService {
 
   private final PushDeviceRepository pushDeviceRepository;
+  private final UserRepository userRepository;
   private final PushNotificationGateway pushNotificationGateway;
 
   public void deliver(UserNotification notification) {
@@ -41,6 +43,16 @@ public class PushDeliveryService {
       String body,
       Map<String, String> data
   ) {
+    boolean pushEnabled =
+        userRepository
+            .existsByIdAndPushNotificationEnabledTrue(
+                userId
+            );
+
+    if (!pushEnabled) {
+      return;
+    }
+
     pushDeviceRepository
         .findAllByUserIdOrderByCreatedAtDesc(userId)
         .forEach(device -> pushNotificationGateway.send(
