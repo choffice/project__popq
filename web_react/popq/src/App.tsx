@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
   createDemoOrder,
@@ -7,6 +7,7 @@ import {
   demoProducts,
 } from './data/demo'
 import {
+  ApiError,
   cancelOrder,
   confirmPayment,
   createOrder,
@@ -50,6 +51,20 @@ const STATUS_SEQUENCE: OrderStatus[] = [
   'READY',
   'COMPLETED',
 ]
+
+const TERMINAL_ORDER_STATUSES: OrderStatus[] = [
+  'COMPLETED',
+  'CANCELED',
+  'REJECTED',
+  'EXPIRED',
+]
+
+const STALE_ORDER_ERROR_CODES = new Set([
+  'ORDER_ACCESS_DENIED',
+  'ORDER_NOT_FOUND',
+  'GUEST_SESSION_INVALID',
+  'GUEST_SESSION_EXPIRED',
+])
 
 const STATUS_COPY: Record<
   OrderStatus,
@@ -154,6 +169,16 @@ function persistStored(storage: Storage, key: string, value: unknown) {
   }
 }
 
+function isTerminalOrder(order: OrderResponse | null) {
+  return Boolean(order && TERMINAL_ORDER_STATUSES.includes(order.status))
+}
+
+function isStaleOrderError(caught: unknown) {
+  return caught instanceof ApiError && Boolean(
+    caught.code && STALE_ORDER_ERROR_CODES.has(caught.code),
+  )
+}
+
 function App() {
   const { theme, toggleTheme } = useThemePreference()
   const qrToken = findQrToken()
@@ -164,15 +189,6 @@ function App() {
   )
   const [products, setProducts] = useState<ProductSummary[]>(
     qrToken ? [] : demoProducts,
-  )
-  const [screen, setScreen] = useState<Screen>(() =>
-    readStored<OrderResponse | null>(
-      window.localStorage,
-      `popq:order:${initialScope}`,
-      null,
-    )
-      ? 'tracking'
-      : 'menu',
   )
   const [category, setCategory] = useState('전체')
   const [selectedDetail, setSelectedDetail] =
@@ -187,13 +203,24 @@ function App() {
   const [orderType, setOrderType] = useState<OrderType>(
     demoContext.storeTableId ? 'DINE_IN' : 'TAKEOUT',
   )
-  const [order, setOrder] = useState<OrderResponse | null>(() =>
-    readStored(
+  const [order, setOrder] = useState<OrderResponse | null>(() => {
+    const storedOrder = readStored<OrderResponse | null>(
       window.localStorage,
       `popq:order:${initialScope}`,
       null,
-    ),
-  )
+    )
+    return qrToken && isTerminalOrder(storedOrder) ? null : storedOrder
+  })
+  const [screen, setScreen] = useState<Screen>(() => {
+    if (qrToken) return 'menu'
+    return readStored<OrderResponse | null>(
+      window.localStorage,
+      `popq:order:${initialScope}`,
+      null,
+    )
+      ? 'tracking'
+      : 'menu'
+  })
   const [checkoutAttempt, setCheckoutAttempt] =
     useState<CheckoutAttempt | null>(() =>
       readStored(
@@ -219,6 +246,15 @@ function App() {
   const cartStorageKey = `popq:cart:${storageScope}`
   const orderStorageKey = `popq:order:${storageScope}`
   const checkoutStorageKey = `popq:checkout:${storageScope}`
+
+  const discardStoredOrder = useCallback((message?: string) => {
+    orderRef.current = null
+    setOrder(null)
+    persistStored(window.localStorage, orderStorageKey, null)
+    setConnected(false)
+    setScreen('menu')
+    if (message) setError(message)
+  }, [orderStorageKey])
 
   useEffect(() => {
     orderRef.current = order
@@ -298,8 +334,14 @@ function App() {
           pendingOrder.version,
         )
         if (synced.order) setOrder(synced.order)
-      } catch {
-        setConnected(false)
+      } catch (caught) {
+        if (isStaleOrderError(caught)) {
+          discardStoredOrder(
+            '이전 QR 세션의 주문 정보가 정리되었습니다. 메뉴에서 새 주문을 진행해 주세요.',
+          )
+        } else {
+          setConnected(false)
+        }
       }
     }
 
@@ -328,6 +370,7 @@ function App() {
     paymentConfirmationAttempt,
     paymentReturn,
     qrToken,
+    discardStoredOrder,
   ])
 
   useEffect(() => {
@@ -350,6 +393,35 @@ function App() {
         setContext(opened)
         setProducts(menu)
         setOrderType(opened.storeTableId ? 'DINE_IN' : 'TAKEOUT')
+
+        const restoredOrder = orderRef.current
+        if (restoredOrder) {
+          try {
+            const synced = await syncOrder(
+              restoredOrder.orderPublicId,
+              restoredOrder.version,
+            )
+            if (!active) return
+            const latestOrder = synced.order ?? restoredOrder
+            if (isTerminalOrder(latestOrder)) {
+              discardStoredOrder()
+            } else if (synced.order) {
+              orderRef.current = synced.order
+              setOrder(synced.order)
+            }
+          } catch (caught) {
+            if (!active) return
+            if (isStaleOrderError(caught)) {
+              discardStoredOrder()
+            } else {
+              setError(
+                caught instanceof Error
+                  ? `이전 주문 상태를 확인하지 못했습니다. ${caught.message}`
+                  : '이전 주문 상태를 확인하지 못했습니다.',
+              )
+            }
+          }
+        }
       } catch (caught) {
         if (active) {
           setError(
@@ -366,7 +438,7 @@ function App() {
     return () => {
       active = false
     }
-  }, [isDemo, qrToken])
+  }, [discardStoredOrder, isDemo, qrToken])
 
   useEffect(() => {
     if (isDemo || screen !== 'tracking' || !trackedOrderPublicId) return
@@ -378,8 +450,14 @@ function App() {
       try {
         const synced = await syncOrder(orderPublicId, current.version)
         if (synced.refreshRequired && synced.order) setOrder(synced.order)
-      } catch {
-        setConnected(false)
+      } catch (caught) {
+        if (isStaleOrderError(caught)) {
+          discardStoredOrder(
+            '이전 QR 세션의 주문이라 더 이상 조회할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+          )
+        } else {
+          setConnected(false)
+        }
       }
     }
 
@@ -416,7 +494,7 @@ function App() {
         if (nextConnected) void recover()
       },
     )
-  }, [isDemo, screen, trackedOrderPublicId])
+  }, [discardStoredOrder, isDemo, screen, trackedOrderPublicId])
 
   const categories = useMemo(
     () => ['전체', ...new Set(products.map((product) => product.categoryName))],
@@ -428,7 +506,10 @@ function App() {
       : products.filter((product) => product.categoryName === category)
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0)
   const cartTotal = cart.reduce((total, item) => total + itemPrice(item), 0)
-  const hasOrderShortcut = Boolean(order && screen === 'menu' && cartCount === 0)
+  const hasActiveOrder = Boolean(order && !isTerminalOrder(order))
+  const hasOrderShortcut = Boolean(
+    hasActiveOrder && screen === 'menu' && cartCount === 0,
+  )
 
   async function openProduct(product: ProductSummary) {
     if (!product.availableForQr) return
@@ -610,9 +691,15 @@ function App() {
         setOrder(await cancelOrder(order.orderPublicId))
       }
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : '주문을 취소하지 못했습니다.',
-      )
+      if (isStaleOrderError(caught)) {
+        discardStoredOrder(
+          '이전 QR 세션의 주문이라 취소할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+        )
+      } else {
+        setError(
+          caught instanceof Error ? caught.message : '주문을 취소하지 못했습니다.',
+        )
+      }
     } finally {
       setProcessing(false)
     }
@@ -684,16 +771,29 @@ function App() {
             <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
           </button>
           <button
-          className="icon-button bag-button"
-          aria-label={
-            hasOrderShortcut
-              ? '진행 중 주문 보기'
-              : `장바구니 ${cartCount}개`
-          }
-          onClick={() => setScreen(hasOrderShortcut ? 'tracking' : 'cart')}
-        >
-          {hasOrderShortcut ? '◎' : '◒'}
-          {cartCount > 0 && <span>{cartCount}</span>}
+            className="icon-button bag-button"
+            aria-label={
+              hasOrderShortcut
+                ? '진행 중 주문 보기'
+                : `장바구니 ${cartCount}개`
+            }
+            onClick={() => setScreen(hasOrderShortcut ? 'tracking' : 'cart')}
+          >
+            {hasOrderShortcut ? (
+              '◎'
+            ) : (
+              <svg
+                className="cart-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path d="M3.5 4.5h2l1.6 8.9a2 2 0 0 0 2 1.65h8.4a2 2 0 0 0 1.95-1.55l1.25-5.45H6.15" />
+                <circle cx="9.25" cy="19" r="1.25" />
+                <circle cx="17.5" cy="19" r="1.25" />
+              </svg>
+            )}
+            {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
           </button>
         </div>
       </header>
@@ -732,6 +832,25 @@ function App() {
               <span>DEMO</span>
               백엔드 없이 전체 주문 흐름을 체험할 수 있어요.
             </div>
+          )}
+
+          {hasActiveOrder && order && (
+            <section className="active-order-card" aria-label="진행 중 주문">
+              <div className="active-order-mark" aria-hidden="true">
+                {order.version}
+              </div>
+              <div className="active-order-copy">
+                <span>진행 중 주문</span>
+                <strong>{STATUS_COPY[order.status].title}</strong>
+                <small>
+                  ORDER {order.orderPublicId.slice(-8).toUpperCase()}
+                </small>
+              </div>
+              <button type="button" onClick={() => setScreen('tracking')}>
+                주문 현황 보기
+                <span aria-hidden="true">→</span>
+              </button>
+            </section>
           )}
 
           <nav className="category-tabs" aria-label="메뉴 카테고리">

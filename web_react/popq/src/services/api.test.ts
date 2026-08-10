@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  ApiError,
   cancelOrder,
   confirmPayment,
   createOrder,
@@ -86,6 +87,47 @@ describe('order API contract', () => {
     await expect(openQrSession('qr-token')).rejects.toThrow(
       '서버 요청이 거부되었습니다. (403)',
     )
+  })
+
+  it('preserves the server error code and HTTP status', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        success: false,
+        data: null,
+        error: {
+          code: 'ORDER_ACCESS_DENIED',
+          message: '주문 조회 권한이 없습니다.',
+        },
+      }),
+    }))
+
+    const caught = await openQrSession('denied-token').catch((error) => error)
+
+    expect(caught).toBeInstanceOf(ApiError)
+    expect(caught).toMatchObject({
+      code: 'ORDER_ACCESS_DENIED',
+      status: 403,
+      message: '주문 조회 권한이 없습니다.',
+    })
+  })
+
+  it('shares a concurrent QR session request for the same token', async () => {
+    let resolveFetch: ((value: ReturnType<typeof response>) => void) | undefined
+    const fetchMock = vi.fn().mockImplementation(
+      () => new Promise<ReturnType<typeof response>>((resolve) => {
+        resolveFetch = resolve
+      }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const first = openQrSession('shared-token')
+    const second = openQrSession('shared-token')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    resolveFetch?.(response({ storeId: 1, storeName: 'POPQ' }))
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2)
   })
 })
 
