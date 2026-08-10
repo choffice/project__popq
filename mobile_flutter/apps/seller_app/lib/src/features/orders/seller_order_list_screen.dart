@@ -588,28 +588,22 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
             ),
           ),
           const SizedBox(width: PopqSpacing.xs),
-          TextButton(
-            onPressed: store.canManage && !_updatingOrderAccepting
-                ? () => _changeOrderAccepting(store, !accepting)
-                : null,
-            style: TextButton.styleFrom(
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: PopqSpacing.sm),
-              foregroundColor: accepting
-                  ? colorScheme.error
-                  : colorScheme.primary,
+          if (_updatingOrderAccepting)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else
+            Switch.adaptive(
+              value: accepting,
+              onChanged: store.canManage
+                  ? (value) => _changeOrderAccepting(store, value)
+                  : null,
             ),
-            child: _updatingOrderAccepting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Text(
-                    accepting ? '접수 잠시 중지' : '접수 재개',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
-                  ),
-          ),
         ],
       ),
     );
