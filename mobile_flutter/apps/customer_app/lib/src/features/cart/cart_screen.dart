@@ -5,12 +5,14 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../auth/sign_in_screen.dart';
+import '../discovery/store_discovery_repository.dart';
 import 'cart_controller.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({
     required this.controller,
     required this.sessionController,
+    required this.storeDiscoveryRepository,
     required this.onSignIn,
     this.onDevelopmentSignIn,
     super.key,
@@ -18,6 +20,7 @@ class CartScreen extends StatefulWidget {
 
   final CartController controller;
   final SessionController sessionController;
+  final StoreDiscoveryRepository storeDiscoveryRepository;
   final Future<void> Function(String email, String password) onSignIn;
   final Future<void> Function()? onDevelopmentSignIn;
 
@@ -27,6 +30,8 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   var _openingCheckout = false;
+  Future<CustomerStore>? _storeFuture;
+  int? _storeFutureId;
 
   @override
   void initState() {
@@ -34,6 +39,7 @@ class _CartScreenState extends State<CartScreen> {
 
     widget.controller.addListener(_changed);
     widget.sessionController.addListener(_changed);
+    _syncStoreFuture(force: true);
   }
 
   @override
@@ -49,7 +55,23 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
+    _syncStoreFuture();
     setState(() {});
+  }
+
+  void _syncStoreFuture({bool force = false}) {
+    final storeId = widget.controller.storeId;
+
+    if (storeId == null) {
+      _storeFutureId = null;
+      _storeFuture = null;
+      return;
+    }
+
+    if (force || _storeFutureId != storeId) {
+      _storeFutureId = storeId;
+      _storeFuture = widget.storeDiscoveryRepository.findDetail(storeId);
+    }
   }
 
   @override
@@ -73,121 +95,159 @@ class _CartScreenState extends State<CartScreen> {
         title: '장바구니가 비어 있어요.',
         description: '스토어에서 원하는 상품을 담아보세요.',
       )
-          : ListView.separated(
-        padding: const EdgeInsets.all(PopqSpacing.md),
-        itemCount: widget.controller.items.length,
-        separatorBuilder: (_, _) {
-          return const SizedBox(
-            height: PopqSpacing.sm,
-          );
-        },
-        itemBuilder: (context, index) {
-          final item = widget.controller.items[index];
+          : Column(
+              children: [
+                FutureBuilder<CustomerStore>(
+                  future: _storeFuture,
+                  builder: (context, snapshot) {
+                    final store = snapshot.data;
+                    if (store == null || store.orderAcceptingEnabled) {
+                      return const SizedBox.shrink();
+                    }
 
-          return Card(
-            child: Padding(
-              padding: const EdgeInsets.all(PopqSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          item.product.name,
-                          style: Theme.of(
-                            context,
-                          ).textTheme.titleLarge,
+                    return const Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        PopqSpacing.md,
+                        PopqSpacing.md,
+                        PopqSpacing.md,
+                        0,
+                      ),
+                      child: _OrderPausedBanner(),
+                    );
+                  },
+                ),
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(PopqSpacing.md),
+                    itemCount: widget.controller.items.length,
+                    separatorBuilder: (_, _) {
+                      return const SizedBox(
+                        height: PopqSpacing.sm,
+                      );
+                    },
+                    itemBuilder: (context, index) {
+                      final item = widget.controller.items[index];
+
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(PopqSpacing.md),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.product.name,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleLarge,
+                                    ),
+                                  ),
+                                  Text(
+                                    _won(item.totalPrice),
+                                  ),
+                                ],
+                              ),
+                              if (item.options.isNotEmpty) ...[
+                                const SizedBox(
+                                  height: PopqSpacing.xs,
+                                ),
+                                Text(
+                                  item.options
+                                      .map(
+                                        (option) => option.name,
+                                      )
+                                      .join(', '),
+                                ),
+                              ],
+                              const SizedBox(
+                                height: PopqSpacing.sm,
+                              ),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: _openingCheckout
+                                        ? null
+                                        : () {
+                                            widget.controller.changeQuantity(
+                                              item,
+                                              item.quantity - 1,
+                                            );
+                                          },
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                                  Text('${item.quantity}'),
+                                  IconButton(
+                                    onPressed: !_openingCheckout &&
+                                            item.quantity < 99
+                                        ? () {
+                                            widget.controller.changeQuantity(
+                                              item,
+                                              item.quantity + 1,
+                                            );
+                                          }
+                                        : null,
+                                    icon: const Icon(
+                                      Icons.add_circle_outline,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  TextButton.icon(
+                                    onPressed: _openingCheckout
+                                        ? null
+                                        : () {
+                                            widget.controller.changeQuantity(
+                                              item,
+                                              0,
+                                            );
+                                          },
+                                    icon: const Icon(
+                                      Icons.delete_outline,
+                                    ),
+                                    label: const Text('삭제'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(
-                        _won(item.totalPrice),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                  if (item.options.isNotEmpty) ...[
-                    const SizedBox(
-                      height: PopqSpacing.xs,
-                    ),
-                    Text(
-                      item.options
-                          .map(
-                            (option) => option.name,
-                      )
-                          .join(', '),
-                    ),
-                  ],
-                  const SizedBox(
-                    height: PopqSpacing.sm,
-                  ),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: _openingCheckout
-                            ? null
-                            : () {
-                          widget.controller.changeQuantity(
-                            item,
-                            item.quantity - 1,
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.remove_circle_outline,
-                        ),
-                      ),
-                      Text('${item.quantity}'),
-                      IconButton(
-                        onPressed:
-                        !_openingCheckout &&
-                            item.quantity < 99
-                            ? () {
-                          widget.controller.changeQuantity(
-                            item,
-                            item.quantity + 1,
-                          );
-                        }
-                            : null,
-                        icon: const Icon(
-                          Icons.add_circle_outline,
-                        ),
-                      ),
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: _openingCheckout
-                            ? null
-                            : () {
-                          widget.controller.changeQuantity(
-                            item,
-                            0,
-                          );
-                        },
-                        icon: const Icon(
-                          Icons.delete_outline,
-                        ),
-                        label: const Text('삭제'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          );
-        },
-      ),
       bottomNavigationBar: widget.controller.isEmpty
           ? null
           : SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(PopqSpacing.md),
-          child: FilledButton(
-            onPressed: _openingCheckout
-                ? null
-                : _openCheckout,
-            child: Text(
-              _openingCheckout
-                  ? '로그인 정보를 확인하고 있어요...'
-                  : '${_won(widget.controller.totalAmount)} · 주문하기',
-            ),
+          child: FutureBuilder<CustomerStore>(
+            future: _storeFuture,
+            builder: (context, snapshot) {
+              final store = snapshot.data;
+              final checking =
+                  snapshot.connectionState != ConnectionState.done;
+              final paused = store != null && !store.orderAcceptingEnabled;
+
+              return FilledButton(
+                onPressed: _openingCheckout || checking || paused
+                    ? null
+                    : _openCheckout,
+                child: Text(
+                  _openingCheckout
+                      ? '주문 가능 여부를 확인하고 있어요...'
+                      : checking
+                          ? '주문 가능 여부 확인 중...'
+                          : paused
+                              ? '현재 주문 접수 중지'
+                              : '${_won(widget.controller.totalAmount)} · 주문하기',
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -204,6 +264,31 @@ class _CartScreenState extends State<CartScreen> {
     });
 
     try {
+      final storeId = widget.controller.storeId;
+      if (storeId == null) {
+        return;
+      }
+
+      final store = await widget.storeDiscoveryRepository.findDetail(storeId);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _storeFutureId = storeId;
+        _storeFuture = Future<CustomerStore>.value(store);
+      });
+
+      if (!store.orderAcceptingEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
+          ),
+        );
+        return;
+      }
+
       if (!widget.sessionController.isSignedIn) {
         final rootNavigator = Navigator.of(
           context,
@@ -264,6 +349,16 @@ class _CartScreenState extends State<CartScreen> {
       await context.push<void>(
         CustomerRoutes.checkout,
       );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.\n$error',
+            ),
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -271,6 +366,56 @@ class _CartScreenState extends State<CartScreen> {
         });
       }
     }
+  }
+}
+
+
+class _OrderPausedBanner extends StatelessWidget {
+  const _OrderPausedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.pause_circle_outline_rounded,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: PopqSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '현재 주문 접수가 잠시 중단되었어요.',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: PopqSpacing.xs),
+                Text(
+                  '장바구니는 유지됩니다. 접수가 다시 시작되면 주문할 수 있어요.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

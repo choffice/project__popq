@@ -389,6 +389,8 @@ GoRouter createCustomerRouter({
             productId: productId,
             repository:
             catalogRepository,
+            storeDiscoveryRepository:
+            storeDiscoveryRepository,
             cartController:
             cartController,
           );
@@ -414,6 +416,8 @@ GoRouter createCustomerRouter({
             storeId: storeId,
             repository:
             catalogRepository,
+            storeDiscoveryRepository:
+            storeDiscoveryRepository,
             cartController:
             cartController,
           );
@@ -454,6 +458,8 @@ GoRouter createCustomerRouter({
             cartController,
             sessionController:
             sessionController,
+            storeDiscoveryRepository:
+            storeDiscoveryRepository,
             onSignIn: onSignIn,
             onDevelopmentSignIn:
             onDevelopmentSignIn,

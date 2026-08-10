@@ -99,6 +99,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
         children: [
           _buildStoreCard(context),
+          _buildOrderAcceptingStatus(context),
           const SizedBox(height: PopqSpacing.md),
           _buildOrderItemsCard(context),
           const SizedBox(height: PopqSpacing.md),
@@ -207,6 +208,91 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildOrderAcceptingStatus(BuildContext context) {
+    return FutureBuilder<CustomerStore>(
+      future: _storeFuture,
+      builder: (context, snapshot) {
+        final store = snapshot.data;
+
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SizedBox.shrink();
+        }
+
+        if (snapshot.hasError || store == null) {
+          return Padding(
+            padding: const EdgeInsets.only(top: PopqSpacing.md),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(PopqSpacing.md),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded),
+                    const SizedBox(width: PopqSpacing.sm),
+                    const Expanded(
+                      child: Text('현재 주문 가능 여부를 확인하지 못했어요.'),
+                    ),
+                    TextButton(
+                      onPressed: _reloadStoreStatus,
+                      child: const Text('다시 확인'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (store.orderAcceptingEnabled || _createdOrder != null) {
+          return const SizedBox.shrink();
+        }
+
+        final colorScheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.only(top: PopqSpacing.md),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(PopqSpacing.md),
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.pause_circle_outline_rounded,
+                  color: colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: PopqSpacing.sm),
+                Expanded(
+                  child: Text(
+                    '현재 매장이 신규 주문 접수를 잠시 중지했어요. '
+                    '접수가 재개되면 결제를 진행할 수 있습니다.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _reloadStoreStatus() {
+    final storeId = widget.cartController.storeId;
+    if (storeId == null) {
+      return;
+    }
+
+    setState(() {
+      _storeFuture = widget.storeDiscoveryRepository.findDetail(storeId);
+    });
   }
 
   Widget _buildOrderItemsCard(BuildContext context) {
@@ -489,16 +575,41 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             ),
           ),
         ),
-        child: FilledButton(
-          onPressed: canPay ? _placeOrder : null,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(58),
-          ),
-          child: Text(
-            _busy
-                ? '결제 상태를 확인하고 있어요...'
-                : '${_won(totalAmount)} 결제하기',
-          ),
+        child: FutureBuilder<CustomerStore>(
+          future: _storeFuture,
+          builder: (context, snapshot) {
+            final store = snapshot.data;
+            final checkingStore =
+                snapshot.connectionState != ConnectionState.done;
+            final storeLoadFailed = snapshot.hasError ||
+                (snapshot.connectionState == ConnectionState.done &&
+                    store == null);
+            final orderPaused = _createdOrder == null &&
+                store != null &&
+                !store.orderAcceptingEnabled;
+            final paymentEnabled = canPay &&
+                (!checkingStore || _createdOrder != null) &&
+                (!storeLoadFailed || _createdOrder != null) &&
+                !orderPaused;
+
+            return FilledButton(
+              onPressed: paymentEnabled ? _placeOrder : null,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(58),
+              ),
+              child: Text(
+                _busy
+                    ? '결제 상태를 확인하고 있어요...'
+                    : orderPaused
+                        ? '현재 주문 접수 중지'
+                        : checkingStore && _createdOrder == null
+                            ? '주문 가능 여부 확인 중...'
+                            : storeLoadFailed && _createdOrder == null
+                                ? '주문 상태를 다시 확인해주세요'
+                                : '${_won(totalAmount)} 결제하기',
+              ),
+            );
+          },
         ),
       ),
     );
@@ -524,6 +635,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
+      if (_createdOrder == null) {
+        final store = await widget.storeDiscoveryRepository.findDetail(storeId);
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _storeFuture = Future<CustomerStore>.value(store);
+        });
+
+        if (!store.orderAcceptingEnabled) {
+          throw StateError('현재 매장이 신규 주문 접수를 잠시 중지했어요.');
+        }
+      }
+
       if (widget.tossClientKey.trim().isEmpty) {
         throw StateError(
           '토스페이먼츠 클라이언트 키가 설정되지 않았습니다.',
@@ -797,6 +924,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   String _resolveErrorMessage(Object error) {
     final message = error.toString();
+
+    if (message.contains('신규 주문 접수를 잠시 중지')) {
+      return '현재 매장이 신규 주문 접수를 잠시 중지했어요. '
+          '접수가 재개된 뒤 다시 주문해주세요.';
+    }
 
     if (message.contains('토스페이먼츠 클라이언트 키')) {
       return '토스페이먼츠 클라이언트 키가 설정되지 않았습니다. '

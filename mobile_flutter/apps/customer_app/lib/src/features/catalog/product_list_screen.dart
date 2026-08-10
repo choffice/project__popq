@@ -4,18 +4,21 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
+import '../discovery/store_discovery_repository.dart';
 import 'catalog_repository.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({
     required this.storeId,
     required this.repository,
+    required this.storeDiscoveryRepository,
     required this.cartController,
     super.key,
   });
 
   final int storeId;
   final CatalogRepository repository;
+  final StoreDiscoveryRepository storeDiscoveryRepository;
   final CartController cartController;
 
   @override
@@ -24,11 +27,13 @@ class ProductListScreen extends StatefulWidget {
 
 class _ProductListScreenState extends State<ProductListScreen> {
   late Future<List<CatalogProduct>> _products;
+  late Future<CustomerStore> _store;
 
   @override
   void initState() {
     super.initState();
     _products = widget.repository.findProducts(widget.storeId);
+    _store = widget.storeDiscoveryRepository.findDetail(widget.storeId);
   }
 
   @override
@@ -59,52 +64,118 @@ class _ProductListScreenState extends State<ProductListScreen> {
               description: '새 상품이 준비되면 이곳에서 확인할 수 있습니다.',
             );
           }
-          return RefreshIndicator(
-            onRefresh: () async {
-              setState(() {
-                _products = widget.repository.findProducts(widget.storeId);
-              });
-              await _products;
-            },
-            child: ListView.separated(
-              padding: const EdgeInsets.all(PopqSpacing.md),
-              itemCount: snapshot.requireData.length,
-              separatorBuilder: (_, _) =>
-                  const SizedBox(height: PopqSpacing.sm),
-              itemBuilder: (context, index) {
-                final product = snapshot.requireData[index];
-                return Card(
-                  child: ListTile(
-                    enabled: !product.soldOut,
-                    contentPadding: const EdgeInsets.all(PopqSpacing.md),
-                    leading: CircleAvatar(
-                      backgroundColor: PopqPalette.lime,
-                      child: Icon(
-                        product.soldOut
-                            ? Icons.remove_shopping_cart_outlined
-                            : Icons.local_cafe_outlined,
-                        color: PopqPalette.forest,
-                      ),
+          return Column(
+            children: [
+              FutureBuilder<CustomerStore>(
+                future: _store,
+                builder: (context, storeSnapshot) {
+                  final store = storeSnapshot.data;
+                  if (store == null || store.orderAcceptingEnabled) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return const Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      PopqSpacing.md,
+                      PopqSpacing.md,
+                      PopqSpacing.md,
+                      0,
                     ),
-                    title: Text(product.name),
-                    subtitle: Text(
-                      product.soldOut
-                          ? '${product.categoryName} · 품절'
-                          : product.categoryName,
-                    ),
-                    trailing: Text(_won(product.basePrice)),
-                    onTap: product.soldOut
-                        ? null
-                        : () => context.push(
-                            '${CustomerRoutes.stores}/${widget.storeId}'
-                            '/products/${product.productId}',
+                    child: _OrderPausedBanner(),
+                  );
+                },
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    setState(() {
+                      _products = widget.repository.findProducts(widget.storeId);
+                      _store = widget.storeDiscoveryRepository.findDetail(
+                        widget.storeId,
+                      );
+                    });
+                    await Future.wait<Object?>([_products, _store]);
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(PopqSpacing.md),
+                    itemCount: snapshot.requireData.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: PopqSpacing.sm),
+                    itemBuilder: (context, index) {
+                      final product = snapshot.requireData[index];
+                      return Card(
+                        child: ListTile(
+                          enabled: !product.soldOut,
+                          contentPadding: const EdgeInsets.all(PopqSpacing.md),
+                          leading: CircleAvatar(
+                            backgroundColor: PopqPalette.lime,
+                            child: Icon(
+                              product.soldOut
+                                  ? Icons.remove_shopping_cart_outlined
+                                  : Icons.local_cafe_outlined,
+                              color: PopqPalette.forest,
+                            ),
                           ),
+                          title: Text(product.name),
+                          subtitle: Text(
+                            product.soldOut
+                                ? '${product.categoryName} · 품절'
+                                : product.categoryName,
+                          ),
+                          trailing: Text(_won(product.basePrice)),
+                          onTap: product.soldOut
+                              ? null
+                              : () => context.push(
+                                  '${CustomerRoutes.stores}/${widget.storeId}'
+                                  '/products/${product.productId}',
+                                ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+            ],
           );
         },
+      ),
+    );
+  }
+}
+
+
+class _OrderPausedBanner extends StatelessWidget {
+  const _OrderPausedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.pause_circle_outline_rounded,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: PopqSpacing.sm),
+          Expanded(
+            child: Text(
+              '현재 신규 주문 접수가 중지되어 있어요. 메뉴는 둘러볼 수 있습니다.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onErrorContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+        ],
       ),
     );
   }
