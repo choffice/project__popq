@@ -68,6 +68,23 @@ class PendingPaymentRecoveryService {
         return _resumeBeforeBackendApproval(pending);
       }
 
+      /*
+       * SharedPreferences는 앱 설치 단위로 남기 때문에 로그아웃 후
+       * 다른 계정으로 로그인하면 이전 계정의 pending 결제가 남아 있을
+       * 수 있습니다. 현재 계정이 해당 주문을 소유하지 않거나 주문 자체가
+       * 더 이상 존재하지 않는다면 현재 사용자에게 복구할 수 없는 오래된
+       * 로컬 정보이므로 제거합니다.
+       *
+       * PAYMENT_NOT_FOUND는 위에서 별도로 처리하므로 정상적인
+       * "토스 인증 성공 후 백엔드 승인 전 앱 종료" 복구 흐름에는
+       * 영향을 주지 않습니다.
+       */
+      if (error.code == 'ORDER_ACCESS_DENIED' ||
+          error.code == 'ORDER_NOT_FOUND') {
+        await _clearPending(pending);
+        return const PendingPaymentRecoveryOutcome.none();
+      }
+
       return PendingPaymentRecoveryOutcome(
         kind: PendingPaymentRecoveryKind.unavailable,
         orderPublicId: pending.orderPublicId,
