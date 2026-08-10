@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -58,12 +58,12 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text(
             pickerSource == ImageSource.camera
-                ? '카메라를 실행하지 못했습니다.'
-                : '갤러리에서 사진을 불러오지 못했습니다.',
+                ? '移대찓?쇰? ?ㅽ뻾?섏? 紐삵뻽?듬땲??'
+                : '媛ㅻ윭由ъ뿉???ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
           ),
         ),
       );
@@ -80,18 +80,18 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       await _reload();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
+      ScaffoldMessenger.of(context).showTopSnackBar(
+        const SnackBar(content: Text('?꾨줈???ъ쭊??蹂寃쎈릱?댁슂.')),
       );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
+      ScaffoldMessenger.of(context).showTopSnackBar(
+        SnackBar(content: Text('?꾨줈???ъ쭊??蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)')),
       );
     } finally {
       if (mounted) {
@@ -103,19 +103,19 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('내 프로필')),
+      appBar: AppBar(title: const Text('???꾨줈??)),
       body: FutureBuilder<SellerIdentity>(
         future: _identity,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
             return const PopqLoadingView(
-              message: '내 프로필을 불러오고 있어요.',
+              message: '???꾨줈?꾩쓣 遺덈윭?ㅺ퀬 ?덉뼱??',
             );
           }
 
           if (snapshot.hasError || !snapshot.hasData) {
             return PopqErrorView(
-              message: '내 프로필을 불러오지 못했어요.',
+              message: '???꾨줈?꾩쓣 遺덈윭?ㅼ? 紐삵뻽?댁슂.',
               onRetry: _reload,
             );
           }
@@ -192,13 +192,13 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.badge_outlined),
-                        title: const Text('이름'),
+                        title: const Text('?대쫫'),
                         subtitle: Text(identity.name),
                       ),
                       const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.mail_outline_rounded),
-                        title: const Text('이메일'),
+                        title: const Text('?대찓??),
                         subtitle: Text(identity.email),
                       ),
                     ],
@@ -212,3 +212,4 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
     );
   }
 }
+

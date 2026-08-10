@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -48,13 +48,13 @@ class _CustomerFindPasswordScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('비밀번호 찾기')),
+      appBar: AppBar(title: const Text('鍮꾨?踰덊샇 李얘린')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(PopqSpacing.lg),
           children: [
             Text(
-              '가입할 때 입력한 아이디(이메일)와\n전화번호를 입력해 주세요.',
+              '媛?낇븷 ???낅젰???꾩씠???대찓???\n?꾪솕踰덊샇瑜??낅젰??二쇱꽭??',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: PopqSpacing.lg),
@@ -67,13 +67,13 @@ class _CustomerFindPasswordScreenState
                     controller: _email,
                     enabled: !_verified,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: '아이디 (이메일)'),
+                    decoration: const InputDecoration(labelText: '?꾩씠??(?대찓??'),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return '아이디를 입력해 주세요.';
+                        return '?꾩씠?붾? ?낅젰??二쇱꽭??';
                       }
                       if (!value.contains('@')) {
-                        return '올바른 이메일 형식이 아닙니다.';
+                        return '?щ컮瑜??대찓???뺤떇???꾨떃?덈떎.';
                       }
                       return null;
                     },
@@ -85,15 +85,15 @@ class _CustomerFindPasswordScreenState
                     enabled: !_verified,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: '전화번호',
+                      labelText: '?꾪솕踰덊샇',
                       hintText: '010-1234-5678',
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return '전화번호를 입력해 주세요.';
+                        return '?꾪솕踰덊샇瑜??낅젰??二쇱꽭??';
                       }
                       if (!_phonePattern.hasMatch(value.trim())) {
-                        return '올바른 전화번호 형식이 아닙니다.';
+                        return '?щ컮瑜??꾪솕踰덊샇 ?뺤떇???꾨떃?덈떎.';
                       }
                       return null;
                     },
@@ -106,7 +106,7 @@ class _CustomerFindPasswordScreenState
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                       ),
-                      child: Text(_busy ? '확인 중...' : '확인'),
+                      child: Text(_busy ? '?뺤씤 以?..' : '?뺤씤'),
                     ),
                   ],
                 ],
@@ -117,7 +117,7 @@ class _CustomerFindPasswordScreenState
               const Divider(),
               const SizedBox(height: PopqSpacing.md),
               Text(
-                '새 비밀번호를 입력해 주세요.',
+                '??鍮꾨?踰덊샇瑜??낅젰??二쇱꽭??',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: PopqSpacing.md),
@@ -130,15 +130,15 @@ class _CustomerFindPasswordScreenState
                       controller: _newPassword,
                       obscureText: true,
                       decoration: const InputDecoration(
-                        labelText: '새 비밀번호',
-                        helperText: '영문과 숫자를 포함해 8자 이상 입력해 주세요.',
+                        labelText: '??鍮꾨?踰덊샇',
+                        helperText: '?곷Ц怨??レ옄瑜??ы븿??8???댁긽 ?낅젰??二쇱꽭??',
                       ),
                       validator: (value) {
                         if (value == null || value.length < 8) {
-                          return '비밀번호는 8자 이상이어야 합니다.';
+                          return '鍮꾨?踰덊샇??8???댁긽?댁뼱???⑸땲??';
                         }
                         if (!_passwordPattern.hasMatch(value)) {
-                          return '비밀번호는 영문과 숫자를 포함해야 합니다.';
+                          return '鍮꾨?踰덊샇???곷Ц怨??レ옄瑜??ы븿?댁빞 ?⑸땲??';
                         }
                         return null;
                       },
@@ -148,10 +148,10 @@ class _CustomerFindPasswordScreenState
                       key: const Key('find-password-new-confirm'),
                       controller: _newPasswordConfirm,
                       obscureText: true,
-                      decoration: const InputDecoration(labelText: '새 비밀번호 확인'),
+                      decoration: const InputDecoration(labelText: '??鍮꾨?踰덊샇 ?뺤씤'),
                       validator: (value) {
                         if (value != _newPassword.text) {
-                          return '비밀번호가 일치하지 않습니다.';
+                          return '鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆뒿?덈떎.';
                         }
                         return null;
                       },
@@ -163,7 +163,7 @@ class _CustomerFindPasswordScreenState
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(52),
                       ),
-                      child: Text(_busy ? '변경 중...' : '비밀번호 변경'),
+                      child: Text(_busy ? '蹂寃?以?..' : '鍮꾨?踰덊샇 蹂寃?),
                     ),
                   ],
                 ),
@@ -206,7 +206,7 @@ class _CustomerFindPasswordScreenState
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _errorMessage = '확인에 실패했습니다. 다시 시도해 주세요.';
+        _errorMessage = '?뺤씤???ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??';
       });
     }
   }
@@ -224,8 +224,8 @@ class _CustomerFindPasswordScreenState
         _newPassword.text,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('비밀번호가 변경되었습니다. 로그인해 주세요.')),
+      ScaffoldMessenger.of(context).showTopSnackBar(
+        const SnackBar(content: Text('鍮꾨?踰덊샇媛 蹂寃쎈릺?덉뒿?덈떎. 濡쒓렇?명빐 二쇱꽭??')),
       );
       context.go(CustomerRoutes.signIn);
     } on PopqFailure catch (failure) {
@@ -238,8 +238,9 @@ class _CustomerFindPasswordScreenState
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _errorMessage = '비밀번호 변경에 실패했습니다. 다시 시도해 주세요.';
+        _errorMessage = '鍮꾨?踰덊샇 蹂寃쎌뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??';
       });
     }
   }
 }
+

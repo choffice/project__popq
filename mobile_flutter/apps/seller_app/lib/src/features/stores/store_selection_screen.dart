@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -72,13 +72,13 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       ) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const PopqLoadingView(
-            message: '사업장을 불러오고 있어요.',
+            message: '?ъ뾽?μ쓣 遺덈윭?ㅺ퀬 ?덉뼱??',
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
           return PopqErrorView(
-            message: '사업장을 불러오지 못했어요.',
+            message: '?ъ뾽?μ쓣 遺덈윭?ㅼ? 紐삵뻽?댁슂.',
             onRetry: _reload,
           );
         }
@@ -94,12 +94,12 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
             padding: const EdgeInsets.all(PopqSpacing.lg),
             children: <Widget>[
               Text(
-                '사업장 대시보드',
+                '?ъ뾽????쒕낫??,
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: PopqSpacing.sm),
               const Text(
-                '운영 중인 사업장을 확인하고 관리할 사업장을 선택하세요.',
+                '?댁쁺 以묒씤 ?ъ뾽?μ쓣 ?뺤씤?섍퀬 愿由ы븷 ?ъ뾽?μ쓣 ?좏깮?섏꽭??',
               ),
               const SizedBox(height: PopqSpacing.md),
               FilledButton.icon(
@@ -112,7 +112,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                       )
                     : const Icon(Icons.add_business_rounded),
                 label: Text(
-                  _creating ? '등록 화면 여는 중...' : '새 사업장 등록',
+                  _creating ? '?깅줉 ?붾㈃ ?щ뒗 以?..' : '???ъ뾽???깅줉',
                 ),
               ),
               const SizedBox(height: PopqSpacing.lg),
@@ -120,13 +120,13 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                 controller: _searchController,
                 enabled: !_busy,
                 decoration: InputDecoration(
-                  labelText: '사업장 검색',
-                  hintText: '사업장명, 주소, 상세주소, 대표 카테고리',
+                  labelText: '?ъ뾽??寃??,
+                  hintText: '?ъ뾽?λ챸, 二쇱냼, ?곸꽭二쇱냼, ???移댄뀒怨좊━',
                   prefixIcon: const Icon(Icons.search_rounded),
                   suffixIcon: _searchQuery.isEmpty
                       ? null
                       : IconButton(
-                          tooltip: '검색어 지우기',
+                          tooltip: '寃?됱뼱 吏?곌린',
                           onPressed: () {
                             _searchController.clear();
                             setState(() {
@@ -146,14 +146,14 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
               if (stores.isEmpty)
                 const PopqEmptyView(
                   icon: Icons.storefront_outlined,
-                  title: '등록된 사업장이 없어요.',
-                  description: '새 사업장 등록을 눌러 첫 운영 공간을 만들어 주세요.',
+                  title: '?깅줉???ъ뾽?μ씠 ?놁뼱??',
+                  description: '???ъ뾽???깅줉???뚮윭 泥??댁쁺 怨듦컙??留뚮뱾??二쇱꽭??',
                 )
               else if (visibleStores.isEmpty)
                 const PopqEmptyView(
                   icon: Icons.search_off_rounded,
-                  title: '조건에 맞는 사업장이 없습니다.',
-                  description: '검색어를 지우고 다시 확인해 주세요.',
+                  title: '議곌굔??留욌뒗 ?ъ뾽?μ씠 ?놁뒿?덈떎.',
+                  description: '寃?됱뼱瑜?吏?곌퀬 ?ㅼ떆 ?뺤씤??二쇱꽭??',
                 )
               else
                 for (final SellerStore store in visibleStores)
@@ -171,7 +171,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
 
     final summary = _summariesByStoreId[store.storeId];
     return Tooltip(
-      message: '${store.name} 사업장 관리',
+      message: '${store.name} ?ъ뾽??愿由?,
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -205,10 +205,10 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       Text(
-                        '${_typeLabel(store.storeType)} · '
-                        '${_roleLabel(store.myRole)} · '
+                        '${_typeLabel(store.storeType)} 쨌 '
+                        '${_roleLabel(store.myRole)} 쨌 '
                         '${_statusLabel(store.businessStatus)}'
-                        '${selected ? ' · 현재 선택' : ''}',
+                        '${selected ? ' 쨌 ?꾩옱 ?좏깮' : ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -220,8 +220,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                 _StoreAlertButton(
                   icon: Icons.notifications_rounded,
                   count: summary?.waitingOrderCount ?? 0,
-                  tooltip: '${store.name} 접수대기 주문 '
-                      '${summary?.waitingOrderCount ?? 0}건',
+                  tooltip: '${store.name} ?묒닔?湲?二쇰Ц '
+                      '${summary?.waitingOrderCount ?? 0}嫄?,
                   onPressed:
                       _busy || summary == null ? null : () => _openOrders(store),
                 ),
@@ -229,8 +229,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                 _StoreAlertButton(
                   icon: Icons.chat_bubble_rounded,
                   count: summary?.unreadChatCount ?? 0,
-                  tooltip: '${store.name} 읽지 않은 채팅 메시지 '
-                      '${summary?.unreadChatCount ?? 0}건',
+                  tooltip: '${store.name} ?쎌? ?딆? 梨꾪똿 硫붿떆吏 '
+                      '${summary?.unreadChatCount ?? 0}嫄?,
                   onPressed:
                       _busy || summary == null ? null : () => _openChats(store),
                 ),
@@ -341,7 +341,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       setState(() {
         _selecting = false;
       });
-      _showMessage('사업장 선택을 저장하지 못했어요.');
+      _showMessage('?ъ뾽???좏깮????ν븯吏 紐삵뻽?댁슂.');
     }
   }
 
@@ -367,7 +367,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _selecting = false);
-      _showMessage('사업장 선택을 저장하지 못했어요.');
+      _showMessage('?ъ뾽???좏깮????ν븯吏 紐삵뻽?댁슂.');
     }
   }
 
@@ -399,7 +399,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     });
 
     if (created != null) {
-      _showMessage('${created.name} 사업장을 등록했습니다.');
+      _showMessage('${created.name} ?ъ뾽?μ쓣 ?깅줉?덉뒿?덈떎.');
     }
   }
 
@@ -419,8 +419,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -508,22 +508,23 @@ class _StoreAlertButton extends StatelessWidget {
 
 String _roleLabel(String role) {
   return switch (role) {
-    'OWNER' => '소유자',
-    'MANAGER' => '매니저',
-    'STAFF' => '스태프',
+    'OWNER' => '?뚯쑀??,
+    'MANAGER' => '留ㅻ땲?',
+    'STAFF' => '?ㅽ깭??,
     _ => role,
   };
 }
 
 String _statusLabel(String status) {
   return switch (status) {
-    'OPEN' => '영업 중',
-    'CLOSED' => '운영 종료',
-    'PRE_OPEN' => '영업 준비',
+    'OPEN' => '?곸뾽 以?,
+    'CLOSED' => '?댁쁺 醫낅즺',
+    'PRE_OPEN' => '?곸뾽 以鍮?,
     _ => status,
   };
 }
 
 String _typeLabel(String type) {
-  return type == 'EVENT_COMMERCE' ? '행사·이벤트' : '로컬마켓';
+  return type == 'EVENT_COMMERCE' ? '?됱궗쨌?대깽?? : '濡쒖뺄留덉폆';
 }
+

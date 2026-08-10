@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -99,14 +99,14 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
             const Padding(
               padding: EdgeInsets.only(top: 120),
               child: PopqLoadingView(
-                message: '판매자 정보를 불러오고 있어요.',
+                message: '?먮ℓ???뺣낫瑜?遺덈윭?ㅺ퀬 ?덉뼱??',
               ),
             )
           else if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 80),
               child: PopqErrorView(
-                message: '판매자 정보를 불러오지 못했습니다.',
+                message: '?먮ℓ???뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
                 onRetry: _loadStore,
               ),
             )
@@ -114,7 +114,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
             _ProfileCard(store: _store),
             const SizedBox(height: PopqSpacing.xl),
             Text(
-              '사업장 관리',
+              '?ъ뾽??愿由?,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: PopqSpacing.sm),
@@ -126,9 +126,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.storefront_outlined,
                     ),
-                    title: const Text('선택 사업장 관리'),
+                    title: const Text('?좏깮 ?ъ뾽??愿由?),
                     subtitle: const Text(
-                      '사업장 정보와 운영 설정을 확인합니다.',
+                      '?ъ뾽???뺣낫? ?댁쁺 ?ㅼ젙???뺤씤?⑸땲??',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
@@ -145,8 +145,8 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                   const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.inventory_2_outlined),
-                    title: const Text('휴업·폐업 사업장'),
-                    subtitle: const Text('휴업 사업장을 재개하거나 폐업 이력을 확인합니다.'),
+                    title: const Text('?댁뾽쨌?먯뾽 ?ъ뾽??),
+                    subtitle: const Text('?댁뾽 ?ъ뾽?μ쓣 ?ш컻?섍굅???먯뾽 ?대젰???뺤씤?⑸땲??'),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: _showInactiveStores,
                   ),
@@ -155,9 +155,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.swap_horiz_rounded,
                     ),
-                    title: const Text('사업장 전환'),
+                    title: const Text('?ъ뾽???꾪솚'),
                     subtitle: const Text(
-                      '다른 사업장을 선택하거나 새로 등록합니다.',
+                      '?ㅻⅨ ?ъ뾽?μ쓣 ?좏깮?섍굅???덈줈 ?깅줉?⑸땲??',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
@@ -173,9 +173,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.person_add_alt_1_rounded,
                     ),
-                    title: const Text('팝큐 고객으로도 이용하기'),
+                    title: const Text('?앺걧 怨좉컼?쇰줈???댁슜?섍린'),
                     subtitle: const Text(
-                      '이 계정으로 고객 앱 서비스도 이용할 수 있게 연결합니다.',
+                      '??怨꾩젙?쇰줈 怨좉컼 ???쒕퉬?ㅻ룄 ?댁슜?????덇쾶 ?곌껐?⑸땲??',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
@@ -187,7 +187,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
             ),
             const SizedBox(height: PopqSpacing.xl),
             Text(
-              '계정 및 앱',
+              '怨꾩젙 諛???,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: PopqSpacing.sm),
@@ -199,9 +199,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.person_outline_rounded,
                     ),
-                    title: const Text('내 프로필'),
+                    title: const Text('???꾨줈??),
                     subtitle: const Text(
-                      '이름, 이메일과 프로필 사진을 확인합니다.',
+                      '?대쫫, ?대찓?쇨낵 ?꾨줈???ъ쭊???뺤씤?⑸땲??',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
@@ -217,9 +217,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.settings_outlined,
                     ),
-                    title: const Text('설정'),
+                    title: const Text('?ㅼ젙'),
                     subtitle: const Text(
-                      '테마와 앱 사용 환경을 관리합니다.',
+                      '?뚮쭏? ???ъ슜 ?섍꼍??愿由ы빀?덈떎.',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,
@@ -235,9 +235,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     leading: const Icon(
                       Icons.info_outline_rounded,
                     ),
-                    title: const Text('앱 정보'),
+                    title: const Text('???뺣낫'),
                     subtitle: const Text(
-                      'POPQ 판매자 앱 · 개발 버전',
+                      'POPQ ?먮ℓ????쨌 媛쒕컻 踰꾩쟾',
                     ),
                   ),
                   const Divider(height: 1),
@@ -246,10 +246,10 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                       Icons.logout_rounded,
                     ),
                     title: Text(
-                      _signingOut ? '로그아웃 중...' : '로그아웃',
+                      _signingOut ? '濡쒓렇?꾩썐 以?..' : '濡쒓렇?꾩썐',
                     ),
                     subtitle: const Text(
-                      '현재 판매자 계정에서 로그아웃합니다.',
+                      '?꾩옱 ?먮ℓ??怨꾩젙?먯꽌 濡쒓렇?꾩썐?⑸땲??',
                     ),
                     trailing: _signingOut
                         ? const SizedBox.square(
@@ -273,13 +273,13 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                       color: Theme.of(context).colorScheme.error,
                     ),
                     title: Text(
-                      _withdrawing ? '탈퇴 처리 중...' : '회원 탈퇴',
+                      _withdrawing ? '?덊눜 泥섎━ 以?..' : '?뚯썝 ?덊눜',
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.error,
                       ),
                     ),
                     subtitle: const Text(
-                      '판매자 계정을 탈퇴합니다.',
+                      '?먮ℓ??怨꾩젙???덊눜?⑸땲??',
                     ),
                     trailing: _withdrawing
                         ? const SizedBox.square(
@@ -379,22 +379,22 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('로그아웃'),
+          title: const Text('濡쒓렇?꾩썐'),
           content: const Text(
-            '현재 판매자 계정에서 로그아웃할까요?',
+            '?꾩옱 ?먮ℓ??怨꾩젙?먯꽌 濡쒓렇?꾩썐?좉퉴??',
           ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(false);
               },
-              child: const Text('취소'),
+              child: const Text('痍⑥냼'),
             ),
             FilledButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(true);
               },
-              child: const Text('로그아웃'),
+              child: const Text('濡쒓렇?꾩썐'),
             ),
           ],
         );
@@ -426,9 +426,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
         _signingOut = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('로그아웃하지 못했어요.'),
+          content: Text('濡쒓렇?꾩썐?섏? 紐삵뻽?댁슂.'),
         ),
       );
     }
@@ -440,8 +440,8 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       stores = await widget.storeRepository.findInactive();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('휴업·폐업 사업장을 불러오지 못했습니다.')),
+      ScaffoldMessenger.of(context).showTopSnackBar(
+        const SnackBar(content: Text('?댁뾽쨌?먯뾽 ?ъ뾽?μ쓣 遺덈윭?ㅼ? 紐삵뻽?듬땲??')),
       );
       return;
     }
@@ -457,7 +457,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
               Padding(
                 padding: const EdgeInsets.all(PopqSpacing.lg),
                 child: Text(
-                  '휴업·폐업 사업장',
+                  '?댁뾽쨌?먯뾽 ?ъ뾽??,
                   style: Theme.of(sheetContext).textTheme.titleLarge,
                 ),
               ),
@@ -465,8 +465,8 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                 child: stores.isEmpty
                     ? const PopqEmptyView(
                         icon: Icons.store_outlined,
-                        title: '휴업·폐업 사업장이 없어요.',
-                        description: '현재 운영 중인 사업장은 사업장 전환에서 확인할 수 있어요.',
+                        title: '?댁뾽쨌?먯뾽 ?ъ뾽?μ씠 ?놁뼱??',
+                        description: '?꾩옱 ?댁쁺 以묒씤 ?ъ뾽?μ? ?ъ뾽???꾪솚?먯꽌 ?뺤씤?????덉뼱??',
                       )
                     : ListView.separated(
                         padding: const EdgeInsets.all(PopqSpacing.md),
@@ -490,8 +490,8 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                             ),
                             title: Text(store.name),
                             subtitle: Text(
-                              '${suspended ? '휴업 중' : '폐업'}'
-                              '${store.address?.isNotEmpty == true ? ' · ${store.address}' : ''}',
+                              '${suspended ? '?댁뾽 以? : '?먯뾽'}'
+                              '${store.address?.isNotEmpty == true ? ' 쨌 ${store.address}' : ''}',
                             ),
                             trailing: suspended && store.myRole == 'OWNER'
                                 ? FilledButton.tonal(
@@ -499,9 +499,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                                       sheetContext,
                                       store,
                                     ),
-                                    child: const Text('재개'),
+                                    child: const Text('?ш컻'),
                                   )
-                                : const Text('조회만 가능'),
+                                : const Text('議고쉶留?媛??),
                           );
                         },
                       ),
@@ -523,8 +523,8 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       await widget.selectionController.select(reopened.storeId);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('사업장을 재개하지 못했습니다.')),
+      ScaffoldMessenger.of(context).showTopSnackBar(
+        const SnackBar(content: Text('?ъ뾽?μ쓣 ?ш컻?섏? 紐삵뻽?듬땲??')),
       );
       return;
     }
@@ -533,19 +533,19 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
     await showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('사업장을 재개했습니다'),
+        title: const Text('?ъ뾽?μ쓣 ?ш컻?덉뒿?덈떎'),
         content: const Text(
-          '영업 시작 전 아래 항목을 확인해 주세요.\n\n'
-          '□ 영업시간\n'
-          '□ 메뉴와 가격\n'
-          '□ 품절 상태\n'
-          '□ 주문 접수 설정\n'
-          '□ 대표 이미지와 주소',
+          '?곸뾽 ?쒖옉 ???꾨옒 ??ぉ???뺤씤??二쇱꽭??\n\n'
+          '???곸뾽?쒓컙\n'
+          '??硫붾돱? 媛寃?n'
+          '???덉젅 ?곹깭\n'
+          '??二쇰Ц ?묒닔 ?ㅼ젙\n'
+          '??????대?吏? 二쇱냼',
         ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
+            child: const Text('?뺤씤'),
           ),
         ],
       ),
@@ -556,19 +556,19 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('팝큐 고객으로도 이용하기'),
+        title: const Text('?앺걧 怨좉컼?쇰줈???댁슜?섍린'),
         content: const Text(
-          '이 계정으로 고객 앱 서비스도 이용할 수 있게 연결할까요?\n'
-          '연결 후에는 같은 이메일과 비밀번호로 고객 앱에 로그인할 수 있어요.',
+          '??怨꾩젙?쇰줈 怨좉컼 ???쒕퉬?ㅻ룄 ?댁슜?????덇쾶 ?곌껐?좉퉴??\n'
+          '?곌껐 ?꾩뿉??媛숈? ?대찓?쇨낵 鍮꾨?踰덊샇濡?怨좉컼 ?깆뿉 濡쒓렇?명븷 ???덉뼱??',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
+            child: const Text('痍⑥냼'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('연결하기'),
+            child: const Text('?곌껐?섍린'),
           ),
         ],
       ),
@@ -580,23 +580,23 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       await widget.onConnectCustomerAccess();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '팝큐 고객 연결이 완료됐어요. 같은 계정으로 고객 앱에 로그인해 보세요.',
+            '?앺걧 怨좉컼 ?곌껐???꾨즺?먯뼱?? 媛숈? 怨꾩젙?쇰줈 怨좉컼 ?깆뿉 濡쒓렇?명빐 蹂댁꽭??',
           ),
         ),
       );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
-          content: Text('팝큐 고객 연결에 실패했어요. ($error)'),
+          content: Text('?앺걧 怨좉컼 ?곌껐???ㅽ뙣?덉뼱?? ($error)'),
         ),
       );
     }
@@ -608,9 +608,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       identity = await widget.identityRepository.getCurrent();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('계정 정보를 불러오지 못했어요.'),
+          content: Text('怨꾩젙 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.'),
         ),
       );
       return;
@@ -618,7 +618,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
 
     if (!mounted) return;
 
-    final expectedPhrase = '${identity.name} / 탈퇴하겠습니다';
+    final expectedPhrase = '${identity.name} / ?덊눜?섍쿋?듬땲??;
     final result = await showDialog<_SellerWithdrawDialogResult>(
       context: context,
       builder: (context) => _SellerWithdrawDialog(
@@ -638,12 +638,12 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text(
             result.immediate
-                ? '탈퇴가 완료됐어요.'
-                : '탈퇴가 접수됐어요. 7일 안에 다시 로그인하면 탈퇴가 취소돼요.',
+                ? '?덊눜媛 ?꾨즺?먯뼱??'
+                : '?덊눜媛 ?묒닔?먯뼱?? 7???덉뿉 ?ㅼ떆 濡쒓렇?명븯硫??덊눜媛 痍⑥냼?쇱슂.',
           ),
         ),
       );
@@ -653,7 +653,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       setState(() {
         _withdrawing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
@@ -661,9 +661,9 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       setState(() {
         _withdrawing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
-          content: Text('회원 탈퇴에 실패했어요. ($error)'),
+          content: Text('?뚯썝 ?덊눜???ㅽ뙣?덉뼱?? ($error)'),
         ),
       );
     }
@@ -699,20 +699,20 @@ class _SellerWithdrawDialogState extends State<_SellerWithdrawDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('회원 탈퇴'),
+      title: const Text('?뚯썝 ?덊눜'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '탈퇴를 누르면 바로 사라지지 않고, 7일의 유예기간 뒤에 확정돼요.\n'
-            '그 안에 다시 로그인하면 탈퇴가 자동으로 취소돼요.',
+            '?덊눜瑜??꾨Ⅴ硫?諛붾줈 ?щ씪吏吏 ?딄퀬, 7?쇱쓽 ?좎삁湲곌컙 ?ㅼ뿉 ?뺤젙?쇱슂.\n'
+            '洹??덉뿉 ?ㅼ떆 濡쒓렇?명븯硫??덊눜媛 ?먮룞?쇰줈 痍⑥냼?쇱슂.',
           ),
           const SizedBox(height: PopqSpacing.md),
           Text(
-            '유예기간 없이 지금 바로 탈퇴하려면 아래에\n'
+            '?좎삁湲곌컙 ?놁씠 吏湲?諛붾줈 ?덊눜?섎젮硫??꾨옒??n'
             '"${widget.expectedPhrase}"\n'
-            '를 정확히 입력하세요.',
+            '瑜??뺥솗???낅젰?섏꽭??',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: PopqSpacing.sm),
@@ -733,13 +733,13 @@ class _SellerWithdrawDialogState extends State<_SellerWithdrawDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
+          child: const Text('痍⑥냼'),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(
             const _SellerWithdrawDialogResult(immediate: false),
           ),
-          child: const Text('7일 후 탈퇴'),
+          child: const Text('7?????덊눜'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -750,7 +750,7 @@ class _SellerWithdrawDialogState extends State<_SellerWithdrawDialog> {
                     const _SellerWithdrawDialogResult(immediate: true),
                   )
               : null,
-          child: const Text('지금 바로 탈퇴'),
+          child: const Text('吏湲?諛붾줈 ?덊눜'),
         ),
       ],
     );
@@ -800,7 +800,7 @@ class _ProfileCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  store?.name ?? '선택된 사업장이 없어요',
+                  store?.name ?? '?좏깮???ъ뾽?μ씠 ?놁뼱??,
                   style: TextStyle(
                     color: colorScheme.onInverseSurface,
                     fontSize: 22,
@@ -810,8 +810,8 @@ class _ProfileCard extends StatelessWidget {
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
                   store == null
-                      ? '대시보드에서 사업장을 선택해 주세요.'
-                      : '${_roleLabel(store.myRole)} · '
+                      ? '??쒕낫?쒖뿉???ъ뾽?μ쓣 ?좏깮??二쇱꽭??'
+                      : '${_roleLabel(store.myRole)} 쨌 '
                           '${_businessStatusLabel(store.businessStatus)}',
                   style: TextStyle(
                     color: colorScheme.onInverseSurface.withValues(
@@ -884,14 +884,14 @@ class _SellerCenterCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'POPQ 고객 문의',
+                      'POPQ 怨좉컼 臾몄쓽',
                       style: TextStyle(
                         fontWeight: FontWeight.w900,
                       ),
                     ),
                     SizedBox(height: PopqSpacing.xs),
                     Text(
-                      '고객 문의와 읽지 않은 메시지를 확인하세요.',
+                      '怨좉컼 臾몄쓽? ?쎌? ?딆? 硫붿떆吏瑜??뺤씤?섏꽭??',
                     ),
                   ],
                 ),
@@ -919,18 +919,19 @@ String _storeInitial(String name) {
 
 String _roleLabel(String role) {
   return switch (role) {
-    'OWNER' => '사업자',
-    'MANAGER' => '매니저',
-    'STAFF' => '직원',
+    'OWNER' => '?ъ뾽??,
+    'MANAGER' => '留ㅻ땲?',
+    'STAFF' => '吏곸썝',
     _ => role,
   };
 }
 
 String _businessStatusLabel(String status) {
   return switch (status) {
-    'OPEN' => '영업 중',
-    'PRE_OPEN' => '영업 준비',
-    'CLOSED' => '영업 종료',
+    'OPEN' => '?곸뾽 以?,
+    'PRE_OPEN' => '?곸뾽 以鍮?,
+    'CLOSED' => '?곸뾽 醫낅즺',
     _ => status,
   };
 }
+

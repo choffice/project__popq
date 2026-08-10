@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 
 import '../auth/seller_identity_repository.dart';
 
@@ -7,7 +8,7 @@ class SellerPhoneInput extends StatefulWidget {
     required this.controller,
     required this.enabled,
     this.identityRepository,
-    this.labelText = '사업장 연락처',
+    this.labelText = '?ъ뾽???곕씫泥?,
     this.validator,
     super.key,
   });
@@ -68,7 +69,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
               child: DropdownButtonFormField<String>(
                 key: ValueKey<String>(_selectedPrefix),
                 initialValue: _selectedPrefix,
-                decoration: const InputDecoration(labelText: '번호 구분'),
+                decoration: const InputDecoration(labelText: '踰덊샇 援щ텇'),
                 items: <DropdownMenuItem<String>>[
                   ..._prefixes.map(
                     (String prefix) => DropdownMenuItem<String>(
@@ -78,7 +79,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
                   ),
                   const DropdownMenuItem<String>(
                     value: 'DIRECT',
-                    child: Text('직접입력'),
+                    child: Text('吏곸젒?낅젰'),
                   ),
                 ],
                 onChanged: widget.enabled ? _changePrefix : null,
@@ -94,7 +95,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
                   labelText: widget.labelText,
-                  hintText: '예: 051-123-4567',
+                  hintText: '?? 051-123-4567',
                   prefixIcon: const Icon(Icons.phone_outlined),
                 ),
                 validator: widget.validator,
@@ -110,8 +111,8 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
             onChanged: !widget.enabled || _loadingMyPhone
                 ? null
                 : (bool? value) => _toggleMyPhone(value ?? false),
-            title: const Text('내 정보의 연락처 사용'),
-            subtitle: _loadingMyPhone ? const Text('연락처를 불러오는 중...') : null,
+            title: const Text('???뺣낫???곕씫泥??ъ슜'),
+            subtitle: _loadingMyPhone ? const Text('?곕씫泥섎? 遺덈윭?ㅻ뒗 以?..') : null,
           ),
       ],
     );
@@ -147,8 +148,8 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
       if (!mounted) return;
       final String phone = identity.phone?.trim() ?? '';
       if (phone.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('내 정보에 저장된 연락처가 없습니다.')),
+        ScaffoldMessenger.of(context).showTopSnackBar(
+          const SnackBar(content: Text('???뺣낫????λ맂 ?곕씫泥섍? ?놁뒿?덈떎.')),
         );
         return;
       }
@@ -159,8 +160,8 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
       });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('내 연락처를 불러오지 못했습니다.')),
+        ScaffoldMessenger.of(context).showTopSnackBar(
+          const SnackBar(content: Text('???곕씫泥섎? 遺덈윭?ㅼ? 紐삵뻽?듬땲??')),
         );
       }
     } finally {
@@ -178,3 +179,4 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
     return 'DIRECT';
   }
 }
+

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -47,14 +47,14 @@ class _CustomerNotificationSettingsScreenState
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(failure.message)));
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(SnackBar(content: Text(failure.message)));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('알림 설정을 변경하지 못했어요. ($error)')),
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
+          SnackBar(content: Text('?뚮┝ ?ㅼ젙??蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)')),
         );
     } finally {
       if (mounted) {
@@ -66,17 +66,17 @@ class _CustomerNotificationSettingsScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('알림 설정')),
+      appBar: AppBar(title: const Text('?뚮┝ ?ㅼ젙')),
       body: FutureBuilder<NotificationPreference>(
         future: _preference,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const PopqLoadingView(message: '알림 설정을 불러오고 있어요.');
+            return const PopqLoadingView(message: '?뚮┝ ?ㅼ젙??遺덈윭?ㅺ퀬 ?덉뼱??');
           }
 
           if (snapshot.hasError || !snapshot.hasData) {
             return PopqErrorView(
-              message: '알림 설정을 불러오지 못했어요.',
+              message: '?뚮┝ ?ㅼ젙??遺덈윭?ㅼ? 紐삵뻽?댁슂.',
               onRetry: () {
                 setState(() {
                   _preference = widget.repository.getNotificationPreferences();
@@ -95,8 +95,8 @@ class _CustomerNotificationSettingsScreenState
                 child: Column(
                   children: [
                     SwitchListTile(
-                      title: const Text('푸시 알림'),
-                      subtitle: const Text('주문, 예약 등 중요한 알림을 받아요'),
+                      title: const Text('?몄떆 ?뚮┝'),
+                      subtitle: const Text('二쇰Ц, ?덉빟 ??以묒슂???뚮┝??諛쏆븘??),
                       value: preference.pushNotificationEnabled,
                       onChanged: _saving
                           ? null
@@ -109,8 +109,8 @@ class _CustomerNotificationSettingsScreenState
                     ),
                     const Divider(height: 1),
                     SwitchListTile(
-                      title: const Text('마케팅 정보 수신'),
-                      subtitle: const Text('이벤트, 혜택 등 마케팅 알림을 받아요'),
+                      title: const Text('留덉????뺣낫 ?섏떊'),
+                      subtitle: const Text('?대깽?? ?쒗깮 ??留덉????뚮┝??諛쏆븘??),
                       value: preference.marketingOptIn,
                       onChanged: _saving
                           ? null
@@ -132,3 +132,4 @@ class _CustomerNotificationSettingsScreenState
     );
   }
 }
+

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -45,12 +45,12 @@ class _SellerNotificationInboxScreenState
       length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('운영 알림'),
+          title: const Text('?댁쁺 ?뚮┝'),
           bottom: const TabBar(
             tabs: [
-              Tab(text: '주문'),
-              Tab(text: '채팅'),
-              Tab(text: '리뷰'),
+              Tab(text: '二쇰Ц'),
+              Tab(text: '梨꾪똿'),
+              Tab(text: '由щ럭'),
             ],
           ),
         ),
@@ -58,11 +58,11 @@ class _SellerNotificationInboxScreenState
           future: _data,
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
-              return const PopqLoadingView(message: '운영 알림을 불러오고 있어요.');
+              return const PopqLoadingView(message: '?댁쁺 ?뚮┝??遺덈윭?ㅺ퀬 ?덉뼱??');
             }
             if (snapshot.hasError || !snapshot.hasData) {
               return PopqErrorView(
-                message: '운영 알림을 불러오지 못했어요.',
+                message: '?댁쁺 ?뚮┝??遺덈윭?ㅼ? 紐삵뻽?댁슂.',
                 onRetry: _refresh,
               );
             }
@@ -70,27 +70,27 @@ class _SellerNotificationInboxScreenState
             return TabBarView(
               children: [
                 _AlertList(
-                  emptyTitle: '접수 대기 주문이 없어요',
+                  emptyTitle: '?묒닔 ?湲?二쇰Ц???놁뼱??,
                   onRefresh: _refresh,
                   children: data.alerts.orders
                       .map((order) => _orderTile(order))
                       .toList(),
                 ),
                 _AlertList(
-                  emptyTitle: '읽지 않은 채팅이 없어요',
+                  emptyTitle: '?쎌? ?딆? 梨꾪똿???놁뼱??,
                   onRefresh: _refresh,
                   children: data.alerts.chats
                       .map((chat) => _chatTile(chat))
                       .toList(),
                 ),
                 _AlertList(
-                  emptyTitle: '답변 대기 리뷰가 없어요',
+                  emptyTitle: '?듬? ?湲?由щ럭媛 ?놁뼱??,
                   onRefresh: _refresh,
                   children: data.alerts.reviews
                       .map(
                         (review) => _reviewTile(
                           review,
-                          data.storeNames[review.storeId] ?? '사업장',
+                          data.storeNames[review.storeId] ?? '?ъ뾽??,
                         ),
                       )
                       .toList(),
@@ -105,13 +105,13 @@ class _SellerNotificationInboxScreenState
 
   Widget _orderTile(SellerOrder order) {
     final items = order.items
-        .map((item) => '${item.productName} ${item.quantity}개')
+        .map((item) => '${item.productName} ${item.quantity}媛?)
         .join(', ');
     return ListTile(
       leading: const CircleAvatar(child: Icon(Icons.notifications_rounded)),
-      title: Text('${order.storeName} · ${formatPopqOrderNumber(order.orderPublicId)}'),
+      title: Text('${order.storeName} 쨌 ${formatPopqOrderNumber(order.orderPublicId)}'),
       subtitle: Text(
-        '${_dateTime(order.createdAt)}\n${items.isEmpty ? '상품 정보 없음' : items}',
+        '${_dateTime(order.createdAt)}\n${items.isEmpty ? '?곹뭹 ?뺣낫 ?놁쓬' : items}',
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
@@ -124,9 +124,9 @@ class _SellerNotificationInboxScreenState
   Widget _chatTile(SellerChatAlert chat) {
     return ListTile(
       leading: const CircleAvatar(child: Icon(Icons.chat_bubble_rounded)),
-      title: Text('${chat.storeName} · ${chat.customerName}'),
+      title: Text('${chat.storeName} 쨌 ${chat.customerName}'),
       subtitle: Text(
-        '${formatPopqOrderNumber(chat.orderPublicId)} · ${_dateTime(chat.lastMessageAt)}\n${chat.lastMessage}',
+        '${formatPopqOrderNumber(chat.orderPublicId)} 쨌 ${_dateTime(chat.lastMessageAt)}\n${chat.lastMessage}',
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
@@ -139,10 +139,10 @@ class _SellerNotificationInboxScreenState
   Widget _reviewTile(SellerReview review, String storeName) {
     final content = review.content?.trim();
     return ListTile(
-      leading: CircleAvatar(child: Text('${review.rating}★')),
-      title: Text('$storeName · ${review.authorName}'),
+      leading: CircleAvatar(child: Text('${review.rating}??)),
+      title: Text('$storeName 쨌 ${review.authorName}'),
       subtitle: Text(
-        '${_dateTime(review.createdAt)}\n${content == null || content.isEmpty ? '내용 없는 리뷰' : content}',
+        '${_dateTime(review.createdAt)}\n${content == null || content.isEmpty ? '?댁슜 ?녿뒗 由щ럭' : content}',
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
       ),
@@ -198,8 +198,8 @@ class _SellerNotificationInboxScreenState
   Future<bool> _selectStore(int storeId) async {
     if (!_activeStoreIds.contains(storeId)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('현재 접근 가능한 사업장을 다시 확인해 주세요.')),
+        ScaffoldMessenger.of(context).showTopSnackBar(
+          const SnackBar(content: Text('?꾩옱 ?묎렐 媛?ν븳 ?ъ뾽?μ쓣 ?ㅼ떆 ?뺤씤??二쇱꽭??')),
         );
       }
       return false;
@@ -209,8 +209,8 @@ class _SellerNotificationInboxScreenState
       return true;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사업장 선택을 저장하지 못했어요.')),
+        ScaffoldMessenger.of(context).showTopSnackBar(
+          const SnackBar(content: Text('?ъ뾽???좏깮????ν븯吏 紐삵뻽?댁슂.')),
         );
       }
       return false;
@@ -218,7 +218,7 @@ class _SellerNotificationInboxScreenState
   }
 
   String _dateTime(DateTime? value) {
-    if (value == null) return '시각 정보 없음';
+    if (value == null) return '?쒓컖 ?뺣낫 ?놁쓬';
     final seoul = value.toUtc().add(const Duration(hours: 9));
     return '${seoul.month.toString().padLeft(2, '0')}.${seoul.day.toString().padLeft(2, '0')} '
         '${seoul.hour.toString().padLeft(2, '0')}:${seoul.minute.toString().padLeft(2, '0')}';
@@ -251,7 +251,7 @@ class _AlertList extends StatelessWidget {
                 child: PopqEmptyView(
                   icon: Icons.notifications_none_rounded,
                   title: emptyTitle,
-                  description: '아래로 당겨 새로고침할 수 있어요.',
+                  description: '?꾨옒濡??밴꺼 ?덈줈怨좎묠?????덉뼱??',
                 ),
               )
             : children[index],
@@ -266,3 +266,4 @@ class _InboxData {
   final SellerOperationalAlerts alerts;
   final Map<int, String> storeNames;
 }
+

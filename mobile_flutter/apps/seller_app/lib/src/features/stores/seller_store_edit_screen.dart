@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -49,22 +49,22 @@ class SellerStoreEditScreen extends StatefulWidget {
 
 class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   static const List<String> _categories = <String>[
-    '카페',
-    '디저트',
-    '베이커리',
-    '한식',
-    '중식',
-    '일식',
-    '양식',
-    '분식',
-    '치킨',
-    '피자',
-    '패스트푸드',
-    '주점',
-    '푸드트럭',
-    '팝업·행사',
-    '플리마켓·행사',
-    '기타',
+    '移댄럹',
+    '?붿???,
+    '踰좎씠而ㅻ━',
+    '?쒖떇',
+    '以묒떇',
+    '?쇱떇',
+    '?묒떇',
+    '遺꾩떇',
+    '移섑궓',
+    '?쇱옄',
+    '?⑥뒪?명뫖??,
+    '二쇱젏',
+    '?몃뱶?몃윮',
+    '?앹뾽쨌?됱궗',
+    '?뚮━留덉폆쨌?됱궗',
+    '湲고?',
   ];
 
   static const double _defaultLatitude = 35.157746;
@@ -131,7 +131,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         latitude: store.latitude!,
         longitude: store.longitude!,
         address: store.address?.trim() ?? '',
-        sourceLabel: '기존 사업장 위치',
+        sourceLabel: '湲곗〈 ?ъ뾽???꾩튂',
       );
     }
   }
@@ -151,7 +151,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     return PopScope<Object?>(
       canPop: !_submitting || _saveCompleted,
       child: Scaffold(
-        appBar: AppBar(title: const Text('사업장 정보 수정')),
+        appBar: AppBar(title: const Text('?ъ뾽???뺣낫 ?섏젙')),
         body: Form(
           key: _formKey,
           autovalidateMode: AutovalidateMode.onUserInteraction,
@@ -160,7 +160,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
             children: <Widget>[
               _buildSection(
                 context,
-                title: '정보 불러오기',
+                title: '?뺣낫 遺덈윭?ㅺ린',
                 children: <Widget>[
                   SizedBox(
                     width: double.infinity,
@@ -174,8 +174,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                           : const Icon(Icons.document_scanner_outlined),
                       label: Text(
                         _recognizingBusinessRegistration
-                            ? '사업자등록증 인식 중...'
-                            : '사업자등록증 촬영 또는 선택',
+                            ? '?ъ뾽?먮벑濡앹쬆 ?몄떇 以?..'
+                            : '?ъ뾽?먮벑濡앹쬆 珥ъ쁺 ?먮뒗 ?좏깮',
                       ),
                     ),
                   ),
@@ -191,7 +191,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                           ? const _ButtonProgress()
                           : const Icon(Icons.map_outlined),
                       label: Text(
-                        _searchingKakaoPlace ? '카카오맵 업체 검색 중...' : '카카오맵 업체 검색',
+                        _searchingKakaoPlace ? '移댁뭅?ㅻ㏊ ?낆껜 寃??以?..' : '移댁뭅?ㅻ㏊ ?낆껜 寃??,
                       ),
                     ),
                   ),
@@ -199,23 +199,23 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               ),
               _buildSection(
                 context,
-                title: '기본 정보',
+                title: '湲곕낯 ?뺣낫',
                 children: <Widget>[
                   DropdownButtonFormField<String>(
                     key: const Key('edit-store-type'),
                     initialValue: _storeType,
                     decoration: const InputDecoration(
-                      labelText: '사업장 유형',
+                      labelText: '?ъ뾽???좏삎',
                       prefixIcon: Icon(Icons.category_outlined),
                     ),
                     items: const <DropdownMenuItem<String>>[
                       DropdownMenuItem(
                         value: 'LOCAL_STORE',
-                        child: Text('일반 매장'),
+                        child: Text('?쇰컲 留ㅼ옣'),
                       ),
                       DropdownMenuItem(
                         value: 'EVENT_COMMERCE',
-                        child: Text('행사·팝업 판매점'),
+                        child: Text('?됱궗쨌?앹뾽 ?먮ℓ??),
                       ),
                     ],
                     onChanged: _busy
@@ -232,15 +232,15 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                     controller: _nameController,
                     enabled: !_busy,
                     maxLength: 150,
-                    decoration: const InputDecoration(labelText: '사업장명'),
+                    decoration: const InputDecoration(labelText: '?ъ뾽?λ챸'),
                     validator: (String? value) =>
-                        _requiredValidator(value, '사업장명을 입력해 주세요.'),
+                        _requiredValidator(value, '?ъ뾽?λ챸???낅젰??二쇱꽭??'),
                   ),
                   const SizedBox(height: PopqSpacing.sm),
                   DropdownButtonFormField<String>(
                     key: const Key('edit-store-category'),
                     initialValue: _representativeCategory,
-                    decoration: const InputDecoration(labelText: '대표 카테고리'),
+                    decoration: const InputDecoration(labelText: '???移댄뀒怨좊━'),
                     items: _categoryOptions
                         .map(
                           (String value) => DropdownMenuItem<String>(
@@ -250,7 +250,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                         )
                         .toList(growable: false),
                     validator: (String? value) =>
-                        _requiredValidator(value, '대표 카테고리를 선택해 주세요.'),
+                        _requiredValidator(value, '???移댄뀒怨좊━瑜??좏깮??二쇱꽭??'),
                     onChanged: _busy
                         ? null
                         : (String? value) {
@@ -264,7 +264,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                     enabled: !_busy,
                     maxLength: 1000,
                     maxLines: 3,
-                    decoration: const InputDecoration(labelText: '설명'),
+                    decoration: const InputDecoration(labelText: '?ㅻ챸'),
                   ),
                   const SizedBox(height: PopqSpacing.sm),
                   SellerPhoneInput(
@@ -272,9 +272,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                     controller: _phoneController,
                     enabled: !_busy,
                     identityRepository: widget.identityRepository,
-                    labelText: '전화번호',
+                    labelText: '?꾪솕踰덊샇',
                     validator: (String? value) =>
-                        _requiredValidator(value, '전화번호를 입력해 주세요.'),
+                        _requiredValidator(value, '?꾪솕踰덊샇瑜??낅젰??二쇱꽭??'),
                   ),
                 ],
               ),
@@ -284,9 +284,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               _buildOrderSection(context),
               _buildSection(
                 context,
-                title: '검색 키워드',
+                title: '寃???ㅼ썙??,
                 titleAction: IconButton.filledTonal(
-                  tooltip: '검색 키워드 추가',
+                  tooltip: '寃???ㅼ썙??異붽?',
                   onPressed: _busy || _tags.length >= 10 ? null : _addTag,
                   icon: const Icon(Icons.add_rounded),
                 ),
@@ -309,7 +309,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                   icon: _submitting
                       ? const _ButtonProgress()
                       : const Icon(Icons.save_outlined),
-                  label: Text(_submitting ? '변경사항 저장 중...' : '변경사항 저장'),
+                  label: Text(_submitting ? '蹂寃쎌궗?????以?..' : '蹂寃쎌궗?????),
                 ),
               ),
               const SizedBox(height: PopqSpacing.lg),
@@ -374,16 +374,16 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     final _SelectedStoreLocation? location = _selectedLocation;
     return _buildSection(
       context,
-      title: '주소 및 위치',
+      title: '二쇱냼 諛??꾩튂',
       children: <Widget>[
         TextFormField(
           key: const Key('edit-store-address'),
           controller: _addressController,
           enabled: !_busy,
           maxLength: 255,
-          decoration: const InputDecoration(labelText: '주소'),
+          decoration: const InputDecoration(labelText: '二쇱냼'),
           validator: (String? value) =>
-              _requiredValidator(value, '주소를 입력해 주세요.'),
+              _requiredValidator(value, '二쇱냼瑜??낅젰??二쇱꽭??'),
           onChanged: _handleManualAddressChange,
         ),
         const SizedBox(height: PopqSpacing.sm),
@@ -392,9 +392,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           controller: _detailAddressController,
           enabled: !_busy,
           maxLength: 255,
-          decoration: const InputDecoration(labelText: '상세주소'),
+          decoration: const InputDecoration(labelText: '?곸꽭二쇱냼'),
           validator: (String? value) =>
-              _requiredValidator(value, '상세주소를 입력해 주세요.'),
+              _requiredValidator(value, '?곸꽭二쇱냼瑜??낅젰??二쇱꽭??'),
         ),
         const SizedBox(height: PopqSpacing.sm),
         Row(
@@ -406,7 +406,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                 icon: _searchingAddress
                     ? const _ButtonProgress()
                     : const Icon(Icons.manage_search_outlined),
-                label: const Text('주소 검색'),
+                label: const Text('二쇱냼 寃??),
               ),
             ),
             const SizedBox(width: PopqSpacing.sm),
@@ -417,7 +417,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                 icon: _selectingMapLocation
                     ? const _ButtonProgress()
                     : const Icon(Icons.location_on_outlined),
-                label: const Text('지도에서 위치 선택'),
+                label: const Text('吏?꾩뿉???꾩튂 ?좏깮'),
               ),
             ),
           ],
@@ -433,17 +433,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: location == null
-              ? const Text('주소와 일치하는 위치를 확인해 주세요.')
+              ? const Text('二쇱냼? ?쇱튂?섎뒗 ?꾩튂瑜??뺤씤??二쇱꽭??')
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(location.address),
                     const SizedBox(height: PopqSpacing.xs),
                     Text(
-                      '위도 ${location.latitude.toStringAsFixed(6)} · '
-                      '경도 ${location.longitude.toStringAsFixed(6)}',
+                      '?꾨룄 ${location.latitude.toStringAsFixed(6)} 쨌 '
+                      '寃쎈룄 ${location.longitude.toStringAsFixed(6)}',
                     ),
-                    Text('선택 방식: ${location.sourceLabel}'),
+                    Text('?좏깮 諛⑹떇: ${location.sourceLabel}'),
                   ],
                 ),
         ),
@@ -462,7 +462,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     final bool hasVisibleImage = showLocalImage || showExistingImage;
     return _buildSection(
       context,
-      title: '대표사진',
+      title: '??쒖궗吏?,
       children: <Widget>[
         AspectRatio(
           aspectRatio: 16 / 9,
@@ -478,10 +478,10 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                         _existingImageUrl!,
                         fit: BoxFit.cover,
                         errorBuilder: (_, _, _) => const _EmptyImagePreview(
-                          label: '기존 사진을 불러오지 못했습니다.',
+                          label: '湲곗〈 ?ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
                         ),
                       )
-                    : const _EmptyImagePreview(label: '등록된 대표사진이 없습니다.'),
+                    : const _EmptyImagePreview(label: '?깅줉????쒖궗吏꾩씠 ?놁뒿?덈떎.'),
               ),
               Positioned(
                 top: PopqSpacing.sm,
@@ -491,7 +491,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                   children: <Widget>[
                     _ImageOverlayButton(
                       key: const Key('edit-store-image-change'),
-                      tooltip: '대표사진 변경',
+                      tooltip: '??쒖궗吏?蹂寃?,
                       icon: Icons.camera_alt_outlined,
                       onPressed: _busy ? null : _openRepresentativeImagePicker,
                     ),
@@ -499,7 +499,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                       const SizedBox(width: PopqSpacing.xs),
                       _ImageOverlayButton(
                         key: const Key('edit-store-image-remove'),
-                        tooltip: '대표사진 제거',
+                        tooltip: '??쒖궗吏??쒓굅',
                         icon: Icons.delete_outline_rounded,
                         onPressed: _busy ? null : _confirmRepresentativeImageRemoval,
                       ),
@@ -527,7 +527,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                       });
                     },
               icon: const Icon(Icons.undo_outlined),
-              label: const Text('새 사진 선택 취소'),
+              label: const Text('???ъ쭊 ?좏깮 痍⑥냼'),
             ),
           ),
         ],
@@ -538,7 +538,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   Widget _buildOperatingSection(BuildContext context) {
     return _buildSection(
       context,
-      title: '영업 정보',
+      title: '?곸뾽 ?뺣낫',
       children: <Widget>[
         SellerBusinessScheduleEditor(
           initialSchedule: _schedule,
@@ -552,12 +552,12 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   Widget _buildOrderSection(BuildContext context) {
     return _buildSection(
       context,
-      title: '주문 운영 설정',
+      title: '二쇰Ц ?댁쁺 ?ㅼ젙',
       children: <Widget>[
         SwitchListTile(
           key: const Key('edit-store-takeout'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('포장 가능'),
+          title: const Text('?ъ옣 媛??),
           value: _takeoutAvailable,
           onChanged: _busy
               ? null
@@ -566,7 +566,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         SwitchListTile(
           key: const Key('edit-store-dine-in'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('매장 식사 가능'),
+          title: const Text('留ㅼ옣 ?앹궗 媛??),
           value: _dineInAvailable,
           onChanged: _busy
               ? null
@@ -575,7 +575,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         SwitchListTile(
           key: const Key('edit-store-order-accepting'),
           contentPadding: EdgeInsets.zero,
-          title: const Text('주문 접수 가능'),
+          title: const Text('二쇰Ц ?묒닔 媛??),
           value: _orderAcceptingEnabled,
           onChanged: _busy
               ? null
@@ -595,7 +595,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     setState(() => _selectedLocation = null);
     if (!_addressLocationWarningShown) {
       _addressLocationWarningShown = true;
-      _showMessage('주소가 변경되었습니다. 주소 검색이나 지도에서 위치를 다시 확인해 주세요.');
+      _showMessage('二쇱냼媛 蹂寃쎈릺?덉뒿?덈떎. 二쇱냼 寃?됱씠??吏?꾩뿉???꾩튂瑜??ㅼ떆 ?뺤씤??二쇱꽭??');
     }
   }
 
@@ -608,17 +608,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           children: <Widget>[
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('카메라로 촬영'),
+              title: const Text('移대찓?쇰줈 珥ъ쁺'),
               onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('갤러리에서 선택'),
+              title: const Text('媛ㅻ윭由ъ뿉???좏깮'),
               onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
             ),
             ListTile(
               leading: const Icon(Icons.close_rounded),
-              title: const Text('취소'),
+              title: const Text('痍⑥냼'),
               onTap: () => Navigator.of(sheetContext).pop(),
             ),
           ],
@@ -635,18 +635,18 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('대표사진을 제거할까요?'),
+        title: const Text('??쒖궗吏꾩쓣 ?쒓굅?좉퉴??'),
         content: const Text(
-          '대표사진 연결만 제거되며 서버에 업로드된 실제 파일은 삭제되지 않습니다.',
+          '??쒖궗吏??곌껐留??쒓굅?섎ŉ ?쒕쾭???낅줈?쒕맂 ?ㅼ젣 ?뚯씪? ??젣?섏? ?딆뒿?덈떎.',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('취소'),
+            child: const Text('痍⑥냼'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('사진 제거'),
+            child: const Text('?ъ쭊 ?쒓굅'),
           ),
         ],
       ),
@@ -686,8 +686,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       if (mounted) {
         _showMessage(
           source == ImageSource.camera
-              ? '카메라를 실행하지 못했습니다.'
-              : '갤러리에서 사진을 불러오지 못했습니다.',
+              ? '移대찓?쇰? ?ㅽ뻾?섏? 紐삵뻽?듬땲??'
+              : '媛ㅻ윭由ъ뿉???ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
         );
       }
     } finally {
@@ -706,12 +706,12 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           children: <Widget>[
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('사업자등록증 촬영'),
+              title: const Text('?ъ뾽?먮벑濡앹쬆 珥ъ쁺'),
               onTap: () => Navigator.of(sheetContext).pop(ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('갤러리에서 선택'),
+              title: const Text('媛ㅻ윭由ъ뿉???좏깮'),
               onTap: () => Navigator.of(sheetContext).pop(ImageSource.gallery),
             ),
           ],
@@ -742,7 +742,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
 
       final String name = await _resolveImportedText(
-        fieldLabel: '사업장명',
+        fieldLabel: '?ъ뾽?λ챸',
         sourceLabel: 'OCR',
         currentValue: _nameController.text,
         importedValue: result.businessName,
@@ -751,7 +751,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       final String address = await _resolveImportedText(
-        fieldLabel: '주소',
+        fieldLabel: '二쇱냼',
         sourceLabel: 'OCR',
         currentValue: _addressController.text,
         importedValue: result.businessAddress,
@@ -766,7 +766,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
     } catch (_) {
       if (mounted) {
-        _showMessage('사업자등록증을 인식하는 중 오류가 발생했습니다.');
+        _showMessage('?ъ뾽?먮벑濡앹쬆???몄떇?섎뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
       }
     } finally {
       if (mounted) {
@@ -780,32 +780,32 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('사업자등록증 인식 결과'),
+        title: const Text('?ъ뾽?먮벑濡앹쬆 ?몄떇 寃곌낵'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text('사업자등록번호: ${result.businessNumber}'),
-              Text('상호명: ${result.businessName ?? '인식되지 않음'}'),
-              Text('대표자명: ${result.representativeName ?? '인식되지 않음'}'),
-              Text('사업장 주소: ${result.businessAddress ?? '인식되지 않음'}'),
+              Text('?ъ뾽?먮벑濡앸쾲?? ${result.businessNumber}'),
+              Text('?곹샇紐? ${result.businessName ?? '?몄떇?섏? ?딆쓬'}'),
+              Text('??쒖옄紐? ${result.representativeName ?? '?몄떇?섏? ?딆쓬'}'),
+              Text('?ъ뾽??二쇱냼: ${result.businessAddress ?? '?몄떇?섏? ?딆쓬'}'),
               const SizedBox(height: PopqSpacing.md),
-              const Text('사업자등록번호와 대표자명은 확인용이며 저장하지 않습니다.'),
+              const Text('?ъ뾽?먮벑濡앸쾲?몄? ??쒖옄紐낆? ?뺤씤?⑹씠硫???ν븯吏 ?딆뒿?덈떎.'),
             ],
           ),
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('취소'),
+            child: const Text('痍⑥냼'),
           ),
           FilledButton(
             onPressed:
                 result.businessName == null && result.businessAddress == null
                 ? null
                 : () => Navigator.of(dialogContext).pop(true),
-            child: const Text('정보 적용'),
+            child: const Text('?뺣낫 ?곸슜'),
           ),
         ],
       ),
@@ -815,7 +815,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
 
   Future<void> _openKakaoPlaceImport() async {
     final String? query = await _requestSearchQuery(
-      title: '카카오맵 업체 검색',
+      title: '移댁뭅?ㅻ㏊ ?낆껜 寃??,
       initialValue: <String>[
         _addressController.text.trim(),
         _nameController.text.trim(),
@@ -832,7 +832,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       if (results.isEmpty) {
-        _showMessage('카카오맵에서 업체를 찾지 못했습니다.');
+        _showMessage('移댁뭅?ㅻ㏊?먯꽌 ?낆껜瑜?李얠? 紐삵뻽?듬땲??');
         return;
       }
       final SellerKakaoPlaceSearchResult? selected = await _selectKakaoPlace(
@@ -848,7 +848,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
     } catch (_) {
       if (mounted) {
-        _showMessage('카카오맵 업체를 검색하는 중 오류가 발생했습니다.');
+        _showMessage('移댁뭅?ㅻ㏊ ?낆껜瑜?寃?됲븯??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
       }
     } finally {
       if (mounted) {
@@ -859,8 +859,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
 
   Future<void> _applyKakaoPlace(SellerKakaoPlaceSearchResult place) async {
     final String name = await _resolveImportedText(
-      fieldLabel: '사업장명',
-      sourceLabel: '카카오',
+      fieldLabel: '?ъ뾽?λ챸',
+      sourceLabel: '移댁뭅??,
       currentValue: _nameController.text,
       importedValue: place.placeName,
     );
@@ -868,8 +868,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     final String address = await _resolveImportedText(
-      fieldLabel: '주소',
-      sourceLabel: '카카오',
+      fieldLabel: '二쇱냼',
+      sourceLabel: '移댁뭅??,
       currentValue: _addressController.text,
       importedValue: place.displayAddress,
     );
@@ -877,8 +877,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     final String phone = await _resolveImportedText(
-      fieldLabel: '전화번호',
-      sourceLabel: '카카오',
+      fieldLabel: '?꾪솕踰덊샇',
+      sourceLabel: '移댁뭅??,
       currentValue: _phoneController.text,
       importedValue: place.phone,
     );
@@ -904,21 +904,21 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               latitude: place.latitude,
               longitude: place.longitude,
               address: address,
-              sourceLabel: '카카오 업체 검색',
+              sourceLabel: '移댁뭅???낆껜 寃??,
             )
           : null;
     });
     _showMessage(
       addressMatches
-          ? '카카오 업체 정보와 위치를 반영했습니다.'
-          : '업체 정보는 반영했지만 주소가 달라 위치를 저장하지 않았습니다. 위치를 다시 확인해 주세요.',
+          ? '移댁뭅???낆껜 ?뺣낫? ?꾩튂瑜?諛섏쁺?덉뒿?덈떎.'
+          : '?낆껜 ?뺣낫??諛섏쁺?덉?留?二쇱냼媛 ?щ씪 ?꾩튂瑜???ν븯吏 ?딆븯?듬땲?? ?꾩튂瑜??ㅼ떆 ?뺤씤??二쇱꽭??',
     );
   }
 
   Future<void> _searchAddress() async {
     final String current = _addressController.text.trim();
     final String? query = await _requestSearchQuery(
-      title: '주소 검색',
+      title: '二쇱냼 寃??,
       initialValue: current,
     );
     if (query == null || !mounted) {
@@ -932,7 +932,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       if (results.isEmpty) {
-        _showMessage('주소 검색 결과가 없습니다.');
+        _showMessage('二쇱냼 寃??寃곌낵媛 ?놁뒿?덈떎.');
         return;
       }
       final SellerAddressSearchResult? selected = await _selectAddress(results);
@@ -945,17 +945,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           latitude: selected.latitude,
           longitude: selected.longitude,
           address: selected.addressName,
-          sourceLabel: '주소 검색',
+          sourceLabel: '二쇱냼 寃??,
         );
       });
-      _showMessage('검색한 주소와 위치를 반영했습니다.');
+      _showMessage('寃?됲븳 二쇱냼? ?꾩튂瑜?諛섏쁺?덉뒿?덈떎.');
     } on PopqFailure catch (failure) {
       if (mounted) {
         _showMessage(failure.message);
       }
     } catch (_) {
       if (mounted) {
-        _showMessage('주소를 검색하는 중 오류가 발생했습니다.');
+        _showMessage('二쇱냼瑜?寃?됲븯??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.');
       }
     } finally {
       if (mounted) {
@@ -967,7 +967,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   Future<void> _selectLocationOnMap() async {
     final String address = _addressController.text.trim();
     if (address.isEmpty) {
-      _showMessage('지도 위치를 선택하기 전에 주소를 입력해 주세요.');
+      _showMessage('吏???꾩튂瑜??좏깮?섍린 ?꾩뿉 二쇱냼瑜??낅젰??二쇱꽭??');
       return;
     }
     final _SelectedStoreLocation? location = _selectedLocation;
@@ -1000,8 +1000,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       final String resolvedAddress = await _resolveImportedText(
-        fieldLabel: '주소',
-        sourceLabel: '지도에서 선택한 위치',
+        fieldLabel: '二쇱냼',
+        sourceLabel: '吏?꾩뿉???좏깮???꾩튂',
         currentValue: address,
         importedValue: result.displayAddress,
       );
@@ -1018,14 +1018,14 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                 latitude: result.latitude,
                 longitude: result.longitude,
                 address: resolvedAddress,
-                sourceLabel: '지도 직접 선택',
+                sourceLabel: '吏??吏곸젒 ?좏깮',
               )
             : null;
       });
       _showMessage(
         matches
-            ? '지도에서 선택한 주소와 위치를 반영했습니다.'
-            : '입력 주소를 유지했습니다. 현재 주소에 맞는 위치를 다시 선택해 주세요.',
+            ? '吏?꾩뿉???좏깮??二쇱냼? ?꾩튂瑜?諛섏쁺?덉뒿?덈떎.'
+            : '?낅젰 二쇱냼瑜??좎??덉뒿?덈떎. ?꾩옱 二쇱냼??留욌뒗 ?꾩튂瑜??ㅼ떆 ?좏깮??二쇱꽭??',
       );
     } on PopqFailure catch (failure) {
       if (mounted) {
@@ -1033,7 +1033,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
     } catch (_) {
       if (mounted) {
-        _showMessage('선택한 위치의 주소를 확인하지 못했습니다.');
+        _showMessage('?좏깮???꾩튂??二쇱냼瑜??뺤씤?섏? 紐삵뻽?듬땲??');
       }
     } finally {
       if (mounted) {
@@ -1057,7 +1057,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           controller: controller,
           autofocus: true,
           textInputAction: TextInputAction.search,
-          decoration: const InputDecoration(labelText: '검색어'),
+          decoration: const InputDecoration(labelText: '寃?됱뼱'),
           onSubmitted: (String value) {
             if (value.trim().isNotEmpty) {
               Navigator.of(dialogContext).pop(value.trim());
@@ -1067,7 +1067,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('취소'),
+            child: const Text('痍⑥냼'),
           ),
           FilledButton(
             onPressed: () {
@@ -1076,7 +1076,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                 Navigator.of(dialogContext).pop(query);
               }
             },
-            child: const Text('검색'),
+            child: const Text('寃??),
           ),
         ],
       ),
@@ -1090,7 +1090,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     return showDialog<SellerKakaoPlaceSearchResult>(
       context: context,
       builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('업체 선택'),
+        title: const Text('?낆껜 ?좏깮'),
         children: results
             .map(
               (SellerKakaoPlaceSearchResult place) => SimpleDialogOption(
@@ -1119,7 +1119,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     return showDialog<SellerAddressSearchResult>(
       context: context,
       builder: (BuildContext dialogContext) => SimpleDialog(
-        title: const Text('주소 선택'),
+        title: const Text('二쇱냼 ?좏깮'),
         children: results
             .map(
               (SellerAddressSearchResult result) => SimpleDialogOption(
@@ -1159,7 +1159,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       builder: (BuildContext dialogContext) => StatefulBuilder(
         builder: (BuildContext context, StateSetter setDialogState) =>
             AlertDialog(
-              title: Text('$fieldLabel 정보 확인'),
+              title: Text('$fieldLabel ?뺣낫 ?뺤씤'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -1176,17 +1176,17 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                         children: <Widget>[
                           RadioListTile<_ImportedValueChoice>(
                             value: _ImportedValueChoice.current,
-                            title: const Text('현재 값 유지'),
+                            title: const Text('?꾩옱 媛??좎?'),
                             subtitle: Text(current),
                           ),
                           RadioListTile<_ImportedValueChoice>(
                             value: _ImportedValueChoice.imported,
-                            title: Text('$sourceLabel 값 사용'),
+                            title: Text('$sourceLabel 媛??ъ슜'),
                             subtitle: Text(imported),
                           ),
                           const RadioListTile<_ImportedValueChoice>(
                             value: _ImportedValueChoice.manual,
-                            title: Text('직접 입력'),
+                            title: Text('吏곸젒 ?낅젰'),
                           ),
                         ],
                       ),
@@ -1195,7 +1195,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                       controller: manual,
                       enabled: choice == _ImportedValueChoice.manual,
                       decoration: InputDecoration(
-                        labelText: '$fieldLabel 직접 입력',
+                        labelText: '$fieldLabel 吏곸젒 ?낅젰',
                       ),
                     ),
                   ],
@@ -1213,7 +1213,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                       Navigator.of(dialogContext).pop(resolved);
                     }
                   },
-                  child: const Text('확인'),
+                  child: const Text('?뺤씤'),
                 ),
               ],
             ),
@@ -1240,8 +1240,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     });
     _showMessage(
       addressChanged
-          ? '$sourceLabel 정보를 반영했습니다. 주소가 변경되어 위치를 다시 확인해 주세요.'
-          : '$sourceLabel 정보를 반영했습니다.',
+          ? '$sourceLabel ?뺣낫瑜?諛섏쁺?덉뒿?덈떎. 二쇱냼媛 蹂寃쎈릺???꾩튂瑜??ㅼ떆 ?뺤씤??二쇱꽭??'
+          : '$sourceLabel ?뺣낫瑜?諛섏쁺?덉뒿?덈떎.',
     );
   }
 
@@ -1250,7 +1250,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     if (!(_formKey.currentState?.validate() ?? false)) {
-      _showMessage('필수 입력 항목을 확인해 주세요.');
+      _showMessage('?꾩닔 ?낅젰 ??ぉ???뺤씤??二쇱꽭??');
       return;
     }
     final String? scheduleError = _schedule.validationMessage;
@@ -1259,7 +1259,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     if (!_takeoutAvailable && !_dineInAvailable) {
-      _showMessage('포장 또는 매장 식사 중 하나는 가능해야 합니다.');
+      _showMessage('?ъ옣 ?먮뒗 留ㅼ옣 ?앹궗 以??섎굹??媛?ν빐???⑸땲??');
       return;
     }
 
@@ -1316,7 +1316,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _submitting = false);
-        _showMessage('사업장 정보를 수정하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+        _showMessage('?ъ뾽???뺣낫瑜??섏젙?섏? 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
       }
     }
   }
@@ -1349,8 +1349,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -1416,3 +1416,4 @@ class _EmptyImagePreview extends StatelessWidget {
     );
   }
 }
+

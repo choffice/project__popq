@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -11,26 +11,26 @@ import '../../routing/customer_router.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
 
-/// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
+/// 留덉씠?섏씠吏 ?곷떒 移대뱶???쒖떆?섎뒗 ?깃툒쨌?쒕룞 ?듦퀎?낅땲??
 ///
-/// 레벨, 방문 횟수, 보유 포인트는 아직 백엔드에
-/// 관련 API가 없어 화면 디자인 확인용 임시값입니다.
-/// 실제 API가 준비되면 [CustomerProfile]에 필드를 추가해 교체합니다.
+/// ?덈꺼, 諛⑸Ц ?잛닔, 蹂댁쑀 ?ъ씤?몃뒗 ?꾩쭅 諛깆뿏?쒖뿉
+/// 愿??API媛 ?놁뼱 ?붾㈃ ?붿옄???뺤씤???꾩떆媛믪엯?덈떎.
+/// ?ㅼ젣 API媛 以鍮꾨릺硫?[CustomerProfile]???꾨뱶瑜?異붽???援먯껜?⑸땲??
 abstract final class _ProfileTemporaryStats {
   static const levelLabel = 'Lv.12';
   static const visitCount = 37;
   static const pointLabel = '2,450P';
-  static const locationLabel = '위치 정보를 설정해 보세요';
+  static const locationLabel = '?꾩튂 ?뺣낫瑜??ㅼ젙??蹂댁꽭??;
 }
 
-/// 가입일부터 오늘까지의 일수를 "팝큐와 함께한지 n일째"로 표시합니다.
-/// 가입일 정보가 없으면(예: 메모리 저장소) 일반적인 문구로 대체합니다.
+/// 媛?낆씪遺???ㅻ뒛源뚯????쇱닔瑜?"?앺걧? ?④퍡?쒖? n?쇱㎏"濡??쒖떆?⑸땲??
+/// 媛?낆씪 ?뺣낫媛 ?놁쑝硫??? 硫붾え由???μ냼) ?쇰컲?곸씤 臾멸뎄濡??泥댄빀?덈떎.
 String _daysTogetherLabel(CustomerProfile profile) {
   final days = profile.daysSinceJoined;
   if (days == null) {
-    return '팝큐와 함께하고 있어요';
+    return '?앺걧? ?④퍡?섍퀬 ?덉뼱??;
   }
-  return '팝큐와 함께한지 $days일째';
+  return '?앺걧? ?④퍡?쒖? $days?쇱㎏';
 }
 
 const _dangerColor = Color(0xFFE5484D);
@@ -203,13 +203,13 @@ class _CustomerProfileScreenState
         if (snapshot.connectionState !=
             ConnectionState.done) {
           return const PopqLoadingView(
-            message: '마이페이지를 불러오고 있어요.',
+            message: '留덉씠?섏씠吏瑜?遺덈윭?ㅺ퀬 ?덉뼱??',
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
           return PopqErrorView(
-            message: '마이페이지를 불러오지 못했어요.',
+            message: '留덉씠?섏씠吏瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.',
             onRetry: _reload,
           );
         }
@@ -239,9 +239,9 @@ class _CustomerProfileScreenState
                 rows: [
                   _MenuRowData(
                     icon: Icons.person_outline_rounded,
-                    title: '내 정보',
+                    title: '???뺣낫',
                     subtitle:
-                    '프로필 사진, 연락처, 비밀번호를 관리해요',
+                    '?꾨줈???ъ쭊, ?곕씫泥? 鍮꾨?踰덊샇瑜?愿由ы빐??,
                     onTap: () {
                       context.push(
                         CustomerRoutes.myInfo,
@@ -251,11 +251,11 @@ class _CustomerProfileScreenState
                   _MenuRowData(
                     icon:
                     Icons.confirmation_number_outlined,
-                    title: '예약 내역',
+                    title: '?덉빟 ?댁뿭',
                     subtitle: _unreadMessageCount > 0
-                        ? '매장에서 보낸 새 답변이 '
-                        '$_unreadMessageCount개 있어요'
-                        : '예매한 이벤트와 예약 정보를 확인해요',
+                        ? '留ㅼ옣?먯꽌 蹂대궦 ???듬???'
+                        '$_unreadMessageCount媛??덉뼱??
+                        : '?덈ℓ???대깽?몄? ?덉빟 ?뺣낫瑜??뺤씤?댁슂',
                     badgeCount: _unreadMessageCount,
                     onTap: () {
                       context.push(
@@ -265,9 +265,9 @@ class _CustomerProfileScreenState
                   ),
                   _MenuRowData(
                     icon: Icons.history_rounded,
-                    title: '방문 기록',
+                    title: '諛⑸Ц 湲곕줉',
                     subtitle:
-                    '방문했던 매장 기록을 확인해요',
+                    '諛⑸Ц?덈뜕 留ㅼ옣 湲곕줉???뺤씤?댁슂',
                     onTap: () {
                       context.push(
                         CustomerRoutes.visitHistory,
@@ -276,9 +276,9 @@ class _CustomerProfileScreenState
                   ),
                   _MenuRowData(
                     icon: Icons.edit_note_rounded,
-                    title: '내 리뷰',
+                    title: '??由щ럭',
                     subtitle:
-                    '내가 작성한 리뷰를 모아봤어요',
+                    '?닿? ?묒꽦??由щ럭瑜?紐⑥븘遊ㅼ뼱??,
                     onTap: () {
                       context.push(
                         CustomerRoutes.myReviews,
@@ -287,17 +287,17 @@ class _CustomerProfileScreenState
                   ),
                   _MenuRowData(
                     icon: Icons.star_border_rounded,
-                    title: '포인트 내역',
+                    title: '?ъ씤???댁뿭',
                     subtitle:
-                    '포인트 적립 및 사용 내역을 확인해요',
+                    '?ъ씤???곷┰ 諛??ъ슜 ?댁뿭???뺤씤?댁슂',
                     onTap: _showComingSoon,
                   ),
                   _MenuRowData(
                     icon:
                     Icons.notifications_none_rounded,
-                    title: '알림 설정',
+                    title: '?뚮┝ ?ㅼ젙',
                     subtitle:
-                    '푸시 알림 및 마케팅 수신 설정을 관리해요',
+                    '?몄떆 ?뚮┝ 諛?留덉????섏떊 ?ㅼ젙??愿由ы빐??,
                     onTap: () {
                       context.push(
                         CustomerRoutes.notificationSettings,
@@ -306,16 +306,16 @@ class _CustomerProfileScreenState
                   ),
                   _MenuRowData(
                     icon: Icons.help_outline_rounded,
-                    title: '고객센터',
+                    title: '怨좉컼?쇳꽣',
                     subtitle:
-                    '자주 묻는 질문과 1:1 문의를 할 수 있어요',
+                    '?먯＜ 臾삳뒗 吏덈Ц怨?1:1 臾몄쓽瑜??????덉뼱??,
                     onTap: _showComingSoon,
                   ),
                   _MenuRowData(
                     icon: Icons.storefront_rounded,
-                    title: '팝큐 비즈 연결하기',
+                    title: '?앺걧 鍮꾩쫰 ?곌껐?섍린',
                     subtitle:
-                    '이 계정으로 판매자 (팝큐 비즈) 서비스도 이용하세요',
+                    '??怨꾩젙?쇰줈 ?먮ℓ??(?앺걧 鍮꾩쫰) ?쒕퉬?ㅻ룄 ?댁슜?섏꽭??,
                     onTap: _connectSellerAccess,
                   ),
                 ],
@@ -329,16 +329,16 @@ class _CustomerProfileScreenState
                 rows: [
                   _MenuRowData(
                     icon: Icons.logout_rounded,
-                    title: '로그아웃',
-                    subtitle: '팝큐 계정에서 로그아웃해요',
+                    title: '濡쒓렇?꾩썐',
+                    subtitle: '?앺걧 怨꾩젙?먯꽌 濡쒓렇?꾩썐?댁슂',
                     color: _dangerColor,
                     onTap: _signOut,
                   ),
                   _MenuRowData(
                     icon: Icons.warning_amber_rounded,
-                    title: '회원 탈퇴',
+                    title: '?뚯썝 ?덊눜',
                     subtitle:
-                    '회원 탈퇴 시 모든 정보가 삭제돼요',
+                    '?뚯썝 ?덊눜 ??紐⑤뱺 ?뺣낫媛 ??젣?쇱슂',
                     color: _dangerColor,
                     onTap: () => _withdraw(profile.name),
                   ),
@@ -381,7 +381,7 @@ class _CustomerProfileScreenState
       _observedConnectionEpoch =
           realtimeClient.connectionEpoch;
 
-      // 재연결 직후 놓친 unread 변화를 REST로 한 번 복구합니다.
+      // ?ъ뿰寃?吏곹썑 ?볦튇 unread 蹂?붾? REST濡???踰?蹂듦뎄?⑸땲??
       unawaited(
         _refreshUnreadMessageCount(),
       );
@@ -411,7 +411,7 @@ class _CustomerProfileScreenState
     Object error,
   ) {
     debugPrint(
-      '마이 화면 실시간 채팅 이벤트를 처리하지 못했습니다: $error',
+      '留덉씠 ?붾㈃ ?ㅼ떆媛?梨꾪똿 ?대깽?몃? 泥섎━?섏? 紐삵뻽?듬땲?? $error',
     );
   }
 
@@ -485,8 +485,8 @@ class _CustomerProfileScreenState
       });
     } catch (error, stackTrace) {
       debugPrint(
-        '예약 내역의 읽지 않은 답변 수를 '
-            '불러오지 못했습니다: $error',
+        '?덉빟 ?댁뿭???쎌? ?딆? ?듬? ?섎? '
+            '遺덈윭?ㅼ? 紐삵뻽?듬땲?? $error',
       );
 
       debugPrintStack(
@@ -501,19 +501,19 @@ class _CustomerProfileScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('팝큐 비즈 연결하기'),
+        title: const Text('?앺걧 鍮꾩쫰 ?곌껐?섍린'),
         content: const Text(
-          '이 계정으로 판매자(팝큐 비즈) 서비스도 이용할 수 있게 연결할까요?\n'
-          '연결 후에는 같은 이메일과 비밀번호로 판매자 앱에 로그인할 수 있어요.',
+          '??怨꾩젙?쇰줈 ?먮ℓ???앺걧 鍮꾩쫰) ?쒕퉬?ㅻ룄 ?댁슜?????덇쾶 ?곌껐?좉퉴??\n'
+          '?곌껐 ?꾩뿉??媛숈? ?대찓?쇨낵 鍮꾨?踰덊샇濡??먮ℓ???깆뿉 濡쒓렇?명븷 ???덉뼱??',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('취소'),
+            child: const Text('痍⑥냼'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('연결하기'),
+            child: const Text('?곌껐?섍린'),
           ),
         ],
       ),
@@ -526,28 +526,28 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
-              '팝큐 비즈 연결이 완료됐어요. 같은 계정으로 판매자 앱에 로그인해 보세요.',
+              '?앺걧 鍮꾩쫰 ?곌껐???꾨즺?먯뼱?? 媛숈? 怨꾩젙?쇰줈 ?먮ℓ???깆뿉 濡쒓렇?명빐 蹂댁꽭??',
             ),
           ),
         );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
-            content: Text('팝큐 비즈 연결에 실패했어요. ($error)'),
+            content: Text('?앺걧 鍮꾩쫰 ?곌껐???ㅽ뙣?덉뼱?? ($error)'),
           ),
         );
     }
@@ -576,13 +576,13 @@ class _CustomerProfileScreenState
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               pickerSource == ImageSource.camera
-                  ? '카메라를 실행하지 못했습니다.'
-                  : '갤러리에서 사진을 불러오지 못했습니다.',
+                  ? '移대찓?쇰? ?ㅽ뻾?섏? 紐삵뻽?듬땲??'
+                  : '媛ㅻ윭由ъ뿉???ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
             ),
           ),
         );
@@ -600,23 +600,23 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
+          const SnackBar(content: Text('?꾨줈???ъ쭊??蹂寃쎈릱?댁슂.')),
         );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
+          SnackBar(content: Text('?꾨줈???ъ쭊??蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)')),
         );
     } finally {
       if (mounted) {
@@ -627,10 +627,10 @@ class _CustomerProfileScreenState
 
   void _showComingSoon() {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
-          content: Text('준비 중인 기능이에요.'),
+          content: Text('以鍮?以묒씤 湲곕뒫?댁뿉??'),
         ),
       );
   }
@@ -644,7 +644,7 @@ class _CustomerProfileScreenState
   }
 
   Future<void> _withdraw(String memberName) async {
-    final expectedPhrase = '$memberName / 탈퇴하겠습니다';
+    final expectedPhrase = '$memberName / ?덊눜?섍쿋?듬땲??;
 
     final result = await showDialog<_WithdrawDialogResult>(
       context: context,
@@ -662,13 +662,13 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               result.immediate
-                  ? '탈퇴가 완료됐어요.'
-                  : '탈퇴가 접수됐어요. 7일 안에 다시 로그인하면 탈퇴가 취소돼요.',
+                  ? '?덊눜媛 ?꾨즺?먯뼱??'
+                  : '?덊눜媛 ?묒닔?먯뼱?? 7???덉뿉 ?ㅼ떆 濡쒓렇?명븯硫??덊눜媛 痍⑥냼?쇱슂.',
             ),
           ),
         );
@@ -676,17 +676,17 @@ class _CustomerProfileScreenState
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
-            content: Text('회원 탈퇴에 실패했어요. ($error)'),
+            content: Text('?뚯썝 ?덊눜???ㅽ뙣?덉뼱?? ($error)'),
           ),
         );
     }
@@ -722,20 +722,20 @@ class _WithdrawDialogState extends State<_WithdrawDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('회원 탈퇴'),
+      title: const Text('?뚯썝 ?덊눜'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '탈퇴를 누르면 바로 사라지지 않고, 7일의 유예기간 뒤에 확정돼요.\n'
-            '그 안에 다시 로그인하면 탈퇴가 자동으로 취소돼요.',
+            '?덊눜瑜??꾨Ⅴ硫?諛붾줈 ?щ씪吏吏 ?딄퀬, 7?쇱쓽 ?좎삁湲곌컙 ?ㅼ뿉 ?뺤젙?쇱슂.\n'
+            '洹??덉뿉 ?ㅼ떆 濡쒓렇?명븯硫??덊눜媛 ?먮룞?쇰줈 痍⑥냼?쇱슂.',
           ),
           const SizedBox(height: PopqSpacing.md),
           Text(
-            '유예기간 없이 지금 바로 탈퇴하려면 아래에\n'
+            '?좎삁湲곌컙 ?놁씠 吏湲?諛붾줈 ?덊눜?섎젮硫??꾨옒??n'
             '"${widget.expectedPhrase}"\n'
-            '를 정확히 입력하세요.',
+            '瑜??뺥솗???낅젰?섏꽭??',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: PopqSpacing.sm),
@@ -756,13 +756,13 @@ class _WithdrawDialogState extends State<_WithdrawDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
+          child: const Text('痍⑥냼'),
         ),
         TextButton(
           onPressed: () => Navigator.of(context).pop(
             const _WithdrawDialogResult(immediate: false),
           ),
-          child: const Text('7일 후 탈퇴'),
+          child: const Text('7?????덊눜'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
@@ -773,7 +773,7 @@ class _WithdrawDialogState extends State<_WithdrawDialog> {
                     const _WithdrawDialogResult(immediate: true),
                   )
               : null,
-          child: const Text('지금 바로 탈퇴'),
+          child: const Text('吏湲?諛붾줈 ?덊눜'),
         ),
       ],
     );
@@ -899,7 +899,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                             children: [
                               Flexible(
                                 child: Text(
-                                  '${profile.name}님',
+                                  '${profile.name}??,
                                   maxLines: 1,
                                   overflow: TextOverflow
                                       .ellipsis,
@@ -1013,7 +1013,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                   child: _StatItem(
                     icon:
                     Icons.star_border_rounded,
-                    label: '찜한 이벤트',
+                    label: '李쒗븳 ?대깽??,
                     value:
                     '${profile.interestCount}',
                   ),
@@ -1023,7 +1023,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                   child: _StatItem(
                     icon: Icons
                         .confirmation_number_outlined,
-                    label: '참여한 이벤트',
+                    label: '李몄뿬???대깽??,
                     value:
                     '${profile.orderCount}',
                   ),
@@ -1033,7 +1033,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                   child: _StatItem(
                     icon: Icons
                         .calendar_today_outlined,
-                    label: '방문 횟수',
+                    label: '諛⑸Ц ?잛닔',
                     value:
                     '${_ProfileTemporaryStats.visitCount}',
                   ),
@@ -1042,7 +1042,7 @@ class _ProfileHeaderCard extends StatelessWidget {
                 Expanded(
                   child: _StatItem(
                     icon: Icons.paid_outlined,
-                    label: '보유 포인트',
+                    label: '蹂댁쑀 ?ъ씤??,
                     value: _ProfileTemporaryStats
                         .pointLabel,
                     highlight: true,

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -215,10 +215,10 @@ class _SellerCustomerChatScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(conversation?.customerName ?? '고객 문의'),
+        title: Text(conversation?.customerName ?? '怨좉컼 臾몄쓽'),
         actions: [
           IconButton(
-            tooltip: '새로고침',
+            tooltip: '?덈줈怨좎묠',
             onPressed: _loading ||
                     _sending ||
                     _refreshing ||
@@ -241,13 +241,13 @@ class _SellerCustomerChatScreenState
   Widget _buildBody() {
     if (_loading) {
       return const PopqLoadingView(
-        message: '고객 문의를 불러오고 있어요.',
+        message: '怨좉컼 臾몄쓽瑜?遺덈윭?ㅺ퀬 ?덉뼱??',
       );
     }
 
     if (_error != null || _conversation == null) {
       return PopqErrorView(
-        message: '고객 문의 내용을 불러오지 못했어요.',
+        message: '怨좉컼 臾몄쓽 ?댁슜??遺덈윭?ㅼ? 紐삵뻽?댁슂.',
         onRetry: _loadConversation,
       );
     }
@@ -262,8 +262,8 @@ class _SellerCustomerChatScreenState
                 hasScrollBody: false,
                 child: PopqEmptyView(
                   icon: Icons.chat_bubble_outline_rounded,
-                  title: '아직 대화가 없어요.',
-                  description: '아래 입력창에서 고객에게 첫 답변을 보내 보세요.',
+                  title: '?꾩쭅 ??붽? ?놁뼱??',
+                  description: '?꾨옒 ?낅젰李쎌뿉??怨좉컼?먭쾶 泥??듬???蹂대궡 蹂댁꽭??',
                 ),
               ),
             ],
@@ -403,7 +403,7 @@ class _SellerCustomerChatScreenState
       onEvent: _handleRealtimeEvent,
       onError: (Object error) {
         debugPrint(
-          '판매자 주문 채팅 구독 오류: $error',
+          '?먮ℓ??二쇰Ц 梨꾪똿 援щ룆 ?ㅻ쪟: $error',
         );
       },
     );
@@ -581,7 +581,7 @@ class _SellerCustomerChatScreenState
       );
     } catch (error) {
       debugPrint(
-        '판매자 메시지 읽음 REST fallback 실패: $error',
+        '?먮ℓ??硫붿떆吏 ?쎌쓬 REST fallback ?ㅽ뙣: $error',
       );
     }
   }
@@ -800,9 +800,9 @@ class _SellerCustomerChatScreenState
         _loadingOlder = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('이전 메시지를 불러오지 못했어요.'),
+          content: Text('?댁쟾 硫붿떆吏瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.'),
         ),
       );
     }
@@ -874,9 +874,9 @@ class _SellerCustomerChatScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('최신 메시지를 불러오지 못했어요.'),
+          content: Text('理쒖떊 硫붿떆吏瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.'),
         ),
       );
     } finally {
@@ -990,7 +990,7 @@ class _SellerCustomerChatScreenState
         _scrollToLatestMessage();
       }
     } catch (error, stackTrace) {
-      debugPrint('고객 문의 상세 자동 갱신 실패: $error');
+      debugPrint('怨좉컼 臾몄쓽 ?곸꽭 ?먮룞 媛깆떊 ?ㅽ뙣: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _pollRequestInProgress = false;
@@ -1006,9 +1006,9 @@ class _SellerCustomerChatScreenState
     }
 
     if (content.length > 2000) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('메시지는 2,000자 이하로 입력해 주세요.'),
+          content: Text('硫붿떆吏??2,000???댄븯濡??낅젰??二쇱꽭??'),
         ),
       );
       return;
@@ -1170,12 +1170,12 @@ class _SellerCustomerChatScreenState
         _sending = false;
       });
 
-      debugPrint('판매자 메시지 전송 실패: $error');
+      debugPrint('?먮ℓ??硫붿떆吏 ?꾩넚 ?ㅽ뙣: $error');
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '메시지 전송에 실패했어요. 말풍선 아래 재전송을 눌러 주세요.',
+            '硫붿떆吏 ?꾩넚???ㅽ뙣?덉뼱?? 留먰뭾???꾨옒 ?ъ쟾?≪쓣 ?뚮윭 二쇱꽭??',
           ),
         ),
       );
@@ -1455,7 +1455,7 @@ class _OlderMessagesLoadingIndicator extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           SizedBox(width: PopqSpacing.sm),
-          Text('이전 메시지를 불러오는 중...'),
+          Text('?댁쟾 硫붿떆吏瑜?遺덈윭?ㅻ뒗 以?..'),
         ],
       ),
     );
@@ -1478,9 +1478,9 @@ class _OrderSummaryCard extends StatelessWidget {
     final itemSummary = conversation.orderItems
         .map(
           (item) =>
-      '${item.productName} ${item.quantity}개',
+      '${item.productName} ${item.quantity}媛?,
     )
-        .join(' · ');
+        .join(' 쨌 ');
 
     return Container(
       width: double.infinity,
@@ -1533,7 +1533,7 @@ class _OrderSummaryCard extends StatelessWidget {
           ),
           Text(
             itemSummary.isEmpty
-                ? '주문 상품 정보 없음'
+                ? '二쇰Ц ?곹뭹 ?뺣낫 ?놁쓬'
                 : itemSummary,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1547,8 +1547,8 @@ class _OrderSummaryCard extends StatelessWidget {
           ),
           Text(
             '${_orderTypeLabel(conversation.orderType)}'
-                ' · ${conversation.totalQuantity}개'
-                ' · ${_won(conversation.totalAmount)}',
+                ' 쨌 ${conversation.totalQuantity}媛?
+                ' 쨌 ${_won(conversation.totalAmount)}',
             style: theme.textTheme.bodySmall,
           ),
         ],
@@ -1753,7 +1753,7 @@ class _OutgoingMessageBubble extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    '전송 실패',
+                    '?꾩넚 ?ㅽ뙣',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.error,
                       fontWeight: FontWeight.w700,
@@ -1766,7 +1766,7 @@ class _OutgoingMessageBubble extends StatelessWidget {
                       Icons.refresh_rounded,
                       size: 17,
                     ),
-                    label: const Text('재전송'),
+                    label: const Text('?ъ쟾??),
                     style: TextButton.styleFrom(
                       minimumSize: const Size(0, 32),
                       padding: const EdgeInsets.symmetric(
@@ -1789,7 +1789,7 @@ class _OutgoingMessageBubble extends StatelessWidget {
                   ),
                   const SizedBox(width: PopqSpacing.xs),
                   Text(
-                    '전송 중',
+                    '?꾩넚 以?,
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -1981,7 +1981,7 @@ class _MessageTime extends StatelessWidget {
       children: [
         if (showRead)
           Text(
-            read ? '읽음' : '전송됨',
+            read ? '?쎌쓬' : '?꾩넚??,
             style: textStyle,
           ),
         Text(
@@ -2042,7 +2042,7 @@ class _MessageComposer extends StatelessWidget {
                   decoration:
                   const InputDecoration(
                     hintText:
-                    '고객에게 답변을 입력하세요.',
+                    '怨좉컼?먭쾶 ?듬????낅젰?섏꽭??',
                     counterText: '',
                     contentPadding:
                     EdgeInsets.symmetric(
@@ -2057,7 +2057,7 @@ class _MessageComposer extends StatelessWidget {
                 width: PopqSpacing.sm,
               ),
               IconButton.filled(
-                tooltip: '메시지 전송',
+                tooltip: '硫붿떆吏 ?꾩넚',
                 onPressed:
                 sending ? null : onSend,
                 icon: sending
@@ -2082,24 +2082,24 @@ class _MessageComposer extends StatelessWidget {
 
 String _orderTypeLabel(String value) {
   return switch (value) {
-    'TAKEOUT' => '포장',
-    'DINE_IN' => '매장 식사',
-    'DELIVERY' => '배달',
+    'TAKEOUT' => '?ъ옣',
+    'DINE_IN' => '留ㅼ옣 ?앹궗',
+    'DELIVERY' => '諛곕떖',
     _ => value,
   };
 }
 
 String _orderStatusLabel(String value) {
   return switch (value) {
-    'CREATED' => '결제 대기',
-    'PLACED' => '접수 대기',
-    'ACCEPTED' => '접수 완료',
-    'PREPARING' => '준비 중',
-    'READY' => '준비 완료',
-    'COMPLETED' => '주문 완료',
-    'REJECTED' => '주문 거절',
-    'CANCELED' => '주문 취소',
-    'EXPIRED' => '결제 만료',
+    'CREATED' => '寃곗젣 ?湲?,
+    'PLACED' => '?묒닔 ?湲?,
+    'ACCEPTED' => '?묒닔 ?꾨즺',
+    'PREPARING' => '以鍮?以?,
+    'READY' => '以鍮??꾨즺',
+    'COMPLETED' => '二쇰Ц ?꾨즺',
+    'REJECTED' => '二쇰Ц 嫄곗젅',
+    'CANCELED' => '二쇰Ц 痍⑥냼',
+    'EXPIRED' => '寃곗젣 留뚮즺',
     _ => value,
   };
 }
@@ -2122,7 +2122,7 @@ String _won(int amount) {
     buffer.write(digits[index]);
   }
 
-  return '$buffer원';
+  return '$buffer??;
 }
 
 String _twoDigits(int value) {

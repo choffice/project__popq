@@ -1,8 +1,9 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -63,9 +64,9 @@ class PopqSellerApp extends StatefulWidget {
   final PopqThemeController? themeController;
   final SellerAuthRepository? authRepository;
 
-  /// 스플래시 화면(부트스트랩)을 최소 이 시간만큼 보여줍니다.
+  /// ?ㅽ뵆?섏떆 ?붾㈃(遺?몄뒪?몃옪)??理쒖냼 ???쒓컙留뚰겮 蹂댁뿬以띾땲??
   ///
-  /// 위젯 테스트에서는 [Duration.zero]로 넘겨서 스플래시를 건너뛸 수 있습니다.
+  /// ?꾩젽 ?뚯뒪?몄뿉?쒕뒗 [Duration.zero]濡??섍꺼???ㅽ뵆?섏떆瑜?嫄대꼫?????덉뒿?덈떎.
   final Duration splashMinDuration;
 
   @override
@@ -139,7 +140,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final useMemoryStorage =
         kIsWeb && widget.environment.flavor == AppFlavor.development;
 
-    // 오창
+    // ?ㅼ갹
     final isWebDevelopment =
         kIsWeb && widget.environment.flavor == AppFlavor.development;
 
@@ -185,7 +186,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    //오창
+    //?ㅼ갹
     if (!(kIsWeb &&
     widget.environment.flavor == AppFlavor.development)) {
       _googleAuthService = GoogleAuthService(
@@ -349,8 +350,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final idToken = await _googleAuthService.signInAndGetIdToken();
 
     debugPrint(
-      '판매자 Google 로그인 성공: ID Token 수신 '
-      '(${idToken.length}자)',
+      '?먮ℓ??Google 濡쒓렇???깃났: ID Token ?섏떊 '
+      '(${idToken.length}??',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -365,8 +366,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final accessToken = await _kakaoAuthService.signInAndGetAccessToken();
 
     debugPrint(
-      '판매자 Kakao 로그인 성공: Access Token 수신 '
-      '(${accessToken.length}자)',
+      '?먮ℓ??Kakao 濡쒓렇???깃났: Access Token ?섏떊 '
+      '(${accessToken.length}??',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -381,8 +382,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     final accessToken = await _naverAuthService.signInAndGetAccessToken();
 
     debugPrint(
-      '판매자 Naver 로그인 성공: Access Token 수신 '
-      '(${accessToken.length}자)',
+      '?먮ℓ??Naver 濡쒓렇???깃났: Access Token ?섏떊 '
+      '(${accessToken.length}??',
     );
 
     final result = await _authRepository.socialLogIn(
@@ -398,7 +399,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       '/api/v1/dev/auth/login',
       body: {
         'email': 'map-seed@popq.local',
-        'name': 'POPQ 지도 테스트 판매자',
+        'name': 'POPQ 吏???뚯뒪???먮ℓ??,
         'role': 'SELLER',
       },
       decode: (value) {
@@ -439,7 +440,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
   void _handlePushDeepLink(String deepLink) {
     if (!_isSellerChatDeepLink(deepLink)) {
-      debugPrint('Seller 지원하지 않는 알림 경로: $deepLink');
+      debugPrint('Seller 吏?먰븯吏 ?딅뒗 ?뚮┝ 寃쎈줈: $deepLink');
       return;
     }
 
@@ -514,7 +515,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         _router.go(uri.path);
       });
     } catch (error, stackTrace) {
-      debugPrint('Seller 알림 채팅 이동 실패: $error');
+      debugPrint('Seller ?뚮┝ 梨꾪똿 ?대룞 ?ㅽ뙣: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _openingPushDeepLink = false;
@@ -552,8 +553,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       if (settings.authorizationStatus == AuthorizationStatus.denied ||
           settings.authorizationStatus == AuthorizationStatus.notDetermined) {
         debugPrint(
-          'Seller 알림 권한이 없어 '
-          'FCM 기기를 등록하지 않습니다.',
+          'Seller ?뚮┝ 沅뚰븳???놁뼱 '
+          'FCM 湲곌린瑜??깅줉?섏? ?딆뒿?덈떎.',
         );
         return;
       }
@@ -562,8 +563,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
 
       if (token == null || token.trim().isEmpty) {
         debugPrint(
-          'Seller FCM 토큰이 없어 '
-          '기기를 등록하지 않습니다.',
+          'Seller FCM ?좏겙???놁뼱 '
+          '湲곌린瑜??깅줉?섏? ?딆뒿?덈떎.',
         );
         return;
       }
@@ -579,12 +580,12 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       );
 
       debugPrint(
-        'Seller FCM 기기 등록 완료: '
+        'Seller FCM 湲곌린 ?깅줉 ?꾨즺: '
         'deviceId=${device.deviceId}, '
         'platform=${device.platform}',
       );
     } catch (error, stackTrace) {
-      debugPrint('Seller FCM 기기 등록 실패: $error');
+      debugPrint('Seller FCM 湲곌린 ?깅줉 ?ㅽ뙣: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -732,10 +733,10 @@ class _SellerBackButtonDispatcher extends RootBackButtonDispatcher {
     final messenger = _scaffoldMessengerKey.currentState;
 
     messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
+      ?..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
-          content: Text('한 번 더 누르면 앱이 종료됩니다.'),
+          content: Text('??踰????꾨Ⅴ硫??깆씠 醫낅즺?⑸땲??'),
           duration: _exitConfirmDuration,
         ),
       );
@@ -751,3 +752,4 @@ class _SellerBackButtonDispatcher extends RootBackButtonDispatcher {
     return location;
   }
 }
+

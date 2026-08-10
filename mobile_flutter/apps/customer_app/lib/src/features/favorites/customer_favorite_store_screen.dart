@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -75,13 +75,13 @@ class _CustomerFavoriteStoreScreenState
   Widget build(BuildContext context) {
     if (_isLoading && _stores.isEmpty) {
       return const PopqLoadingView(
-        message: '찜한 매장을 불러오고 있어요.',
+        message: '李쒗븳 留ㅼ옣??遺덈윭?ㅺ퀬 ?덉뼱??',
       );
     }
 
     if (_loadError != null && _stores.isEmpty) {
       return PopqErrorView(
-        message: '찜한 매장을 불러오지 못했어요.',
+        message: '李쒗븳 留ㅼ옣??遺덈윭?ㅼ? 紐삵뻽?댁슂.',
         onRetry: _load,
       );
     }
@@ -128,7 +128,7 @@ class _CustomerFavoriteStoreScreenState
             )
           else ...[
             Text(
-              '총 ${_stores.length}곳',
+              '珥?${_stores.length}怨?,
               style: Theme.of(context)
                   .textTheme
                   .labelLarge
@@ -203,19 +203,19 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
-              '${store.name}을(를) 찜에서 삭제했어요.',
+              '${store.name}??瑜? 李쒖뿉????젣?덉뼱??',
             ),
             duration: _snackBarDuration,
 
-            // action이 있어도 3초 뒤 자동으로 사라지게 합니다.
+            // action???덉뼱??3珥????먮룞?쇰줈 ?щ씪吏寃??⑸땲??
             persist: false,
 
             action: SnackBarAction(
-              label: '되돌리기',
+              label: '?섎룎由ш린',
               onPressed: () {
                 unawaited(
                   _restoreInterest(store),
@@ -233,11 +233,11 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
-              '찜을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
+              '李쒖쓣 ??젣?섏? 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??',
             ),
             duration: _snackBarDuration,
           ),
@@ -287,11 +287,11 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
-              '${store.name}을(를) 다시 찜했어요.',
+              '${store.name}??瑜? ?ㅼ떆 李쒗뻽?댁슂.',
             ),
             duration: _snackBarDuration,
           ),
@@ -305,11 +305,11 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
-              '찜을 다시 등록하지 못했어요.',
+              '李쒖쓣 ?ㅼ떆 ?깅줉?섏? 紐삵뻽?댁슂.',
             ),
             duration: _snackBarDuration,
           ),
@@ -385,7 +385,7 @@ class _FavoriteHeader extends StatelessWidget {
               CrossAxisAlignment.start,
               children: [
                 Text(
-                  '내가 찜한 매장',
+                  '?닿? 李쒗븳 留ㅼ옣',
                   style: theme
                       .textTheme
                       .titleLarge
@@ -398,7 +398,7 @@ class _FavoriteHeader extends StatelessWidget {
                   height: PopqSpacing.xs,
                 ),
                 Text(
-                  '다시 방문하고 싶은 매장을 한곳에서 확인하세요.',
+                  '?ㅼ떆 諛⑸Ц?섍퀬 ?띠? 留ㅼ옣???쒓납?먯꽌 ?뺤씤?섏꽭??',
                   style: theme
                       .textTheme
                       .bodySmall
@@ -469,13 +469,13 @@ class _FavoriteLoadNotice
           ),
           const Expanded(
             child: Text(
-              '새로운 찜 목록을 불러오지 못했어요. 현재 목록을 표시하고 있어요.',
+              '?덈줈??李?紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?댁슂. ?꾩옱 紐⑸줉???쒖떆?섍퀬 ?덉뼱??',
             ),
           ),
           TextButton(
             onPressed: onRetry,
             child: const Text(
-              '재시도',
+              '?ъ떆??,
             ),
           ),
         ],
@@ -544,7 +544,7 @@ class _FavoriteEmptyView
             height: PopqSpacing.md,
           ),
           Text(
-            '아직 찜한 매장이 없어요.',
+            '?꾩쭅 李쒗븳 留ㅼ옣???놁뼱??',
             style: theme
                 .textTheme
                 .titleLarge
@@ -556,7 +556,7 @@ class _FavoriteEmptyView
             height: PopqSpacing.sm,
           ),
           Text(
-            '관심 있는 매장의 하트를 누르면\n이곳에서 빠르게 다시 찾을 수 있어요.',
+            '愿???덈뒗 留ㅼ옣???섑듃瑜??꾨Ⅴ硫?n?닿납?먯꽌 鍮좊Ⅴ寃??ㅼ떆 李얠쓣 ???덉뼱??',
             textAlign: TextAlign.center,
             style: theme
                 .textTheme
@@ -576,7 +576,7 @@ class _FavoriteEmptyView
               Icons.search_rounded,
             ),
             label: const Text(
-              '매장 둘러보기',
+              '留ㅼ옣 ?섎윭蹂닿린',
             ),
           ),
         ],
@@ -723,7 +723,7 @@ class _FavoriteStoreCard
                           .isNotEmpty ==
                           true
                           ? store.description!
-                          : '매장 상세에서 메뉴와 정보를 확인해 보세요.',
+                          : '留ㅼ옣 ?곸꽭?먯꽌 硫붾돱? ?뺣낫瑜??뺤씤??蹂댁꽭??',
                       maxLines: 2,
                       overflow:
                       TextOverflow.ellipsis,
@@ -756,7 +756,7 @@ class _FavoriteStoreCard
                         Expanded(
                           child: Text(
                             store.fullAddress.isEmpty
-                                ? '주소 정보 없음'
+                                ? '二쇱냼 ?뺣낫 ?놁쓬'
                                 : store.fullAddress,
                             maxLines: 1,
                             overflow:
@@ -791,7 +791,7 @@ class _FavoriteStoreCard
                 )
               else
                 IconButton(
-                  tooltip: '찜 삭제',
+                  tooltip: '李???젣',
                   onPressed: onRemovePressed,
                   icon: const Icon(
                     Icons.favorite_rounded,
@@ -825,10 +825,10 @@ class _BusinessStatusBadge
         businessStatus == 'OPEN';
 
     final label = switch (businessStatus) {
-      'OPEN' => '영업 중',
-      'PRE_OPEN' => '영업 준비',
-      'CLOSED' => '영업 종료',
-      'TEMPORARILY_CLOSED' => '임시 휴무',
+      'OPEN' => '?곸뾽 以?,
+      'PRE_OPEN' => '?곸뾽 以鍮?,
+      'CLOSED' => '?곸뾽 醫낅즺',
+      'TEMPORARILY_CLOSED' => '?꾩떆 ?대Т',
       _ => businessStatus,
     };
 
@@ -876,3 +876,4 @@ class _BusinessStatusBadge
     );
   }
 }
+

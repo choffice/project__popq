@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'customer_engagement_repository.dart';
@@ -31,20 +31,20 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('리뷰 작성')),
+      appBar: AppBar(title: const Text('由щ럭 ?묒꽦')),
       body: ListView(
         padding: const EdgeInsets.all(PopqSpacing.lg),
         children: [
-          Text('주문은 어떠셨나요?', style: Theme.of(context).textTheme.headlineSmall),
+          Text('二쇰Ц? ?대뼚?⑤굹??', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: PopqSpacing.sm),
-          const Text('완료된 주문에는 리뷰를 한 번만 작성할 수 있어요.'),
+          const Text('?꾨즺??二쇰Ц?먮뒗 由щ럭瑜???踰덈쭔 ?묒꽦?????덉뼱??'),
           const SizedBox(height: PopqSpacing.xl),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               for (var value = 1; value <= 5; value++)
                 IconButton(
-                  tooltip: '별 $value개',
+                  tooltip: '蹂?$value媛?,
                   onPressed: _saving
                       ? null
                       : () => setState(() => _rating = value),
@@ -65,8 +65,8 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
             maxLength: 1000,
             maxLines: 7,
             decoration: const InputDecoration(
-              labelText: '리뷰 내용',
-              hintText: '좋았던 점과 아쉬웠던 점을 남겨주세요.',
+              labelText: '由щ럭 ?댁슜',
+              hintText: '醫뗭븯???먭낵 ?꾩돩?좊뜕 ?먯쓣 ?④꺼二쇱꽭??',
               alignLabelWithHint: true,
               border: OutlineInputBorder(),
             ),
@@ -75,7 +75,7 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
           FilledButton.icon(
             onPressed: _saving ? null : _save,
             icon: const Icon(Icons.rate_review_rounded),
-            label: Text(_saving ? '등록 중...' : '리뷰 등록'),
+            label: Text(_saving ? '?깅줉 以?..' : '由щ럭 ?깅줉'),
           ),
         ],
       ),
@@ -96,7 +96,8 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('리뷰를 등록하지 못했어요.')));
+      ).showTopSnackBar(const SnackBar(content: Text('由щ럭瑜??깅줉?섏? 紐삵뻽?댁슂.')));
     }
   }
 }
+

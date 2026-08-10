@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -63,8 +63,8 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _editProfileImage() async {
@@ -90,8 +90,8 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       _showMessage(
         pickerSource == ImageSource.camera
-            ? '카메라를 실행하지 못했습니다.'
-            : '갤러리에서 사진을 불러오지 못했습니다.',
+            ? '移대찓?쇰? ?ㅽ뻾?섏? 紐삵뻽?듬땲??'
+            : '媛ㅻ윭由ъ뿉???ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
       );
       return;
     }
@@ -106,13 +106,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       await _reloadProfile();
 
       if (!mounted) return;
-      _showMessage('프로필 사진이 변경됐어요.');
+      _showMessage('?꾨줈???ъ쭊??蹂寃쎈릱?댁슂.');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('프로필 사진을 변경하지 못했어요. ($error)');
+      _showMessage('?꾨줈???ъ쭊??蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)');
     } finally {
       if (mounted) {
         setState(() => _uploadingProfileImage = false);
@@ -124,9 +124,9 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (context) => _TextEditDialog(
-        title: '이름 변경',
+        title: '?대쫫 蹂寃?,
         initialValue: currentName,
-        hintText: '이름을 입력하세요',
+        hintText: '?대쫫???낅젰?섏꽭??,
       ),
     );
 
@@ -137,13 +137,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       await _reloadProfile();
       if (!mounted) return;
-      _showMessage('이름이 변경됐어요.');
+      _showMessage('?대쫫??蹂寃쎈릱?댁슂.');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('이름을 변경하지 못했어요. ($error)');
+      _showMessage('?대쫫??蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)');
     }
   }
 
@@ -160,13 +160,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       await _reloadProfile();
       if (!mounted) return;
-      _showMessage('전화번호가 변경됐어요.');
+      _showMessage('?꾪솕踰덊샇媛 蹂寃쎈릱?댁슂.');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('전화번호를 변경하지 못했어요. ($error)');
+      _showMessage('?꾪솕踰덊샇瑜?蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)');
     }
   }
 
@@ -189,11 +189,11 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
-              '비밀번호가 변경되어 모든 기기에서 로그아웃됐어요. 새 비밀번호로 다시 로그인해 주세요.',
+              '鍮꾨?踰덊샇媛 蹂寃쎈릺??紐⑤뱺 湲곌린?먯꽌 濡쒓렇?꾩썐?먯뼱?? ??鍮꾨?踰덊샇濡??ㅼ떆 濡쒓렇?명빐 二쇱꽭??',
             ),
           ),
         );
@@ -203,7 +203,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('비밀번호를 변경하지 못했어요. ($error)');
+      _showMessage('鍮꾨?踰덊샇瑜?蹂寃쏀븯吏 紐삵뻽?댁슂. ($error)');
     }
   }
 
@@ -218,7 +218,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     };
 
     if (callback == null) {
-      _showMessage('현재 지원되지 않는 연동이에요.');
+      _showMessage('?꾩옱 吏?먮릺吏 ?딅뒗 ?곕룞?댁뿉??');
       return;
     }
 
@@ -228,13 +228,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       await _reloadLinkedSocialProviders();
       if (!mounted) return;
-      _showMessage('${_socialProviderLabel(provider)} 연동이 완료됐어요.');
+      _showMessage('${_socialProviderLabel(provider)} ?곕룞???꾨즺?먯뼱??');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('${_socialProviderLabel(provider)} 연동에 실패했어요. ($error)');
+      _showMessage('${_socialProviderLabel(provider)} ?곕룞???ㅽ뙣?덉뼱?? ($error)');
     } finally {
       if (mounted) {
         setState(() => _linkingProvider = null);
@@ -245,17 +245,17 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('내 정보')),
+      appBar: AppBar(title: const Text('???뺣낫')),
       body: FutureBuilder<CustomerProfile>(
         future: _profile,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const PopqLoadingView(message: '내 정보를 불러오고 있어요.');
+            return const PopqLoadingView(message: '???뺣낫瑜?遺덈윭?ㅺ퀬 ?덉뼱??');
           }
 
           if (snapshot.hasError || !snapshot.hasData) {
             return PopqErrorView(
-              message: '내 정보를 불러오지 못했어요.',
+              message: '???뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.',
               onRetry: _reloadProfile,
             );
           }
@@ -329,7 +329,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.badge_outlined),
-                        title: const Text('이름'),
+                        title: const Text('?대쫫'),
                         subtitle: Text(profile.name),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editName(profile.name),
@@ -337,16 +337,16 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                       const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.mail_outline_rounded),
-                        title: const Text('이메일 (ID)'),
+                        title: const Text('?대찓??(ID)'),
                         subtitle: Text(profile.email),
                       ),
                       const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.call_outlined),
-                        title: const Text('전화번호'),
+                        title: const Text('?꾪솕踰덊샇'),
                         subtitle: Text(
                           formatKoreanPhoneNumber(profile.phone) ??
-                              '등록된 전화번호가 없어요',
+                              '?깅줉???꾪솕踰덊샇媛 ?놁뼱??,
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editPhone(profile.phone),
@@ -359,15 +359,15 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                   clipBehavior: Clip.antiAlias,
                   child: ListTile(
                     leading: const Icon(Icons.lock_outline_rounded),
-                    title: const Text('비밀번호 변경'),
-                    subtitle: const Text('로그인 비밀번호를 변경해요'),
+                    title: const Text('鍮꾨?踰덊샇 蹂寃?),
+                    subtitle: const Text('濡쒓렇??鍮꾨?踰덊샇瑜?蹂寃쏀빐??),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: _changePassword,
                   ),
                 ),
                 const SizedBox(height: PopqSpacing.md),
                 Text(
-                  '소셜 로그인 연동',
+                  '?뚯뀥 濡쒓렇???곕룞',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: PopqSpacing.sm),
@@ -402,7 +402,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                           ListTile(
                             leading: const Icon(Icons.link_rounded),
                             title: Text(_socialProviderLabel(provider)),
-                            trailing: const Text('연동됨'),
+                            trailing: const Text('?곕룞??),
                           ),
                         for (final provider in linkable)
                           ListTile(
@@ -417,7 +417,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                                   )
                                 : TextButton(
                                     onPressed: () => _linkProvider(provider),
-                                    child: const Text('연동하기'),
+                                    child: const Text('?곕룞?섍린'),
                                   ),
                           ),
                       ];
@@ -445,20 +445,20 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 String _socialProviderLabel(String provider) {
   return switch (provider) {
     'GOOGLE' => 'Google',
-    'KAKAO' => '카카오',
-    'NAVER' => '네이버',
+    'KAKAO' => '移댁뭅??,
+    'NAVER' => '?ㅼ씠踰?,
     'FIREBASE' => 'Firebase',
     _ => provider,
   };
 }
 
-/// "010"으로 시작하는 11자리 휴대폰 번호인지 검사합니다.
-/// 백엔드의 `UpdatePhoneRequest` 정규식(`^010-?\d{4}-?\d{4}$`)과 동일한 규칙입니다.
+/// "010"?쇰줈 ?쒖옉?섎뒗 11?먮━ ?대???踰덊샇?몄? 寃?ы빀?덈떎.
+/// 諛깆뿏?쒖쓽 `UpdatePhoneRequest` ?뺢퇋??`^010-?\d{4}-?\d{4}$`)怨??숈씪??洹쒖튃?낅땲??
 bool isValidKoreanPhoneNumber(String digitsOnly) {
   return RegExp(r'^010\d{8}$').hasMatch(digitsOnly);
 }
 
-/// 숫자만 있는 전화번호(예: "01012345678")를 "010-1234-5678" 형태로 변환합니다.
+/// ?レ옄留??덈뒗 ?꾪솕踰덊샇(?? "01012345678")瑜?"010-1234-5678" ?뺥깭濡?蹂?섑빀?덈떎.
 String? formatKoreanPhoneNumber(String? raw) {
   final digits = raw?.replaceAll(RegExp(r'[^0-9]'), '') ?? '';
   if (digits.isEmpty) return null;
@@ -525,7 +525,7 @@ class _TextEditDialogState extends State<_TextEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
+          child: const Text('痍⑥냼'),
         ),
         FilledButton(
           onPressed: () {
@@ -533,7 +533,7 @@ class _TextEditDialogState extends State<_TextEditDialog> {
             if (value.isEmpty) return;
             Navigator.of(context).pop(value);
           },
-          child: const Text('저장'),
+          child: const Text('???),
         ),
       ],
     );
@@ -565,13 +565,13 @@ class _PhoneEditDialogState extends State<_PhoneEditDialog> {
     final digits = _controller.text.replaceAll(RegExp(r'[^0-9]'), '');
 
     if (digits.isEmpty) {
-      setState(() => _errorText = '전화번호를 입력해 주세요.');
+      setState(() => _errorText = '?꾪솕踰덊샇瑜??낅젰??二쇱꽭??');
       return;
     }
 
     if (!isValidKoreanPhoneNumber(digits)) {
       setState(
-        () => _errorText = '전화번호를 다시 확인해 주세요.',
+        () => _errorText = '?꾪솕踰덊샇瑜??ㅼ떆 ?뺤씤??二쇱꽭??',
       );
       return;
     }
@@ -582,7 +582,7 @@ class _PhoneEditDialogState extends State<_PhoneEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('전화번호 변경'),
+      title: const Text('?꾪솕踰덊샇 蹂寃?),
       content: TextField(
         controller: _controller,
         keyboardType: TextInputType.phone,
@@ -600,11 +600,11 @@ class _PhoneEditDialogState extends State<_PhoneEditDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
+          child: const Text('痍⑥냼'),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('저장'),
+          child: const Text('???),
         ),
       ],
     );
@@ -648,12 +648,12 @@ class _PasswordChangeDialogState extends State<_PasswordChangeDialog> {
     final confirmPassword = _confirmPasswordController.text;
 
     if (currentPassword.isEmpty || newPassword.isEmpty) {
-      setState(() => _errorText = '모든 항목을 입력해 주세요.');
+      setState(() => _errorText = '紐⑤뱺 ??ぉ???낅젰??二쇱꽭??');
       return;
     }
 
     if (newPassword != confirmPassword) {
-      setState(() => _errorText = '새 비밀번호가 서로 달라요.');
+      setState(() => _errorText = '??鍮꾨?踰덊샇媛 ?쒕줈 ?щ씪??');
       return;
     }
 
@@ -669,7 +669,7 @@ class _PasswordChangeDialogState extends State<_PasswordChangeDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       scrollable: true,
-      title: const Text('비밀번호 변경'),
+      title: const Text('鍮꾨?踰덊샇 蹂寃?),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -677,22 +677,22 @@ class _PasswordChangeDialogState extends State<_PasswordChangeDialog> {
           TextField(
             controller: _currentPasswordController,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '현재 비밀번호'),
+            decoration: const InputDecoration(labelText: '?꾩옱 鍮꾨?踰덊샇'),
           ),
           const SizedBox(height: PopqSpacing.sm),
           TextField(
             controller: _newPasswordController,
             obscureText: true,
             decoration: const InputDecoration(
-              labelText: '새 비밀번호',
-              helperText: '영문, 숫자 포함 8자 이상',
+              labelText: '??鍮꾨?踰덊샇',
+              helperText: '?곷Ц, ?レ옄 ?ы븿 8???댁긽',
             ),
           ),
           const SizedBox(height: PopqSpacing.sm),
           TextField(
             controller: _confirmPasswordController,
             obscureText: true,
-            decoration: const InputDecoration(labelText: '새 비밀번호 확인'),
+            decoration: const InputDecoration(labelText: '??鍮꾨?踰덊샇 ?뺤씤'),
           ),
           if (_errorText != null) ...[
             const SizedBox(height: PopqSpacing.sm),
@@ -706,13 +706,14 @@ class _PasswordChangeDialogState extends State<_PasswordChangeDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('취소'),
+          child: const Text('痍⑥냼'),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('변경'),
+          child: const Text('蹂寃?),
         ),
       ],
     );
   }
 }
+
