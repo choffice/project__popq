@@ -305,31 +305,45 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                       'REJECTED_FAMILY',
                     ];
               final selected = current ? _currentFilter : _recentFilter;
-              return ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: PopqSpacing.md,
-                  vertical: PopqSpacing.sm,
-                ),
-                itemCount: filters.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(width: PopqSpacing.xs),
-                itemBuilder: (context, index) {
-                  final filter = filters[index];
-                  return FilterChip(
-                    label: Text(_filterLabel(filter)),
-                    selected: selected == filter,
-                    selectedColor: const Color(0xFFFFC9BA),
-                    checkmarkColor: const Color(0xFF4A1C12),
-                    labelStyle: TextStyle(
-                      color: selected == filter
-                          ? const Color(0xFF4A1C12)
-                          : Theme.of(context).colorScheme.onSurface,
-                      fontWeight: selected == filter
-                          ? FontWeight.w800
-                          : FontWeight.w500,
+
+              return FutureBuilder<List<SellerOrder>>(
+                future: _orders,
+                builder: (context, orderSnapshot) {
+                  final source = orderSnapshot.data ?? _orderSnapshot;
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PopqSpacing.md,
+                      vertical: PopqSpacing.sm,
                     ),
-                    onSelected: (_) => _selectFilter(filter),
+                    itemCount: filters.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: PopqSpacing.xs),
+                    itemBuilder: (context, index) {
+                      final filter = filters[index];
+                      final count = current
+                          ? _currentOrderCountForFilter(source, filter)
+                          : null;
+                      return FilterChip(
+                        label: Text(
+                          count == null
+                              ? _filterLabel(filter)
+                              : '${_filterLabel(filter)} $count',
+                        ),
+                        selected: selected == filter,
+                        selectedColor: const Color(0xFFFFC9BA),
+                        checkmarkColor: const Color(0xFF4A1C12),
+                        labelStyle: TextStyle(
+                          color: selected == filter
+                              ? const Color(0xFF4A1C12)
+                              : Theme.of(context).colorScheme.onSurface,
+                          fontWeight: selected == filter
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
+                        onSelected: (_) => _selectFilter(filter),
+                      );
+                    },
                   );
                 },
               );
@@ -511,6 +525,23 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     };
   }
 
+  int _currentOrderCountForFilter(
+    List<SellerOrder> orders,
+    String? filter,
+  ) {
+    return orders.where((order) {
+      if (!_currentStatuses.contains(order.status)) return false;
+      return switch (filter) {
+        null => true,
+        'PLACED' => order.status == 'PLACED',
+        'ACCEPTED_PREPARING' =>
+          order.status == 'ACCEPTED' || order.status == 'PREPARING',
+        'READY' => order.status == 'READY',
+        _ => false,
+      };
+    }).length;
+  }
+
   Future<void> _reload() async {
     setState(() {
       _stores = _loadStores();
@@ -520,141 +551,66 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   }
 
   Widget _buildOrderOperationCard(SellerStore store) {
-    final summary = _summariesByStoreId[store.storeId];
-    final waitingCount = summary?.waitingOrderCount ?? 0;
-    final activeCount = summary?.activeOrderCount ?? 0;
-    final readyCount = summary?.readyOrderCount ?? 0;
-    final currentCount = waitingCount + activeCount + readyCount;
     final accepting = store.orderAcceptingEnabled;
     final colorScheme = Theme.of(context).colorScheme;
+    final statusColor = accepting ? colorScheme.primary : colorScheme.error;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(PopqSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  accepting
-                      ? Icons.check_circle_rounded
-                      : Icons.pause_circle_filled_rounded,
-                  color: accepting
-                      ? colorScheme.primary
-                      : colorScheme.error,
-                ),
-                const SizedBox(width: PopqSpacing.xs),
-                Expanded(
-                  child: Text(
-                    accepting ? '신규 주문 접수 중' : '신규 주문 접수 중지',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: PopqSpacing.md),
-            Text(
-              '현재 처리 중',
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: PopqSpacing.sm,
+        vertical: PopqSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            accepting
+                ? Icons.check_circle_rounded
+                : Icons.pause_circle_filled_rounded,
+            size: 18,
+            color: statusColor,
+          ),
+          const SizedBox(width: PopqSpacing.xs),
+          Expanded(
+            child: Text(
+              accepting ? '신규 주문 접수 중' : '신규 주문 접수 중지',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
+                color: statusColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 2),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '$currentCount',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      height: 1.1,
-                    ),
-                  ),
-                  const TextSpan(
-                    text: '건',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          const SizedBox(width: PopqSpacing.xs),
+          TextButton(
+            onPressed: store.canManage && !_updatingOrderAccepting
+                ? () => _changeOrderAccepting(store, !accepting)
+                : null,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 36),
+              padding: const EdgeInsets.symmetric(horizontal: PopqSpacing.sm),
+              foregroundColor: accepting
+                  ? colorScheme.error
+                  : colorScheme.primary,
             ),
-            const SizedBox(height: PopqSpacing.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: _OrderCountBadge(
-                    label: '접수 대기',
-                    count: waitingCount,
+            child: _updatingOrderAccepting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    accepting ? '접수 잠시 중지' : '접수 재개',
+                    style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
-                ),
-                const SizedBox(width: PopqSpacing.xs),
-                Expanded(
-                  child: _OrderCountBadge(
-                    label: '준비 중',
-                    count: activeCount,
-                  ),
-                ),
-                const SizedBox(width: PopqSpacing.xs),
-                Expanded(
-                  child: _OrderCountBadge(
-                    label: '준비 완료',
-                    count: readyCount,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: PopqSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: accepting
-                  ? OutlinedButton.icon(
-                      onPressed: store.canManage && !_updatingOrderAccepting
-                          ? () => _changeOrderAccepting(store, false)
-                          : null,
-                      icon: _updatingOrderAccepting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.pause_circle_outline_rounded),
-                      label: const Text('주문 접수 잠시 중지'),
-                    )
-                  : FilledButton.icon(
-                      onPressed: store.canManage && !_updatingOrderAccepting
-                          ? () => _changeOrderAccepting(store, true)
-                          : null,
-                      icon: _updatingOrderAccepting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.play_circle_outline_rounded),
-                      label: const Text('주문 접수 재개'),
-                    ),
-            ),
-            if (!store.canManage) ...[
-              const SizedBox(height: PopqSpacing.xs),
-              Text(
-                '주문 접수 설정은 점주 또는 매니저만 변경할 수 있어요.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -943,50 +899,6 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       '${date.day.toString().padLeft(2, '0')}';
 }
 
-class _OrderCountBadge extends StatelessWidget {
-  const _OrderCountBadge({
-    required this.label,
-    required this.count,
-  });
-
-  final String label;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PopqSpacing.sm,
-        vertical: PopqSpacing.xs,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$count',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _OrderCard extends StatelessWidget {
   const _OrderCard({required this.order, required this.onTap});
