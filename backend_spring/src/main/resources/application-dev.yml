@@ -17,3 +17,9 @@ popq:
 
   push:
     firebase-enabled: ${POPQ_FIREBASE_ENABLED:false}
+
+  admin-seed:
+    enabled: ${POPQ_ADMIN_SEED_ENABLED:false}
+    email: ${POPQ_ADMIN_EMAIL:}
+    password: ${POPQ_ADMIN_PASSWORD:}
+    name: ${POPQ_ADMIN_NAME:POPQ 관리자}

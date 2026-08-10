@@ -74,6 +74,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
           }
           final store = snapshot.requireData;
           final schedule = store.resolvedSchedule;
+          final orderPaused = !store.orderAcceptingEnabled;
           return ListView(
             padding: const EdgeInsets.all(PopqSpacing.lg),
             children: [
@@ -82,6 +83,10 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                 height: 180,
               ),
               const SizedBox(height: PopqSpacing.lg),
+              if (orderPaused) ...[
+                const _OrderPausedBanner(),
+                const SizedBox(height: PopqSpacing.md),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -271,6 +276,56 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('관심 스토어를 변경하지 못했어요.')));
     }
+  }
+}
+
+
+class _OrderPausedBanner extends StatelessWidget {
+  const _OrderPausedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.pause_circle_outline_rounded,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: PopqSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '현재 주문 접수가 잠시 중단되었어요.',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: PopqSpacing.xs),
+                Text(
+                  '상품은 둘러볼 수 있지만 새로운 주문은 접수 재개 후 진행할 수 있어요.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

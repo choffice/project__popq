@@ -52,6 +52,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   String? _recentFilter;
   late DateTime _pastDate;
   Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
+  List<SellerStore> _storeSnapshot = const <SellerStore>[];
+  var _updatingOrderAccepting = false;
   var _requestSerial = 0;
   var _loadedTabIndex = 0;
   var _lastConnectionEpoch = 0;
@@ -169,52 +171,78 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                 stores.any((store) => store.storeId == selectedId)
                 ? selectedId
                 : null;
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(
-                PopqSpacing.md,
-                PopqSpacing.md,
-                PopqSpacing.md,
-                PopqSpacing.xs,
-              ),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: '주문을 확인할 사업장',
-                  prefixIcon: Icon(Icons.storefront_outlined),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<int>(
-                    key: const Key('seller-order-store-selector'),
-                    value: validValue,
-                    isExpanded: true,
-                    isDense: true,
-                    hint: Text(
-                      snapshot.connectionState == ConnectionState.done
-                          ? '사업장을 선택해 주세요.'
-                          : '사업장을 불러오는 중...',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+            SellerStore? selectedStore;
+            if (validValue != null) {
+              for (final store in stores) {
+                if (store.storeId == validValue) {
+                  selectedStore = store;
+                  break;
+                }
+              }
+            }
+
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    PopqSpacing.md,
+                    PopqSpacing.md,
+                    PopqSpacing.md,
+                    PopqSpacing.xs,
+                  ),
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: '주문을 확인할 사업장',
+                      prefixIcon: Icon(Icons.storefront_outlined),
                     ),
-                    items: stores
-                        .map(
-                          (store) => DropdownMenuItem<int>(
-                            value: store.storeId,
-                            child: _storeDropdownItem(store),
-                          ),
-                        )
-                        .toList(),
-                    selectedItemBuilder: (context) => stores
-                        .map((store) => _storeDropdownItem(store))
-                        .toList(),
-                    onChanged: snapshot.connectionState == ConnectionState.done
-                        ? (storeId) {
-                            if (storeId != null) {
-                              widget.selectionController.select(storeId);
-                            }
-                          }
-                        : null,
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<int>(
+                        key: const Key('seller-order-store-selector'),
+                        value: validValue,
+                        isExpanded: true,
+                        isDense: true,
+                        hint: Text(
+                          snapshot.connectionState == ConnectionState.done
+                              ? '사업장을 선택해 주세요.'
+                              : '사업장을 불러오는 중...',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        items: stores
+                            .map(
+                              (store) => DropdownMenuItem<int>(
+                                value: store.storeId,
+                                child: _storeDropdownItem(store),
+                              ),
+                            )
+                            .toList(),
+                        selectedItemBuilder: (context) => stores
+                            .map((store) => _storeDropdownItem(store))
+                            .toList(),
+                        onChanged:
+                            snapshot.connectionState == ConnectionState.done
+                            ? (storeId) {
+                                if (storeId != null) {
+                                  widget.selectionController.select(storeId);
+                                }
+                              }
+                            : null,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (selectedStore != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      PopqSpacing.md,
+                      PopqSpacing.xs,
+                      PopqSpacing.md,
+                      PopqSpacing.sm,
+                    ),
+                    child: _buildOrderOperationCard(selectedStore),
+                  ),
+              ],
             );
           },
         ),
@@ -377,6 +405,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     final stores = (results[0] as List<SellerStore>)
         .where((store) => store.status == 'ACTIVE')
         .toList();
+    _storeSnapshot = List<SellerStore>.unmodifiable(stores);
     final summaries = results[1] as List<SellerDashboardSummary>;
     _summariesByStoreId = {
       for (final summary in summaries) summary.storeId: summary,
@@ -488,6 +517,259 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       _orders = _loadOrders();
     });
     await Future.wait([_stores, _orders]);
+  }
+
+  Widget _buildOrderOperationCard(SellerStore store) {
+    final summary = _summariesByStoreId[store.storeId];
+    final waitingCount = summary?.waitingOrderCount ?? 0;
+    final activeCount = summary?.activeOrderCount ?? 0;
+    final readyCount = summary?.readyOrderCount ?? 0;
+    final currentCount = waitingCount + activeCount + readyCount;
+    final accepting = store.orderAcceptingEnabled;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  accepting
+                      ? Icons.check_circle_rounded
+                      : Icons.pause_circle_filled_rounded,
+                  color: accepting
+                      ? colorScheme.primary
+                      : colorScheme.error,
+                ),
+                const SizedBox(width: PopqSpacing.xs),
+                Expanded(
+                  child: Text(
+                    accepting ? '신규 주문 접수 중' : '신규 주문 접수 중지',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            Text(
+              '현재 처리 중',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: '$currentCount',
+                    style: const TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      height: 1.1,
+                    ),
+                  ),
+                  const TextSpan(
+                    text: '건',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: _OrderCountBadge(
+                    label: '접수 대기',
+                    count: waitingCount,
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.xs),
+                Expanded(
+                  child: _OrderCountBadge(
+                    label: '준비 중',
+                    count: activeCount,
+                  ),
+                ),
+                const SizedBox(width: PopqSpacing.xs),
+                Expanded(
+                  child: _OrderCountBadge(
+                    label: '준비 완료',
+                    count: readyCount,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: accepting
+                  ? OutlinedButton.icon(
+                      onPressed: store.canManage && !_updatingOrderAccepting
+                          ? () => _changeOrderAccepting(store, false)
+                          : null,
+                      icon: _updatingOrderAccepting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.pause_circle_outline_rounded),
+                      label: const Text('주문 접수 잠시 중지'),
+                    )
+                  : FilledButton.icon(
+                      onPressed: store.canManage && !_updatingOrderAccepting
+                          ? () => _changeOrderAccepting(store, true)
+                          : null,
+                      icon: _updatingOrderAccepting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.play_circle_outline_rounded),
+                      label: const Text('주문 접수 재개'),
+                    ),
+            ),
+            if (!store.canManage) ...[
+              const SizedBox(height: PopqSpacing.xs),
+              Text(
+                '주문 접수 설정은 점주 또는 매니저만 변경할 수 있어요.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _changeOrderAccepting(
+    SellerStore store,
+    bool nextValue,
+  ) async {
+    if (_updatingOrderAccepting || !store.canManage) return;
+
+    if (!nextValue) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('주문 접수를 잠시 중지할까요?'),
+          content: const Text(
+            '이미 접수된 주문은 계속 처리할 수 있고, '
+            '새로운 주문만 받지 않게 됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('접수 중지'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    setState(() => _updatingOrderAccepting = true);
+
+    try {
+      final updated = await widget.storeRepository.update(
+        store.storeId,
+        storeType: store.storeType,
+        name: store.name,
+        description: store.description,
+        address: store.address,
+        detailAddress: store.detailAddress,
+        representativeCategory: store.representativeCategory,
+        imageUrl: store.imageUrl,
+        phone: store.phone,
+        latitude: store.latitude,
+        longitude: store.longitude,
+        openTime: store.openTime,
+        closeTime: store.closeTime,
+        closedDays: store.closedDays,
+        takeoutAvailable: store.takeoutAvailable,
+        dineInAvailable: store.dineInAvailable,
+        orderAcceptingEnabled: nextValue,
+        tags: store.tags,
+      );
+
+      final nextStores = _storeSnapshot
+          .map((item) => item.storeId == updated.storeId ? updated : item)
+          .toList(growable: false);
+      _storeSnapshot = List<SellerStore>.unmodifiable(nextStores);
+
+      if (!mounted) return;
+      setState(() {
+        _stores = Future<List<SellerStore>>.value(_storeSnapshot);
+      });
+
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              nextValue
+                  ? '새로운 주문 접수를 다시 시작했습니다.'
+                  : '새로운 주문 접수를 잠시 중지했습니다.',
+            ),
+          ),
+        );
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(failure.message)));
+    } catch (error) {
+      debugPrint('판매자 주문 접수 상태 변경 오류: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('주문 접수 상태를 변경하지 못했습니다. 다시 시도해 주세요.'),
+          ),
+        );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingOrderAccepting = false);
+      }
+    }
+  }
+
+  Future<void> _refreshDashboardSummariesSilently() async {
+    if (!mounted || !_isAppActive) return;
+
+    try {
+      final summaries = await widget.storeRepository.findDashboardSummaries();
+      if (!mounted) return;
+      setState(() {
+        _summariesByStoreId = {
+          for (final summary in summaries) summary.storeId: summary,
+        };
+      });
+    } catch (error) {
+      debugPrint('판매자 주문 현황 요약 동기화 오류: $error');
+    }
   }
 
   Widget _storeDropdownItem(SellerStore store) {
@@ -620,6 +902,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
           List<SellerOrder>.unmodifiable(loaded),
         );
       });
+      unawaited(_refreshDashboardSummariesSilently());
     } catch (error) {
       debugPrint('판매자 주문 목록 REST 동기화 오류: $error');
     }
@@ -658,6 +941,51 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   String _dateLabel(DateTime date) =>
       '${date.year}.${date.month.toString().padLeft(2, '0')}.'
       '${date.day.toString().padLeft(2, '0')}';
+}
+
+class _OrderCountBadge extends StatelessWidget {
+  const _OrderCountBadge({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: PopqSpacing.sm,
+        vertical: PopqSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$count',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _OrderCard extends StatelessWidget {

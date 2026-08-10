@@ -4,6 +4,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
+import '../discovery/store_discovery_repository.dart';
 import 'catalog_repository.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class ProductDetailScreen extends StatefulWidget {
     required this.storeId,
     required this.productId,
     required this.repository,
+    required this.storeDiscoveryRepository,
     required this.cartController,
     super.key,
   });
@@ -18,6 +20,7 @@ class ProductDetailScreen extends StatefulWidget {
   final int storeId;
   final int productId;
   final CatalogRepository repository;
+  final StoreDiscoveryRepository storeDiscoveryRepository;
   final CartController cartController;
 
   @override
@@ -26,13 +29,16 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late Future<CatalogProduct> _product;
+  late Future<CustomerStore> _store;
   final Map<int, Set<int>> _selected = {};
   var _quantity = 1;
+  var _addingToCart = false;
 
   @override
   void initState() {
     super.initState();
     _product = widget.repository.findProduct(widget.storeId, widget.productId);
+    _store = widget.storeDiscoveryRepository.findDetail(widget.storeId);
   }
 
   @override
@@ -66,12 +72,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             );
           }
           final product = snapshot.requireData;
-          return Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.all(PopqSpacing.lg),
-                  children: [
+          return FutureBuilder<CustomerStore>(
+            future: _store,
+            builder: (context, storeSnapshot) {
+              final store = storeSnapshot.data;
+              final checkingStore =
+                  storeSnapshot.connectionState != ConnectionState.done;
+              final storeLoadFailed = storeSnapshot.hasError ||
+                  (storeSnapshot.connectionState == ConnectionState.done &&
+                      store == null);
+              final orderPaused =
+                  store != null && !store.orderAcceptingEnabled;
+
+              return Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.all(PopqSpacing.lg),
+                      children: [
+                        if (orderPaused) ...[
+                          const _OrderPausedBanner(),
+                          const SizedBox(height: PopqSpacing.md),
+                        ] else if (storeLoadFailed) ...[
+                          _StoreStatusError(
+                            onRetry: () {
+                              setState(() {
+                                _store = widget.storeDiscoveryRepository
+                                    .findDetail(widget.storeId);
+                              });
+                            },
+                          ),
+                          const SizedBox(height: PopqSpacing.md),
+                        ],
                     Container(
                       height: 180,
                       decoration: BoxDecoration(
@@ -157,24 +189,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ],
                 ),
               ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(PopqSpacing.md),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed:
-                          product.availableForCustomerApp &&
-                              _isSelectionValid(product)
-                          ? () => _addToCart(product)
-                          : null,
-                      child: Text('${_won(_total(product))} · 장바구니 담기'),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(PopqSpacing.md),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: !checkingStore &&
+                                  !storeLoadFailed &&
+                                  !orderPaused &&
+                                  !_addingToCart &&
+                                  product.availableForCustomerApp &&
+                                  _isSelectionValid(product)
+                              ? () => _addToCart(product)
+                              : null,
+                          child: Text(
+                            checkingStore
+                                ? '주문 가능 여부 확인 중...'
+                                : storeLoadFailed
+                                    ? '주문 상태를 확인해주세요'
+                                    : orderPaused
+                                        ? '현재 주문 접수 중지'
+                                        : _addingToCart
+                                            ? '주문 상태 확인 중...'
+                                            : '${_won(_total(product))} · 장바구니 담기',
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           );
         },
       ),
@@ -214,9 +261,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _addToCart(CatalogProduct product) async {
-    final options = _selectedOptions(product);
+    if (_addingToCart) {
+      return;
+    }
+
+    setState(() {
+      _addingToCart = true;
+    });
+
     try {
-      widget.cartController.add(
+      final store = await widget.storeDiscoveryRepository.findDetail(
+        widget.storeId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _store = Future<CustomerStore>.value(store);
+      });
+
+      if (!store.orderAcceptingEnabled) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
+          ),
+        );
+        return;
+      }
+
+      final options = _selectedOptions(product);
+      try {
+        widget.cartController.add(
         targetStoreId: widget.storeId,
         product: product,
         options: options,
@@ -250,13 +327,107 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         quantity: _quantity,
       );
     }
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('장바구니에 담았습니다.'),
-        action: SnackBarAction(
-          label: '보기',
-          onPressed: () => context.push(CustomerRoutes.cart),
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('장바구니에 담았습니다.'),
+          action: SnackBarAction(
+            label: '보기',
+            onPressed: () => context.push(CustomerRoutes.cart),
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _addingToCart = false;
+        });
+      }
+    }
+  }
+}
+
+
+class _OrderPausedBanner extends StatelessWidget {
+  const _OrderPausedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.pause_circle_outline_rounded,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: PopqSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '현재 주문 접수가 잠시 중단되었어요.',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: PopqSpacing.xs),
+                Text(
+                  '접수가 다시 시작되면 장바구니에 담을 수 있어요.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onErrorContainer,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StoreStatusError extends StatelessWidget {
+  const _StoreStatusError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: Row(
+          children: [
+            const Icon(Icons.wifi_off_rounded),
+            const SizedBox(width: PopqSpacing.sm),
+            const Expanded(
+              child: Text('현재 주문 가능 여부를 확인하지 못했어요.'),
+            ),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('다시 확인'),
+            ),
+          ],
         ),
       ),
     );
