@@ -8,6 +8,8 @@ type Props = {
   onError: (message: string | null) => void
 }
 
+type LedgerTab = 'orders' | 'refunds' | 'cancellations'
+
 function money(value: number) {
   return `${value.toLocaleString('ko-KR')}원`
 }
@@ -26,6 +28,29 @@ function rangeDates(days: number) {
   return { from: localDate(from), to: localDate(to) }
 }
 
+function dateTime(value: string | null) {
+  if (!value) return '처리 시각 없음'
+  return new Date(value).toLocaleString('ko-KR', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function orderNumber(orderPublicId: string) {
+  return `#${orderPublicId.slice(-8).toUpperCase()}`
+}
+
+const REQUESTER_LABELS: Record<string, string> = {
+  GUEST: '비회원 고객',
+  CUSTOMER: '고객',
+  SELLER: '판매자',
+  ADMIN: '관리자',
+  SYSTEM: '시스템',
+  UNKNOWN: '처리자 미상',
+}
+
 export function SalesAnalytics({ connection, onError }: Props) {
   const isDemo = !connection
   const initialRange = rangeDates(7)
@@ -36,6 +61,14 @@ export function SalesAnalytics({ connection, onError }: Props) {
     createDemoSalesSummary(7),
   )
   const [loading, setLoading] = useState(!isDemo)
+  const [ledgerTab, setLedgerTab] = useState<LedgerTab>('orders')
+
+  // Keep the analytics page compatible with API instances that have not yet
+  // deployed the optional ledger fields. Missing arrays must render as empty
+  // states instead of crashing the whole seller application.
+  const orderHistory = summary.orderHistory ?? []
+  const refundHistory = summary.refundHistory ?? []
+  const cancellationHistory = summary.cancellationHistory ?? []
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -76,9 +109,9 @@ export function SalesAnalytics({ connection, onError }: Props) {
     [summary.dailySales],
   )
   const dineInRatio =
-    summary.grossSales === 0
+    summary.netSales === 0
       ? 0
-      : Math.round((summary.dineInSales / summary.grossSales) * 100)
+      : Math.round((summary.dineInSales / summary.netSales) * 100)
 
   function selectPreset(days: 7 | 30) {
     const dates = rangeDates(days)
@@ -99,6 +132,38 @@ export function SalesAnalytics({ connection, onError }: Props) {
       ['취소/거절 주문 수', summary.canceledOrderCount],
       ['취소/거절 금액', summary.canceledAmount],
       ['순매출', summary.netSales],
+      [],
+      ['완료 주문 내역'],
+      ['완료 시각', '주문 번호', '상품', '주문 유형', '결제액', '환불액', '순매출'],
+      ...orderHistory.map((order) => [
+        order.completedAt,
+        orderNumber(order.orderPublicId),
+        order.itemSummary,
+        order.orderType,
+        order.approvedAmount,
+        order.refundedAmount,
+        order.netSales,
+      ]),
+      [],
+      ['환불 내역'],
+      ['환불 시각', '주문 번호', '사유', '처리자', '환불액'],
+      ...refundHistory.map((refund) => [
+        refund.completedAt,
+        orderNumber(refund.orderPublicId),
+        refund.reason,
+        REQUESTER_LABELS[refund.requesterType] ?? refund.requesterType,
+        refund.amount,
+      ]),
+      [],
+      ['취소·거절 내역'],
+      ['처리 시각', '주문 번호', '상태', '사유', '주문 금액'],
+      ...cancellationHistory.map((cancellation) => [
+        cancellation.canceledAt,
+        orderNumber(cancellation.orderPublicId),
+        cancellation.status,
+        cancellation.reason,
+        cancellation.amount,
+      ]),
     ]
     const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }))
@@ -116,7 +181,7 @@ export function SalesAnalytics({ connection, onError }: Props) {
           <p className="eyebrow">SALES PULSE</p>
           <h2>매출 흐름</h2>
           <p>
-            결제 후 전달까지 완료된 주문만 순매출로 집계합니다.
+            조회 기간에 완료된 주문의 결제 금액에서 성공한 환불 금액을 차감합니다.
           </p>
         </div>
         <div className="range-control" aria-label="매출 조회 기간">
@@ -186,7 +251,7 @@ export function SalesAnalytics({ connection, onError }: Props) {
               <header>
                 <div>
                   <p className="eyebrow">DAILY SALES</p>
-                  <h3>일별 완료 매출</h3>
+                  <h3>일별 순매출</h3>
                 </div>
                 <small>최근 {chartDays.length}일 표시</small>
               </header>
@@ -268,6 +333,114 @@ export function SalesAnalytics({ connection, onError }: Props) {
                 )}
               </ol>
             </article>
+          </section>
+
+          <section className="sales-ledger-card" aria-label="매출 상세 내역">
+            <header className="sales-ledger-header">
+              <div>
+                <p className="eyebrow">SALES LEDGER</p>
+                <h3>매출 상세 내역</h3>
+                <p>순매출을 구성하는 완료 주문과 환불, 별도의 취소·거절 기록을 확인하세요.</p>
+              </div>
+              <div className="sales-ledger-tabs" role="tablist" aria-label="매출 내역 유형">
+                <button
+                  role="tab"
+                  aria-selected={ledgerTab === 'orders'}
+                  className={ledgerTab === 'orders' ? 'active' : ''}
+                  onClick={() => setLedgerTab('orders')}
+                >
+                  주문 내역 <b>{orderHistory.length}</b>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={ledgerTab === 'refunds'}
+                  className={ledgerTab === 'refunds' ? 'active' : ''}
+                  onClick={() => setLedgerTab('refunds')}
+                >
+                  환불 내역 <b>{refundHistory.length}</b>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={ledgerTab === 'cancellations'}
+                  className={ledgerTab === 'cancellations' ? 'active' : ''}
+                  onClick={() => setLedgerTab('cancellations')}
+                >
+                  취소·거절 <b>{cancellationHistory.length}</b>
+                </button>
+              </div>
+            </header>
+
+            {ledgerTab === 'orders' && (
+              <div className="sales-ledger-list order-ledger" role="tabpanel">
+                <div className="sales-ledger-columns" aria-hidden="true">
+                  <span>주문</span><span>유형</span><span>결제액</span><span>환불</span><span>순매출</span>
+                </div>
+                {orderHistory.map((order) => (
+                  <article className="sales-ledger-row" key={order.orderPublicId}>
+                    <div className="ledger-order-main">
+                      <strong>{orderNumber(order.orderPublicId)}</strong>
+                      <span>{order.itemSummary} · 총 {order.itemCount}개</span>
+                      <small>{dateTime(order.completedAt)} 완료</small>
+                    </div>
+                    <span className="ledger-pill">{order.orderType === 'DINE_IN' ? '매장' : '포장'}</span>
+                    <span>{money(order.approvedAmount)}</span>
+                    <span className={order.refundedAmount > 0 ? 'ledger-refund' : ''}>
+                      {order.refundedAmount > 0 ? `-${money(order.refundedAmount)}` : '—'}
+                    </span>
+                    <strong className="ledger-net">{money(order.netSales)}</strong>
+                  </article>
+                ))}
+                {orderHistory.length === 0 && (
+                  <div className="sales-ledger-empty">선택한 기간에 완료된 주문이 없습니다.</div>
+                )}
+              </div>
+            )}
+
+            {ledgerTab === 'refunds' && (
+              <div className="sales-ledger-list refund-ledger" role="tabpanel">
+                <div className="sales-ledger-columns" aria-hidden="true">
+                  <span>환불 정보</span><span>처리자</span><span>처리 시각</span><span>환불액</span>
+                </div>
+                {refundHistory.map((refund) => (
+                  <article className="sales-ledger-row" key={refund.refundId}>
+                    <div className="ledger-order-main">
+                      <strong>{orderNumber(refund.orderPublicId)}</strong>
+                      <span>{refund.reason}</span>
+                    </div>
+                    <span>{REQUESTER_LABELS[refund.requesterType] ?? refund.requesterType}</span>
+                    <span>{dateTime(refund.completedAt)}</span>
+                    <strong className="ledger-refund">-{money(refund.amount)}</strong>
+                  </article>
+                ))}
+                {refundHistory.length === 0 && (
+                  <div className="sales-ledger-empty">선택한 완료 주문에 적용된 환불이 없습니다.</div>
+                )}
+              </div>
+            )}
+
+            {ledgerTab === 'cancellations' && (
+              <div className="sales-ledger-list cancellation-ledger" role="tabpanel">
+                <div className="sales-ledger-columns" aria-hidden="true">
+                  <span>주문</span><span>상태</span><span>처리 시각</span><span>주문 금액</span>
+                </div>
+                {cancellationHistory.map((cancellation) => (
+                  <article className="sales-ledger-row" key={`${cancellation.orderPublicId}-${cancellation.canceledAt}`}>
+                    <div className="ledger-order-main">
+                      <strong>{orderNumber(cancellation.orderPublicId)}</strong>
+                      <span>{cancellation.reason || '처리 사유 없음'}</span>
+                    </div>
+                    <span className="ledger-pill muted">
+                      {cancellation.status === 'CANCELED' ? '고객 취소' : '주문 거절'}
+                    </span>
+                    <span>{dateTime(cancellation.canceledAt)}</span>
+                    <strong>{money(cancellation.amount)}</strong>
+                  </article>
+                ))}
+                {cancellationHistory.length === 0 && (
+                  <div className="sales-ledger-empty">선택한 기간의 취소·거절 주문이 없습니다.</div>
+                )}
+              </div>
+            )}
           </section>
         </>
       )}

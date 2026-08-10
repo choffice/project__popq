@@ -375,15 +375,32 @@ export function createDemoSalesSummary(days: 7 | 30): SalesSummary {
     (sum, day) => sum + day.orderCount,
     0,
   )
+  const refundedAmount = 3000
+  const orderHistory = dailySales.slice(-6).reverse().map((day, index) => {
+    const approvedAmount = 11800 + index * 900
+    const orderRefundedAmount = index === 1 ? 3000 : 0
+    return {
+      orderPublicId: `demo-sales-order-${202608100001 - index}`,
+      orderType: index % 3 === 0 ? 'TAKEOUT' as const : 'DINE_IN' as const,
+      approvedAmount,
+      refundedAmount: orderRefundedAmount,
+      netSales: approvedAmount - orderRefundedAmount,
+      completedAt: `${day.date}T${String(18 - index).padStart(2, '0')}:20:00+09:00`,
+      itemCount: index % 2 === 0 ? 2 : 1,
+      itemSummary: index % 2 === 0
+        ? '블랙 세서미 크림 라떼 외 1개'
+        : '제주 말차 클라우드',
+    }
+  })
   return {
     from: dailySales[0].date,
     to: dailySales.at(-1)!.date,
-    grossSales: netSales + Math.round(netSales * 0.03),
+    grossSales: netSales + refundedAmount,
     netSales,
-    refundedAmount: Math.round(netSales * 0.02),
-    refundCount: Math.max(1, Math.round(days / 5)),
-    canceledOrderCount: Math.max(1, Math.round(days / 4)),
-    canceledAmount: Math.round(netSales * 0.01),
+    refundedAmount,
+    refundCount: 1,
+    canceledOrderCount: 1,
+    canceledAmount: 7200,
     completedOrderCount,
     averageOrderAmount: Math.round(netSales / completedOrderCount),
     dineInSales: Math.round(netSales * 0.68),
@@ -395,5 +412,21 @@ export function createDemoSalesSummary(days: 7 | 30): SalesSummary {
       { productName: '성수 블렌드 아메리카노', quantity: days * 7, sales: days * 33600 },
       { productName: '솔티드 카라멜 휘낭시에', quantity: days * 5, sales: days * 19500 },
     ],
+    orderHistory,
+    refundHistory: orderHistory.length > 1 ? [{
+      refundId: 1,
+      orderPublicId: orderHistory[1].orderPublicId,
+      amount: orderHistory[1].refundedAmount,
+      reason: '일부 메뉴 누락',
+      requesterType: 'SELLER',
+      completedAt: orderHistory[1].completedAt,
+    }] : [],
+    cancellationHistory: orderHistory.length > 2 ? [{
+      orderPublicId: `demo-canceled-${orderHistory[2].orderPublicId}`,
+      status: 'CANCELED',
+      amount: 7200,
+      reason: '고객 주문 취소',
+      canceledAt: orderHistory[2].completedAt,
+    }] : [],
   }
 }
