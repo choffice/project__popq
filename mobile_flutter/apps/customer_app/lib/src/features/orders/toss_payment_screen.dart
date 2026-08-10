@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+//오창
+import 'toss_payment_web_stub.dart'
+if (dart.library.js_interop) 'toss_payment_web.dart';
 
 class TossPaymentResult {
   const TossPaymentResult.success({
@@ -681,15 +684,55 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
         appBar: AppBar(
           title: const Text('토스 결제'),
         ),
-        body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24),
-            child: Text(
-              '현재 토스 결제 테스트는 '
-                  'Android 앱에서 진행해주세요.',
-              textAlign: TextAlign.center,
-            ),
-          ),
+        body: TossPaymentWeb(
+          clientKey: widget.clientKey,
+          orderId: widget.orderId,
+          orderName: widget.orderName,
+          amount: widget.amount,
+          onSuccess: (
+              paymentKey,
+              orderId,
+              amount,
+              ) {
+            if (orderId != widget.orderId) {
+              _finish(
+                const TossPaymentResult.failure(
+                  errorCode: 'ORDER_ID_MISMATCH',
+                  errorMessage: '주문번호가 일치하지 않습니다.',
+                ),
+              );
+              return;
+            }
+
+            if (amount != widget.amount) {
+              _finish(
+                const TossPaymentResult.failure(
+                  errorCode: 'PAYMENT_AMOUNT_MISMATCH',
+                  errorMessage: '결제 금액이 일치하지 않습니다.',
+                ),
+              );
+              return;
+            }
+
+            _finish(
+              TossPaymentResult.success(
+                paymentKey: paymentKey,
+                orderId: orderId,
+                amount: amount,
+              ),
+            );
+          },
+          onFailure: (
+              errorCode,
+              errorMessage,
+              ) {
+            _finish(
+              TossPaymentResult.failure(
+                errorCode: errorCode,
+                errorMessage: errorMessage,
+              ),
+            );
+          },
         ),
       );
     }
