@@ -80,9 +80,10 @@ describe('POPQ QR order demo', () => {
     firstRender.unmount()
 
     render(<App />)
-    expect(
-      screen.getByRole('button', { name: '장바구니 1개' }),
-    ).toBeInTheDocument()
+    const cartButton = screen.getByRole('button', { name: '장바구니 1개' })
+    expect(cartButton.querySelector('.cart-icon')).toBeInTheDocument()
+    const cartCount = cartButton.querySelector('.cart-count')
+    expect(cartCount).toHaveTextContent('1')
   })
 
   it('restores and cancels a placed demo order', async () => {
@@ -109,6 +110,108 @@ describe('POPQ QR order demo', () => {
     expect(
       screen.getByRole('button', { name: '새 주문 시작하기' }),
     ).toBeInTheDocument()
+  })
+
+  it('opens the QR menu first and exposes a stored active order as a shortcut', async () => {
+    const user = userEvent.setup()
+    const activeOrder = {
+      ...createDemoOrder(6800, 'DINE_IN'),
+      orderPublicId: 'order-active-1234',
+      status: 'PREPARING' as const,
+      version: 3,
+    }
+    window.localStorage.setItem(
+      'popq:order:qr-token',
+      JSON.stringify(activeOrder),
+    )
+    window.history.replaceState({}, '', '/q/qr-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) => {
+        if (path.endsWith('/sessions')) {
+          return response({
+            storeId: 1,
+            storeName: '성수 커피 연구소',
+            storeType: 'LOCAL_STORE',
+            businessStatus: 'OPEN',
+            storeTableId: 10,
+            tableName: '테이블 10',
+            sessionExpiresAt: '2026-08-10T12:00:00Z',
+          })
+        }
+        if (path === '/api/v1/qr/products') return response([])
+        if (path.includes('/sync')) {
+          return response({
+            refreshRequired: false,
+            serverVersion: activeOrder.version,
+            order: null,
+          })
+        }
+        throw new Error(`Unexpected request: ${path}`)
+      }),
+    )
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: '맛있게 준비 중이에요' }),
+    ).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: '진행 중 주문' })).toHaveTextContent(
+      '맛있게 준비 중이에요',
+    )
+
+    await user.click(screen.getByRole('button', { name: /주문 현황 보기/ }))
+
+    expect(
+      screen.getByRole('heading', { name: '맛있게 준비 중이에요' }),
+    ).toBeInTheDocument()
+  })
+
+  it('clears a terminal order when the QR menu is opened again', async () => {
+    const completedOrder = {
+      ...createDemoOrder(6800, 'DINE_IN'),
+      orderPublicId: 'order-completed-1234',
+      status: 'COMPLETED' as const,
+      version: 5,
+    }
+    window.localStorage.setItem(
+      'popq:order:qr-token',
+      JSON.stringify(completedOrder),
+    )
+    window.history.replaceState({}, '', '/q/qr-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) => {
+        if (path.endsWith('/sessions')) {
+          return response({
+            storeId: 1,
+            storeName: '성수 커피 연구소',
+            storeType: 'LOCAL_STORE',
+            businessStatus: 'OPEN',
+            storeTableId: 10,
+            tableName: '테이블 10',
+            sessionExpiresAt: '2026-08-10T12:00:00Z',
+          })
+        }
+        if (path === '/api/v1/qr/products') return response([])
+        throw new Error(`Unexpected request: ${path}`)
+      }),
+    )
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: '진행 중 주문' }),
+    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(window.localStorage.getItem('popq:order:qr-token')).toBeNull(),
+    )
   })
 
   it('filters categories and prevents selecting a sold-out product', async () => {
