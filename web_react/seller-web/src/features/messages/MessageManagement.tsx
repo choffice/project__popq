@@ -35,6 +35,30 @@ const demoConversation: SellerConversationSummary = {
   unreadCount: 1,
 }
 
+const orderStatusLabel: Record<
+  SellerConversationDetail['orderStatus'],
+  string
+> = {
+  CREATED: '결제 대기',
+  PLACED: '신규 주문',
+  ACCEPTED: '접수 완료',
+  PREPARING: '준비 중',
+  READY: '픽업 대기',
+  COMPLETED: '완료',
+  CANCELED: '고객 취소',
+  REJECTED: '주문 거절',
+  EXPIRED: '시간 만료',
+}
+
+const orderTypeLabel: Record<SellerConversationDetail['orderType'], string> = {
+  DINE_IN: '매장',
+  TAKEOUT: '포장',
+}
+
+function displayOrderNumber(orderPublicId: string) {
+  return orderPublicId.slice(-4).toUpperCase()
+}
+
 function mergeMessages(current: OrderMessage[], incoming: OrderMessage[]) {
   const byId = new Map(current.map((message) => [message.orderMessageId, message]))
   incoming.forEach((message) => byId.set(message.orderMessageId, message))
@@ -177,21 +201,145 @@ export function MessageManagement({ connection, onError, onUnreadChange }: Props
 
   return (
     <main className="management-page messages-page">
-      <section className="management-hero compact-hero"><div><p className="eyebrow">CUSTOMER CONVERSATIONS</p><h2>고객 문의 · 주문 메시지</h2><p>주문별 요청을 확인하고 실시간으로 답변합니다.</p></div><span className={`realtime-indicator ${realtimeConnected || isDemo ? 'connected' : ''}`}>{realtimeConnected || isDemo ? '● 실시간 연결' : '○ 재연결 중'}</span></section>
+      <section className="management-hero compact-hero">
+        <div>
+          <p className="eyebrow">CUSTOMER CONVERSATIONS</p>
+          <h2>고객 문의 · 주문 메시지</h2>
+          <p>주문별 요청을 확인하고 실시간으로 답변합니다.</p>
+        </div>
+        <span className={`realtime-indicator ${realtimeConnected || isDemo ? 'connected' : ''}`}>
+          <i aria-hidden="true" />
+          {realtimeConnected || isDemo ? '실시간 연결' : '재연결 중'}
+        </span>
+      </section>
       <section className="message-workspace">
         <aside className="conversation-list">
-          <header><h3>대화 목록</h3><button onClick={() => void refreshList()}>새로고침</button></header>
+          <header>
+            <div>
+              <h3>대화 목록</h3>
+              <small>{conversations.length}개의 대화</small>
+            </div>
+            <button
+              type="button"
+              className="conversation-refresh"
+              aria-label="대화 목록 새로고침"
+              onClick={() => void refreshList()}
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+          </header>
           {loading && <p>불러오는 중…</p>}
-          {conversations.map((item) => <button key={item.orderPublicId} className={selectedId === item.orderPublicId ? 'active' : ''} onClick={() => setSelectedId(item.orderPublicId)}><span className="conversation-avatar">{item.customerName.slice(0, 1)}</span><span><strong>{item.customerName}</strong><small>{item.lastMessage}</small><time>{new Date(item.lastMessageAt).toLocaleString('ko-KR')}</time></span>{item.unreadCount > 0 && <b>{item.unreadCount}</b>}</button>)}
+          {conversations.map((item) => (
+            <button
+              type="button"
+              key={item.orderPublicId}
+              className={selectedId === item.orderPublicId ? 'active' : ''}
+              aria-pressed={selectedId === item.orderPublicId}
+              onClick={() => setSelectedId(item.orderPublicId)}
+            >
+              <span className="conversation-avatar">{item.customerName.slice(0, 1)}</span>
+              <span className="conversation-copy">
+                <strong>{item.customerName}</strong>
+                <small>{item.lastMessage}</small>
+                <time>{new Date(item.lastMessageAt).toLocaleString('ko-KR')}</time>
+              </span>
+              {item.unreadCount > 0 && <b className="unread-badge">{item.unreadCount}</b>}
+            </button>
+          ))}
           {!loading && conversations.length === 0 && <p className="management-empty">아직 대화가 없습니다.</p>}
         </aside>
         <article className="chat-panel">
-          {!detail ? <div className="management-empty">대화를 선택해 주세요.</div> : <>
-            <header><div><h3>{detail.customerName}</h3><p>주문 {detail.orderPublicId} · {detail.orderStatus}</p></div><strong>{detail.totalAmount.toLocaleString('ko-KR')}원</strong></header>
-            <div className="order-message-summary">{detail.orderItems.map((item) => <span key={item.orderItemId}>{item.productName} × {item.quantity}</span>)}</div>
-            <div className="message-stream">{hasMore && <button className="load-more" onClick={() => void loadOlder()}>이전 메시지 불러오기</button>}{messages.map((message) => <div key={message.orderMessageId} className={`message-bubble ${message.senderType.toLowerCase()}`}><strong>{message.senderName}</strong><p>{message.content}</p><small>{new Date(message.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}{message.senderType === 'SELLER' && ` · ${message.read ? '읽음' : '전송됨'}`}</small></div>)}</div>
-            <footer><textarea maxLength={2000} placeholder="고객에게 보낼 메시지" value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage() } }} /><button className="primary-action" disabled={sending || !draft.trim()} onClick={() => void sendMessage()}>{sending ? '전송 중…' : '전송'}</button></footer>
-          </>}
+          {!detail ? (
+            <div className="management-empty">대화를 선택해 주세요.</div>
+          ) : (
+            <>
+              <header>
+                <div className="chat-customer-summary">
+                  <span className="chat-customer-avatar">{detail.customerName.slice(0, 1)}</span>
+                  <div>
+                    <h3>{detail.customerName}</h3>
+                    <p>
+                      <span>{orderTypeLabel[detail.orderType]} 주문 #{displayOrderNumber(detail.orderPublicId)}</span>
+                      <b>{orderStatusLabel[detail.orderStatus]}</b>
+                    </p>
+                  </div>
+                </div>
+                <div className="chat-order-total">
+                  <small>주문 금액</small>
+                  <strong>{detail.totalAmount.toLocaleString('ko-KR')}원</strong>
+                </div>
+              </header>
+              <div className="order-message-summary" aria-label="주문 상품">
+                <strong>주문 상품</strong>
+                <div>
+                  {detail.orderItems.map((item) => (
+                    <span key={item.orderItemId}>{item.productName} × {item.quantity}</span>
+                  ))}
+                </div>
+              </div>
+              <div
+                className="message-stream"
+                role="log"
+                aria-live="polite"
+                aria-label={`${detail.customerName}님과의 대화`}
+              >
+                {hasMore && (
+                  <button type="button" className="load-more" onClick={() => void loadOlder()}>
+                    이전 메시지 불러오기
+                  </button>
+                )}
+                {messages.map((message) => {
+                  const senderClass = message.senderType.toLowerCase()
+                  return (
+                    <div key={message.orderMessageId} className={`message-row ${senderClass}`}>
+                      {message.senderType === 'CUSTOMER' && (
+                        <span className="message-avatar" aria-hidden="true">
+                          {message.senderName.slice(0, 1)}
+                        </span>
+                      )}
+                      <div className="message-content">
+                        <strong className="message-sender">{message.senderName}</strong>
+                        <div className="message-bubble">
+                          <p>{message.content}</p>
+                        </div>
+                        <small className="message-time">
+                          {new Date(message.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                          {message.senderType === 'SELLER' && ` · ${message.read ? '읽음' : '전송됨'}`}
+                        </small>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+              <footer>
+                <div className="message-composer">
+                  <textarea
+                    maxLength={2000}
+                    aria-label="고객에게 보낼 메시지"
+                    placeholder="고객에게 보낼 메시지를 입력하세요."
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !event.shiftKey) {
+                        event.preventDefault()
+                        void sendMessage()
+                      }
+                    }}
+                  />
+                  <small>{draft.length.toLocaleString('ko-KR')} / 2,000 · Enter 전송</small>
+                </div>
+                <button
+                  type="button"
+                  className="primary-action message-send"
+                  disabled={sending || !draft.trim()}
+                  onClick={() => void sendMessage()}
+                >
+                  <span aria-hidden="true">↑</span>
+                  {sending ? '전송 중' : '전송'}
+                </button>
+              </footer>
+            </>
+          )}
         </article>
       </section>
     </main>

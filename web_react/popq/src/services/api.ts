@@ -14,6 +14,20 @@ interface ApiEnvelope<T> {
   error: { code: string; message: string } | null
 }
 
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: string | null
+
+  constructor(message: string, status: number, code: string | null = null) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+  }
+}
+
+const qrSessionRequests = new Map<string, Promise<QrContext>>()
+
 async function request<T>(
   path: string,
   init?: RequestInit,
@@ -31,20 +45,40 @@ async function request<T>(
     envelope = (await response.json()) as ApiEnvelope<T>
   } catch {
     if (!response.ok) {
-      throw new Error(`서버 요청이 거부되었습니다. (${response.status})`)
+      throw new ApiError(
+        `서버 요청이 거부되었습니다. (${response.status})`,
+        response.status,
+      )
     }
     throw new Error('서버 응답 형식이 올바르지 않습니다.')
   }
   if (!response.ok || !envelope.success) {
-    throw new Error(envelope.error?.message ?? '요청을 처리하지 못했습니다.')
+    throw new ApiError(
+      envelope.error?.message ?? '요청을 처리하지 못했습니다.',
+      response.status,
+      envelope.error?.code ?? null,
+    )
   }
   return envelope.data
 }
 
 export async function openQrSession(token: string): Promise<QrContext> {
-  return request<QrContext>(`/api/v1/qr/${encodeURIComponent(token)}/sessions`, {
-    method: 'POST',
-  })
+  const pending = qrSessionRequests.get(token)
+  if (pending) return pending
+
+  const sessionRequest = request<QrContext>(
+    `/api/v1/qr/${encodeURIComponent(token)}/sessions`,
+    { method: 'POST' },
+  )
+  qrSessionRequests.set(token, sessionRequest)
+  void sessionRequest
+    .finally(() => {
+      if (qrSessionRequests.get(token) === sessionRequest) {
+        qrSessionRequests.delete(token)
+      }
+    })
+    .catch(() => undefined)
+  return sessionRequest
 }
 
 export async function getProducts(): Promise<ProductSummary[]> {
