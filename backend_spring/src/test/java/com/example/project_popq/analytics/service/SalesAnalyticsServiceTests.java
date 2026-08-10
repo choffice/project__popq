@@ -91,16 +91,18 @@ class SalesAnalyticsServiceTests {
         assertThat(result.refundCount()).isEqualTo(1);
         assertThat(result.netSales()).isEqualTo(17_000);
         assertThat(result.completedOrderCount()).isEqualTo(2);
-        assertThat(result.averageOrderAmount()).isEqualTo(10_000);
+        assertThat(result.averageOrderAmount()).isEqualTo(8_500);
         assertThat(result.dineInSales()).isEqualTo(12_000);
-        assertThat(result.takeoutSales()).isEqualTo(8_000);
+        assertThat(result.takeoutSales()).isEqualTo(5_000);
         assertThat(result.dailySales())
             .extracting("sales")
-            .containsExactly(12_000L, 8_000L, -3_000L);
+            .containsExactly(12_000L, 5_000L, 0L);
         assertThat(result.topProducts()).hasSize(2);
         assertThat(result.topProducts().get(0).productName()).isEqualTo("라떼");
         assertThat(result.topProducts().get(0).quantity()).isEqualTo(3);
         assertThat(result.topProducts().get(0).sales()).isEqualTo(18_000);
+        assertThat(result.orderHistory()).hasSize(2);
+        assertThat(result.refundHistory()).hasSize(1);
     }
 
     @Test
@@ -132,11 +134,14 @@ class SalesAnalyticsServiceTests {
             List.of(payment)
         );
 
-        assertThat(result.grossSales()).isEqualTo(9_000);
-        assertThat(result.refundedAmount()).isEqualTo(9_000);
+        assertThat(result.grossSales()).isZero();
+        assertThat(result.refundedAmount()).isZero();
         assertThat(result.netSales()).isZero();
         assertThat(result.canceledOrderCount()).isEqualTo(1);
         assertThat(result.canceledAmount()).isEqualTo(9_000);
+        assertThat(result.orderHistory()).isEmpty();
+        assertThat(result.refundHistory()).isEmpty();
+        assertThat(result.cancellationHistory()).hasSize(1);
     }
 
     @Test
@@ -178,9 +183,9 @@ class SalesAnalyticsServiceTests {
     }
 
     @Test
-    void usesAsiaSeoulBusinessDateForApproval() {
+    void usesAsiaSeoulBusinessDateForCompletion() {
         Order order = order(
-            OrderStatus.PLACED,
+            OrderStatus.COMPLETED,
             OrderType.TAKEOUT,
             7_000,
             "2026-07-26T15:30:00Z",
@@ -207,6 +212,50 @@ class SalesAnalyticsServiceTests {
                 assertThat(day.date()).isEqualTo(LocalDate.of(2026, 7, 27));
                 assertThat(day.sales()).isEqualTo(7_000);
                 assertThat(day.orderCount()).isEqualTo(1);
+            });
+    }
+
+    @Test
+    void subtractsSuccessfulRefundsFromTheCompletedOrderCohort() {
+        Order order = order(
+            OrderStatus.COMPLETED,
+            OrderType.TAKEOUT,
+            10_000,
+            "2026-07-28T03:00:00Z",
+            List.of(item("refund target", 1, 10_000))
+        );
+        Refund laterRefund = refund(
+            4_000,
+            RefundStatus.SUCCEEDED,
+            "2026-08-03T03:00:00Z"
+        );
+        Payment payment = payment(
+            order,
+            PaymentStatus.PARTIALLY_REFUNDED,
+            10_000,
+            "2026-07-27T03:00:00Z",
+            List.of(laterRefund)
+        );
+
+        SalesSummaryResponse result = service.aggregate(
+            LocalDate.of(2026, 7, 28),
+            LocalDate.of(2026, 7, 28),
+            List.of(order),
+            List.of(payment)
+        );
+
+        assertThat(result.grossSales()).isEqualTo(10_000);
+        assertThat(result.refundedAmount()).isEqualTo(4_000);
+        assertThat(result.netSales()).isEqualTo(6_000);
+        assertThat(result.averageOrderAmount()).isEqualTo(6_000);
+        assertThat(result.dailySales()).singleElement()
+            .extracting("sales")
+            .isEqualTo(6_000L);
+        assertThat(result.orderHistory()).singleElement()
+            .satisfies(detail -> {
+                assertThat(detail.approvedAmount()).isEqualTo(10_000);
+                assertThat(detail.refundedAmount()).isEqualTo(4_000);
+                assertThat(detail.netSales()).isEqualTo(6_000);
             });
     }
 

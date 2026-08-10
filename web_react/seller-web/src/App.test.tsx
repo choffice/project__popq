@@ -179,8 +179,20 @@ describe('판매자 주문 운영', () => {
     await user.click(screen.getByRole('button', { name: /매출 분석/ }))
 
     expect(screen.getByRole('heading', { name: '매출 흐름' })).toBeVisible()
-    expect(screen.getByText('순매출')).toBeVisible()
+    expect(screen.getAllByText('순매출').length).toBeGreaterThan(0)
     expect(screen.getByRole('heading', { name: '인기 상품' })).toBeVisible()
+    expect(screen.getByRole('heading', { name: '매출 상세 내역' })).toBeVisible()
+    expect(screen.getByRole('tab', { name: /주문 내역/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getAllByText(/블랙 세서미 크림 라떼/).length).toBeGreaterThan(0)
+
+    await user.click(screen.getByRole('tab', { name: /환불 내역/ }))
+    expect(screen.getByText('일부 메뉴 누락')).toBeVisible()
+    await user.click(screen.getByRole('tab', { name: /취소·거절/ }))
+    expect(screen.getByText('고객 주문 취소')).toBeVisible()
+
     await user.click(screen.getByRole('button', { name: '최근 30일' }))
     expect(
       screen.getByRole('button', { name: '최근 30일' }),
@@ -228,7 +240,7 @@ describe('판매자 주문 운영', () => {
 
     await user.click(screen.getByRole('button', { name: /고객 문의/ }))
     expect(await screen.findByRole('heading', { name: '김고객' })).toBeVisible()
-    const input = screen.getByPlaceholderText('고객에게 보낼 메시지')
+    const input = screen.getByPlaceholderText('고객에게 보낼 메시지를 입력하세요.')
     await user.type(input, '요청하신 포크를 함께 드릴게요.')
     await user.click(screen.getByRole('button', { name: '전송' }))
 
