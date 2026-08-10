@@ -170,6 +170,53 @@ describe('POPQ QR order demo', () => {
     ).toBeInTheDocument()
   })
 
+  it('clears a stored order that the current QR session cannot access', async () => {
+    const staleOrder = {
+      ...createDemoOrder(6800, 'DINE_IN'),
+      orderPublicId: 'order-stale-session',
+      status: 'PLACED' as const,
+      version: 1,
+    }
+    window.localStorage.setItem(
+      'popq:order:qr-token',
+      JSON.stringify(staleOrder),
+    )
+    window.history.replaceState({}, '', '/q/qr-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) => {
+        if (path.endsWith('/sessions')) {
+          return response({
+            storeId: 1,
+            storeName: '성수 커피 연구소',
+            storeType: 'LOCAL_STORE',
+            businessStatus: 'OPEN',
+            storeTableId: 10,
+            tableName: '테이블 10',
+            sessionExpiresAt: '2026-08-10T12:00:00Z',
+          })
+        }
+        if (path === '/api/v1/qr/products') return response([])
+        if (path.includes('/sync')) {
+          return errorResponse(403, '주문 조회 권한이 없습니다.')
+        }
+        throw new Error(`Unexpected request: ${path}`)
+      }),
+    )
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('region', { name: '진행 중 주문' }),
+    ).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(window.localStorage.getItem('popq:order:qr-token')).toBeNull(),
+    )
+  })
+
   it('clears a terminal order when the QR menu is opened again', async () => {
     const completedOrder = {
       ...createDemoOrder(6800, 'DINE_IN'),
@@ -333,7 +380,7 @@ describe('POPQ QR order demo', () => {
       if (path === '/api/v1/qr/products') return response([])
       if (path.includes('/payments')) return response({ status: 'PAID' })
       if (path.includes('/sync')) {
-        return errorResponse(403, '주문 조회 권한이 없습니다.')
+        throw new TypeError('네트워크 연결 실패')
       }
       throw new Error(`Unexpected request: ${path}`)
     })
@@ -347,6 +394,62 @@ describe('POPQ QR order demo', () => {
     expect(screen.queryByText(/주문 조회 권한이 없습니다/)).not.toBeInTheDocument()
     expect(window.location.search).toBe('')
     expect(window.sessionStorage.getItem('popq:checkout:qr-token')).toBeNull()
+  })
+
+  it('clears a paid order when the current QR session has no access', async () => {
+    const created = {
+      ...createDemoOrder(5000, 'TAKEOUT'),
+      orderPublicId: 'order-session-mismatch',
+      status: 'CREATED' as const,
+      version: 0,
+    }
+    window.sessionStorage.setItem(
+      'popq:checkout:qr-token',
+      JSON.stringify({
+        orderKey: 'order-idempotency-key',
+        paymentKey: 'payment-idempotency-key',
+        order: created,
+      }),
+    )
+    window.history.replaceState(
+      {},
+      '',
+      '/q/qr-token?payment=success&paymentKey=toss-payment-key'
+        + '&orderId=order-session-mismatch&amount=5000',
+    )
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (path: string) => {
+        if (path.endsWith('/sessions')) {
+          return response({
+            storeId: 1,
+            storeName: '성수 커피 연구소',
+            storeType: 'LOCAL_STORE',
+            businessStatus: 'OPEN',
+            storeTableId: null,
+            tableName: null,
+            sessionExpiresAt: '2026-08-05T12:00:00Z',
+          })
+        }
+        if (path === '/api/v1/qr/products') return response([])
+        if (path.includes('/payments')) return response({ status: 'PAID' })
+        if (path.includes('/sync')) {
+          return errorResponse(403, '주문 조회 권한이 없습니다.')
+        }
+        throw new Error(`Unexpected request: ${path}`)
+      }),
+    )
+
+    render(<App />)
+
+    expect(
+      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '이전 QR 세션의 주문 정보가 정리되었습니다.',
+    )
+    expect(window.location.search).toBe('')
+    expect(window.localStorage.getItem('popq:order:qr-token')).toBeNull()
   })
 
   it('blocks duplicate checkout and offers confirmation retry after a return error', async () => {

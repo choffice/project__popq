@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import {
   createDemoOrder,
@@ -7,6 +7,7 @@ import {
   demoProducts,
 } from './data/demo'
 import {
+  ApiError,
   cancelOrder,
   confirmPayment,
   createOrder,
@@ -57,6 +58,13 @@ const TERMINAL_ORDER_STATUSES: OrderStatus[] = [
   'REJECTED',
   'EXPIRED',
 ]
+
+const STALE_ORDER_ERROR_CODES = new Set([
+  'ORDER_ACCESS_DENIED',
+  'ORDER_NOT_FOUND',
+  'GUEST_SESSION_INVALID',
+  'GUEST_SESSION_EXPIRED',
+])
 
 const STATUS_COPY: Record<
   OrderStatus,
@@ -165,6 +173,12 @@ function isTerminalOrder(order: OrderResponse | null) {
   return Boolean(order && TERMINAL_ORDER_STATUSES.includes(order.status))
 }
 
+function isStaleOrderError(caught: unknown) {
+  return caught instanceof ApiError && Boolean(
+    caught.code && STALE_ORDER_ERROR_CODES.has(caught.code),
+  )
+}
+
 function App() {
   const { theme, toggleTheme } = useThemePreference()
   const qrToken = findQrToken()
@@ -232,6 +246,15 @@ function App() {
   const cartStorageKey = `popq:cart:${storageScope}`
   const orderStorageKey = `popq:order:${storageScope}`
   const checkoutStorageKey = `popq:checkout:${storageScope}`
+
+  const discardStoredOrder = useCallback((message?: string) => {
+    orderRef.current = null
+    setOrder(null)
+    persistStored(window.localStorage, orderStorageKey, null)
+    setConnected(false)
+    setScreen('menu')
+    if (message) setError(message)
+  }, [orderStorageKey])
 
   useEffect(() => {
     orderRef.current = order
@@ -311,8 +334,14 @@ function App() {
           pendingOrder.version,
         )
         if (synced.order) setOrder(synced.order)
-      } catch {
-        setConnected(false)
+      } catch (caught) {
+        if (isStaleOrderError(caught)) {
+          discardStoredOrder(
+            '이전 QR 세션의 주문 정보가 정리되었습니다. 메뉴에서 새 주문을 진행해 주세요.',
+          )
+        } else {
+          setConnected(false)
+        }
       }
     }
 
@@ -341,6 +370,7 @@ function App() {
     paymentConfirmationAttempt,
     paymentReturn,
     qrToken,
+    discardStoredOrder,
   ])
 
   useEffect(() => {
@@ -363,6 +393,35 @@ function App() {
         setContext(opened)
         setProducts(menu)
         setOrderType(opened.storeTableId ? 'DINE_IN' : 'TAKEOUT')
+
+        const restoredOrder = orderRef.current
+        if (restoredOrder) {
+          try {
+            const synced = await syncOrder(
+              restoredOrder.orderPublicId,
+              restoredOrder.version,
+            )
+            if (!active) return
+            const latestOrder = synced.order ?? restoredOrder
+            if (isTerminalOrder(latestOrder)) {
+              discardStoredOrder()
+            } else if (synced.order) {
+              orderRef.current = synced.order
+              setOrder(synced.order)
+            }
+          } catch (caught) {
+            if (!active) return
+            if (isStaleOrderError(caught)) {
+              discardStoredOrder()
+            } else {
+              setError(
+                caught instanceof Error
+                  ? `이전 주문 상태를 확인하지 못했습니다. ${caught.message}`
+                  : '이전 주문 상태를 확인하지 못했습니다.',
+              )
+            }
+          }
+        }
       } catch (caught) {
         if (active) {
           setError(
@@ -379,7 +438,7 @@ function App() {
     return () => {
       active = false
     }
-  }, [isDemo, qrToken])
+  }, [discardStoredOrder, isDemo, qrToken])
 
   useEffect(() => {
     if (isDemo || screen !== 'tracking' || !trackedOrderPublicId) return
@@ -391,8 +450,14 @@ function App() {
       try {
         const synced = await syncOrder(orderPublicId, current.version)
         if (synced.refreshRequired && synced.order) setOrder(synced.order)
-      } catch {
-        setConnected(false)
+      } catch (caught) {
+        if (isStaleOrderError(caught)) {
+          discardStoredOrder(
+            '이전 QR 세션의 주문이라 더 이상 조회할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+          )
+        } else {
+          setConnected(false)
+        }
       }
     }
 
@@ -429,7 +494,7 @@ function App() {
         if (nextConnected) void recover()
       },
     )
-  }, [isDemo, screen, trackedOrderPublicId])
+  }, [discardStoredOrder, isDemo, screen, trackedOrderPublicId])
 
   const categories = useMemo(
     () => ['전체', ...new Set(products.map((product) => product.categoryName))],
@@ -626,9 +691,15 @@ function App() {
         setOrder(await cancelOrder(order.orderPublicId))
       }
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : '주문을 취소하지 못했습니다.',
-      )
+      if (isStaleOrderError(caught)) {
+        discardStoredOrder(
+          '이전 QR 세션의 주문이라 취소할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+        )
+      } else {
+        setError(
+          caught instanceof Error ? caught.message : '주문을 취소하지 못했습니다.',
+        )
+      }
     } finally {
       setProcessing(false)
     }
