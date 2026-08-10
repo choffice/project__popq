@@ -49,6 +49,8 @@ services:
       POPQ_ORDER_PAYMENT_DEADLINE: ${POPQ_ORDER_PAYMENT_DEADLINE:-PT15M}
       POPQ_PAYMENT_PROVIDER: ${POPQ_PAYMENT_PROVIDER:-TEST}
       POPQ_TOSS_SECRET_KEY: ${POPQ_TOSS_SECRET_KEY:-}
+      POPQ_FIREBASE_ENABLED: ${POPQ_FIREBASE_ENABLED:-false}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
       POPQ_REALTIME_ALLOWED_ORIGINS: ${POPQ_REALTIME_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
       POPQ_WEB_ALLOWED_ORIGINS: ${POPQ_WEB_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
       TZ: UTC
@@ -56,6 +58,7 @@ services:
       - "${POPQ_SERVER_PORT:-8082}:8082"
     volumes:
       - popq_uploads:/app/uploads
+      - "${GOOGLE_APPLICATION_CREDENTIALS:-C:/workspace/popq-36fd0-firebase-adminsdk-fbsvc-d8b380e7c6.json}:/run/secrets/firebase-admin.json:ro"
     depends_on:
       mysql:
         condition: service_healthy
