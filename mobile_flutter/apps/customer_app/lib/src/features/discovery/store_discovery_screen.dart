@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 import 'package:flutter/foundation.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
@@ -411,20 +412,36 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         )
         else
           KakaoStoreMapWeb(
+            controller: _mapController,
             stores: stores,
+            favoriteStoreIds: _favoriteStoreIds,
             currentLocation: _controller.location,
             searchCenter: _controller.searchCenter,
+            onStoreSelected: _selectStore,
+            selectedStoreId: _selectedStore?.storeId,
+            onViewportIdle: _onMapViewportIdle,
           ),
         _buildStatusOverlay(stores),
 
-        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _buildTopControls(),
+          ),
+        ),
 
         Positioned(
           right: 16,
           bottom: _selectedStore == null ? 20 : 158,
-          child: _CurrentLocationButton(
-            active: _controller.location != null,
-            onPressed: _useCurrentLocation,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _CurrentLocationButton(
+              active: _controller.location != null,
+              onPressed: _useCurrentLocation,
+            ),
           ),
         ),
 
@@ -433,32 +450,36 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: _SelectedStoreCard(
-              store: _selectedStore!,
-              favorite: _isFavorite(_selectedStore!.storeId),
-              favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
-              walkingRoute: _walkingRoute,
-              walkingRouteLoading: _walkingRouteLoading,
-              walkingRouteError: _walkingRouteError,
-              onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
-              onStoreLocationPressed:
-              _focusSelectedStoreOnMap,
-              onFavoritePressed: _toggleFavorite,
-              onDetailsPressed: _openStoreDetail,
-              onClose: () {
-                setState(() {
-                  _clearSelectedStoreState();
-                });
-              },
+            child: PointerInterceptor(
+              intercepting: kIsWeb,
+              child: _SelectedStoreCard(
+                store: _selectedStore!,
+                favorite: _isFavorite(_selectedStore!.storeId),
+                favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
+                walkingRoute: _walkingRoute,
+                walkingRouteLoading: _walkingRouteLoading,
+                walkingRouteError: _walkingRouteError,
+                onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
+                onStoreLocationPressed: _focusSelectedStoreOnMap,
+                onFavoritePressed: _toggleFavorite,
+                onDetailsPressed: _openStoreDetail,
+                onClose: () {
+                  setState(() {
+                    _clearSelectedStoreState();
+                  });
+                },
+              ),
             ),
           ),
-
         if (_showInitialLocationChoice)
           Positioned.fill(
-            child: _InitialLocationChoice(
-              requestingLocation: _requestingInitialLocation,
-              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
-              onContinueWithBusan: _continueWithBusan,
+            child: PointerInterceptor(
+              intercepting: kIsWeb,
+              child: _InitialLocationChoice(
+                requestingLocation: _requestingInitialLocation,
+                onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
+                onContinueWithBusan: _continueWithBusan,
+              ),
             ),
           ),
       ],
@@ -662,6 +683,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     if (stores.length == 1) {
       _selectStore(stores.first);
+      await _focusSelectedStoreOnMap();
     }
   }
 
@@ -681,9 +703,29 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _selectSearchSuggestion(CustomerStore store) {
     _queryController
       ..text = store.name
-      ..selection = TextSelection.collapsed(offset: store.name.length);
+      ..selection = TextSelection.collapsed(
+        offset: store.name.length,
+      );
 
     _selectStore(store);
+
+    final latitude = store.latitude;
+    final longitude = store.longitude;
+
+    if (latitude == null || longitude == null) {
+      return;
+    }
+
+    _mapSearchDebounce?.cancel();
+
+    unawaited(
+      _mapController.focusStoreLocation(
+        CustomerLocation(
+          latitude: latitude,
+          longitude: longitude,
+        ),
+      ),
+    );
   }
 
   void _onMapViewportIdle(KakaoMapViewport viewport) {
