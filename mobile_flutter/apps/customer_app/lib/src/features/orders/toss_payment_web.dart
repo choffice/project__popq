@@ -60,6 +60,10 @@ class _TossPaymentWebState
               'data-payment-result',
             );
 
+            debugPrint(
+              '[POPQ WEB TOSS] Dart success event: $rawResult',
+            );
+
             if (rawResult == null ||
                 rawResult.isEmpty) {
               _completeFailure(
@@ -90,11 +94,37 @@ class _TossPaymentWebState
               final rawAmount =
               result['amount'];
 
-              final amount = rawAmount is num
-                  ? rawAmount.toInt()
-                  : int.tryParse(
-                rawAmount?.toString() ?? '',
-              );
+              int? amount;
+
+              if (rawAmount is num) {
+                amount = rawAmount.toInt();
+              } else if (rawAmount is Map) {
+                final amountData =
+                Map<String, Object?>.from(rawAmount);
+
+                final rawValue =
+                amountData['value'];
+
+                amount = rawValue is num
+                    ? rawValue.toInt()
+                    : int.tryParse(
+                  rawValue?.toString() ?? '',
+                );
+
+                final currency =
+                amountData['currency']?.toString();
+
+                if (currency != null &&
+                    currency != 'KRW') {
+                  throw const FormatException(
+                    '결제 통화가 올바르지 않습니다.',
+                  );
+                }
+              } else {
+                amount = int.tryParse(
+                  rawAmount?.toString() ?? '',
+                );
+              }
 
               if (paymentKey == null ||
                   paymentKey.isEmpty ||
@@ -203,6 +233,11 @@ class _TossPaymentWebState
       return;
     }
 
+    debugPrint(
+      '[POPQ WEB TOSS] Dart failure: '
+          '$errorCode / $errorMessage',
+    );
+
     _completed = true;
 
     widget.onFailure(
@@ -291,6 +326,17 @@ class _TossPaymentWebState
 
               windowTarget: 'iframe'
             });
+console.log(
+  '[POPQ WEB TOSS] Promise success',
+  {
+    hasPaymentKey:
+        !!result?.paymentKey,
+    orderId:
+        result?.orderId,
+    amount:
+        result?.amount
+  }
+);
 
         frame.setAttribute(
           'data-payment-result',
@@ -301,6 +347,12 @@ class _TossPaymentWebState
           new Event('popq-payment-success')
         );
       } catch (error) {
+      console.error(
+  '[POPQ WEB TOSS] Promise failure',
+  error?.code,
+  error?.message
+);
+
         const failure = {
           code:
               error?.code ??
