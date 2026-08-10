@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -205,13 +205,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         appBar: AppBar(
           automaticallyImplyLeading: false,
           leading: IconButton(
-            tooltip: '?ㅻ줈媛湲?,
+            tooltip: '뒤로가기',
             onPressed: _goBack,
             icon: const Icon(
               Icons.arrow_back_rounded,
             ),
           ),
-          title: const Text('二쇰Ц ?곸꽭'),
+          title: const Text('주문 상세'),
         ),
         body: _buildBody(),
       ),
@@ -221,13 +221,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   Widget _buildBody() {
     if (_loading) {
       return const PopqLoadingView(
-        message: '理쒖떊 二쇰Ц ?곹깭瑜??뺤씤?섍퀬 ?덉뼱??',
+        message: '최신 주문 상태를 확인하고 있어요.',
       );
     }
 
     if (_error != null || _order == null) {
       return PopqErrorView(
-        message: '二쇰Ц ?곸꽭瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+        message: '주문 상세를 불러오지 못했습니다.',
         onRetry: _load,
       );
     }
@@ -305,13 +305,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 leading: const Icon(Icons.timer_outlined),
                 title: Text(
                   order.preparationMinutes == 0
-                      ? '?곹뭹??諛붾줈 以鍮꾪빐??
-                      : '?덉긽 以鍮꾩떆媛?${order.preparationMinutes}遺?,
+                      ? '상품을 바로 준비해요'
+                      : '예상 준비시간 ${order.preparationMinutes}분',
                 ),
                 subtitle: order.estimatedReadyAt == null
                     ? null
                     : Text(
-                        '?덉긽 ?꾨즺 ${_formatEstimatedTime(order.estimatedReadyAt!)}',
+                        '예상 완료 ${_formatEstimatedTime(order.estimatedReadyAt!)}',
                       ),
               ),
             ),
@@ -322,7 +322,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
           ),
 
           Text(
-            '二쇰Ц ?곹뭹',
+            '주문 상품',
             style:
             Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
@@ -339,7 +339,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 item.productName,
               ),
               subtitle: Text(
-                '${item.quantity}媛?,
+                '${item.quantity}개',
               ),
               trailing: Text(
                 _won(item.itemTotalPrice),
@@ -351,7 +351,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
-              '珥?寃곗젣 湲덉븸',
+              '총 결제 금액',
             ),
             trailing: Text(
               _won(order.totalAmount),
@@ -412,7 +412,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                       .showTopSnackBar(
                     const SnackBar(
                       content: Text(
-                        '由щ럭瑜??깅줉?덉뼱??',
+                        '리뷰를 등록했어요.',
                       ),
                     ),
                   );
@@ -422,7 +422,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 Icons.rate_review_rounded,
               ),
               label: const Text(
-                '由щ럭 ?묒꽦',
+                '리뷰 작성',
               ),
             ),
             const SizedBox(
@@ -444,8 +444,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
             ),
             label: Text(
               _syncing
-                  ? '?뺤씤 以?..'
-                  : '理쒖떊 ?곹깭 ?뺤씤',
+                  ? '확인 중...'
+                  : '최신 상태 확인',
             ),
           ),
 
@@ -454,9 +454,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
           ),
 
           Text(
-            '?쒕쾭 踰꾩쟾 ${order.version} 쨌 '
-                '?뚮┝ ?섏떊 ?꾩뿉????API濡?理쒖떊 ?곹깭瑜?'
-                '?ㅼ떆 ?뺤씤?⑸땲??',
+            '서버 버전 ${order.version} · '
+                '알림 수신 후에도 이 API로 최신 상태를 '
+                '다시 확인합니다.',
             textAlign: TextAlign.center,
             style:
             Theme.of(context).textTheme.bodySmall,
@@ -552,7 +552,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '理쒖떊 二쇰Ц ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+            '최신 주문 정보를 불러오지 못했습니다.',
           ),
         ),
       );
@@ -580,7 +580,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       });
     } catch (error, stackTrace) {
       debugPrint(
-        '二쇰Ц ?곸꽭 理쒖떊 ?곹깭瑜??먮룞 蹂듦뎄?섏? 紐삵뻽?듬땲?? $error',
+        '주문 상세 최신 상태를 자동 복구하지 못했습니다: $error',
       );
       debugPrintStack(
         stackTrace: stackTrace,
@@ -616,11 +616,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
       await _refreshPaymentSummary();
     } catch (error, stackTrace) {
-      // status/version? ?ㅼ떆媛??대깽?몄뿉???대? 諛섏쁺?덉뒿?덈떎.
-      // 以鍮꾩떆媛?媛숈? ?섎㉧吏 ?꾨뱶???ъ뿰寃?fallback REST 議고쉶?먯꽌
-      // ?ㅼ떆 蹂듦뎄?⑸땲??
+      // status/version은 실시간 이벤트에서 이미 반영했습니다.
+      // 준비시간 같은 나머지 필드는 재연결/fallback REST 조회에서
+      // 다시 복구합니다.
       debugPrint(
-        '二쇰Ц ?곸꽭 ?ㅼ떆媛??대깽????REST ?숆린?붿뿉 ?ㅽ뙣?덉뒿?덈떎: $error',
+        '주문 상세 실시간 이벤트 후 REST 동기화에 실패했습니다: $error',
       );
       debugPrintStack(
         stackTrace: stackTrace,
@@ -685,8 +685,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         SnackBar(
           content: Text(
             result.refreshRequired
-                ? '理쒖떊 二쇰Ц ?곹깭濡?媛깆떊?덉뒿?덈떎.'
-                : '?대? 理쒖떊 ?곹깭?낅땲??',
+                ? '최신 주문 상태로 갱신했습니다.'
+                : '이미 최신 상태입니다.',
           ),
         ),
       );
@@ -702,7 +702,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '理쒖떊 ?곹깭瑜??뺤씤?섏? 紐삵뻽?듬땲??',
+            '최신 상태를 확인하지 못했습니다.',
           ),
         ),
       );
@@ -728,20 +728,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('二쇰Ц??痍⑥냼?섏떆寃좎뼱??'),
+          title: const Text('주문을 취소하시겠어요?'),
           content: Text(
-            '痍⑥냼 ?ъ쑀: $reason\n\n'
-            '?먮ℓ?먭? ?꾩쭅 ?묒닔?섏? ?딆? 二쇰Ц留?痍⑥냼?????덉쑝硫? '
-            '痍⑥냼媛 ?꾨즺?섎㈃ 寃곗젣 湲덉븸???꾩븸 ?섎텋 泥섎━?⑸땲??',
+            '취소 사유: $reason\n\n'
+            '판매자가 아직 접수하지 않은 주문만 취소할 수 있으며, '
+            '취소가 완료되면 결제 금액도 전액 환불 처리됩니다.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('?뚯븘媛湲?),
+              child: const Text('돌아가기'),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('二쇰Ц 痍⑥냼'),
+              child: const Text('주문 취소'),
             ),
           ],
         );
@@ -784,12 +784,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '二쇰Ц??痍⑥냼?덇퀬 寃곗젣 湲덉븸???섎텋 泥섎━?덉뼱??',
+            '주문을 취소했고 결제 금액도 환불 처리했어요.',
           ),
         ),
       );
     } catch (error, stackTrace) {
-      debugPrint('怨좉컼 二쇰Ц 痍⑥냼???ㅽ뙣?덉뒿?덈떎: $error');
+      debugPrint('고객 주문 취소에 실패했습니다: $error');
       debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) {
@@ -803,7 +803,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
-            '二쇰Ц??痍⑥냼?섏? 紐삵뻽?듬땲?? ?먮ℓ?먭? ?대? ?묒닔?덇굅???섎텋 泥섎━???ㅽ뙣?덉쓣 ???덉뼱??',
+            '주문을 취소하지 못했습니다. 판매자가 이미 접수했거나 환불 처리에 실패했을 수 있어요.',
           ),
         ),
       );
@@ -815,9 +815,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   Future<String?> _showCancelReasonSheet() async {
     const otherValue = '__OTHER__';
     const reasons = <String>[
-      '二쇰Ц???섎せ?덉뼱??,
-      '?ㅻⅨ 硫붾돱濡?蹂寃쏀븯怨??띠뼱??,
-      '湲곕떎由ш린 ?대젮?뚯슂',
+      '주문을 잘못했어요',
+      '다른 메뉴로 변경하고 싶어요',
+      '기다리기 어려워요',
     ];
 
     final selected = await showModalBottomSheet<String>(
@@ -837,7 +837,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '痍⑥냼 ?ъ쑀瑜??좏깮?댁＜?몄슂',
+                  '취소 사유를 선택해주세요',
                   style: Theme.of(sheetContext)
                       .textTheme
                       .titleLarge
@@ -847,7 +847,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 ),
                 const SizedBox(height: PopqSpacing.sm),
                 Text(
-                  '?좏깮???ъ쑀???먮ℓ?먯뿉寃뚮룄 ?쒖떆?⑸땲??',
+                  '선택한 사유는 판매자에게도 표시됩니다.',
                   style: Theme.of(sheetContext)
                       .textTheme
                       .bodyMedium
@@ -869,7 +869,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.edit_outlined),
-                  title: const Text('湲고?'),
+                  title: const Text('기타'),
                   trailing: const Icon(Icons.chevron_right_rounded),
                   onTap: () => Navigator.of(sheetContext).pop(otherValue),
                 ),
@@ -899,20 +899,20 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
-            title: const Text('痍⑥냼 ?ъ쑀 ?낅젰'),
+            title: const Text('취소 사유 입력'),
             content: TextField(
               controller: controller,
               autofocus: true,
               maxLength: 100,
               maxLines: 3,
               decoration: const InputDecoration(
-                hintText: '痍⑥냼 ?ъ쑀瑜??낅젰?댁＜?몄슂.',
+                hintText: '취소 사유를 입력해주세요.',
               ),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
-                child: const Text('?リ린'),
+                child: const Text('닫기'),
               ),
               FilledButton(
                 onPressed: () {
@@ -924,7 +924,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
                   Navigator.of(dialogContext).pop(value);
                 },
-                child: const Text('?좏깮'),
+                child: const Text('선택'),
               ),
             ],
           );
@@ -953,11 +953,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     }
 
     /*
-     * 梨꾪똿 ?붾㈃?먯꽌 ?먮ℓ???듬???議고쉶?섎㈃
-     * 諛깆뿏?쒓? ?대떦 硫붿떆吏瑜??쎌쓬 泥섎━?⑸땲??
+     * 채팅 화면에서 판매자 답변을 조회하면
+     * 백엔드가 해당 메시지를 읽음 처리합니다.
      *
-     * ?붾㈃ 蹂듦? 利됱떆 諛곗?瑜??쒓굅????
-     * ?쒕쾭??理쒖떊 二쇰Ц 諛??쎌? ?딆? 媛쒖닔瑜??ㅼ떆 ?뺤씤?⑸땲??
+     * 화면 복귀 즉시 배지를 제거한 뒤
+     * 서버의 최신 주문 및 읽지 않은 개수를 다시 확인합니다.
      */
     setState(() {
       _unreadCount = 0;
@@ -989,8 +989,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       });
     } catch (_) {
       /*
-       * 梨꾪똿 ?붾㈃?먯꽌 ?뺤긽?곸쑝濡??뚯븘??寃쎌슦?먮뒗
-       * 二쇰Ц ?곸꽭 ?붾㈃???ㅻ쪟 ?붾㈃?쇰줈 諛붽씀吏 ?딆뒿?덈떎.
+       * 채팅 화면에서 정상적으로 돌아온 경우에는
+       * 주문 상세 화면을 오류 화면으로 바꾸지 않습니다.
        */
     }
   }
@@ -1008,7 +1008,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       );
     } catch (error, stackTrace) {
       debugPrint(
-        '二쇰Ц ?곸꽭 寃곗젣/?섎텋 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? $error',
+        '주문 상세 결제/환불 정보를 불러오지 못했습니다: $error',
       );
       debugPrintStack(
         stackTrace: stackTrace,
@@ -1079,7 +1079,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       });
     } catch (error, stackTrace) {
       debugPrint(
-        '二쇰Ц ?곸꽭???쎌? ?딆? ?듬? ?섎? 媛깆떊?섏? 紐삵뻽?듬땲?? $error',
+        '주문 상세의 읽지 않은 답변 수를 갱신하지 못했습니다: $error',
       );
       debugPrintStack(
         stackTrace: stackTrace,
@@ -1105,8 +1105,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       _observedConnectionEpoch =
           realtimeClient.connectionEpoch;
 
-      // ?ъ뿰寃?吏곹썑 ?딄릿 ?숈븞 ?볦튇 二쇰Ц ?곹깭? 臾몄쓽 諛곗?瑜?
-      // REST濡??ㅼ떆 議고쉶?⑸땲??
+      // 재연결 직후 끊긴 동안 놓친 주문 상태와 문의 배지를
+      // REST로 다시 조회합니다.
       unawaited(
         _recoverLatestState(),
       );
@@ -1142,8 +1142,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
       _error = null;
     });
 
-    // ?붾㈃?먮뒗 利됱떆 ?곹깭瑜?蹂댁뿬二쇨퀬, ?대깽?몄뿉 ?ы븿?섏? ?딆?
-    // 以鍮꾩떆媛??덉긽?꾨즺?쒓컙 ?깆? REST sync濡?蹂댁젙?⑸땲??
+    // 화면에는 즉시 상태를 보여주고, 이벤트에 포함되지 않은
+    // 준비시간/예상완료시간 등은 REST sync로 보정합니다.
     unawaited(
       _syncOrderAfterRealtimeEvent(
         knownVersion: knownVersion,
@@ -1155,7 +1155,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     Object error,
   ) {
     debugPrint(
-      '二쇰Ц ?곸꽭 ?ㅼ떆媛??곹깭 ?대깽?몃? 泥섎━?섏? 紐삵뻽?듬땲?? $error',
+      '주문 상세 실시간 상태 이벤트를 처리하지 못했습니다: $error',
     );
   }
 
@@ -1184,7 +1184,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
     Object error,
   ) {
     debugPrint(
-      '二쇰Ц ?곸꽭 ?ㅼ떆媛?梨꾪똿 ?대깽?몃? 泥섎━?섏? 紐삵뻽?듬땲?? $error',
+      '주문 상세 실시간 채팅 이벤트를 처리하지 못했습니다: $error',
     );
   }
 
@@ -1286,7 +1286,7 @@ class _CancellationInfoSection extends StatelessWidget {
               ),
               const SizedBox(width: PopqSpacing.sm),
               Text(
-                isRejected ? '二쇰Ц 嫄곗젅 ?뺣낫' : '二쇰Ц 痍⑥냼 ?뺣낫',
+                isRejected ? '주문 거절 정보' : '주문 취소 정보',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -1295,21 +1295,21 @@ class _CancellationInfoSection extends StatelessWidget {
           ),
           const SizedBox(height: PopqSpacing.md),
           _InfoRow(
-            label: isRejected ? '嫄곗젅 二쇱껜' : '痍⑥냼 二쇱껜',
+            label: isRejected ? '거절 주체' : '취소 주체',
             value: _actorLabel(history.actorType),
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: isRejected ? '嫄곗젅 ?ъ쑀' : '痍⑥냼 ?ъ쑀',
+            label: isRejected ? '거절 사유' : '취소 사유',
             value: reason == null || reason.isEmpty
-                ? '?ъ쑀媛 ?깅줉?섏? ?딆븯?댁슂.'
+                ? '사유가 등록되지 않았어요.'
                 : reason,
             alignTop: true,
           ),
           if (history.changedAt != null) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: isRejected ? '嫄곗젅 ?쒓컙' : '痍⑥냼 ?쒓컙',
+              label: isRejected ? '거절 시간' : '취소 시간',
               value: _formatDateTime(history.changedAt!),
             ),
           ],
@@ -1352,7 +1352,7 @@ class _PaymentRefundSection extends StatelessWidget {
               ),
               const SizedBox(width: PopqSpacing.sm),
               Text(
-                '寃곗젣쨌?섎텋',
+                '결제·환불',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -1361,23 +1361,23 @@ class _PaymentRefundSection extends StatelessWidget {
           ),
           const SizedBox(height: PopqSpacing.md),
           _InfoRow(
-            label: '寃곗젣 ?곹깭',
+            label: '결제 상태',
             value: _paymentStatusLabel(payment.paymentStatus),
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '寃곗젣 ?섎떒',
+            label: '결제 수단',
             value: _paymentMethodLabel(payment.paymentMethod),
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '寃곗젣 湲덉븸',
+            label: '결제 금액',
             value: _won(payment.approvedAmount),
           ),
           if (payment.refundedAmount > 0) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: '?섎텋 湲덉븸',
+              label: '환불 금액',
               value: _won(payment.refundedAmount),
               valueStyle: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.error,
@@ -1388,14 +1388,14 @@ class _PaymentRefundSection extends StatelessWidget {
           if (payment.approvedAt != null) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: '寃곗젣 ?뱀씤',
+              label: '결제 승인',
               value: _formatDateTime(payment.approvedAt!),
             ),
           ],
           if (payment.canceledAt != null) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: '寃곗젣 痍⑥냼',
+              label: '결제 취소',
               value: _formatDateTime(payment.canceledAt!),
             ),
           ],
@@ -1404,7 +1404,7 @@ class _PaymentRefundSection extends StatelessWidget {
             Divider(color: colorScheme.outlineVariant),
             const SizedBox(height: PopqSpacing.sm),
             Text(
-              '?섎텋 ?대젰',
+              '환불 이력',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -1455,7 +1455,7 @@ class _RefundHistoryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  '?섎텋 $index',
+                  '환불 $index',
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -1466,29 +1466,29 @@ class _RefundHistoryCard extends StatelessWidget {
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '?섎텋 湲덉븸',
+            label: '환불 금액',
             value: _won(refund.amount),
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '泥섎━ 二쇱껜',
+            label: '처리 주체',
             value: _actorLabel(refund.requesterType),
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '?섎텋 ?ъ쑀',
-            value: reason.isEmpty ? '?ъ쑀媛 ?깅줉?섏? ?딆븯?댁슂.' : reason,
+            label: '환불 사유',
+            value: reason.isEmpty ? '사유가 등록되지 않았어요.' : reason,
             alignTop: true,
           ),
           const SizedBox(height: PopqSpacing.sm),
           _InfoRow(
-            label: '?붿껌 ?쒓컙',
+            label: '요청 시간',
             value: _formatDateTime(refund.requestedAt),
           ),
           if (refund.completedAt != null) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: '?꾨즺 ?쒓컙',
+              label: '완료 시간',
               value: _formatDateTime(refund.completedAt!),
             ),
           ],
@@ -1496,7 +1496,7 @@ class _RefundHistoryCard extends StatelessWidget {
               (refund.failureMessage?.trim().isNotEmpty ?? false)) ...[
             const SizedBox(height: PopqSpacing.sm),
             _InfoRow(
-              label: '?ㅽ뙣 ?ъ쑀',
+              label: '실패 사유',
               value: refund.failureMessage!.trim(),
               alignTop: true,
             ),
@@ -1623,7 +1623,7 @@ class _OrderNumberSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '二쇰Ц踰덊샇',
+            '주문번호',
             style: theme.textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -1690,7 +1690,7 @@ class _InquirySection extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  '1:1 臾몄쓽',
+                  '1:1 문의',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -1707,8 +1707,8 @@ class _InquirySection extends StatelessWidget {
           ),
           Text(
             hasUnreadMessage
-                ? '留ㅼ옣?먯꽌 蹂대궦 ???듬????덉뼱??'
-                : '二쇰Ц?대굹 ?곹뭹??沅곴툑???먯쓣 留ㅼ옣??臾몄쓽??蹂댁꽭??',
+                ? '매장에서 보낸 새 답변이 있어요.'
+                : '주문이나 상품에 궁금한 점을 매장에 문의해 보세요.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: hasUnreadMessage
                   ? colorScheme.error
@@ -1730,8 +1730,8 @@ class _InquirySection extends StatelessWidget {
               ),
               label: Text(
                 hasUnreadMessage
-                    ? '???듬? ?뺤씤?섍린'
-                    : '臾몄쓽?섍린',
+                    ? '새 답변 확인하기'
+                    : '문의하기',
               ),
             ),
           ),
@@ -1777,7 +1777,7 @@ class _CustomerCancelSection extends StatelessWidget {
               const SizedBox(width: PopqSpacing.sm),
               Expanded(
                 child: Text(
-                  '二쇰Ц 痍⑥냼',
+                  '주문 취소',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
@@ -1787,8 +1787,8 @@ class _CustomerCancelSection extends StatelessWidget {
           ),
           const SizedBox(height: PopqSpacing.sm),
           Text(
-            '?먮ℓ?먭? 二쇰Ц???묒닔?섍린 ?꾧퉴吏留?痍⑥냼?????덉뼱?? '
-            '痍⑥냼媛 ?꾨즺?섎㈃ 寃곗젣 湲덉븸? ?꾩븸 ?섎텋?⑸땲??',
+            '판매자가 주문을 접수하기 전까지만 취소할 수 있어요. '
+            '취소가 완료되면 결제 금액은 전액 환불됩니다.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -1812,7 +1812,7 @@ class _CustomerCancelSection extends StatelessWidget {
                     )
                   : const Icon(Icons.cancel_outlined),
               label: Text(
-                canceling ? '痍⑥냼 泥섎━ 以?..' : '二쇰Ц 痍⑥냼',
+                canceling ? '취소 처리 중...' : '주문 취소',
               ),
             ),
           ),
@@ -1863,43 +1863,43 @@ class _UnreadCountBadge extends StatelessWidget {
 
 String _actorLabel(String actorType) {
   return switch (actorType) {
-    'CUSTOMER' => '怨좉컼',
-    'SELLER' => '?먮ℓ??,
-    'ADMIN' => '愿由ъ옄',
-    'SYSTEM' => '?쒖뒪??,
-    'GUEST' => '鍮꾪쉶??怨좉컼',
+    'CUSTOMER' => '고객',
+    'SELLER' => '판매자',
+    'ADMIN' => '관리자',
+    'SYSTEM' => '시스템',
+    'GUEST' => '비회원 고객',
     _ => actorType,
   };
 }
 
 String _paymentStatusLabel(String status) {
   return switch (status) {
-    'READY' => '寃곗젣 以鍮?,
-    'IN_PROGRESS' => '寃곗젣 ?뺤씤 以?,
-    'PAID' => '寃곗젣 ?꾨즺',
-    'PARTIALLY_REFUNDED' => '遺遺??섎텋',
-    'REFUNDED' => '?섎텋 ?꾨즺',
-    'CANCELED' => '寃곗젣 痍⑥냼',
-    'FAILED' => '寃곗젣 ?ㅽ뙣',
-    'EXPIRED' => '寃곗젣 留뚮즺',
+    'READY' => '결제 준비',
+    'IN_PROGRESS' => '결제 확인 중',
+    'PAID' => '결제 완료',
+    'PARTIALLY_REFUNDED' => '부분 환불',
+    'REFUNDED' => '환불 완료',
+    'CANCELED' => '결제 취소',
+    'FAILED' => '결제 실패',
+    'EXPIRED' => '결제 만료',
     _ => status,
   };
 }
 
 String _paymentMethodLabel(String method) {
   return switch (method) {
-    'CARD' => '移대뱶 / 媛꾪렪寃곗젣',
-    'TEST' => '?뚯뒪??寃곗젣',
+    'CARD' => '카드 / 간편결제',
+    'TEST' => '테스트 결제',
     _ => method,
   };
 }
 
 String _refundStatusLabel(String status) {
   return switch (status) {
-    'REQUESTED' => '?섎텋 ?붿껌',
-    'PROCESSING' => '?섎텋 泥섎━ 以?,
-    'SUCCEEDED' => '?섎텋 ?꾨즺',
-    'FAILED' => '?섎텋 ?ㅽ뙣',
+    'REQUESTED' => '환불 요청',
+    'PROCESSING' => '환불 처리 중',
+    'SUCCEEDED' => '환불 완료',
+    'FAILED' => '환불 실패',
     _ => status,
   };
 }
@@ -1916,15 +1916,15 @@ String _formatDateTime(DateTime value) {
 
 String _statusLabel(String status) {
   return switch (status) {
-    'CREATED' => '寃곗젣 ?湲?,
-    'PLACED' => '二쇰Ц ?묒닔 ?湲?,
-    'ACCEPTED' => '二쇰Ц???묒닔?먯뼱??,
-    'PREPARING' => '?곹뭹??以鍮꾪븯怨??덉뼱??,
-    'READY' => '以鍮꾧? ?꾨즺?먯뼱??,
-    'COMPLETED' => '二쇰Ц ?꾨즺',
-    'REJECTED' => '二쇰Ц 嫄곗젅',
-    'CANCELED' => '二쇰Ц 痍⑥냼',
-    'EXPIRED' => '寃곗젣 留뚮즺',
+    'CREATED' => '결제 대기',
+    'PLACED' => '주문 접수 대기',
+    'ACCEPTED' => '주문이 접수됐어요',
+    'PREPARING' => '상품을 준비하고 있어요',
+    'READY' => '준비가 완료됐어요',
+    'COMPLETED' => '주문 완료',
+    'REJECTED' => '주문 거절',
+    'CANCELED' => '주문 취소',
+    'EXPIRED' => '결제 만료',
     _ => status,
   };
 }
@@ -1944,6 +1944,5 @@ String _won(int amount) {
     buffer.write(digits[index]);
   }
 
-  return '$buffer??;
+  return '$buffer원';
 }
-

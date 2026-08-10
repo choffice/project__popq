@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -45,10 +45,10 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('留ㅼ옣 ?곸꽭'),
+        title: const Text('매장 상세'),
         actions: [
           IconButton(
-            tooltip: _interested == true ? '愿???ㅽ넗???댁젣' : '愿???ㅽ넗???깅줉',
+            tooltip: _interested == true ? '관심 스토어 해제' : '관심 스토어 등록',
             onPressed: _interestSaving ? null : _toggleInterest,
             icon: Icon(
               _interested == true
@@ -62,11 +62,11 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
         future: _store,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const PopqLoadingView(message: '?ㅽ넗???뺣낫瑜?遺덈윭?ㅺ퀬 ?덉뼱??');
+            return const PopqLoadingView(message: '스토어 정보를 불러오고 있어요.');
           }
           if (snapshot.hasError || !snapshot.hasData) {
             return PopqErrorView(
-              message: '?ㅽ넗???곸꽭 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.',
+              message: '스토어 상세 정보를 불러오지 못했어요.',
               onRetry: () => setState(() {
                 _store = widget.repository.findDetail(widget.storeId);
               }),
@@ -125,7 +125,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                       if (store.fullAddress.isNotEmpty)
                         ListTile(
                           leading: const Icon(Icons.place_rounded),
-                          title: const Text('?꾩튂'),
+                          title: const Text('위치'),
                           subtitle: Text(store.fullAddress),
                         ),
                       if (store.phone?.trim().isNotEmpty == true) ...[
@@ -133,7 +133,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                           const Divider(height: 1),
                         ListTile(
                           leading: const Icon(Icons.phone_outlined),
-                          title: const Text('?꾪솕踰덊샇'),
+                          title: const Text('전화번호'),
                           subtitle: Text(store.phone!),
                         ),
                       ],
@@ -142,13 +142,13 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.today_outlined),
-                        title: const Text('?ㅻ뒛 ?곸뾽?쒓컙'),
+                        title: const Text('오늘 영업시간'),
                         subtitle: Text(schedule.todayLabel()),
                       ),
                       const Divider(height: 1),
                       ExpansionTile(
                         leading: const Icon(Icons.schedule_outlined),
-                        title: const Text('?꾩껜 ?곸뾽?쒓컙'),
+                        title: const Text('전체 영업시간'),
                         childrenPadding: const EdgeInsets.fromLTRB(
                           PopqSpacing.lg,
                           0,
@@ -179,7 +179,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '?댁슜 ?덈궡',
+                        '이용 안내',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: PopqSpacing.sm),
@@ -188,15 +188,15 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         runSpacing: PopqSpacing.sm,
                         children: [
                           _AvailabilityChip(
-                            label: '?ъ옣',
+                            label: '포장',
                             available: store.takeoutAvailable,
                           ),
                           _AvailabilityChip(
-                            label: '留ㅼ옣 ?앹궗',
+                            label: '매장 식사',
                             available: store.dineInAvailable,
                           ),
                           _AvailabilityChip(
-                            label: '二쇰Ц ?묒닔',
+                            label: '주문 접수',
                             available: store.businessStatus == 'OPEN' &&
                                 store.orderAcceptingEnabled,
                           ),
@@ -222,10 +222,10 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   '${CustomerRoutes.stores}/${store.storeId}/products',
                 ),
                 icon: const Icon(Icons.shopping_bag_outlined),
-                label: const Text('?곹뭹 蹂닿린'),
+                label: const Text('상품 보기'),
               ),
               const SizedBox(height: PopqSpacing.xl),
-              Text('怨좉컼 由щ럭', style: Theme.of(context).textTheme.titleLarge),
+              Text('고객 리뷰', style: Theme.of(context).textTheme.titleLarge),
               const SizedBox(height: PopqSpacing.sm),
               _StoreReviewSection(reviews: _reviews),
             ],
@@ -266,7 +266,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       });
       ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
-          content: Text(interested ? '愿???ㅽ넗?댁뿉 異붽??덉뼱??' : '愿???ㅽ넗?댁뿉???댁젣?덉뼱??'),
+          content: Text(interested ? '관심 스토어에 추가했어요.' : '관심 스토어에서 해제했어요.'),
         ),
       );
     } catch (_) {
@@ -274,7 +274,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       setState(() => _interestSaving = false);
       ScaffoldMessenger.of(
         context,
-      ).showTopSnackBar(const SnackBar(content: Text('愿???ㅽ넗?대? 蹂寃쏀븯吏 紐삵뻽?댁슂.')));
+      ).showTopSnackBar(const SnackBar(content: Text('관심 스토어를 변경하지 못했어요.')));
     }
   }
 }
@@ -307,7 +307,7 @@ class _OrderPausedBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '?꾩옱 二쇰Ц ?묒닔媛 ?좎떆 以묐떒?섏뿀?댁슂.',
+                  '현재 주문 접수가 잠시 중단되었어요.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                         fontWeight: FontWeight.w800,
@@ -315,7 +315,7 @@ class _OrderPausedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '?곹뭹? ?섎윭蹂????덉?留??덈줈??二쇰Ц? ?묒닔 ?ш컻 ??吏꾪뻾?????덉뼱??',
+                  '상품은 둘러볼 수 있지만 새로운 주문은 접수 재개 후 진행할 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                       ),
@@ -386,20 +386,20 @@ class _AvailabilityChip extends StatelessWidget {
         available ? Icons.check_circle_outline : Icons.cancel_outlined,
         size: 18,
       ),
-      label: Text('$label ${available ? '媛?? : '遺덇?'}'),
+      label: Text('$label ${available ? '가능' : '불가'}'),
     );
   }
 }
 
 String _storeTypeLabel(String storeType) {
-  return storeType == 'EVENT_COMMERCE' ? '?됱궗쨌?앹뾽 ?먮ℓ?? : '?쇰컲 留ㅼ옣';
+  return storeType == 'EVENT_COMMERCE' ? '행사·팝업 판매점' : '일반 매장';
 }
 
 String _businessStatusLabel(String status) {
   return switch (status) {
-    'OPEN' => '?곸뾽 以?,
-    'PRE_OPEN' => '?곸뾽 以鍮?,
-    'CLOSED' => '?곸뾽 醫낅즺',
+    'OPEN' => '영업 중',
+    'PRE_OPEN' => '영업 준비',
+    'CLOSED' => '영업 종료',
     _ => status,
   };
 }
@@ -421,14 +421,14 @@ class _StoreReviewSection extends StatelessWidget {
           );
         }
         if (snapshot.hasError) {
-          return const Text('由щ럭瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.');
+          return const Text('리뷰를 불러오지 못했어요.');
         }
         final items = snapshot.data ?? const [];
         if (items.isEmpty) {
           return const Card(
             child: Padding(
               padding: EdgeInsets.all(PopqSpacing.lg),
-              child: Text('?꾩쭅 ?깅줉??由щ럭媛 ?놁뼱??'),
+              child: Text('아직 등록된 리뷰가 없어요.'),
             ),
           );
         }
@@ -447,11 +447,11 @@ class _StoreReviewSection extends StatelessWidget {
                     const Icon(Icons.star_rounded, color: Color(0xFFFFB300)),
                     const SizedBox(width: PopqSpacing.xs),
                     Text(
-                      '?꾩껜 ?됱젏 ${average.toStringAsFixed(1)}',
+                      '전체 평점 ${average.toStringAsFixed(1)}',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const Spacer(),
-                    Text('由щ럭 ${items.length}媛?),
+                    Text('리뷰 ${items.length}개'),
                   ],
                 ),
               ),
@@ -462,7 +462,7 @@ class _StoreReviewSection extends StatelessWidget {
                   title: Row(
                     children: [
                       Expanded(child: Text(review.authorName)),
-                      Text(List.filled(review.rating, '??).join()),
+                      Text(List.filled(review.rating, '★').join()),
                     ],
                   ),
                   subtitle: Column(
@@ -478,7 +478,7 @@ class _StoreReviewSection extends StatelessWidget {
                             color: Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text('?ъ옣???듦?\n${review.sellerReply!}'),
+                          child: Text('사장님 답글\n${review.sellerReply!}'),
                         ),
                       ],
                     ],
@@ -491,4 +491,3 @@ class _StoreReviewSection extends StatelessWidget {
     );
   }
 }
-

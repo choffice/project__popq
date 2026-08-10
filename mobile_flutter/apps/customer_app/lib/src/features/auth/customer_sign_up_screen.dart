@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -48,13 +48,13 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('?뚯썝媛??)),
+      appBar: AppBar(title: const Text('회원가입')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(PopqSpacing.lg),
           children: [
             Text(
-              '?뚯썝媛?낇븯怨?nPOPQ瑜??댁뼱??利먭꺼蹂댁꽭??',
+              '회원가입하고\nPOPQ를 이어서 즐겨보세요.',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: PopqSpacing.lg),
@@ -66,13 +66,13 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     key: const Key('sign-up-email'),
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: '?대찓??),
+                    decoration: const InputDecoration(labelText: '이메일'),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return '?대찓?쇱쓣 ?낅젰??二쇱꽭??';
+                        return '이메일을 입력해 주세요.';
                       }
                       if (!value.contains('@')) {
-                        return '?щ컮瑜??대찓???뺤떇???꾨떃?덈떎.';
+                        return '올바른 이메일 형식이 아닙니다.';
                       }
                       return null;
                     },
@@ -82,10 +82,10 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     key: const Key('sign-up-name'),
                     controller: _name,
                     maxLength: 100,
-                    decoration: const InputDecoration(labelText: '?대쫫'),
+                    decoration: const InputDecoration(labelText: '이름'),
                     validator: (value) {
                       if (value == null || value.trim().length < 2) {
-                        return '?대쫫??2???댁긽 ?낅젰??二쇱꽭??';
+                        return '이름을 2자 이상 입력해 주세요.';
                       }
                       return null;
                     },
@@ -95,15 +95,15 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     controller: _phone,
                     keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: '?꾪솕踰덊샇',
+                      labelText: '전화번호',
                       hintText: '010-1234-5678',
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return '?꾪솕踰덊샇瑜??낅젰??二쇱꽭??';
+                        return '전화번호를 입력해 주세요.';
                       }
                       if (!_phonePattern.hasMatch(value.trim())) {
-                        return '?щ컮瑜??꾪솕踰덊샇 ?뺤떇???꾨떃?덈떎.';
+                        return '올바른 전화번호 형식이 아닙니다.';
                       }
                       return null;
                     },
@@ -114,15 +114,15 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     controller: _password,
                     obscureText: true,
                     decoration: const InputDecoration(
-                      labelText: '鍮꾨?踰덊샇',
-                      helperText: '?곷Ц怨??レ옄瑜??ы븿??8???댁긽 ?낅젰??二쇱꽭??',
+                      labelText: '비밀번호',
+                      helperText: '영문과 숫자를 포함해 8자 이상 입력해 주세요.',
                     ),
                     validator: (value) {
                       if (value == null || value.length < 8) {
-                        return '鍮꾨?踰덊샇??8???댁긽?댁뼱???⑸땲??';
+                        return '비밀번호는 8자 이상이어야 합니다.';
                       }
                       if (!_passwordPattern.hasMatch(value)) {
-                        return '鍮꾨?踰덊샇???곷Ц怨??レ옄瑜??ы븿?댁빞 ?⑸땲??';
+                        return '비밀번호는 영문과 숫자를 포함해야 합니다.';
                       }
                       return null;
                     },
@@ -132,10 +132,10 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     key: const Key('sign-up-password-confirm'),
                     controller: _passwordConfirm,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: '鍮꾨?踰덊샇 ?뺤씤'),
+                    decoration: const InputDecoration(labelText: '비밀번호 확인'),
                     validator: (value) {
                       if (value != _password.text) {
-                        return '鍮꾨?踰덊샇媛 ?쇱튂?섏? ?딆뒿?덈떎.';
+                        return '비밀번호가 일치하지 않습니다.';
                       }
                       return null;
                     },
@@ -150,7 +150,7 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                           setState(() => _agreed = value ?? false);
                         },
                       ),
-                      const Text('?곗씠?????멸쾶??),
+                      const Text('데이터 잘 쓸게요'),
                     ],
                   ),
                   const SizedBox(height: PopqSpacing.sm),
@@ -160,7 +160,7 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                     ),
-                    child: Text(_busy ? '媛??泥섎━ 以?..' : '?뚯썝媛??),
+                    child: Text(_busy ? '가입 처리 중...' : '회원가입'),
                   ),
                 ],
               ),
@@ -182,7 +182,7 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (!_agreed) {
-      setState(() => _errorMessage = '?곗씠???댁슜???숈쓽??二쇱꽭??');
+      setState(() => _errorMessage = '데이터 이용에 동의해 주세요.');
       return;
     }
     setState(() {
@@ -199,7 +199,7 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showTopSnackBar(
-        const SnackBar(content: Text('?뚯썝媛?낆씠 ?꾨즺?섏뿀?듬땲?? 濡쒓렇?명빐 二쇱꽭??')),
+        const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해 주세요.')),
       );
       context.go(CustomerRoutes.signIn);
     } on PopqFailure catch (failure) {
@@ -212,9 +212,8 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _errorMessage = '?뚯썝媛?낆뿉 ?ㅽ뙣?덉뒿?덈떎. ?ㅼ떆 ?쒕룄??二쇱꽭??';
+        _errorMessage = '회원가입에 실패했습니다. 다시 시도해 주세요.';
       });
     }
   }
 }
-

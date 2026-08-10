@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'qr_webview_screen.dart';
@@ -61,7 +61,7 @@ class _CustomerQrScannerScreenState
         ..hideCurrentTopSnackBar()
         ..showTopSnackBar(
           const SnackBar(
-            content: Text('?щ컮瑜?URL ?뺤떇??QR 肄붾뱶媛 ?꾨떃?덈떎.'),
+            content: Text('올바른 URL 형식의 QR 코드가 아닙니다.'),
           ),
         );
 
@@ -126,7 +126,7 @@ class _CustomerQrScannerScreenState
           right: 24,
           bottom: 32,
           child: Text(
-            'QR 肄붾뱶瑜??ш컖???덉뿉 留욎떠二쇱꽭??',
+            'QR 코드를 사각형 안에 맞춰주세요.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white,
@@ -145,4 +145,3 @@ class _CustomerQrScannerScreenState
     );
   }
 }
-

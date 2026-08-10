@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -66,9 +66,9 @@ class PopqCustomerApp extends StatefulWidget {
   final CustomerAuthRepository? authRepository;
   final CustomerIdentityRepository? identityRepository;
 
-  /// ?ㅽ뵆?섏떆 ?붾㈃(遺?몄뒪?몃옪)??理쒖냼 ???쒓컙留뚰겮 蹂댁뿬以띾땲??
+  /// 스플래시 화면(부트스트랩)을 최소 이 시간만큼 보여줍니다.
   ///
-  /// ?꾩젽 ?뚯뒪?몄뿉?쒕뒗 [Duration.zero]濡??섍꺼???ㅽ뵆?섏떆瑜?嫄대꼫?????덉뒿?덈떎.
+  /// 위젯 테스트에서는 [Duration.zero]로 넘겨서 스플래시를 건너뛸 수 있습니다.
   final Duration splashMinDuration;
 
   @override
@@ -79,7 +79,6 @@ class PopqCustomerApp extends StatefulWidget {
 
 class _PopqCustomerAppState extends State<PopqCustomerApp>
     with WidgetsBindingObserver {
-
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
@@ -109,30 +108,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   bool _isRecoveringPendingPayment = false;
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
-
-  //?ㅼ갹 : ??媛쒕컻紐⑤뱶 ?꾩슜
-  bool get _isWebDevelopment =>
-      kIsWeb &&
-          widget.environment.flavor == AppFlavor.development;
-  Future<void> Function()? get _webSafeGoogleSignIn =>
-      _isWebDevelopment ? null : _googleSignIn;
-
-  Future<void> Function()? get _webSafeKakaoSignIn =>
-      _isWebDevelopment ? null : _kakaoSignIn;
-
-  Future<void> Function()? get _webSafeNaverSignIn =>
-      _isWebDevelopment ? null : _naverSignIn;
-
-  Future<void> Function()? get _webSafeGoogleLink =>
-      _isWebDevelopment ? null : _googleLink;
-
-  Future<void> Function()? get _webSafeKakaoLink =>
-      _isWebDevelopment ? null : _kakaoLink;
-
-  Future<void> Function()? get _webSafeNaverLink =>
-      _isWebDevelopment ? null : _naverLink;
-  //?ш린源뚯? ?ㅼ갹
-
 
   @override
   void initState() {
@@ -173,22 +148,19 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    //?ㅼ갹
-    if (!_isWebDevelopment) {
-      _googleAuthService = GoogleAuthService(
-        webClientId:
+    _googleAuthService = GoogleAuthService(
+      webClientId:
           '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-      );
-
-      _kakaoAuthService = KakaoAuthService();
-      _naverAuthService = NaverAuthService();
-    }
+    );
 
     _authRepository =
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
 
     _identityRepository =
         widget.identityRepository ?? ApiCustomerIdentityRepository(_apiClient);
+
+    _kakaoAuthService = KakaoAuthService();
+    _naverAuthService = NaverAuthService();
 
     final permissionGateway =
         widget.permissionGateway ?? DeviceCustomerPermissionGateway();
@@ -265,18 +237,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
-      // onGoogleSignIn: _googleSignIn,
-      // onKakaoSignIn: _kakaoSignIn,
-      // onNaverSignIn: _naverSignIn,
-      // onGoogleLink: _googleLink,
-      // onKakaoLink: _kakaoLink,
-      // onNaverLink: _naverLink,
-      onGoogleSignIn: _webSafeGoogleSignIn,
-      onKakaoSignIn: _webSafeKakaoSignIn,
-      onNaverSignIn: _webSafeNaverSignIn,
-      onGoogleLink: _webSafeGoogleLink,
-      onKakaoLink: _webSafeKakaoLink,
-      onNaverLink: _webSafeNaverLink,
+      onGoogleSignIn: _googleSignIn,
+      onKakaoSignIn: _kakaoSignIn,
+      onNaverSignIn: _naverSignIn,
+      onGoogleLink: _googleLink,
+      onKakaoLink: _kakaoLink,
+      onNaverLink: _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -306,7 +272,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     } on AuthenticationFailure {
       await _sessionController.signOut();
     } catch (_) {
-      // ?쇱떆?곸씤 ?ㅽ듃?뚰겕 ?ㅻ쪟 ?깆? ?몄뀡??濡쒓렇?꾩썐?쒗궎吏 ?딄퀬 洹몃?濡??〓땲??
+      // 일시적인 네트워크 오류 등은 세션을 로그아웃시키지 않고 그대로 둡니다.
     }
   }
 
@@ -315,7 +281,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       '/api/v1/dev/auth/login',
       body: {
         'email': 'customer-app-dev@popq.local',
-        'name': 'POPQ 媛쒕컻 怨좉컼',
+        'name': 'POPQ 개발 고객',
         'role': 'CUSTOMER',
       },
       decode: (value) {
@@ -399,8 +365,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final accessToken = await _kakaoAuthService.signInAndGetAccessToken();
 
     debugPrint(
-      '移댁뭅??濡쒓렇???깃났: Access Token ?섏떊 '
-      '(${accessToken.length}??',
+      '카카오 로그인 성공: Access Token 수신 '
+      '(${accessToken.length}자)',
     );
 
     final session = await _authRepository.socialLogIn(
@@ -415,8 +381,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final accessToken = await _naverAuthService.signInAndGetAccessToken();
 
     debugPrint(
-      '?ㅼ씠踰?濡쒓렇???깃났: Access Token ?섏떊 '
-      '(${accessToken.length}??',
+      '네이버 로그인 성공: Access Token 수신 '
+      '(${accessToken.length}자)',
     );
 
     final session = await _authRepository.socialLogIn(
@@ -456,7 +422,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
   void _handlePushDeepLink(String deepLink) {
     if (!_isSupportedCustomerDeepLink(deepLink)) {
-      debugPrint('Customer 吏?먰븯吏 ?딅뒗 ?뚮┝ 寃쎈줈: $deepLink');
+      debugPrint('Customer 지원하지 않는 알림 경로: $deepLink');
       return;
     }
 
@@ -511,10 +477,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       return;
     }
 
-    //?ㅼ갹
-    if (!_isWebDevelopment) {
-      unawaited(_registerPushDevice());
-    }
+    unawaited(_registerPushDevice());
 
     final pendingPushDeepLink = _pendingPushDeepLink;
 
@@ -557,7 +520,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         case PendingPaymentRecoveryKind.paid:
           _cartController.clear();
 
-          _showPaymentRecoveryNotice(outcome.message ?? '寃곗젣媛 ?뺤긽?곸쑝濡??뺤씤?섏뿀?듬땲??');
+          _showPaymentRecoveryNotice(outcome.message ?? '결제가 정상적으로 확인되었습니다.');
 
           final orderPublicId = outcome.orderPublicId;
 
@@ -572,16 +535,16 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         case PendingPaymentRecoveryKind.retryAllowed:
           _showPaymentRecoveryNotice(
             outcome.message ??
-                '?댁쟾 寃곗젣???꾨즺?섏? ?딆븯?듬땲?? '
-                    '?ㅼ떆 寃곗젣?????덉뒿?덈떎.',
+                '이전 결제는 완료되지 않았습니다. '
+                    '다시 결제할 수 있습니다.',
           );
           return;
 
         case PendingPaymentRecoveryKind.pending:
           _showPaymentRecoveryNotice(
             outcome.message ??
-                '寃곗젣 寃곌낵瑜??뺤씤?섍퀬 ?덉뒿?덈떎. '
-                    '?좎떆 ???먮룞?쇰줈 ?ㅼ떆 ?뺤씤?⑸땲??',
+                '결제 결과를 확인하고 있습니다. '
+                    '잠시 후 자동으로 다시 확인합니다.',
           );
           return;
 
@@ -589,21 +552,21 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         case PendingPaymentRecoveryKind.inconsistent:
           _showPaymentRecoveryNotice(
             outcome.message ??
-                '寃곗젣 ?곹깭瑜??먮룞?쇰줈 ?뺤젙?????놁뒿?덈떎. '
-                    '二쇰Ц쨌寃곗젣 ?댁뿭???뺤씤?댁＜?몄슂.',
+                '결제 상태를 자동으로 확정할 수 없습니다. '
+                    '주문·결제 내역을 확인해주세요.',
           );
           return;
 
         case PendingPaymentRecoveryKind.unavailable:
           _showPaymentRecoveryNotice(
             outcome.message ??
-                '寃곗젣 ?곹깭瑜??뺤씤?섏? 紐삵뻽?듬땲?? '
-                    '?ㅽ듃?뚰겕 ?곌껐 ???ㅼ떆 ?뺤씤?⑸땲??',
+                '결제 상태를 확인하지 못했습니다. '
+                    '네트워크 연결 후 다시 확인합니다.',
           );
           return;
       }
     } catch (error, stackTrace) {
-      debugPrint('Customer pending 寃곗젣 ?먮룞 蹂듦뎄 ?ㅽ뙣: $error');
+      debugPrint('Customer pending 결제 자동 복구 실패: $error');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _isRecoveringPendingPayment = false;
@@ -660,8 +623,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       if (settings.authorizationStatus == AuthorizationStatus.denied ||
           settings.authorizationStatus == AuthorizationStatus.notDetermined) {
         debugPrint(
-          'Customer ?뚮┝ 沅뚰븳???놁뼱 '
-          'FCM 湲곌린瑜??깅줉?섏? ?딆뒿?덈떎.',
+          'Customer 알림 권한이 없어 '
+          'FCM 기기를 등록하지 않습니다.',
         );
         return;
       }
@@ -670,8 +633,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
       if (token == null || token.trim().isEmpty) {
         debugPrint(
-          'Customer FCM ?좏겙???놁뼱 '
-          '湲곌린瑜??깅줉?섏? ?딆뒿?덈떎.',
+          'Customer FCM 토큰이 없어 '
+          '기기를 등록하지 않습니다.',
         );
         return;
       }
@@ -687,12 +650,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       );
 
       debugPrint(
-        'Customer FCM 湲곌린 ?깅줉 ?꾨즺: '
+        'Customer FCM 기기 등록 완료: '
         'deviceId=${device.deviceId}, '
         'platform=${device.platform}',
       );
     } catch (error, stackTrace) {
-      debugPrint('Customer FCM 湲곌린 ?깅줉 ?ㅽ뙣: $error');
+      debugPrint('Customer FCM 기기 등록 실패: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
   }
@@ -844,7 +807,7 @@ class _CustomerBackButtonDispatcher extends RootBackButtonDispatcher {
       ?..hideCurrentTopSnackBar()
       ..showTopSnackBar(
         const SnackBar(
-          content: Text('??踰????꾨Ⅴ硫??깆씠 醫낅즺?⑸땲??'),
+          content: Text('한 번 더 누르면 앱이 종료됩니다.'),
           duration: _exitConfirmDuration,
         ),
       );
@@ -860,4 +823,3 @@ class _CustomerBackButtonDispatcher extends RootBackButtonDispatcher {
     return location;
   }
 }
-

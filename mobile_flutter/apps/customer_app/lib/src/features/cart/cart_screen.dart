@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -78,22 +78,22 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('?λ컮援щ땲'),
+        title: const Text('장바구니'),
         actions: [
           if (!widget.controller.isEmpty)
             TextButton(
               onPressed: _openingCheckout
                   ? null
                   : widget.controller.clear,
-              child: const Text('?꾩껜 ??젣'),
+              child: const Text('전체 삭제'),
             ),
         ],
       ),
       body: widget.controller.isEmpty
           ? const PopqEmptyView(
         icon: Icons.shopping_bag_outlined,
-        title: '?λ컮援щ땲媛 鍮꾩뼱 ?덉뼱??',
-        description: '?ㅽ넗?댁뿉???먰븯???곹뭹???댁븘蹂댁꽭??',
+        title: '장바구니가 비어 있어요.',
+        description: '스토어에서 원하는 상품을 담아보세요.',
       )
           : Column(
               children: [
@@ -207,7 +207,7 @@ class _CartScreenState extends State<CartScreen> {
                                     icon: const Icon(
                                       Icons.delete_outline,
                                     ),
-                                    label: const Text('??젣'),
+                                    label: const Text('삭제'),
                                   ),
                                 ],
                               ),
@@ -239,12 +239,12 @@ class _CartScreenState extends State<CartScreen> {
                     : _openCheckout,
                 child: Text(
                   _openingCheckout
-                      ? '二쇰Ц 媛???щ?瑜??뺤씤?섍퀬 ?덉뼱??..'
+                      ? '주문 가능 여부를 확인하고 있어요...'
                       : checking
-                          ? '二쇰Ц 媛???щ? ?뺤씤 以?..'
+                          ? '주문 가능 여부 확인 중...'
                           : paused
-                              ? '?꾩옱 二쇰Ц ?묒닔 以묒?'
-                              : '${_won(widget.controller.totalAmount)} 쨌 二쇰Ц?섍린',
+                              ? '현재 주문 접수 중지'
+                              : '${_won(widget.controller.totalAmount)} · 주문하기',
                 ),
               );
             },
@@ -283,7 +283,7 @@ class _CartScreenState extends State<CartScreen> {
       if (!store.orderAcceptingEnabled) {
         ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(
-            content: Text('?꾩옱 留ㅼ옣???좉퇋 二쇰Ц ?묒닔瑜??좎떆 以묒??덉뼱??'),
+            content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
           ),
         );
         return;
@@ -296,11 +296,11 @@ class _CartScreenState extends State<CartScreen> {
         );
 
         /*
-         * GoRouter??/sign-in 寃쎈줈瑜??ъ슜?섏? ?딆뒿?덈떎.
+         * GoRouter의 /sign-in 경로를 사용하지 않습니다.
          *
-         * 濡쒓렇???붾㈃???쇰컲 ?꾩껜 ?붾㈃ 紐⑤떖濡??닿린 ?뚮Ц??
-         * 濡쒓렇???꾨즺 ??紐⑤떖??pop?섎㈃ 濡쒓렇???섏씠吏媛
-         * GoRouter ?ㅻ줈媛湲?湲곕줉???⑥? ?딆뒿?덈떎.
+         * 로그인 화면을 일반 전체 화면 모달로 열기 때문에
+         * 로그인 완료 후 모달을 pop하면 로그인 페이지가
+         * GoRouter 뒤로가기 기록에 남지 않습니다.
          */
         final signedIn = await rootNavigator.push<bool>(
           MaterialPageRoute<bool>(
@@ -340,11 +340,11 @@ class _CartScreenState extends State<CartScreen> {
       }
 
       /*
-       * 濡쒓렇??紐⑤떖???꾩쟾???쒓굅???꾩뿉留?
-       * 寃곗젣 ?붾㈃???λ컮援щ땲 ?꾩뿉 push?⑸땲??
+       * 로그인 모달이 완전히 제거된 후에만
+       * 결제 화면을 장바구니 위에 push합니다.
        *
-       * ?붾㈃ 湲곕줉:
-       * ?곹뭹/留ㅼ옣 ???λ컮援щ땲 ??寃곗젣
+       * 화면 기록:
+       * 상품/매장 → 장바구니 → 결제
        */
       await context.push<void>(
         CustomerRoutes.checkout,
@@ -354,7 +354,7 @@ class _CartScreenState extends State<CartScreen> {
         ScaffoldMessenger.of(context).showTopSnackBar(
           SnackBar(
             content: Text(
-              '二쇰Ц 媛???щ?瑜??뺤씤?섏? 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.\n$error',
+              '주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.\n$error',
             ),
           ),
         );
@@ -397,7 +397,7 @@ class _OrderPausedBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '?꾩옱 二쇰Ц ?묒닔媛 ?좎떆 以묐떒?섏뿀?댁슂.',
+                  '현재 주문 접수가 잠시 중단되었어요.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                         fontWeight: FontWeight.w800,
@@ -405,7 +405,7 @@ class _OrderPausedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '?λ컮援щ땲???좎??⑸땲?? ?묒닔媛 ?ㅼ떆 ?쒖옉?섎㈃ 二쇰Ц?????덉뼱??',
+                  '장바구니는 유지됩니다. 접수가 다시 시작되면 주문할 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                       ),
@@ -432,5 +432,5 @@ String _won(int amount) {
     buffer.write(digits[index]);
   }
 
-  return '$buffer??;
+  return '$buffer원';
 }

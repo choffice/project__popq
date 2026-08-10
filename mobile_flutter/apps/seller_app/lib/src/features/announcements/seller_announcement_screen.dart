@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'seller_announcement_repository.dart';
@@ -58,7 +58,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
             children: [
               Expanded(
                 child: Text(
-                  '?ъ뾽??怨듭?',
+                  '사업장 공지',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -67,7 +67,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                   key: const Key('add-announcement'),
                   onPressed: () => _edit(),
                   icon: const Icon(Icons.add_rounded),
-                  label: const Text('怨듭? ?묒꽦'),
+                  label: const Text('공지 작성'),
                 ),
             ],
           ),
@@ -80,11 +80,11 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 
   Widget _buildBody() {
     if (_loading) {
-      return const PopqLoadingView(message: '?ъ뾽??怨듭??ы빆??遺덈윭?ㅺ퀬 ?덉뼱??');
+      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
     }
     if (_error != null || _announcements == null) {
       return PopqErrorView(
-        message: '怨듭??ы빆??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+        message: '공지사항을 불러오지 못했습니다.',
         onRetry: _load,
       );
     }
@@ -102,8 +102,8 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                 children: [
                   const PopqEmptyView(
                     icon: Icons.campaign_outlined,
-                    title: '?깅줉??怨듭??ы빆???놁뼱??',
-                    description: '?ъ뾽???댁쁺 ?뚯떇???묒꽦?섍퀬 寃뚯떆 ?곹깭瑜?愿由ы븯?몄슂.',
+                    title: '등록된 공지사항이 없어요.',
+                    description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
                   ),
                   if (widget.canManage) ...[
                     const SizedBox(height: PopqSpacing.md),
@@ -111,7 +111,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                       key: const Key('add-first-announcement'),
                       onPressed: () => _edit(),
                       icon: const Icon(Icons.add_rounded),
-                      label: const Text('泥?怨듭? ?묒꽦'),
+                      label: const Text('첫 공지 작성'),
                     ),
                   ],
                 ],
@@ -126,7 +126,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
             const Padding(
               padding: EdgeInsets.only(top: PopqSpacing.sm),
               child: Text(
-                'STAFF??怨듭??ы빆??議고쉶?????덉쑝硫??묒꽦쨌?섏젙쨌寃뚯떆 沅뚰븳? ?놁뒿?덈떎.',
+                'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
                 textAlign: TextAlign.center,
               ),
             ),
@@ -166,7 +166,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
             if (announcement.publishedAt != null) ...[
               const SizedBox(height: PopqSpacing.xs),
               Text(
-                '寃뚯떆 ${_dateLabel(announcement.publishedAt!)}',
+                '게시 ${_dateLabel(announcement.publishedAt!)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
@@ -179,7 +179,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                     key: Key('edit-announcement-${announcement.announcementId}'),
                     onPressed: updating ? null : () => _edit(announcement),
                     icon: const Icon(Icons.edit_outlined),
-                    label: const Text('?섏젙'),
+                    label: const Text('수정'),
                   ),
                   TextButton.icon(
                     key: Key(
@@ -199,7 +199,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                           : Icons.publish_outlined,
                     ),
                     label: Text(
-                      announcement.status == 'PUBLISHED' ? '?④?' : '寃뚯떆',
+                      announcement.status == 'PUBLISHED' ? '숨김' : '게시',
                     ),
                   ),
                 ],
@@ -275,10 +275,10 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
         _announcements = announcements;
         _error = null;
       });
-      _showMessage('${saved.title} 怨듭?瑜???ν뻽?듬땲??');
+      _showMessage('${saved.title} 공지를 저장했습니다.');
     } catch (_) {
       if (!mounted) return;
-      _showMessage('怨듭??ы빆????ν븯吏 紐삵뻽?듬땲??');
+      _showMessage('공지사항을 저장하지 못했습니다.');
     }
   }
 
@@ -301,18 +301,18 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
         if (index >= 0) _announcements![index] = saved;
         _updatingIds.remove(announcement.announcementId);
       });
-      _showMessage('${saved.title} 怨듭?瑜?${_statusLabel(status)} ?곹깭濡?蹂寃쏀뻽?듬땲??');
+      _showMessage('${saved.title} 공지를 ${_statusLabel(status)} 상태로 변경했습니다.');
     } catch (_) {
       if (!mounted) return;
       setState(() => _updatingIds.remove(announcement.announcementId));
-      _showMessage('怨듭? 寃뚯떆 ?곹깭瑜?蹂寃쏀븯吏 紐삵뻽?듬땲??');
+      _showMessage('공지 게시 상태를 변경하지 못했습니다.');
     }
   }
 
   String _statusLabel(String status) => switch (status) {
-    'PUBLISHED' => '寃뚯떆 以?,
-    'HIDDEN' => '?④?',
-    _ => '?묒꽦 以?,
+    'PUBLISHED' => '게시 중',
+    'HIDDEN' => '숨김',
+    _ => '작성 중',
   };
 
   Color _statusColor(String status) => switch (status) {
@@ -377,7 +377,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.announcement == null ? '怨듭? ?묒꽦' : '怨듭? ?섏젙'),
+      title: Text(widget.announcement == null ? '공지 작성' : '공지 수정'),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -389,7 +389,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 controller: _title,
                 autofocus: true,
                 maxLength: 200,
-                decoration: const InputDecoration(labelText: '?쒕ぉ'),
+                decoration: const InputDecoration(labelText: '제목'),
               ),
               TextField(
                 key: const Key('announcement-content'),
@@ -397,7 +397,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 maxLength: 2000,
                 minLines: 4,
                 maxLines: 8,
-                decoration: const InputDecoration(labelText: '?댁슜'),
+                decoration: const InputDecoration(labelText: '내용'),
               ),
               CheckboxListTile(
                 key: const Key('notify-interested-customers'),
@@ -406,8 +406,8 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 onChanged: (value) {
                   setState(() => _notifyInterestedCustomers = value ?? false);
                 },
-                title: const Text('李쒗븳 怨좉컼?먭쾶 ?뚮┝ 蹂대궡湲?),
-                subtitle: const Text('??κ낵 ?숈떆??怨듭?瑜?寃뚯떆?섍퀬 怨좉컼?먭쾶 ?뚮젮??'),
+                title: const Text('찜한 고객에게 알림 보내기'),
+                subtitle: const Text('저장과 동시에 공지를 게시하고 고객에게 알려요.'),
                 controlAffinity: ListTileControlAffinity.leading,
               ),
             ],
@@ -417,7 +417,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('痍⑥냼'),
+          child: const Text('취소'),
         ),
         FilledButton(
           key: const Key('save-announcement'),
@@ -434,10 +434,9 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
               ),
             );
           },
-          child: const Text('???),
+          child: const Text('저장'),
         ),
       ],
     );
   }
 }
-

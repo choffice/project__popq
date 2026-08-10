@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -45,10 +45,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('?곹뭹 ?좏깮'),
+        title: const Text('상품 선택'),
         actions: [
           IconButton(
-            tooltip: '?λ컮援щ땲',
+            tooltip: '장바구니',
             onPressed: () => context.push(CustomerRoutes.cart),
             icon: const Icon(Icons.shopping_bag_outlined),
           ),
@@ -58,11 +58,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         future: _product,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return const PopqLoadingView(message: '?곹뭹 ?뺣낫瑜?遺덈윭?ㅺ퀬 ?덉뼱??');
+            return const PopqLoadingView(message: '상품 정보를 불러오고 있어요.');
           }
           if (snapshot.hasError || !snapshot.hasData) {
             return PopqErrorView(
-              message: '?곹뭹 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+              message: '상품 정보를 불러오지 못했습니다.',
               onRetry: () => setState(() {
                 _product = widget.repository.findProduct(
                   widget.storeId,
@@ -139,8 +139,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           Text(
                             group.required
-                                ? '?꾩닔 ${group.minSelect}媛?
-                                : '理쒕? ${group.maxSelect}媛?,
+                                ? '필수 ${group.minSelect}개'
+                                : '최대 ${group.maxSelect}개',
                           ),
                         ],
                       ),
@@ -206,14 +206,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               : null,
                           child: Text(
                             checkingStore
-                                ? '二쇰Ц 媛???щ? ?뺤씤 以?..'
+                                ? '주문 가능 여부 확인 중...'
                                 : storeLoadFailed
-                                    ? '二쇰Ц ?곹깭瑜??뺤씤?댁＜?몄슂'
+                                    ? '주문 상태를 확인해주세요'
                                     : orderPaused
-                                        ? '?꾩옱 二쇰Ц ?묒닔 以묒?'
+                                        ? '현재 주문 접수 중지'
                                         : _addingToCart
-                                            ? '二쇰Ц ?곹깭 ?뺤씤 以?..'
-                                            : '${_won(_total(product))} 쨌 ?λ컮援щ땲 ?닿린',
+                                            ? '주문 상태 확인 중...'
+                                            : '${_won(_total(product))} · 장바구니 담기',
                           ),
                         ),
                       ),
@@ -285,7 +285,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!store.orderAcceptingEnabled) {
         ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(
-            content: Text('?꾩옱 留ㅼ옣???좉퇋 二쇰Ц ?묒닔瑜??좎떆 以묒??덉뼱??'),
+            content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
           ),
         );
         return;
@@ -304,16 +304,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('?ㅻⅨ ?ㅽ넗???곹뭹???덉뼱??'),
-            content: const Text('湲곗〈 ?λ컮援щ땲瑜?鍮꾩슦怨????곹뭹???댁쓣源뚯슂?'),
+            title: const Text('다른 스토어 상품이 있어요.'),
+            content: const Text('기존 장바구니를 비우고 이 상품을 담을까요?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('痍⑥냼'),
+                child: const Text('취소'),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('鍮꾩슦怨??닿린'),
+                child: const Text('비우고 담기'),
               ),
             ],
           );
@@ -330,9 +330,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
-          content: const Text('?λ컮援щ땲???댁븯?듬땲??'),
+          content: const Text('장바구니에 담았습니다.'),
           action: SnackBarAction(
-            label: '蹂닿린',
+            label: '보기',
             onPressed: () => context.push(CustomerRoutes.cart),
           ),
         ),
@@ -343,7 +343,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('二쇰Ц 媛???щ?瑜??뺤씤?섏? 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄?댁＜?몄슂.'),
+          content: Text('주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.'),
         ),
       );
     } finally {
@@ -384,7 +384,7 @@ class _OrderPausedBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '?꾩옱 二쇰Ц ?묒닔媛 ?좎떆 以묐떒?섏뿀?댁슂.',
+                  '현재 주문 접수가 잠시 중단되었어요.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                         fontWeight: FontWeight.w800,
@@ -392,7 +392,7 @@ class _OrderPausedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '?묒닔媛 ?ㅼ떆 ?쒖옉?섎㈃ ?λ컮援щ땲???댁쓣 ???덉뼱??',
+                  '접수가 다시 시작되면 장바구니에 담을 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                       ),
@@ -421,11 +421,11 @@ class _StoreStatusError extends StatelessWidget {
             const Icon(Icons.wifi_off_rounded),
             const SizedBox(width: PopqSpacing.sm),
             const Expanded(
-              child: Text('?꾩옱 二쇰Ц 媛???щ?瑜??뺤씤?섏? 紐삵뻽?댁슂.'),
+              child: Text('현재 주문 가능 여부를 확인하지 못했어요.'),
             ),
             TextButton(
               onPressed: onRetry,
-              child: const Text('?ㅼ떆 ?뺤씤'),
+              child: const Text('다시 확인'),
             ),
           ],
         ),
@@ -441,6 +441,5 @@ String _won(int amount) {
     if (index > 0 && (digits.length - index) % 3 == 0) buffer.write(',');
     buffer.write(digits[index]);
   }
-  return '$buffer??;
+  return '$buffer원';
 }
-

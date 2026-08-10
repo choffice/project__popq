@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -193,7 +193,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                   ),
                   child: InputDecorator(
                     decoration: const InputDecoration(
-                      labelText: '二쇰Ц???뺤씤???ъ뾽??,
+                      labelText: '주문을 확인할 사업장',
                       prefixIcon: Icon(Icons.storefront_outlined),
                     ),
                     child: DropdownButtonHideUnderline(
@@ -204,8 +204,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                         isDense: true,
                         hint: Text(
                           snapshot.connectionState == ConnectionState.done
-                              ? '?ъ뾽?μ쓣 ?좏깮??二쇱꽭??'
-                              : '?ъ뾽?μ쓣 遺덈윭?ㅻ뒗 以?..',
+                              ? '사업장을 선택해 주세요.'
+                              : '사업장을 불러오는 중...',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -261,8 +261,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
               indicatorColor: activeColor,
               dividerColor: Theme.of(context).colorScheme.outlineVariant,
               tabs: const [
-                Tab(text: '吏꾪뻾 以?),
-                Tab(text: '吏??二쇰Ц'),
+                Tab(text: '진행 중'),
+                Tab(text: '지난 주문'),
               ],
             );
           },
@@ -360,11 +360,11 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       future: _orders,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const PopqLoadingView(message: '?ㅽ넗??二쇰Ц??遺덈윭?ㅺ퀬 ?덉뼱??');
+          return const PopqLoadingView(message: '스토어 주문을 불러오고 있어요.');
         }
         if (snapshot.hasError || !snapshot.hasData) {
           return PopqErrorView(
-            message: '?좏깮???ㅽ넗?댁쓽 二쇰Ц??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+            message: '선택한 스토어의 주문을 불러오지 못했습니다.',
             onRetry: _reload,
           );
         }
@@ -380,9 +380,9 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
                   child: PopqEmptyView(
                     icon: Icons.receipt_long_outlined,
                     title: _tabController.index == 0
-                        ? '吏꾪뻾 以묒씤 二쇰Ц???놁뼱??'
-                        : '${_dateLabel(_pastDate)} 吏??二쇰Ц???놁뼱??',
-                    description: '?꾨옒濡??밴꺼 二쇰Ц 紐⑸줉???덈줈怨좎묠?????덉뼱??',
+                        ? '진행 중인 주문이 없어요.'
+                        : '${_dateLabel(_pastDate)} 지난 주문이 없어요.',
+                    description: '아래로 당겨 주문 목록을 새로고침할 수 있어요.',
                   ),
                 ),
               ],
@@ -447,7 +447,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       return const [];
     }
     if (orders.any((order) => order.storeId != storeId)) {
-      throw StateError('?ㅻⅨ ?ъ뾽?μ쓽 二쇰Ц ?묐떟???ы븿?섏뼱 ?덉뒿?덈떎.');
+      throw StateError('다른 사업장의 주문 응답이 포함되어 있습니다.');
     }
     _orderSnapshot = List<SellerOrder>.unmodifiable(orders);
     return orders;
@@ -516,11 +516,11 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
 
   String _filterLabel(String? filter) {
     return switch (filter) {
-      null => '?꾩껜',
-      'ACCEPTED_PREPARING' => '?묒닔쨌以鍮?以?,
-      'COMPLETED' => '泥섎━?꾨즺',
-      'CANCELED_FAMILY' => '二쇰Ц痍⑥냼',
-      'REJECTED_FAMILY' => '二쇰Ц嫄곗젅',
+      null => '전체',
+      'ACCEPTED_PREPARING' => '접수·준비 중',
+      'COMPLETED' => '처리완료',
+      'CANCELED_FAMILY' => '주문취소',
+      'REJECTED_FAMILY' => '주문거절',
       _ => sellerOrderStatusLabel(filter),
     };
   }
@@ -577,7 +577,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
           const SizedBox(width: PopqSpacing.xs),
           Expanded(
             child: Text(
-              accepting ? '?좉퇋 二쇰Ц ?묒닔 以? : '?좉퇋 二쇰Ц ?묒닔 以묒?',
+              accepting ? '신규 주문 접수 중' : '신규 주문 접수 중지',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -619,19 +619,19 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          title: const Text('二쇰Ц ?묒닔瑜??좎떆 以묒??좉퉴??'),
+          title: const Text('주문 접수를 잠시 중지할까요?'),
           content: const Text(
-            '?대? ?묒닔??二쇰Ц? 怨꾩냽 泥섎━?????덇퀬, '
-            '?덈줈??二쇰Ц留?諛쏆? ?딄쾶 ?⑸땲??',
+            '이미 접수된 주문은 계속 처리할 수 있고, '
+            '새로운 주문만 받지 않게 됩니다.',
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('痍⑥냼'),
+              child: const Text('취소'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('?묒닔 以묒?'),
+              child: const Text('접수 중지'),
             ),
           ],
         ),
@@ -679,8 +679,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
           SnackBar(
             content: Text(
               nextValue
-                  ? '?덈줈??二쇰Ц ?묒닔瑜??ㅼ떆 ?쒖옉?덉뒿?덈떎.'
-                  : '?덈줈??二쇰Ц ?묒닔瑜??좎떆 以묒??덉뒿?덈떎.',
+                  ? '새로운 주문 접수를 다시 시작했습니다.'
+                  : '새로운 주문 접수를 잠시 중지했습니다.',
             ),
           ),
         );
@@ -690,13 +690,13 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         ..hideCurrentTopSnackBar()
         ..showTopSnackBar(SnackBar(content: Text(failure.message)));
     } catch (error) {
-      debugPrint('?먮ℓ??二쇰Ц ?묒닔 ?곹깭 蹂寃??ㅻ쪟: $error');
+      debugPrint('판매자 주문 접수 상태 변경 오류: $error');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
         ..hideCurrentTopSnackBar()
         ..showTopSnackBar(
           const SnackBar(
-            content: Text('二쇰Ц ?묒닔 ?곹깭瑜?蹂寃쏀븯吏 紐삵뻽?듬땲?? ?ㅼ떆 ?쒕룄??二쇱꽭??'),
+            content: Text('주문 접수 상태를 변경하지 못했습니다. 다시 시도해 주세요.'),
           ),
         );
     } finally {
@@ -718,7 +718,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         };
       });
     } catch (error) {
-      debugPrint('?먮ℓ??二쇰Ц ?꾪솴 ?붿빟 ?숆린???ㅻ쪟: $error');
+      debugPrint('판매자 주문 현황 요약 동기화 오류: $error');
     }
   }
 
@@ -738,7 +738,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
           ),
           const SizedBox(width: 2),
           Text(
-            '?묒닔?湲?$waiting',
+            '접수대기 $waiting',
             style: TextStyle(
               color: Theme.of(context).colorScheme.error,
               fontWeight: FontWeight.w800,
@@ -760,7 +760,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         todayInSeoul.month,
         todayInSeoul.day,
       ),
-      helpText: '吏??二쇰Ц ?좎쭨 ?좏깮',
+      helpText: '지난 주문 날짜 선택',
     );
     if (selected == null || !mounted) return;
     setState(() {
@@ -800,7 +800,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       storeId: storeId,
       onEvent: _handleStoreOrderEvent,
       onError: (error) {
-        debugPrint('?먮ℓ??二쇰Ц 紐⑸줉 ?ㅼ떆媛?援щ룆 ?ㅻ쪟: $error');
+        debugPrint('판매자 주문 목록 실시간 구독 오류: $error');
       },
     );
   }
@@ -835,8 +835,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       });
     }
 
-    // ?좉퇋 二쇰Ц?닿굅???곹깭媛 ??寃쎄퀎瑜??섎뒗 寃쎌슦源뚯? ?뺥솗??諛섏쁺?섍린 ?꾪빐
-    // ?대깽???곸슜 吏곹썑 REST ?ㅻ깄?룹쑝濡???踰?蹂댁젙?쒕떎.
+    // 신규 주문이거나 상태가 탭 경계를 넘는 경우까지 정확히 반영하기 위해
+    // 이벤트 적용 직후 REST 스냅샷으로 한 번 보정한다.
     unawaited(_refreshOrdersSilently());
   }
 
@@ -854,7 +854,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       });
       unawaited(_refreshDashboardSummariesSilently());
     } catch (error) {
-      debugPrint('?먮ℓ??二쇰Ц 紐⑸줉 REST ?숆린???ㅻ쪟: $error');
+      debugPrint('판매자 주문 목록 REST 동기화 오류: $error');
     }
   }
 
@@ -903,7 +903,7 @@ class _OrderCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final itemSummary = formatPopqOrderItemSummary(
-      order.items.map((item) => '${item.productName} ${item.quantity}媛?),
+      order.items.map((item) => '${item.productName} ${item.quantity}개'),
     );
     return Card(
       child: ListTile(
@@ -934,7 +934,7 @@ class _OrderCard extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                '${sellerOrderTypeLabel(order.orderType)} 쨌 珥?${order.totalQuantity}媛?,
+                '${sellerOrderTypeLabel(order.orderType)} · 총 ${order.totalQuantity}개',
               ),
             ],
           ),
@@ -952,24 +952,24 @@ class _OrderCard extends StatelessWidget {
 
 String sellerOrderStatusLabel(String status) {
   return switch (status) {
-    'CREATED' => '寃곗젣 ?湲?,
-    'PLACED' => '?묒닔 ?湲?,
-    'ACCEPTED' => '?묒닔 ?꾨즺',
-    'PREPARING' => '以鍮?以?,
-    'READY' => '以鍮??꾨즺',
-    'COMPLETED' => '二쇰Ц ?꾨즺',
-    'REJECTED' => '二쇰Ц 嫄곗젅',
-    'CANCELED' => '二쇰Ц 痍⑥냼',
-    'EXPIRED' => '寃곗젣 留뚮즺',
+    'CREATED' => '결제 대기',
+    'PLACED' => '접수 대기',
+    'ACCEPTED' => '접수 완료',
+    'PREPARING' => '준비 중',
+    'READY' => '준비 완료',
+    'COMPLETED' => '주문 완료',
+    'REJECTED' => '주문 거절',
+    'CANCELED' => '주문 취소',
+    'EXPIRED' => '결제 만료',
     _ => status,
   };
 }
 
 String sellerOrderTypeLabel(String orderType) {
   return switch (orderType) {
-    'TAKEOUT' => '?ъ옣',
-    'DINE_IN' => '留ㅼ옣',
-    'DELIVERY' => '諛곕떖',
+    'TAKEOUT' => '포장',
+    'DINE_IN' => '매장',
+    'DELIVERY' => '배달',
     _ => orderType,
   };
 }
@@ -1002,6 +1002,5 @@ String sellerWon(int amount) {
     if (index > 0 && (digits.length - index) % 3 == 0) buffer.write(',');
     buffer.write(digits[index]);
   }
-  return '$buffer??;
+  return '$buffer원';
 }
-

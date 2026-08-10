@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'seller_review_repository.dart';
@@ -62,8 +62,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                             reviews.length;
                     return Text(
                       average == null
-                          ? '?꾩껜 ?됱젏 - 쨌 由щ럭 0媛?
-                          : '?꾩껜 ?됱젏 ${average.toStringAsFixed(1)} 쨌 由щ럭 ${reviews.length}媛?,
+                          ? '전체 평점 - · 리뷰 0개'
+                          : '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개',
                       style: Theme.of(context).textTheme.titleMedium,
                     );
                   },
@@ -73,7 +73,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                 OutlinedButton.icon(
                   onPressed: _manageReplyTemplates,
                   icon: const Icon(Icons.quickreply_outlined),
-                  label: const Text('????듦?'),
+                  label: const Text('대표 답글'),
                 ),
             ],
           ),
@@ -85,21 +85,21 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
             padding: const EdgeInsets.all(PopqSpacing.sm),
             children: [
               ChoiceChip(
-                label: const Text('?꾩껜 蹂꾩젏'),
+                label: const Text('전체 별점'),
                 selected: _rating == null,
                 onSelected: (_) => _changeFilter(null),
               ),
               for (var value = 5; value >= 1; value--) ...[
                 const SizedBox(width: PopqSpacing.xs),
                 ChoiceChip(
-                  label: Text('$value??),
+                  label: Text('$value점'),
                   selected: _rating == value,
                   onSelected: (_) => _changeFilter(value),
                 ),
               ],
               const SizedBox(width: PopqSpacing.sm),
               FilterChip(
-                label: const Text('誘몃떟蹂'),
+                label: const Text('미답변'),
                 selected: _unanswered,
                 onSelected: (value) {
                   setState(() {
@@ -116,17 +116,17 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
             future: _reviews,
             builder: (context, snapshot) {
               if (snapshot.connectionState != ConnectionState.done) {
-                return const PopqLoadingView(message: '由щ럭瑜?遺덈윭?ㅺ퀬 ?덉뼱??');
+                return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
               }
               if (snapshot.hasError) {
-                return PopqErrorView(message: '由щ럭瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??', onRetry: _reload);
+                return PopqErrorView(message: '리뷰를 불러오지 못했습니다.', onRetry: _reload);
               }
               final reviews = snapshot.data ?? const <SellerReview>[];
               if (reviews.isEmpty) {
                 return const PopqEmptyView(
                   icon: Icons.reviews_outlined,
-                  title: '議곌굔??留욌뒗 由щ럭媛 ?놁뼱??',
-                  description: '蹂꾩젏 ?먮뒗 誘몃떟蹂 ?꾪꽣瑜?諛붽퓭 蹂댁꽭??',
+                  title: '조건에 맞는 리뷰가 없어요.',
+                  description: '별점 또는 미답변 필터를 바꿔 보세요.',
                 );
               }
               return RefreshIndicator(
@@ -155,7 +155,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
             Row(
               children: [
                 Expanded(child: Text(review.authorName, style: const TextStyle(fontWeight: FontWeight.w800))),
-                Text(List.filled(review.rating, '??).join()),
+                Text(List.filled(review.rating, '★').join()),
               ],
             ),
             if (review.content?.isNotEmpty ?? false) ...[
@@ -164,7 +164,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
             ],
             if (review.sellerReply?.isNotEmpty ?? false) ...[
               const Divider(),
-              Text('?ъ옣???듦?\n${review.sellerReply!}'),
+              Text('사장님 답글\n${review.sellerReply!}'),
             ],
             if (widget.canReply) ...[
               const SizedBox(height: PopqSpacing.sm),
@@ -173,12 +173,12 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                 children: [
                   TextButton(
                     onPressed: () => _editReply(review),
-                    child: Text(review.sellerReply == null ? '?듦? ?묒꽦' : '?듦? ?섏젙'),
+                    child: Text(review.sellerReply == null ? '답글 작성' : '답글 수정'),
                   ),
                   if (review.sellerReply != null)
                     TextButton(
                       onPressed: () => _deleteReply(review),
-                      child: const Text('?듦? ??젣'),
+                      child: const Text('답글 삭제'),
                     ),
                 ],
               ),
@@ -225,7 +225,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('由щ럭 ?듦?'),
+          title: const Text('리뷰 답글'),
           content: SizedBox(
             width: 460,
             child: Column(
@@ -233,11 +233,11 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
               children: [
                 DropdownButtonFormField<int>(
                   initialValue: selectedTemplateId,
-                  decoration: const InputDecoration(labelText: '????듦? 臾멸뎄'),
+                  decoration: const InputDecoration(labelText: '대표 답글 문구'),
                   items: <DropdownMenuItem<int>>[
                     const DropdownMenuItem<int>(
                       value: 0,
-                      child: Text('??λ맂 ?듦? ?놁쓬'),
+                      child: Text('저장된 답글 없음'),
                     ),
                     ...templates.map(
                       (template) => DropdownMenuItem<int>(
@@ -265,7 +265,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                   maxLength: 1000,
                   minLines: 3,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: '?듦? ?댁슜'),
+                  decoration: const InputDecoration(labelText: '답글 내용'),
                 ),
               ],
             ),
@@ -273,14 +273,14 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('痍⑥냼'),
+              child: const Text('취소'),
             ),
             FilledButton(
               onPressed: () {
                 final value = controller.text.trim();
                 if (value.isNotEmpty) Navigator.pop(context, value);
               },
-              child: const Text('?묒꽦 ?꾨즺'),
+              child: const Text('작성 완료'),
             ),
           ],
         ),
@@ -296,7 +296,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       );
       if (mounted) _replaceReview(saved);
     } catch (_) {
-      if (mounted) _showError('?듦?????ν븯吏 紐삵뻽?듬땲??');
+      if (mounted) _showError('답글을 저장하지 못했습니다.');
     }
   }
 
@@ -304,11 +304,11 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('?듦?????젣?좉퉴??'),
-        content: const Text('??젣???듦?? 怨좉컼 ?붾㈃?먯꽌??蹂댁씠吏 ?딆뒿?덈떎.'),
+        title: const Text('답글을 삭제할까요?'),
+        content: const Text('삭제한 답글은 고객 화면에서도 보이지 않습니다.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('痍⑥냼')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('??젣')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
         ],
       ),
     );
@@ -320,7 +320,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       );
       if (mounted) _replaceReview(saved);
     } catch (_) {
-      if (mounted) _showError('?듦?????젣?섏? 紐삵뻽?듬땲??');
+      if (mounted) _showError('답글을 삭제하지 못했습니다.');
     }
   }
 
@@ -345,7 +345,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         await widget.repository.findReplyTemplates(widget.storeId),
       );
     } catch (_) {
-      if (mounted) _showError('????듦???遺덈윭?ㅼ? 紐삵뻽?듬땲??');
+      if (mounted) _showError('대표 답글을 불러오지 못했습니다.');
       return;
     }
     if (!mounted) return;
@@ -354,13 +354,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('????듦? 臾멸뎄'),
+          title: const Text('대표 답글 문구'),
           content: SizedBox(
             width: 520,
             child: templates.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: PopqSpacing.lg),
-                    child: Text('??λ맂 ?듦????놁뒿?덈떎.'),
+                    child: Text('저장된 답글이 없습니다.'),
                   )
                 : ListView.separated(
                     shrinkWrap: true,
@@ -373,7 +373,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                         trailing: Wrap(
                           children: [
                             IconButton(
-                              tooltip: '?섏젙',
+                              tooltip: '수정',
                               icon: const Icon(Icons.edit_outlined),
                               onPressed: () async {
                                 final value = await _promptTemplateText(
@@ -390,13 +390,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                                   setDialogState(() => templates[index] = saved);
                                 } catch (_) {
                                   if (mounted) {
-                                    _showError('????듦????섏젙?섏? 紐삵뻽?듬땲??');
+                                    _showError('대표 답글을 수정하지 못했습니다.');
                                   }
                                 }
                               },
                             ),
                             IconButton(
-                              tooltip: '??젣',
+                              tooltip: '삭제',
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () async {
                                 try {
@@ -409,7 +409,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                                   );
                                 } catch (_) {
                                   if (mounted) {
-                                    _showError('????듦?????젣?섏? 紐삵뻽?듬땲??');
+                                    _showError('대표 답글을 삭제하지 못했습니다.');
                                   }
                                 }
                               },
@@ -436,16 +436,16 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                         setDialogState(() => templates.add(saved));
                       } catch (_) {
                         if (mounted) {
-                          _showError('????듦???異붽??섏? 紐삵뻽?듬땲??');
+                          _showError('대표 답글을 추가하지 못했습니다.');
                         }
                       }
                     },
               icon: const Icon(Icons.add_rounded),
-              label: const Text('臾멸뎄 異붽?'),
+              label: const Text('문구 추가'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('?꾨즺'),
+              child: const Text('완료'),
             ),
           ],
         ),
@@ -458,7 +458,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     final value = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(initialValue == null ? '????듦? 異붽?' : '????듦? ?섏젙'),
+        title: Text(initialValue == null ? '대표 답글 추가' : '대표 답글 수정'),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -469,14 +469,14 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('痍⑥냼'),
+            child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () {
               final text = controller.text.trim();
               if (text.isNotEmpty) Navigator.pop(context, text);
             },
-            child: const Text('???),
+            child: const Text('저장'),
           ),
         ],
       ),
@@ -485,4 +485,3 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     return value;
   }
 }
-

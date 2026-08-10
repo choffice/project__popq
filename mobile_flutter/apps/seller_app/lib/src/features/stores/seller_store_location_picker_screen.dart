@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -28,12 +28,12 @@ class SellerStoreLocationPickerScreen
   final double initialLatitude;
   final double initialLongitude;
 
-  /// ?ㅼ젣 湲곌린??GPS ?꾩튂.
-  /// 吏???꾩뿉 ?뚮? ?먯쑝濡쒕쭔 ?쒖떆?쒕떎.
+  /// 실제 기기의 GPS 위치.
+  /// 지도 위에 파란 점으로만 표시한다.
   final double? currentLatitude;
   final double? currentLongitude;
 
-  /// ?깅줉?쇱뿉 ?낅젰??二쇱냼瑜??붾㈃ ?곷떒???쒖떆?쒕떎.
+  /// 등록폼에 입력된 주소를 화면 상단에 표시한다.
   final String? addressLabel;
 
   @override
@@ -182,7 +182,7 @@ class _SellerStoreLocationPickerScreenState
             longitudeValue.toDouble();
       });
     } catch (_) {
-      // ?섎せ??WebView 硫붿떆吏??臾댁떆?쒕떎.
+      // 잘못된 WebView 메시지는 무시한다.
     }
   }
 
@@ -196,8 +196,8 @@ class _SellerStoreLocationPickerScreenState
         _loading = false;
         _mapReady = false;
         _errorMessage =
-        '移댁뭅?ㅻ㏊ JavaScript ?ㅺ? ?놁뒿?덈떎.\n'
-            'KAKAO_MAP_JS_KEY瑜??ㅼ젙??二쇱꽭??';
+        '카카오맵 JavaScript 키가 없습니다.\n'
+            'KAKAO_MAP_JS_KEY를 설정해 주세요.';
       });
 
       return;
@@ -248,7 +248,7 @@ class _SellerStoreLocationPickerScreenState
           .showTopSnackBar(
         const SnackBar(
           content: Text(
-            '?꾩옱 ?꾩튂濡?吏?꾨? ?대룞?섏? 紐삵뻽?듬땲??',
+            '현재 위치로 지도를 이동하지 못했습니다.',
           ),
         ),
       );
@@ -340,7 +340,7 @@ class _SellerStoreLocationPickerScreenState
       column
     ) {
       const errorMessage =
-        '吏??JavaScript ?ㅻ쪟: '
+        '지도 JavaScript 오류: '
         + String(message)
         + ' / line='
         + String(line)
@@ -487,9 +487,9 @@ class _SellerStoreLocationPickerScreenState
         !window.kakao.maps
       ) {
         reportError(
-          '移댁뭅??吏??媛앹껜媛 ?놁뒿?덈떎. '
-          + 'JavaScript ?ㅼ? SDK ?꾨찓?몄쓣 '
-          + '?뺤씤??二쇱꽭??'
+          '카카오 지도 객체가 없습니다. '
+          + 'JavaScript 키와 SDK 도메인을 '
+          + '확인해 주세요.'
         );
 
         return;
@@ -518,8 +518,8 @@ class _SellerStoreLocationPickerScreenState
           renderCurrentLocation();
 
           /*
-           * 吏???대룞?대굹 ?뺣?쨌異뺤냼媛 ?앸궃 ??
-           * 以묒떖 醫뚰몴瑜?Flutter???꾨떖?쒕떎.
+           * 지도 이동이나 확대·축소가 끝난 뒤
+           * 중심 좌표를 Flutter에 전달한다.
            */
           window.kakao.maps.event
             .addListener(
@@ -578,8 +578,8 @@ class _SellerStoreLocationPickerScreenState
     script.onerror =
       function() {
         reportError(
-          '移댁뭅??吏??SDK瑜?'
-          + '?ㅼ슫濡쒕뱶?섏? 紐삵뻽?듬땲??'
+          '카카오 지도 SDK를 '
+          + '다운로드하지 못했습니다.'
         );
       };
 
@@ -616,7 +616,7 @@ class _SellerStoreLocationPickerScreenState
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          '吏?꾩뿉???꾩튂 ?좏깮',
+          '지도에서 위치 선택',
         ),
       ),
       body: Stack(
@@ -628,9 +628,9 @@ class _SellerStoreLocationPickerScreenState
           ),
 
           /*
-           * 吏??以묒떖??怨좎젙???먮뒗 ??대떎.
-           * ?ъ슜?먮뒗 ?????린?????
-           * 吏???먯껜瑜??吏곸씤??
+           * 지도 중심에 고정해 두는 핀이다.
+           * 사용자는 핀을 옮기는 대신
+           * 지도 자체를 움직인다.
            */
           const IgnorePointer(
             child: Center(
@@ -705,7 +705,7 @@ class _SellerStoreLocationPickerScreenState
                       ? _moveToCurrentLocation
                       : null,
                   tooltip:
-                  '?꾩옱 ?꾩튂濡??대룞',
+                  '현재 위치로 이동',
                   child: const Icon(
                     Icons.my_location_rounded,
                   ),
@@ -733,16 +733,16 @@ class _SellerStoreLocationPickerScreenState
                         .start,
                     children: [
                       const Text(
-                        '媛?대뜲 ????ъ뾽???꾩튂???ㅻ룄濡?'
-                            '吏?꾨? ?吏곸뿬 二쇱꽭??',
+                        '가운데 핀이 사업장 위치에 오도록 '
+                            '지도를 움직여 주세요.',
                       ),
                       const SizedBox(
                         height: 8,
                       ),
                       Text(
-                        '?꾨룄 '
+                        '위도 '
                             '${_selectedLatitude.toStringAsFixed(6)}'
-                            ' 쨌 寃쎈룄 '
+                            ' · 경도 '
                             '${_selectedLongitude.toStringAsFixed(6)}',
                         style: Theme.of(context)
                             .textTheme
@@ -764,7 +764,7 @@ class _SellerStoreLocationPickerScreenState
                             Icons.check_rounded,
                           ),
                           label: const Text(
-                            '???꾩튂濡??좏깮',
+                            '이 위치로 선택',
                           ),
                         ),
                       ),
@@ -809,7 +809,7 @@ class _SellerStoreLocationPickerScreenState
                         height: 16,
                       ),
                       const Text(
-                        '移댁뭅?ㅻ㏊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+                        '카카오맵을 불러오지 못했습니다.',
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight:
@@ -833,7 +833,7 @@ class _SellerStoreLocationPickerScreenState
                           Icons.refresh_rounded,
                         ),
                         label: const Text(
-                          '?ㅼ떆 ?쒕룄',
+                          '다시 시도',
                         ),
                       ),
                     ],

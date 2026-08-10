@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'customer_engagement_repository.dart';
@@ -36,13 +36,13 @@ class _CustomerMyReviewsScreenState
         if (snapshot.connectionState !=
             ConnectionState.done) {
           return const PopqLoadingView(
-            message: '??由щ럭瑜?遺덈윭?ㅺ퀬 ?덉뼱??',
+            message: '내 리뷰를 불러오고 있어요.',
           );
         }
 
         if (snapshot.hasError || !snapshot.hasData) {
           return PopqErrorView(
-            message: '??由щ럭瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.',
+            message: '내 리뷰를 불러오지 못했어요.',
             onRetry: _reload,
           );
         }
@@ -83,7 +83,7 @@ class _CustomerMyReviewsScreenState
                     vertical: PopqSpacing.xl,
                   ),
                   child: Text(
-                    '$selectedLabel 移댄뀒怨좊━??由щ럭媛 ?놁뼱??',
+                    '$selectedLabel 카테고리의 리뷰가 없어요.',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
@@ -131,7 +131,7 @@ class _CustomerMyReviewsScreenState
           builder: (context, setDialogState) {
             return AlertDialog(
               title: Text(
-                '${review.storeName} 由щ럭 ?섏젙',
+                '${review.storeName} 리뷰 수정',
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -140,7 +140,7 @@ class _CustomerMyReviewsScreenState
                     initialValue: rating,
                     decoration:
                     const InputDecoration(
-                      labelText: '蹂꾩젏',
+                      labelText: '별점',
                     ),
                     items: [
                       for (var value = 1;
@@ -149,7 +149,7 @@ class _CustomerMyReviewsScreenState
                         DropdownMenuItem(
                           value: value,
                           child: Text(
-                            '蹂?$value媛?,
+                            '별 $value개',
                           ),
                         ),
                     ],
@@ -174,7 +174,7 @@ class _CustomerMyReviewsScreenState
                     maxLines: 4,
                     decoration:
                     const InputDecoration(
-                      labelText: '由щ럭 ?댁슜',
+                      labelText: '리뷰 내용',
                       alignLabelWithHint: true,
                     ),
                   ),
@@ -189,7 +189,7 @@ class _CustomerMyReviewsScreenState
                       dialogContext,
                     ).pop();
                   },
-                  child: const Text('痍⑥냼'),
+                  child: const Text('취소'),
                 ),
                 FilledButton(
                   onPressed: saving
@@ -233,14 +233,14 @@ class _CustomerMyReviewsScreenState
                       ).showTopSnackBar(
                         const SnackBar(
                           content: Text(
-                            '由щ럭瑜??섏젙?섏? 紐삵뻽?댁슂.',
+                            '리뷰를 수정하지 못했어요.',
                           ),
                         ),
                       );
                     }
                   },
                   child: Text(
-                    saving ? '???以?..' : '???,
+                    saving ? '저장 중...' : '저장',
                   ),
                 ),
               ],
@@ -264,9 +264,9 @@ class _CustomerMyReviewsScreenState
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('由щ럭瑜???젣?좉퉴??'),
+          title: const Text('리뷰를 삭제할까요?'),
           content: const Text(
-            '??젣??由щ럭???ㅽ넗?댁뿉 ???댁긽 ?몄텧?섏? ?딆븘??',
+            '삭제한 리뷰는 스토어에 더 이상 노출되지 않아요.',
           ),
           actions: [
             TextButton(
@@ -275,7 +275,7 @@ class _CustomerMyReviewsScreenState
                   dialogContext,
                 ).pop(false);
               },
-              child: const Text('痍⑥냼'),
+              child: const Text('취소'),
             ),
             FilledButton(
               onPressed: () {
@@ -283,7 +283,7 @@ class _CustomerMyReviewsScreenState
                   dialogContext,
                 ).pop(true);
               },
-              child: const Text('??젣'),
+              child: const Text('삭제'),
             ),
           ],
         );
@@ -309,7 +309,7 @@ class _CustomerMyReviewsScreenState
 
       ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
-          content: Text('由щ럭瑜???젣?섏? 紐삵뻽?댁슂.'),
+          content: Text('리뷰를 삭제하지 못했어요.'),
         ),
       );
     }
@@ -351,7 +351,7 @@ class _ReviewCard extends StatelessWidget {
                 Text(
                   List.filled(
                     review.rating,
-                    '??,
+                    '★',
                   ).join(),
                 ),
               ],
@@ -372,7 +372,7 @@ class _ReviewCard extends StatelessWidget {
                   color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text('?ъ옣???듦?\n${review.sellerReply!}'),
+                child: Text('사장님 답글\n${review.sellerReply!}'),
               ),
             ],
             Row(
@@ -381,11 +381,11 @@ class _ReviewCard extends StatelessWidget {
               children: [
                 TextButton(
                   onPressed: onEdit,
-                  child: const Text('?섏젙'),
+                  child: const Text('수정'),
                 ),
                 TextButton(
                   onPressed: onDelete,
-                  child: const Text('??젣'),
+                  child: const Text('삭제'),
                 ),
               ],
             ),
@@ -407,11 +407,10 @@ class _EmptyReviews extends StatelessWidget {
           PopqSpacing.lg,
         ),
         child: Text(
-          '?묒꽦??由щ럭媛 ?놁뼱??',
+          '작성한 리뷰가 없어요.',
           textAlign: TextAlign.center,
         ),
       ),
     );
   }
 }
-

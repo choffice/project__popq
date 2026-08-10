@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -47,10 +47,10 @@ class _SelectedStoreLocation {
   final double latitude;
   final double longitude;
 
-  /// ??醫뚰몴瑜?寃?됲븯嫄곕굹 ?좏깮?????ъ슜??二쇱냼.
+  /// 이 좌표를 검색하거나 선택할 때 사용한 주소.
   final String address;
 
-  /// 移댁뭅???낆껜, 二쇱냼 寃?? 吏??吏곸젒 ?좏깮 ??
+  /// 카카오 업체, 주소 검색, 지도 직접 선택 등.
   final String sourceLabel;
 }
 
@@ -84,22 +84,22 @@ class SellerStoreRegistrationScreen extends StatefulWidget {
 class _SellerStoreRegistrationScreenState
     extends State<SellerStoreRegistrationScreen> {
   static const List<String> _categories = [
-    '移댄럹',
-    '?붿???,
-    '踰좎씠而ㅻ━',
-    '?쒖떇',
-    '以묒떇',
-    '?쇱떇',
-    '?묒떇',
-    '遺꾩떇',
-    '移섑궓',
-    '?쇱옄',
-    '?⑥뒪?명뫖??,
-    '二쇱젏',
-    '?몃뱶?몃윮',
-    '?앹뾽쨌?됱궗',
-    '?뚮━留덉폆쨌?됱궗',
-    '湲고?',
+    '카페',
+    '디저트',
+    '베이커리',
+    '한식',
+    '중식',
+    '일식',
+    '양식',
+    '분식',
+    '치킨',
+    '피자',
+    '패스트푸드',
+    '주점',
+    '푸드트럭',
+    '팝업·행사',
+    '플리마켓·행사',
+    '기타',
   ];
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -197,7 +197,7 @@ class _SellerStoreRegistrationScreenState
       canPop: !_submitting || _registrationCompleted,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('???ъ뾽???깅줉'),
+          title: const Text('새 사업장 등록'),
         ),
         body: Form(
           key: _formKey,
@@ -209,7 +209,7 @@ class _SellerStoreRegistrationScreenState
             ),
             children: [
               Text(
-                '?ъ뾽??湲곕낯 ?뺣낫',
+                '사업장 기본 정보',
                 style: Theme.of(context)
                     .textTheme
                     .headlineSmall,
@@ -218,7 +218,7 @@ class _SellerStoreRegistrationScreenState
                 height: PopqSpacing.sm,
               ),
               Text(
-                '怨좉컼?먭쾶 怨듦컻???ъ뾽???뺣낫瑜??낅젰??二쇱꽭??',
+                '고객에게 공개될 사업장 정보를 입력해 주세요.',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall,
@@ -268,8 +268,8 @@ class _SellerStoreRegistrationScreenState
                 ),
                 label: Text(
                   _submitting
-                      ? '?깅줉 ?붿껌 以?..'
-                      : '?ъ뾽???깅줉',
+                      ? '등록 요청 중...'
+                      : '사업장 등록',
                 ),
               ),
               const SizedBox(
@@ -294,7 +294,7 @@ class _SellerStoreRegistrationScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '?ъ뾽???뺣낫 ?먮룞 ?낅젰',
+              '사업장 정보 자동 입력',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge,
@@ -303,7 +303,7 @@ class _SellerStoreRegistrationScreenState
               height: PopqSpacing.sm,
             ),
             Text(
-              '?ъ뾽?먮벑濡앹쬆??珥ъ쁺?섍굅??移댁뭅?ㅻ㏊???깅줉???낆껜 ?뺣낫瑜?遺덈윭?????덉뒿?덈떎.',
+              '사업자등록증을 촬영하거나 카카오맵에 등록된 업체 정보를 불러올 수 있습니다.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall,
@@ -335,8 +335,8 @@ class _SellerStoreRegistrationScreenState
                 ),
                 label: Text(
                   _recognizingBusinessRegistration
-                      ? '?ъ뾽?먮벑濡앹쬆 ?몄떇 以?..'
-                      : '?ъ뾽?먮벑濡앹쬆?쇰줈 ?먮룞 ?낅젰',
+                      ? '사업자등록증 인식 중...'
+                      : '사업자등록증으로 자동 입력',
                 ),
               ),
             ),
@@ -368,8 +368,8 @@ class _SellerStoreRegistrationScreenState
                 ),
                 label: Text(
                   _searchingKakaoPlace
-                      ? '移댁뭅?ㅻ㏊ ?낆껜 寃??以?..'
-                      : '移댁뭅?ㅻ㏊ ?낆껜 ?뺣낫 遺덈윭?ㅺ린',
+                      ? '카카오맵 업체 검색 중...'
+                      : '카카오맵 업체 정보 불러오기',
                 ),
               ),
             ),
@@ -379,7 +379,7 @@ class _SellerStoreRegistrationScreenState
             ),
 
             Text(
-              '遺덈윭???뺣낫???깅줉 ?꾩뿉 吏곸젒 ?뺤씤?섍퀬 ?섏젙?????덉뒿?덈떎.',
+              '불러온 정보는 등록 전에 직접 확인하고 수정할 수 있습니다.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall,
@@ -403,7 +403,7 @@ class _SellerStoreRegistrationScreenState
           CrossAxisAlignment.start,
           children: [
             Text(
-              '湲곕낯 ?뺣낫',
+              '기본 정보',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge,
@@ -414,7 +414,7 @@ class _SellerStoreRegistrationScreenState
             DropdownButtonFormField<String>(
               initialValue: _storeType,
               decoration: const InputDecoration(
-                labelText: '?ъ뾽???좏삎',
+                labelText: '사업장 유형',
                 prefixIcon: Icon(
                   Icons.category_outlined,
                 ),
@@ -422,11 +422,11 @@ class _SellerStoreRegistrationScreenState
               items: const [
                 DropdownMenuItem<String>(
                   value: 'LOCAL_STORE',
-                  child: Text('?쇰컲 留ㅼ옣'),
+                  child: Text('일반 매장'),
                 ),
                 DropdownMenuItem<String>(
                   value: 'EVENT_COMMERCE',
-                  child: Text('?됱궗쨌?앹뾽 ?먮ℓ??),
+                  child: Text('행사·팝업 판매점'),
                 ),
               ],
               onChanged: _submitting
@@ -452,8 +452,8 @@ class _SellerStoreRegistrationScreenState
               textInputAction:
               TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: '?ъ뾽?λ챸',
-                hintText: '?? ?쒕㈃ ?ы룷遺꾩떇',
+                labelText: '사업장명',
+                hintText: '예: 서면 포포분식',
                 prefixIcon: Icon(
                   Icons.storefront_outlined,
                 ),
@@ -461,7 +461,7 @@ class _SellerStoreRegistrationScreenState
               validator: (String? value) {
                 if (value == null ||
                     value.trim().isEmpty) {
-                  return '?ъ뾽?λ챸???낅젰??二쇱꽭??';
+                  return '사업장명을 입력해 주세요.';
                 }
 
                 return null;
@@ -474,7 +474,7 @@ class _SellerStoreRegistrationScreenState
               initialValue:
               _representativeCategory,
               decoration: const InputDecoration(
-                labelText: '???移댄뀒怨좊━',
+                labelText: '대표 카테고리',
                 prefixIcon: Icon(
                   Icons.restaurant_menu_rounded,
                 ),
@@ -491,7 +491,7 @@ class _SellerStoreRegistrationScreenState
               validator: (String? value) {
                 if (value == null ||
                     value.isEmpty) {
-                  return '???移댄뀒怨좊━瑜??좏깮??二쇱꽭??';
+                  return '대표 카테고리를 선택해 주세요.';
                 }
 
                 return null;
@@ -515,9 +515,9 @@ class _SellerStoreRegistrationScreenState
               textInputAction:
               TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: '二쇱냼',
+                labelText: '주소',
                 hintText:
-                '?? 遺?곌킅??떆 遺?곗쭊援?以묒븰?濡?123',
+                '예: 부산광역시 부산진구 중앙대로 123',
                 prefixIcon: Icon(
                   Icons.location_on_outlined,
                 ),
@@ -525,7 +525,7 @@ class _SellerStoreRegistrationScreenState
               validator: (String? value) {
                 if (value == null ||
                     value.trim().isEmpty) {
-                  return '二쇱냼瑜??낅젰??二쇱꽭??';
+                  return '주소를 입력해 주세요.';
                 }
 
                 return null;
@@ -567,9 +567,9 @@ class _SellerStoreRegistrationScreenState
               textInputAction:
               TextInputAction.next,
               decoration: const InputDecoration(
-                labelText: '?곸꽭 二쇱냼',
+                labelText: '상세 주소',
                 hintText:
-                '?? ?ы룷鍮뚮뵫 1痢?101??,
+                '예: 포포빌딩 1층 101호',
                 prefixIcon: Icon(
                   Icons.maps_home_work_outlined,
                 ),
@@ -577,7 +577,7 @@ class _SellerStoreRegistrationScreenState
               validator: (String? value) {
                 if (value == null ||
                     value.trim().isEmpty) {
-                  return '?곸꽭 二쇱냼瑜??낅젰??二쇱꽭??';
+                  return '상세 주소를 입력해 주세요.';
                 }
 
                 return null;
@@ -601,7 +601,7 @@ class _SellerStoreRegistrationScreenState
                     value?.trim() ?? '';
 
                 if (phone.isEmpty) {
-                  return '?ъ뾽???곕씫泥섎? ?낅젰??二쇱꽭??';
+                  return '사업장 연락처를 입력해 주세요.';
                 }
 
                 final RegExp validCharacters =
@@ -611,7 +611,7 @@ class _SellerStoreRegistrationScreenState
 
                 if (!validCharacters
                     .hasMatch(phone)) {
-                  return '?곕씫泥??뺤떇???뺤씤??二쇱꽭??';
+                  return '연락처 형식을 확인해 주세요.';
                 }
 
                 return null;
@@ -630,9 +630,9 @@ class _SellerStoreRegistrationScreenState
               textInputAction:
               TextInputAction.newline,
               decoration: const InputDecoration(
-                labelText: '?ъ뾽???ㅻ챸',
+                labelText: '사업장 설명',
                 hintText:
-                '?ъ뾽?μ쓽 ?뱀쭠怨?二쇱슂 ?먮ℓ ?곹뭹???뚭컻??二쇱꽭??',
+                '사업장의 특징과 주요 판매 상품을 소개해 주세요.',
                 alignLabelWithHint: true,
                 prefixIcon: Icon(
                   Icons.description_outlined,
@@ -663,7 +663,7 @@ class _SellerStoreRegistrationScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '????대?吏',
+          '대표 이미지',
           style: Theme.of(context)
               .textTheme
               .titleMedium,
@@ -672,7 +672,7 @@ class _SellerStoreRegistrationScreenState
           height: PopqSpacing.sm,
         ),
         Text(
-          '移대찓?쇰줈 珥ъ쁺?섍굅??媛ㅻ윭由ъ뿉???ъ뾽??????ъ쭊???좏깮??二쇱꽭??',
+          '카메라로 촬영하거나 갤러리에서 사업장 대표 사진을 선택해 주세요.',
           style: Theme.of(context)
               .textTheme
               .bodySmall,
@@ -706,7 +706,7 @@ class _SellerStoreRegistrationScreenState
                       height: PopqSpacing.sm,
                     ),
                     Text(
-                      '?좏깮??????ъ쭊???놁뒿?덈떎.',
+                      '선택된 대표 사진이 없습니다.',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium,
@@ -726,7 +726,7 @@ class _SellerStoreRegistrationScreenState
                   ) {
                 return const Center(
                   child: Text(
-                    '?대?吏瑜??쒖떆?섏? 紐삵뻽?듬땲??',
+                    '이미지를 표시하지 못했습니다.',
                   ),
                 );
               },
@@ -754,7 +754,7 @@ class _SellerStoreRegistrationScreenState
                   Icons.photo_camera_outlined,
                 ),
                 label: const Text(
-                  '移대찓??珥ъ쁺',
+                  '카메라 촬영',
                 ),
               ),
             ),
@@ -777,7 +777,7 @@ class _SellerStoreRegistrationScreenState
                   Icons.photo_library_outlined,
                 ),
                 label: const Text(
-                  '媛ㅻ윭由??좏깮',
+                  '갤러리 선택',
                 ),
               ),
             ),
@@ -803,7 +803,7 @@ class _SellerStoreRegistrationScreenState
                 Icons.delete_outline_rounded,
               ),
               label: const Text(
-                '?좏깮???ъ쭊 ?쒓굅',
+                '선택한 사진 제거',
               ),
             ),
           ),
@@ -812,7 +812,7 @@ class _SellerStoreRegistrationScreenState
           height: PopqSpacing.sm,
         ),
         Text(
-          '?좏깮???ъ쭊? ?ъ뾽???깅줉 ???쒕쾭???낅줈?쒕맗?덈떎.',
+          '선택한 사진은 사업장 등록 시 서버에 업로드됩니다.',
           style: Theme.of(context)
               .textTheme
               .bodySmall,
@@ -831,13 +831,13 @@ class _SellerStoreRegistrationScreenState
           keyboardType: TextInputType.url,
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
-            labelText: '????대?吏 URL',
+            labelText: '대표 이미지 URL',
             hintText: 'https://example.com/store.jpg',
             prefixIcon: Icon(
               Icons.link_rounded,
             ),
             helperText:
-            '?ъ쭊???좏깮?섏? ?딆? 寃쎌슦?먮쭔 ??URL???ъ슜?⑸땲??',
+            '사진을 선택하지 않은 경우에만 이 URL을 사용합니다.',
           ),
           validator: (String? value) {
             final String imageUrl =
@@ -857,7 +857,7 @@ class _SellerStoreRegistrationScreenState
             if (uri == null ||
                 !validScheme ||
                 uri.host.isEmpty) {
-              return '?щ컮瑜??대?吏 URL???낅젰??二쇱꽭??';
+              return '올바른 이미지 URL을 입력해 주세요.';
             }
 
             return null;
@@ -880,7 +880,7 @@ class _SellerStoreRegistrationScreenState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          '吏???꾩튂',
+          '지도 위치',
           style: Theme.of(context)
               .textTheme
               .titleMedium,
@@ -889,7 +889,7 @@ class _SellerStoreRegistrationScreenState
           height: PopqSpacing.sm,
         ),
         Text(
-          '怨좉컼 ?먯깋 吏?꾩뿉 ?쒖떆???뺥솗???ъ뾽???꾩튂瑜??좏깮??二쇱꽭??',
+          '고객 탐색 지도에 표시할 정확한 사업장 위치를 선택해 주세요.',
           style: Theme.of(context)
               .textTheme
               .bodySmall,
@@ -925,7 +925,7 @@ class _SellerStoreRegistrationScreenState
               ),
               Expanded(
                 child: Text(
-                  '?꾩쭅 吏???꾩튂媛 ?뺤젙?섏? ?딆븯?듬땲??',
+                  '아직 지도 위치가 확정되지 않았습니다.',
                 ),
               ),
             ],
@@ -944,7 +944,7 @@ class _SellerStoreRegistrationScreenState
                   ),
                   Expanded(
                     child: Text(
-                      '?꾩튂 ?좏깮 ?꾨즺',
+                      '위치 선택 완료',
                       style: Theme.of(context)
                           .textTheme
                           .titleSmall,
@@ -962,8 +962,8 @@ class _SellerStoreRegistrationScreenState
                 height: PopqSpacing.xs,
               ),
               Text(
-                '?꾨룄 ${location.latitude.toStringAsFixed(6)} 쨌 '
-                    '寃쎈룄 ${location.longitude.toStringAsFixed(6)}',
+                '위도 ${location.latitude.toStringAsFixed(6)} · '
+                    '경도 ${location.longitude.toStringAsFixed(6)}',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall,
@@ -972,7 +972,7 @@ class _SellerStoreRegistrationScreenState
                 height: PopqSpacing.xs,
               ),
               Text(
-                '?좏깮 諛⑹떇: ${location.sourceLabel}',
+                '선택 방식: ${location.sourceLabel}',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall,
@@ -1008,8 +1008,8 @@ class _SellerStoreRegistrationScreenState
             ),
             label: Text(
               _searchingAddressLocation
-                  ? '二쇱냼 寃??以?..'
-                  : '?낅젰??二쇱냼濡??꾩튂 李얘린',
+                  ? '주소 검색 중...'
+                  : '입력한 주소로 위치 찾기',
             ),
           ),
         ),
@@ -1045,8 +1045,8 @@ class _SellerStoreRegistrationScreenState
             ),
             label: Text(
               _loadingCurrentLocation
-                  ? '?꾩옱 ?꾩튂 ?뺤씤 以?..'
-                  : '?꾩옱 ?꾩튂 遺덈윭?ㅺ린',
+                  ? '현재 위치 확인 중...'
+                  : '현재 위치 불러오기',
             ),
           ),
         ),
@@ -1068,7 +1068,7 @@ class _SellerStoreRegistrationScreenState
             height: PopqSpacing.xs,
           ),
           Text(
-            '?꾩옱 ?꾩튂: '
+            '현재 위치: '
                 '${_currentDeviceLocation!.latitude.toStringAsFixed(6)}, '
                 '${_currentDeviceLocation!.longitude.toStringAsFixed(6)}',
             style: Theme.of(context)
@@ -1094,7 +1094,7 @@ class _SellerStoreRegistrationScreenState
               Icons.map_outlined,
             ),
             label: const Text(
-              '吏?꾩뿉??吏곸젒 ?꾩튂 ?좏깮',
+              '지도에서 직접 위치 선택',
             ),
           ),
         ),
@@ -1113,7 +1113,7 @@ class _SellerStoreRegistrationScreenState
                 Icons.refresh_rounded,
               ),
               label: const Text(
-                '?꾩튂 ?ㅼ떆 ?좏깮',
+                '위치 다시 선택',
               ),
             ),
           ),
@@ -1135,7 +1135,7 @@ class _SellerStoreRegistrationScreenState
           CrossAxisAlignment.start,
           children: [
             Text(
-              '?곸뾽 ?뺣낫',
+              '영업 정보',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge,
@@ -1144,7 +1144,7 @@ class _SellerStoreRegistrationScreenState
               height: PopqSpacing.sm,
             ),
             Text(
-              '?쇨컙 ?곸뾽泥섎읆 醫낅즺 ?쒓컙???ㅼ쓬 ?좎씠?대룄 ?깅줉?????덉뒿?덈떎.',
+              '야간 영업처럼 종료 시간이 다음 날이어도 등록할 수 있습니다.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall,
@@ -1176,7 +1176,7 @@ class _SellerStoreRegistrationScreenState
           CrossAxisAlignment.start,
           children: [
             Text(
-              '二쇰Ц ?댁쁺 ?ㅼ젙',
+              '주문 운영 설정',
               style: Theme.of(context)
                   .textTheme
                   .titleLarge,
@@ -1187,9 +1187,9 @@ class _SellerStoreRegistrationScreenState
             SwitchListTile(
               contentPadding:
               EdgeInsets.zero,
-              title: const Text('?ъ옣 媛??),
+              title: const Text('포장 가능'),
               subtitle: const Text(
-                '怨좉컼???ъ옣 二쇰Ц???좏깮?????덉뒿?덈떎.',
+                '고객이 포장 주문을 선택할 수 있습니다.',
               ),
               value: _takeoutAvailable,
               onChanged: _submitting
@@ -1205,9 +1205,9 @@ class _SellerStoreRegistrationScreenState
               contentPadding:
               EdgeInsets.zero,
               title:
-              const Text('留ㅼ옣 ?앹궗 媛??),
+              const Text('매장 식사 가능'),
               subtitle: const Text(
-                '怨좉컼??留ㅼ옣 ?앹궗瑜??좏깮?????덉뒿?덈떎.',
+                '고객이 매장 식사를 선택할 수 있습니다.',
               ),
               value: _dineInAvailable,
               onChanged: _submitting
@@ -1223,9 +1223,9 @@ class _SellerStoreRegistrationScreenState
               contentPadding:
               EdgeInsets.zero,
               title:
-              const Text('二쇰Ц ?묒닔 媛??),
+              const Text('주문 접수 가능'),
               subtitle: const Text(
-                '?깅줉 吏곹썑 二쇰Ц??諛쏆쓣 ???덈룄濡??ㅼ젙?⑸땲??',
+                '등록 직후 주문을 받을 수 있도록 설정합니다.',
               ),
               value:
               _orderAcceptingEnabled,
@@ -1253,8 +1253,8 @@ class _SellerStoreRegistrationScreenState
           PopqSpacing.md,
         ),
         child: SellerTagBlocks(
-          title: '寃???ㅼ썙??,
-          description: '怨좉컼???ъ뾽?μ쓣 李얘린 ?쎈룄濡?理쒕? 8媛쒓퉴吏 ?깅줉?????덉뒿?덈떎.',
+          title: '검색 키워드',
+          description: '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
           tags: _tags,
           maxCount: 8,
           enabled: !_submitting,
@@ -1290,10 +1290,10 @@ class _SellerStoreRegistrationScreenState
                     Icons.photo_camera_outlined,
                   ),
                   title: const Text(
-                    '?ъ뾽?먮벑濡앹쬆 珥ъ쁺',
+                    '사업자등록증 촬영',
                   ),
                   subtitle: const Text(
-                    '移대찓?쇰줈 ?깅줉利앹쓣 珥ъ쁺?⑸땲??',
+                    '카메라로 등록증을 촬영합니다.',
                   ),
                   onTap: () {
                     Navigator.of(
@@ -1308,10 +1308,10 @@ class _SellerStoreRegistrationScreenState
                     Icons.photo_library_outlined,
                   ),
                   title: const Text(
-                    '媛ㅻ윭由ъ뿉???좏깮',
+                    '갤러리에서 선택',
                   ),
                   subtitle: const Text(
-                    '??λ맂 ?깅줉利??ъ쭊???좏깮?⑸땲??',
+                    '저장된 등록증 사진을 선택합니다.',
                   ),
                   onTap: () {
                     Navigator.of(
@@ -1332,7 +1332,7 @@ class _SellerStoreRegistrationScreenState
                         bottomSheetContext,
                       ).pop();
                     },
-                    child: const Text('痍⑥냼'),
+                    child: const Text('취소'),
                   ),
                 ),
               ],
@@ -1397,14 +1397,14 @@ class _SellerStoreRegistrationScreenState
 
       if (!hasImportedFormValue) {
         _showMessage(
-          '?ъ뾽?먮벑濡앸쾲?몃뒗 ?뺤씤?덉?留??곹샇紐낃낵 二쇱냼瑜??먮룞?쇰줈 李얠? 紐삵뻽?듬땲?? 吏곸젒 ?낅젰??二쇱꽭??',
+          '사업자등록번호는 확인했지만 상호명과 주소를 자동으로 찾지 못했습니다. 직접 입력해 주세요.',
         );
         return;
       }
 
       await _applyImportedInformation(
         _ImportedStoreInformation(
-          sourceLabel: '?ъ뾽?먮벑濡앹쬆 OCR',
+          sourceLabel: '사업자등록증 OCR',
           name: result.businessName,
           address: result.businessAddress,
           phone: null,
@@ -1426,7 +1426,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       _showMessage(
-        '?ъ뾽?먮벑濡앹쬆???몄떇?섎뒗 以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.',
+        '사업자등록증을 인식하는 중 오류가 발생했습니다.',
       );
     } finally {
       if (mounted) {
@@ -1454,7 +1454,7 @@ class _SellerStoreRegistrationScreenState
           ) {
         return AlertDialog(
           title: const Text(
-            '?ъ뾽?먮벑濡앹쬆 ?몄떇 寃곌낵',
+            '사업자등록증 인식 결과',
           ),
           content: SizedBox(
             width: double.maxFinite,
@@ -1466,7 +1466,7 @@ class _SellerStoreRegistrationScreenState
                 children: [
                   _buildOcrResultItem(
                     context: context,
-                    label: '?ъ뾽?먮벑濡앸쾲??,
+                    label: '사업자등록번호',
                     value: result.businessNumber,
                   ),
                   const SizedBox(
@@ -1474,7 +1474,7 @@ class _SellerStoreRegistrationScreenState
                   ),
                   _buildOcrResultItem(
                     context: context,
-                    label: '?곹샇紐?,
+                    label: '상호명',
                     value: result.businessName,
                   ),
                   const SizedBox(
@@ -1482,7 +1482,7 @@ class _SellerStoreRegistrationScreenState
                   ),
                   _buildOcrResultItem(
                     context: context,
-                    label: '??쒖옄紐?,
+                    label: '대표자명',
                     value:
                     result.representativeName,
                   ),
@@ -1491,7 +1491,7 @@ class _SellerStoreRegistrationScreenState
                   ),
                   _buildOcrResultItem(
                     context: context,
-                    label: '?ъ뾽???뚯옱吏',
+                    label: '사업장 소재지',
                     value:
                     result.businessAddress,
                   ),
@@ -1511,8 +1511,8 @@ class _SellerStoreRegistrationScreenState
                       BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      '?ъ뾽?먮벑濡앸쾲?몄? ??쒖옄紐낆? ?뺤씤?⑹씠硫?'
-                          '?꾩옱 ?ъ뾽??DB?먮뒗 ??ν븯吏 ?딆뒿?덈떎.',
+                      '사업자등록번호와 대표자명은 확인용이며 '
+                          '현재 사업장 DB에는 저장하지 않습니다.',
                     ),
                   ),
                   const SizedBox(
@@ -1525,7 +1525,7 @@ class _SellerStoreRegistrationScreenState
                       bottom: PopqSpacing.sm,
                     ),
                     title: const Text(
-                      'OCR ?꾩껜 ?먮Ц 蹂닿린',
+                      'OCR 전체 원문 보기',
                     ),
                     children: [
                       DecoratedBox(
@@ -1565,7 +1565,7 @@ class _SellerStoreRegistrationScreenState
                 ).pop(false);
               },
               child: const Text(
-                '痍⑥냼',
+                '취소',
               ),
             ),
             FilledButton(
@@ -1577,7 +1577,7 @@ class _SellerStoreRegistrationScreenState
               }
                   : null,
               child: const Text(
-                '?낅젰?쇱뿉 諛섏쁺',
+                '입력폼에 반영',
               ),
             ),
           ],
@@ -1596,7 +1596,7 @@ class _SellerStoreRegistrationScreenState
     final String displayedValue =
     value?.trim().isNotEmpty == true
         ? value!.trim()
-        : '?몄떇?섏? 紐삵븿';
+        : '인식하지 못함';
 
     final bool recognized =
         value?.trim().isNotEmpty == true;
@@ -1679,8 +1679,8 @@ class _SellerStoreRegistrationScreenState
 
       if (results.isEmpty) {
         _showMessage(
-          '移댁뭅?ㅻ㏊?먯꽌 ?낆껜瑜?李얠? 紐삵뻽?듬땲?? '
-              '吏??챸怨??낆껜紐낆쓣 ?④퍡 ?낅젰???ㅼ떆 寃?됲빐 二쇱꽭??',
+          '카카오맵에서 업체를 찾지 못했습니다. '
+              '지역명과 업체명을 함께 입력해 다시 검색해 주세요.',
         );
         return;
       }
@@ -1713,7 +1713,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       _showMessage(
-        '移댁뭅?ㅻ㏊ ?낆껜瑜?寃?됲븯??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.',
+        '카카오맵 업체를 검색하는 중 오류가 발생했습니다.',
       );
     } finally {
       if (mounted) {
@@ -1761,7 +1761,7 @@ class _SellerStoreRegistrationScreenState
               if (trimmed.isEmpty) {
                 setDialogState(() {
                   errorText =
-                  '寃?됲븷 ?낆껜紐낆씠??吏??쓣 ?낅젰??二쇱꽭??';
+                  '검색할 업체명이나 지역을 입력해 주세요.';
                 });
                 return;
               }
@@ -1777,7 +1777,7 @@ class _SellerStoreRegistrationScreenState
 
             return AlertDialog(
               title: const Text(
-                '移댁뭅?ㅻ㏊ ?낆껜 寃??,
+                '카카오맵 업체 검색',
               ),
               content: TextFormField(
                 initialValue: initialQuery,
@@ -1785,9 +1785,9 @@ class _SellerStoreRegistrationScreenState
                 textInputAction:
                 TextInputAction.search,
                 decoration: InputDecoration(
-                  labelText: '?낆껜紐??먮뒗 寃?됱뼱',
+                  labelText: '업체명 또는 검색어',
                   hintText:
-                  '?? 遺???쒕㈃ ?ы룷移댄럹',
+                  '예: 부산 서면 포포카페',
                   errorText: errorText,
                   prefixIcon: const Icon(
                     Icons.search_rounded,
@@ -1822,13 +1822,13 @@ class _SellerStoreRegistrationScreenState
                     ).pop();
                   },
                   child: const Text(
-                    '痍⑥냼',
+                    '취소',
                   ),
                 ),
                 FilledButton(
                   onPressed: submitSearch,
                   child: const Text(
-                    '寃??,
+                    '검색',
                   ),
                 ),
               ],
@@ -1861,7 +1861,7 @@ class _SellerStoreRegistrationScreenState
               ) {
             return AlertDialog(
               title: const Text(
-                '移댁뭅?ㅻ㏊ ?낆껜 ?좏깮',
+                '카카오맵 업체 선택',
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -1927,7 +1927,7 @@ class _SellerStoreRegistrationScreenState
                     ).pop();
                   },
                   child: const Text(
-                    '痍⑥냼',
+                    '취소',
                   ),
                 ),
                 FilledButton(
@@ -1939,7 +1939,7 @@ class _SellerStoreRegistrationScreenState
                     );
                   },
                   child: const Text(
-                    '???낆껜 ?좏깮',
+                    '이 업체 선택',
                   ),
                 ),
               ],
@@ -1976,7 +1976,7 @@ class _SellerStoreRegistrationScreenState
     if (roadAddress != null &&
         roadAddress.isNotEmpty) {
       lines.add(
-        '?꾨줈紐? $roadAddress',
+        '도로명: $roadAddress',
       );
     }
 
@@ -1984,20 +1984,20 @@ class _SellerStoreRegistrationScreenState
         jibunAddress.isNotEmpty &&
         jibunAddress != roadAddress) {
       lines.add(
-        '吏踰? $jibunAddress',
+        '지번: $jibunAddress',
       );
     }
 
     if (phone != null &&
         phone.isNotEmpty) {
       lines.add(
-        '?꾪솕: $phone',
+        '전화: $phone',
       );
     }
 
     lines.add(
-      '?꾨룄 ${place.latitude.toStringAsFixed(6)} 쨌 '
-          '寃쎈룄 ${place.longitude.toStringAsFixed(6)}',
+      '위도 ${place.latitude.toStringAsFixed(6)} · '
+          '경도 ${place.longitude.toStringAsFixed(6)}',
     );
 
     return lines.join('\n');
@@ -2011,8 +2011,8 @@ class _SellerStoreRegistrationScreenState
 
     final String resolvedName =
     await _resolveImportedText(
-      fieldLabel: '?ъ뾽?λ챸',
-      sourceLabel: '移댁뭅?ㅻ㏊',
+      fieldLabel: '사업장명',
+      sourceLabel: '카카오맵',
       currentValue:
       _nameController.text,
       importedValue:
@@ -2025,8 +2025,8 @@ class _SellerStoreRegistrationScreenState
 
     final String resolvedAddress =
     await _resolveImportedText(
-      fieldLabel: '二쇱냼',
-      sourceLabel: '移댁뭅?ㅻ㏊',
+      fieldLabel: '주소',
+      sourceLabel: '카카오맵',
       currentValue:
       _addressController.text,
       importedValue:
@@ -2039,8 +2039,8 @@ class _SellerStoreRegistrationScreenState
 
     final String resolvedPhone =
     await _resolveImportedText(
-      fieldLabel: '?ъ뾽???곕씫泥?,
-      sourceLabel: '移댁뭅?ㅻ㏊',
+      fieldLabel: '사업장 연락처',
+      sourceLabel: '카카오맵',
       currentValue:
       _phoneController.text,
       importedValue:
@@ -2099,22 +2099,22 @@ class _SellerStoreRegistrationScreenState
         address:
         resolvedAddress,
         sourceLabel:
-        '移댁뭅???낆껜 寃??,
+        '카카오 업체 검색',
       )
           : null;
     });
 
     if (!addressMatchesPlace) {
       _showMessage(
-        '?낆껜 ?뺣낫??諛섏쁺?덉?留??좏깮??二쇱냼媛 '
-            '移댁뭅???낆껜 二쇱냼? ?щ씪 吏???꾩튂瑜???ν븯吏 ?딆븯?듬땲?? '
-            '二쇱냼 寃?됱씠??吏??吏곸젒 ?좏깮?쇰줈 ?꾩튂瑜??뺤씤??二쇱꽭??',
+        '업체 정보는 반영했지만 선택한 주소가 '
+            '카카오 업체 주소와 달라 지도 위치를 저장하지 않았습니다. '
+            '주소 검색이나 지도 직접 선택으로 위치를 확인해 주세요.',
       );
       return;
     }
 
     _showMessage(
-      '移댁뭅?ㅻ㏊ ?낆껜 ?뺣낫? ?꾩튂瑜??낅젰?쇱뿉 諛섏쁺?덉뒿?덈떎.',
+      '카카오맵 업체 정보와 위치를 입력폼에 반영했습니다.',
     );
   }
 
@@ -2126,7 +2126,7 @@ class _SellerStoreRegistrationScreenState
     }
 
     final String resolvedName = await _resolveImportedText(
-      fieldLabel: '?ъ뾽?λ챸',
+      fieldLabel: '사업장명',
       sourceLabel: information.sourceLabel,
       currentValue: _nameController.text,
       importedValue: information.name,
@@ -2137,7 +2137,7 @@ class _SellerStoreRegistrationScreenState
     }
 
     final String resolvedAddress = await _resolveImportedText(
-      fieldLabel: '二쇱냼',
+      fieldLabel: '주소',
       sourceLabel: information.sourceLabel,
       currentValue: _addressController.text,
       importedValue: information.address,
@@ -2148,7 +2148,7 @@ class _SellerStoreRegistrationScreenState
     }
 
     final String resolvedPhone = await _resolveImportedText(
-      fieldLabel: '?ъ뾽???곕씫泥?,
+      fieldLabel: '사업장 연락처',
       sourceLabel: information.sourceLabel,
       currentValue: _phoneController.text,
       importedValue: information.phone,
@@ -2188,9 +2188,9 @@ class _SellerStoreRegistrationScreenState
 
     _showMessage(
       locationAddressChanged
-          ? '${information.sourceLabel} ?뺣낫瑜?諛섏쁺?덉뒿?덈떎. '
-          '二쇱냼媛 蹂寃쎈릺??吏???꾩튂瑜??ㅼ떆 ?좏깮??二쇱꽭??'
-          : '${information.sourceLabel} ?뺣낫瑜??낅젰?쇱뿉 諛섏쁺?덉뒿?덈떎.',
+          ? '${information.sourceLabel} 정보를 반영했습니다. '
+          '주소가 변경되어 지도 위치를 다시 선택해 주세요.'
+          : '${information.sourceLabel} 정보를 입력폼에 반영했습니다.',
     );
   }
 
@@ -2203,17 +2203,17 @@ class _SellerStoreRegistrationScreenState
     final String current = currentValue.trim();
     final String imported = importedValue?.trim() ?? '';
 
-    // 遺덈윭??媛믪씠 ?놁쑝硫?湲곗〈 媛믪쓣 洹몃?濡??붾떎.
+    // 불러온 값이 없으면 기존 값을 그대로 둔다.
     if (imported.isEmpty) {
       return current;
     }
 
-    // ?ъ슜?먭? ?꾩쭅 ?낅젰?섏? ?딆븯?ㅻ㈃ 諛붾줈 ?먮룞 ?낅젰?쒕떎.
+    // 사용자가 아직 입력하지 않았다면 바로 자동 입력한다.
     if (current.isEmpty) {
       return imported;
     }
 
-    // 怨듬갚怨???뚮Ц??李⑥씠留??덈떎硫?媛숈? 媛믪쑝濡?泥섎━?쒕떎.
+    // 공백과 대소문자 차이만 있다면 같은 값으로 처리한다.
     if (_normalizeComparisonText(current) ==
         _normalizeComparisonText(imported)) {
       return current;
@@ -2265,7 +2265,7 @@ class _SellerStoreRegistrationScreenState
               ) {
             return AlertDialog(
               title: Text(
-                '$fieldLabel ?뺣낫 ?뺤씤',
+                '$fieldLabel 정보 확인',
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -2274,7 +2274,7 @@ class _SellerStoreRegistrationScreenState
                   CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$sourceLabel?먯꽌 遺덈윭???뺣낫媛 ?꾩옱 ?낅젰???댁슜怨??ㅻ쫭?덈떎.',
+                      '$sourceLabel에서 불러온 정보가 현재 입력한 내용과 다릅니다.',
                     ),
                     const SizedBox(
                       height: PopqSpacing.md,
@@ -2286,7 +2286,7 @@ class _SellerStoreRegistrationScreenState
                       _ImportedValueChoice.current,
                       groupValue: selectedChoice,
                       title: const Text(
-                        '?꾩옱 ?낅젰 ?좎?',
+                        '현재 입력 유지',
                       ),
                       subtitle: Text(
                         currentValue,
@@ -2311,7 +2311,7 @@ class _SellerStoreRegistrationScreenState
                       _ImportedValueChoice.imported,
                       groupValue: selectedChoice,
                       title: Text(
-                        '$sourceLabel ?뺣낫 ?ъ슜',
+                        '$sourceLabel 정보 사용',
                       ),
                       subtitle: Text(
                         importedValue,
@@ -2336,7 +2336,7 @@ class _SellerStoreRegistrationScreenState
                       _ImportedValueChoice.manual,
                       groupValue: selectedChoice,
                       title: const Text(
-                        '吏곸젒 ?낅젰',
+                        '직접 입력',
                       ),
                       onChanged: (
                           _ImportedValueChoice? value,
@@ -2361,7 +2361,7 @@ class _SellerStoreRegistrationScreenState
                         enabled: selectedChoice ==
                             _ImportedValueChoice.manual,
                         decoration: InputDecoration(
-                          labelText: '$fieldLabel 吏곸젒 ?낅젰',
+                          labelText: '$fieldLabel 직접 입력',
                           errorText: manualInputError,
                         ),
                         onTap: () {
@@ -2387,7 +2387,7 @@ class _SellerStoreRegistrationScreenState
                       currentValue,
                     );
                   },
-                  child: const Text('痍⑥냼'),
+                  child: const Text('취소'),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -2413,7 +2413,7 @@ class _SellerStoreRegistrationScreenState
                     if (manualValue.isEmpty) {
                       setDialogState(() {
                         manualInputError =
-                        '$fieldLabel???낅젰??二쇱꽭??';
+                        '$fieldLabel을 입력해 주세요.';
                       });
                       return;
                     }
@@ -2422,7 +2422,7 @@ class _SellerStoreRegistrationScreenState
                       manualValue,
                     );
                   },
-                  child: const Text('?뺤씤'),
+                  child: const Text('확인'),
                 ),
               ],
             );
@@ -2477,8 +2477,8 @@ class _SellerStoreRegistrationScreenState
 
       _showMessage(
         source == ImageSource.camera
-            ? '珥ъ쁺???ъ쭊??????대?吏濡??좏깮?덉뒿?덈떎.'
-            : '媛ㅻ윭由??ъ쭊??????대?吏濡??좏깮?덉뒿?덈떎.',
+            ? '촬영한 사진을 대표 이미지로 선택했습니다.'
+            : '갤러리 사진을 대표 이미지로 선택했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -2491,8 +2491,8 @@ class _SellerStoreRegistrationScreenState
 
       _showMessage(
         source == ImageSource.camera
-            ? '移대찓?쇰? ?ㅽ뻾?섏? 紐삵뻽?듬땲??'
-            : '媛ㅻ윭由ъ뿉???ъ쭊??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+            ? '카메라를 실행하지 못했습니다.'
+            : '갤러리에서 사진을 불러오지 못했습니다.',
       );
     }
   }
@@ -2507,7 +2507,7 @@ class _SellerStoreRegistrationScreenState
     });
 
     _showMessage(
-      '?좏깮??????ъ쭊???쒓굅?덉뒿?덈떎.',
+      '선택한 대표 사진을 제거했습니다.',
     );
   }
 
@@ -2523,7 +2523,7 @@ class _SellerStoreRegistrationScreenState
 
     if (address.isEmpty) {
       _showMessage(
-        '?꾩튂瑜?寃?됲븷 二쇱냼瑜?癒쇱? ?낅젰??二쇱꽭??',
+        '위치를 검색할 주소를 먼저 입력해 주세요.',
       );
       return;
     }
@@ -2546,8 +2546,8 @@ class _SellerStoreRegistrationScreenState
 
       if (results.isEmpty) {
         _showMessage(
-          '?낅젰??二쇱냼??寃??寃곌낵瑜?李얠? 紐삵뻽?듬땲?? '
-              '?곸꽭 二쇱냼瑜??쒖쇅?섍퀬 ?꾨줈紐낆씠??吏踰?二쇱냼濡??ㅼ떆 寃?됲빐 二쇱꽭??',
+          '입력한 주소의 검색 결과를 찾지 못했습니다. '
+              '상세 주소를 제외하고 도로명이나 지번 주소로 다시 검색해 주세요.',
         );
         return;
       }
@@ -2564,7 +2564,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       await _applySelectedStoreLocation(
-        sourceLabel: '移댁뭅??二쇱냼 寃??,
+        sourceLabel: '카카오 주소 검색',
         address:
         selectedResult.addressName,
         latitude:
@@ -2586,7 +2586,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       _showMessage(
-        '二쇱냼瑜?寃?됲븯??以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.',
+        '주소를 검색하는 중 오류가 발생했습니다.',
       );
     } finally {
       if (mounted) {
@@ -2619,7 +2619,7 @@ class _SellerStoreRegistrationScreenState
               ) {
             return AlertDialog(
               title: const Text(
-                '?ъ뾽???꾩튂 ?좏깮',
+                '사업장 위치 선택',
               ),
               content: SizedBox(
                 width: double.maxFinite,
@@ -2685,7 +2685,7 @@ class _SellerStoreRegistrationScreenState
                     ).pop();
                   },
                   child: const Text(
-                    '痍⑥냼',
+                    '취소',
                   ),
                 ),
                 FilledButton(
@@ -2697,7 +2697,7 @@ class _SellerStoreRegistrationScreenState
                     );
                   },
                   child: const Text(
-                    '???꾩튂 ?좏깮',
+                    '이 위치 선택',
                   ),
                 ),
               ],
@@ -2725,7 +2725,7 @@ class _SellerStoreRegistrationScreenState
         roadAddress !=
             result.addressName) {
       lines.add(
-        '?꾨줈紐? $roadAddress',
+        '도로명: $roadAddress',
       );
     }
 
@@ -2734,19 +2734,19 @@ class _SellerStoreRegistrationScreenState
         jibunAddress !=
             result.addressName) {
       lines.add(
-        '吏踰? $jibunAddress',
+        '지번: $jibunAddress',
       );
     }
 
     if (result.zoneNo != null) {
       lines.add(
-        '?고렪踰덊샇: ${result.zoneNo}',
+        '우편번호: ${result.zoneNo}',
       );
     }
 
     lines.add(
-      '?꾨룄 ${result.latitude.toStringAsFixed(6)} 쨌 '
-          '寃쎈룄 ${result.longitude.toStringAsFixed(6)}',
+      '위도 ${result.latitude.toStringAsFixed(6)} · '
+          '경도 ${result.longitude.toStringAsFixed(6)}',
     );
 
     return lines.join('\n');
@@ -2775,7 +2775,7 @@ class _SellerStoreRegistrationScreenState
 
         setState(() {
           _currentLocationMessage =
-          '湲곌린???꾩튂 ?쒕퉬?ㅺ? 爰쇱졇 ?덉뒿?덈떎.';
+          '기기의 위치 서비스가 꺼져 있습니다.';
         });
 
         return;
@@ -2797,7 +2797,7 @@ class _SellerStoreRegistrationScreenState
 
         setState(() {
           _currentLocationMessage =
-          '?꾩옱 ?꾩튂瑜??ъ슜?섎젮硫??꾩튂 沅뚰븳???덉슜??二쇱꽭??';
+          '현재 위치를 사용하려면 위치 권한을 허용해 주세요.';
         });
 
         return;
@@ -2811,8 +2811,8 @@ class _SellerStoreRegistrationScreenState
 
         setState(() {
           _currentLocationMessage =
-          '?꾩튂 沅뚰븳???곴뎄?곸쑝濡?嫄곕??섏뿀?듬땲?? '
-              '???ㅼ젙?먯꽌 ?꾩튂 沅뚰븳???덉슜??二쇱꽭??';
+          '위치 권한이 영구적으로 거부되었습니다. '
+              '앱 설정에서 위치 권한을 허용해 주세요.';
         });
 
         return;
@@ -2844,7 +2844,7 @@ class _SellerStoreRegistrationScreenState
             );
 
         _currentLocationMessage =
-        '?꾩옱 ?꾩튂瑜?吏???쒖옉?먯쑝濡?以鍮꾪뻽?듬땲??';
+        '현재 위치를 지도 시작점으로 준비했습니다.';
       });
     } on TimeoutException {
       if (!mounted) {
@@ -2853,7 +2853,7 @@ class _SellerStoreRegistrationScreenState
 
       setState(() {
         _currentLocationMessage =
-        '?꾩옱 ?꾩튂瑜??뺤씤?섎뒗 ???쒓컙???ㅻ옒 嫄몃━怨??덉뒿?덈떎.';
+        '현재 위치를 확인하는 데 시간이 오래 걸리고 있습니다.';
       });
     } catch (_) {
       if (!mounted) {
@@ -2862,7 +2862,7 @@ class _SellerStoreRegistrationScreenState
 
       setState(() {
         _currentLocationMessage =
-        '?꾩옱 ?꾩튂瑜??뺤씤?섏? 紐삵뻽?듬땲??';
+        '현재 위치를 확인하지 못했습니다.';
       });
     } finally {
       if (mounted) {
@@ -2884,8 +2884,8 @@ class _SellerStoreRegistrationScreenState
 
     if (address.isEmpty) {
       _showMessage(
-        '吏???꾩튂瑜??좏깮?섍린 ?꾩뿉 '
-            '?ъ뾽??二쇱냼瑜?癒쇱? ?낅젰??二쇱꽭??',
+        '지도 위치를 선택하기 전에 '
+            '사업장 주소를 먼저 입력해 주세요.',
       );
       return;
     }
@@ -2905,11 +2905,11 @@ class _SellerStoreRegistrationScreenState
     129.059319;
 
     /*
-   * ?쒖옉 以묒떖 ?곗꽑?쒖쐞:
+   * 시작 중심 우선순위:
    *
-   * 1. ?댁쟾???좏깮???ъ뾽??醫뚰몴
-   * 2. 湲곌린 ?꾩옱 ?꾩튂
-   * 3. 遺???쒕㈃??
+   * 1. 이전에 선택한 사업장 좌표
+   * 2. 기기 현재 위치
+   * 3. 부산 서면역
    */
     final double initialLatitude =
         selectedLocation?.latitude ??
@@ -2984,7 +2984,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       _showMessage(
-        '?좏깮??吏???꾩튂??二쇱냼瑜??뺤씤?섏? 紐삵뻽?듬땲??',
+        '선택한 지도 위치의 주소를 확인하지 못했습니다.',
       );
     } finally {
       if (mounted) {
@@ -3008,7 +3008,7 @@ class _SellerStoreRegistrationScreenState
 
     if (mapAddress.isEmpty) {
       _showMessage(
-        '吏?꾩뿉???좏깮???꾩튂??二쇱냼瑜??뺤씤?섏? 紐삵뻽?듬땲??',
+        '지도에서 선택한 위치의 주소를 확인하지 못했습니다.',
       );
       return;
     }
@@ -3021,8 +3021,8 @@ class _SellerStoreRegistrationScreenState
         .toSet();
 
     /*
-   * 湲곗〈 二쇱냼媛 鍮꾩뼱 ?덉쑝硫?吏??二쇱냼? 醫뚰몴瑜?
-   * 洹몃?濡??곸슜?쒕떎.
+   * 기존 주소가 비어 있으면 지도 주소와 좌표를
+   * 그대로 적용한다.
    */
     if (currentAddress.isEmpty) {
       setState(() {
@@ -3034,12 +3034,12 @@ class _SellerStoreRegistrationScreenState
               latitude: result.latitude,
               longitude: result.longitude,
               address: mapAddress,
-              sourceLabel: '吏??吏곸젒 ?좏깮',
+              sourceLabel: '지도 직접 선택',
             );
       });
 
       _showMessage(
-        '吏?꾩뿉???좏깮??二쇱냼? ?꾩튂瑜??곸슜?덉뒿?덈떎.',
+        '지도에서 선택한 주소와 위치를 적용했습니다.',
       );
 
       return;
@@ -3053,8 +3053,8 @@ class _SellerStoreRegistrationScreenState
     );
 
     /*
-   * ?꾨줈紐??먮뒗 吏踰?二쇱냼媛 湲곗〈 二쇱냼? 媛숇떎硫?
-   * 二쇱냼???좎??섍퀬 醫뚰몴留??곸슜?쒕떎.
+   * 도로명 또는 지번 주소가 기존 주소와 같다면
+   * 주소는 유지하고 좌표만 적용한다.
    */
     if (currentAddressMatches) {
       setState(() {
@@ -3063,24 +3063,24 @@ class _SellerStoreRegistrationScreenState
               latitude: result.latitude,
               longitude: result.longitude,
               address: currentAddress,
-              sourceLabel: '吏??吏곸젒 ?좏깮',
+              sourceLabel: '지도 직접 선택',
             );
       });
 
       _showMessage(
-        '?낅젰??二쇱냼? 吏???꾩튂媛 ?쇱튂?⑸땲??',
+        '입력한 주소와 지도 위치가 일치합니다.',
       );
 
       return;
     }
 
     /*
-   * 二쇱냼媛 ?ㅻⅤ硫?湲곗〈??留뚮뱺 異⑸룎 紐⑤떖???ъ슜?쒕떎.
+   * 주소가 다르면 기존에 만든 충돌 모달을 사용한다.
    */
     final String resolvedAddress =
     await _showImportedValueConflictDialog(
-      fieldLabel: '二쇱냼',
-      sourceLabel: '吏?꾩뿉???좏깮???꾩튂',
+      fieldLabel: '주소',
+      sourceLabel: '지도에서 선택한 위치',
       currentValue: currentAddress,
       importedValue: mapAddress,
     );
@@ -3101,10 +3101,10 @@ class _SellerStoreRegistrationScreenState
           resolvedAddress;
 
       /*
-     * 吏??二쇱냼瑜??좏깮?덇굅??吏곸젒 ?낅젰媛믪씠
-     * 移댁뭅??二쇱냼? 媛숈쓣 ?뚮쭔 醫뚰몴瑜??뺤젙?쒕떎.
+     * 지도 주소를 선택했거나 직접 입력값이
+     * 카카오 주소와 같을 때만 좌표를 확정한다.
      *
-     * 湲곗〈???ㅻⅨ 二쇱냼瑜??좎??덈떎硫?醫뚰몴????ν븯吏 ?딅뒗??
+     * 기존의 다른 주소를 유지했다면 좌표는 저장하지 않는다.
      */
       _selectedStoreLocation =
       resolvedMatchesMap
@@ -3116,21 +3116,21 @@ class _SellerStoreRegistrationScreenState
         address:
         resolvedAddress,
         sourceLabel:
-        '吏??吏곸젒 ?좏깮',
+        '지도 직접 선택',
       )
           : null;
     });
 
     if (!resolvedMatchesMap) {
       _showMessage(
-        '?낅젰 二쇱냼瑜??좎??덉뒿?덈떎. '
-            '?꾩옱 二쇱냼??留욌뒗 吏???꾩튂瑜??ㅼ떆 ?좏깮??二쇱꽭??',
+        '입력 주소를 유지했습니다. '
+            '현재 주소에 맞는 지도 위치를 다시 선택해 주세요.',
       );
       return;
     }
 
     _showMessage(
-      '吏?꾩뿉???좏깮??二쇱냼? ?꾩튂瑜??곸슜?덉뒿?덈떎.',
+      '지도에서 선택한 주소와 위치를 적용했습니다.',
     );
   }
 
@@ -3144,7 +3144,7 @@ class _SellerStoreRegistrationScreenState
     });
 
     _showMessage(
-      '?좏깮??吏???꾩튂瑜?珥덇린?뷀뻽?듬땲??',
+      '선택된 지도 위치를 초기화했습니다.',
     );
   }
 
@@ -3162,14 +3162,14 @@ class _SellerStoreRegistrationScreenState
 
     if (importedAddress.isEmpty) {
       _showMessage(
-        '?좏깮???꾩튂??二쇱냼 ?뺣낫媛 ?놁뒿?덈떎.',
+        '선택한 위치에 주소 정보가 없습니다.',
       );
       return;
     }
 
     final String resolvedAddress =
     await _resolveImportedText(
-      fieldLabel: '二쇱냼',
+      fieldLabel: '주소',
       sourceLabel: sourceLabel,
       currentValue:
       _addressController.text,
@@ -3181,9 +3181,9 @@ class _SellerStoreRegistrationScreenState
     }
 
     /*
-   * ?ъ슜?먭? 移댁뭅??二쇱냼 ???湲곗〈 二쇱냼??吏곸젒 ?낅젰??
-   * ?좏깮?덈떎硫? ?대떦 醫뚰몴媛 ?ㅼ젣濡?洹?二쇱냼? ?쇱튂?섎뒗吏
-   * 蹂댁옣?????놁쑝誘濡?醫뚰몴瑜???ν븯吏 ?딅뒗??
+   * 사용자가 카카오 주소 대신 기존 주소나 직접 입력을
+   * 선택했다면, 해당 좌표가 실제로 그 주소와 일치하는지
+   * 보장할 수 없으므로 좌표를 저장하지 않는다.
    */
     final String normalizedResolved =
     _normalizeComparisonText(
@@ -3217,14 +3217,14 @@ class _SellerStoreRegistrationScreenState
 
     if (!addressMatchesLocation) {
       _showMessage(
-        '二쇱냼???좏깮???댁슜?쇰줈 諛섏쁺?덉뒿?덈떎. '
-            '吏???꾩튂??蹂寃쎈맂 二쇱냼濡??ㅼ떆 ?뺤씤??二쇱꽭??',
+        '주소는 선택한 내용으로 반영했습니다. '
+            '지도 위치는 변경된 주소로 다시 확인해 주세요.',
       );
       return;
     }
 
     _showMessage(
-      '$sourceLabel ?꾩튂瑜??곸슜?덉뒿?덈떎.',
+      '$sourceLabel 위치를 적용했습니다.',
     );
   }
 
@@ -3235,7 +3235,7 @@ class _SellerStoreRegistrationScreenState
 
     if (_tags.length >= 8) {
       _showMessage(
-        '寃???ㅼ썙?쒕뒗 理쒕? 8媛쒓퉴吏 ?깅줉?????덉뼱??',
+        '검색 키워드는 최대 8개까지 등록할 수 있어요.',
       );
 
       return;
@@ -3259,7 +3259,7 @@ class _SellerStoreRegistrationScreenState
 
     if (!valid) {
       _showMessage(
-        '?꾩닔 ?낅젰 ??ぉ???뺤씤??二쇱꽭??',
+        '필수 입력 항목을 확인해 주세요.',
       );
 
       return;
@@ -3274,7 +3274,7 @@ class _SellerStoreRegistrationScreenState
     if (!_takeoutAvailable &&
         !_dineInAvailable) {
       _showMessage(
-        '?ъ옣 ?먮뒗 留ㅼ옣 ?앹궗 以??섎굹??媛?ν빐???댁슂.',
+        '포장 또는 매장 식사 중 하나는 가능해야 해요.',
       );
 
       return;
@@ -3295,7 +3295,7 @@ class _SellerStoreRegistrationScreenState
 
       if (selectedImage != null) {
         _showMessage(
-          '????ъ쭊???낅줈?쒗븯怨??덉뒿?덈떎.',
+          '대표 사진을 업로드하고 있습니다.',
         );
 
         representativeImageUrl =
@@ -3397,7 +3397,7 @@ class _SellerStoreRegistrationScreenState
       });
 
       _showMessage(
-        '?ъ뾽?μ쓣 ?깅줉?섏? 紐삵뻽?듬땲?? ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??',
+        '사업장을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.',
       );
     }
   }
@@ -3442,7 +3442,7 @@ class _SellerStoreRegistrationScreenState
         });
 
         _showMessage(
-          '?댁쟾???좏깮?섎뜕 ????ъ쭊??蹂듦뎄?덉뒿?덈떎.',
+          '이전에 선택하던 대표 사진을 복구했습니다.',
         );
 
         return;
@@ -3450,7 +3450,7 @@ class _SellerStoreRegistrationScreenState
 
       if (response.exception != null) {
         _showMessage(
-          '?댁쟾???좏깮?섎뜕 ?대?吏瑜?蹂듦뎄?섏? 紐삵뻽?듬땲??',
+          '이전에 선택하던 이미지를 복구하지 못했습니다.',
         );
       }
     } catch (_) {
@@ -3459,9 +3459,8 @@ class _SellerStoreRegistrationScreenState
       }
 
       _showMessage(
-        '?대?吏 ?좏깮 ?뺣낫瑜?蹂듦뎄?섏? 紐삵뻽?듬땲??',
+        '이미지 선택 정보를 복구하지 못했습니다.',
       );
     }
   }
 }
-

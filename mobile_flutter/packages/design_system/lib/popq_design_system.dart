@@ -1,4 +1,4 @@
-﻿export 'src/popq_theme.dart';
+export 'src/popq_theme.dart';
 export 'src/widgets/popq_async_views.dart';
 export 'src/widgets/popq_app_scaffold.dart';
 export 'src/widgets/popq_category_tabs.dart';
@@ -8,4 +8,3 @@ export 'src/widgets/popq_splash_screen.dart';
 
 export 'src/formatters/popq_order_number_formatter.dart';
 export 'src/widgets/popq_top_snack_bar.dart';
-

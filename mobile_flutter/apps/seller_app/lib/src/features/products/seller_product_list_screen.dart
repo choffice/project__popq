@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../orders/seller_order_list_screen.dart';
@@ -101,7 +101,7 @@ class _SellerProductListScreenState
   Widget build(BuildContext context) {
     if (_loading) {
       return const PopqLoadingView(
-        message: '?ㅽ넗???곹뭹??遺덈윭?ㅺ퀬 ?덉뼱??',
+        message: '스토어 상품을 불러오고 있어요.',
       );
     }
 
@@ -109,7 +109,7 @@ class _SellerProductListScreenState
         _products == null ||
         _categories == null) {
       return PopqErrorView(
-        message: '?좏깮???ㅽ넗?댁쓽 ?곹뭹??遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+        message: '선택한 스토어의 상품을 불러오지 못했습니다.',
         onRetry: _load,
       );
     }
@@ -136,7 +136,7 @@ class _SellerProductListScreenState
                 CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    '硫붾돱 援ъ꽦',
+                    '메뉴 구성',
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge,
@@ -145,7 +145,7 @@ class _SellerProductListScreenState
                     height: PopqSpacing.xs,
                   ),
                   Text(
-                    '移댄뀒怨좊━瑜?留뚮뱺 ??硫붾돱? ?듭뀡???깅줉?????덉뒿?덈떎.',
+                    '카테고리를 만든 뒤 메뉴와 옵션을 등록할 수 있습니다.',
                     style: Theme.of(context)
                         .textTheme
                         .bodyMedium,
@@ -164,7 +164,7 @@ class _SellerProductListScreenState
                       Icons.create_new_folder_outlined,
                     ),
                     label: const Text(
-                      '移댄뀒怨좊━ 異붽?',
+                      '카테고리 추가',
                     ),
                   ),
                   const SizedBox(
@@ -183,7 +183,7 @@ class _SellerProductListScreenState
                       Icons.add_rounded,
                     ),
                     label: const Text(
-                      '硫붾돱 異붽?',
+                      '메뉴 추가',
                     ),
                   ),
                   if (categories.isEmpty)
@@ -192,7 +192,7 @@ class _SellerProductListScreenState
                         top: PopqSpacing.sm,
                       ),
                       child: Text(
-                        '硫붾돱瑜?異붽??섎젮硫?移댄뀒怨좊━瑜?癒쇱? ?깅줉??二쇱꽭??',
+                        '메뉴를 추가하려면 카테고리를 먼저 등록해 주세요.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Theme.of(context)
@@ -209,14 +209,14 @@ class _SellerProductListScreenState
                       children: [
                         Expanded(
                           child: Text(
-                            '?깅줉??移댄뀒怨좊━',
+                            '등록된 카테고리',
                             style: Theme.of(context)
                                 .textTheme
                                 .titleMedium,
                           ),
                         ),
                         Text(
-                          '?좏깮?섎㈃ ?섏젙',
+                          '선택하면 수정',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall,
@@ -257,7 +257,7 @@ class _SellerProductListScreenState
                     Icons.search_rounded,
                   ),
                   hintText:
-                  '?곹뭹紐??먮뒗 移댄뀒怨좊━ 寃??,
+                  '상품명 또는 카테고리 검색',
                 ),
                 onChanged: (String value) {
                   setState(() {
@@ -281,19 +281,19 @@ class _SellerProductListScreenState
                 children: [
                   _filterChip(
                     _ProductFilter.all,
-                    '?꾩껜',
+                    '전체',
                   ),
                   _filterChip(
                     _ProductFilter.selling,
-                    '?먮ℓ 以?,
+                    '판매 중',
                   ),
                   _filterChip(
                     _ProductFilter.soldOut,
-                    '?덉젅',
+                    '품절',
                   ),
                   _filterChip(
                     _ProductFilter.channelOff,
-                    '梨꾨꼸 爰쇱쭚',
+                    '채널 꺼짐',
                   ),
                 ],
               ),
@@ -305,9 +305,9 @@ class _SellerProductListScreenState
               child: PopqEmptyView(
                 icon:
                 Icons.inventory_2_outlined,
-                title: '議곌굔??留욌뒗 ?곹뭹???놁뼱??',
+                title: '조건에 맞는 상품이 없어요.',
                 description:
-                '硫붾돱瑜?異붽??섍굅??寃?됱뼱? ?꾪꽣瑜?蹂寃쏀빐 二쇱꽭??',
+                '메뉴를 추가하거나 검색어와 필터를 변경해 주세요.',
               ),
             )
           else
@@ -389,7 +389,7 @@ class _SellerProductListScreenState
         size: 18,
       ),
       deleteButtonTooltipMessage:
-      '移댄뀒怨좊━ ??젣',
+      '카테고리 삭제',
     );
   }
 
@@ -466,14 +466,14 @@ class _SellerProductListScreenState
               ),
             ),
             subtitle: Text(
-              '${product.categoryName} 쨌 '
+              '${product.categoryName} · '
                   '${sellerWon(product.basePrice)}',
             ),
             trailing: Chip(
               label: Text(
                 product.soldOut
-                    ? '?덉젅'
-                    : '?먮ℓ 以?,
+                    ? '품절'
+                    : '판매 중',
               ),
               backgroundColor: product.soldOut
                   ? const Color(0xFFE7E4EA)
@@ -504,7 +504,7 @@ class _SellerProductListScreenState
                     Icons.tune_rounded,
                   ),
                   label: const Text(
-                    '?듭뀡 ?몄쭛',
+                    '옵션 편집',
                   ),
                 ),
                 TextButton.icon(
@@ -523,7 +523,7 @@ class _SellerProductListScreenState
                     Icons.edit_outlined,
                   ),
                   label: const Text(
-                    '湲곕낯?뺣낫 ?섏젙',
+                    '기본정보 수정',
                   ),
                 ),
                 TextButton.icon(
@@ -555,8 +555,8 @@ class _SellerProductListScreenState
                   ),
                   label: Text(
                     isDeleting
-                        ? '??젣 以?
-                        : '硫붾돱 ??젣',
+                        ? '삭제 중'
+                        : '메뉴 삭제',
                   ),
                 ),
               ],
@@ -567,9 +567,9 @@ class _SellerProductListScreenState
             key: Key(
               'sold-out-${product.productId}',
             ),
-            title: const Text('?덉젅 泥섎━'),
+            title: const Text('품절 처리'),
             subtitle: const Text(
-              '耳쒕㈃ 紐⑤뱺 ?먮ℓ 梨꾨꼸?먯꽌 利됱떆 二쇰Ц?????놁뒿?덈떎.',
+              '켜면 모든 판매 채널에서 즉시 주문할 수 없습니다.',
             ),
             value: product.soldOut,
             onChanged: isBusy
@@ -586,11 +586,11 @@ class _SellerProductListScreenState
               'customer-app-'
                   '${product.productId}',
             ),
-            title: const Text('怨좉컼 ???먮ℓ'),
+            title: const Text('고객 앱 판매'),
             subtitle: Text(
               product.customerAppEnabled
-                  ? '?몄텧 ?덉슜'
-                  : '?몄텧 以묒?',
+                  ? '노출 허용'
+                  : '노출 중지',
             ),
             value:
             product.customerAppEnabled,
@@ -608,11 +608,11 @@ class _SellerProductListScreenState
             key: Key(
               'qr-web-${product.productId}',
             ),
-            title: const Text('QR ???먮ℓ'),
+            title: const Text('QR 웹 판매'),
             subtitle: Text(
               product.qrWebEnabled
-                  ? '?몄텧 ?덉슜'
-                  : '?몄텧 以묒?',
+                  ? '노출 허용'
+                  : '노출 중지',
             ),
             value: product.qrWebEnabled,
             onChanged: isBusy
@@ -757,7 +757,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${saved.name} 移댄뀒怨좊━瑜???ν뻽?듬땲??',
+        '${saved.name} 카테고리를 저장했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -765,7 +765,7 @@ class _SellerProductListScreenState
       }
 
       _showMessage(
-        '移댄뀒怨좊━瑜???ν븯吏 紐삵뻽?듬땲??',
+        '카테고리를 저장하지 못했습니다.',
       );
     }
   }
@@ -779,7 +779,7 @@ class _SellerProductListScreenState
 
     if (categories.isEmpty) {
       _showMessage(
-        '移댄뀒怨좊━瑜?癒쇱? ?깅줉??二쇱꽭??',
+        '카테고리를 먼저 등록해 주세요.',
       );
 
       return;
@@ -844,7 +844,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${saved.name} 硫붾돱瑜???ν뻽?듬땲??',
+        '${saved.name} 메뉴를 저장했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -852,7 +852,7 @@ class _SellerProductListScreenState
       }
 
       _showMessage(
-        '硫붾돱瑜???ν븯吏 紐삵뻽?듬땲??',
+        '메뉴를 저장하지 못했습니다.',
       );
     }
   }
@@ -919,8 +919,8 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${saved.product.name} ?듭뀡 洹몃９ '
-            '${saved.optionGroups.length}媛쒕? ??ν뻽?듬땲??',
+        '${saved.product.name} 옵션 그룹 '
+            '${saved.optionGroups.length}개를 저장했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -934,7 +934,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '?듭뀡????ν븯吏 紐삵뻽?듬땲??',
+        '옵션을 저장하지 못했습니다.',
       );
     }
   }
@@ -986,7 +986,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${updated.name} ?먮ℓ ?곹깭瑜?蹂寃쏀뻽?듬땲??',
+        '${updated.name} 판매 상태를 변경했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -1000,7 +1000,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '?곹뭹 ?먮ℓ ?곹깭瑜?蹂寃쏀븯吏 紐삵뻽?듬땲??',
+        '상품 판매 상태를 변경하지 못했습니다.',
       );
     }
   }
@@ -1010,11 +1010,11 @@ class _SellerProductListScreenState
       ) async {
     final bool confirmed =
     await _showDeleteDialog(
-      title: '硫붾돱 ??젣',
+      title: '메뉴 삭제',
       message:
-      '${product.name} 硫붾돱瑜???젣?좉퉴??\n\n'
-          '?먮ℓ??諛?怨좉컼 硫붾돱 紐⑸줉?먯꽌???щ씪吏吏留?'
-          '湲곗〈 二쇰Ц怨?寃곗젣 湲곕줉? 蹂댁〈?⑸땲??',
+      '${product.name} 메뉴를 삭제할까요?\n\n'
+          '판매자 및 고객 메뉴 목록에서는 사라지지만 '
+          '기존 주문과 결제 기록은 보존됩니다.',
     );
 
     if (!confirmed || !mounted) {
@@ -1061,7 +1061,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${product.name} 硫붾돱瑜???젣?덉뒿?덈떎.',
+        '${product.name} 메뉴를 삭제했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -1075,7 +1075,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '硫붾돱瑜???젣?섏? 紐삵뻽?듬땲??',
+        '메뉴를 삭제하지 못했습니다.',
       );
     }
   }
@@ -1095,8 +1095,8 @@ class _SellerProductListScreenState
 
     if (hasProducts) {
       _showMessage(
-        '??移댄뀒怨좊━???깅줉??硫붾돱媛 ?덉뒿?덈떎. '
-            '硫붾돱瑜?癒쇱? ??젣??二쇱꽭??',
+        '이 카테고리에 등록된 메뉴가 있습니다. '
+            '메뉴를 먼저 삭제해 주세요.',
       );
 
       return;
@@ -1104,10 +1104,10 @@ class _SellerProductListScreenState
 
     final bool confirmed =
     await _showDeleteDialog(
-      title: '移댄뀒怨좊━ ??젣',
+      title: '카테고리 삭제',
       message:
-      '${category.name} 移댄뀒怨좊━瑜???젣?좉퉴??\n\n'
-          '??젣??移댄뀒怨좊━??硫붾돱 ?깅줉 ?붾㈃?먯꽌 ???댁긽 ?쒖떆?섏? ?딆뒿?덈떎.',
+      '${category.name} 카테고리를 삭제할까요?\n\n'
+          '삭제한 카테고리는 메뉴 등록 화면에서 더 이상 표시되지 않습니다.',
     );
 
     if (!confirmed || !mounted) {
@@ -1150,7 +1150,7 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '${category.name} 移댄뀒怨좊━瑜???젣?덉뒿?덈떎.',
+        '${category.name} 카테고리를 삭제했습니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -1164,8 +1164,8 @@ class _SellerProductListScreenState
       });
 
       _showMessage(
-        '移댄뀒怨좊━瑜???젣?섏? 紐삵뻽?듬땲?? '
-            '?곌껐??硫붾돱媛 ?녿뒗吏 ?뺤씤??二쇱꽭??',
+        '카테고리를 삭제하지 못했습니다. '
+            '연결된 메뉴가 없는지 확인해 주세요.',
       );
     }
   }
@@ -1192,7 +1192,7 @@ class _SellerProductListScreenState
                 Navigator.of(dialogContext)
                     .pop(false);
               },
-              child: const Text('痍⑥냼'),
+              child: const Text('취소'),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -1205,7 +1205,7 @@ class _SellerProductListScreenState
                 Navigator.of(dialogContext)
                     .pop(true);
               },
-              child: const Text('??젣'),
+              child: const Text('삭제'),
             ),
           ],
         );

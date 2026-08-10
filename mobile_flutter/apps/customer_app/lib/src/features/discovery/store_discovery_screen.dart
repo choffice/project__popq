@@ -1,7 +1,7 @@
-﻿//- 寃?됱갹
-// - 濡쒖뺄留덉폆/?됱궗 ?꾪꽣
-// - ?좏깮???낆껜
-// - ?섎떒 ?낆껜 移대뱶
+//- 검색창
+// - 로컬마켓/행사 필터
+// - 선택한 업체
+// - 하단 업체 카드
 
 import 'dart:async';
 
@@ -9,8 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
-import 'package:flutter/foundation.dart';
-import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
@@ -19,9 +17,6 @@ import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
-
-import 'kakao_store_map_web_stub.dart'
-if (dart.library.js_interop) 'kakao_store_map_web.dart';
 
 class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
@@ -35,10 +30,10 @@ class StoreDiscoveryScreen extends StatefulWidget {
   final StoreDiscoveryRepository repository;
   final CustomerPermissionGateway permissionGateway;
 
-  /// ?ㅼ쓬 ?④퀎?먯꽌 ?쇱슦?곌? ?꾨떖?⑸땲??
+  /// 다음 단계에서 라우터가 전달합니다.
   ///
-  /// ???섏〈?깆씠 紐⑤몢 ?꾨떖?섎㈃ ?먯깋 ?붾㈃???섑듃媛
-  /// ?ㅼ젣 愿??留ㅼ옣 API? ?곌껐?⑸땲??
+  /// 두 의존성이 모두 전달되면 탐색 화면의 하트가
+  /// 실제 관심 매장 API와 연결됩니다.
   final CustomerEngagementRepository? engagementRepository;
   final SessionController? sessionController;
 
@@ -50,22 +45,22 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   static const _filters = [
     _StoreFilter(
       type: _StoreFilterType.all,
-      label: '?꾩껜',
+      label: '전체',
       icon: Icons.apps_rounded,
     ),
     _StoreFilter(
       type: _StoreFilterType.localStore,
-      label: '濡쒖뺄留덉폆',
+      label: '로컬마켓',
       icon: Icons.storefront_rounded,
     ),
     _StoreFilter(
       type: _StoreFilterType.eventCommerce,
-      label: '?됱궗쨌?대깽??,
+      label: '행사·이벤트',
       icon: Icons.celebration_rounded,
     ),
     _StoreFilter(
       type: _StoreFilterType.favorites,
-      label: '留덉씠??,
+      label: '마이픽',
       icon: Icons.favorite_rounded,
     ),
   ];
@@ -175,8 +170,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     setState(() {
       /*
-     * 濡쒓렇?꾩썐?섎㈃ 留덉씠???꾪꽣瑜??좎??섏? ?딄퀬
-     * ?꾩껜 ?꾪꽣濡??섎룎由쎈땲??
+     * 로그아웃되면 마이픽 필터를 유지하지 않고
+     * 전체 필터로 되돌립니다.
      */
       if (_selectedFilter == _StoreFilterType.favorites &&
           interestController != null &&
@@ -188,9 +183,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       }
 
       /*
-     * 留덉씠???붾㈃?먯꽌 ?좏깮???낆껜???섑듃瑜??댁젣?섎㈃
-     * ?대떦 ?낆껜???꾪꽣 寃곌낵?먯꽌 鍮좎?誘濡?
-     * ?섎떒 ?좏깮 移대뱶???④퍡 ?レ뒿?덈떎.
+     * 마이픽 화면에서 선택한 업체의 하트를 해제하면
+     * 해당 업체는 필터 결과에서 빠지므로
+     * 하단 선택 카드도 함께 닫습니다.
      */
       if (_selectedFilter != _StoreFilterType.favorites) {
         return;
@@ -224,10 +219,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   Future<void> _initializeDiscovery() async {
     _lastSearchWasMapMove = false;
     /*
-   * 遺??湲곕낯 ?꾩튂瑜?湲곗??쇰줈 ?낆껜 API瑜??몄텧?⑸땲??
+   * 부산 기본 위치를 기준으로 업체 API를 호출합니다.
    *
-   * ?붿껌???깃났?섎㈃ ?명꽣?룰낵 諛깆뿏???곌껐????寃껋쑝濡?蹂닿퀬
-   * ?꾩옱 ?꾩튂 ?ъ슜 ?щ?瑜?臾삳뒗 ?덈궡瑜??쒖떆?⑸땲??
+   * 요청이 성공하면 인터넷과 백엔드 연결이 된 것으로 보고
+   * 현재 위치 사용 여부를 묻는 안내를 표시합니다.
    */
     await _controller.initializeAtBusan(query: _queryController.text.trim());
 
@@ -236,16 +231,16 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     /*
-   * API ?붿껌 ?먯껜媛 ?ㅽ뙣??寃쎌슦?먮뒗
-   * ?꾩튂 ?덈궡瑜??꾩슦吏 ?딄퀬 ?곌껐 ?ㅻ쪟 ?붾㈃???좎??⑸땲??
+   * API 요청 자체가 실패한 경우에는
+   * 위치 안내를 띄우지 않고 연결 오류 화면을 유지합니다.
    */
     if (_controller.status == DiscoveryStatus.failure) {
       return;
     }
 
     /*
-   * ?대? ?꾩튂 沅뚰븳???덉슜???ъ슜?먯뿉寃뚮뒗
-   * 留ㅻ쾲 ?좏깮 ?덈궡瑜??ㅼ떆 臾살? ?딄퀬 諛붾줈 ?꾩옱 ?꾩튂濡?議고쉶?⑸땲??
+   * 이미 위치 권한을 허용한 사용자에게는
+   * 매번 선택 안내를 다시 묻지 않고 바로 현재 위치로 조회합니다.
    */
     final permissionStatus =
         await widget.permissionGateway.checkLocationPermission();
@@ -272,8 +267,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final refreshError = _controller.error;
 
     /*
-   * ??寃?됱씠 ?쒖옉?섎㈃???ㅻ쪟媛 珥덇린?붾릺硫?
-   * ?ㅼ쓬 ?ㅻ쪟瑜??ㅼ떆 ?쒖떆?????덈룄濡??곹깭瑜??뺣━?⑸땲??
+   * 새 검색이 시작되면서 오류가 초기화되면
+   * 다음 오류를 다시 표시할 수 있도록 상태를 정리합니다.
    */
     if (refreshError == null) {
       _lastShownRefreshError = null;
@@ -281,10 +276,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         !_controller.isRefreshing &&
         !identical(_lastShownRefreshError, refreshError)) {
       /*
-     * 理쒖큹 ?곌껐 ?ㅽ뙣??以묒븰 ?ㅻ쪟 ?붾㈃?먯꽌 泥섎━?⑸땲??
+     * 최초 연결 실패는 중앙 오류 화면에서 처리합니다.
      *
-     * ?대? 吏?꾧? ?쒖떆???ㅼ쓽 ?ш????ㅽ뙣留?
-     * SnackBar濡??뚮젮二쇨퀬 湲곗〈 ?? ?좎??⑸땲??
+     * 이미 지도가 표시된 뒤의 재검색 실패만
+     * SnackBar로 알려주고 기존 핀은 유지합니다.
      */
       _lastShownRefreshError = refreshError;
 
@@ -296,8 +291,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(
             content: Text(
-              '??吏??쓽 ?낆껜瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲?? '
-              '湲곗〈 寃??寃곌낵瑜??좎??⑸땲??',
+              '새 지역의 업체를 불러오지 못했습니다. '
+              '기존 검색 결과를 유지합니다.',
             ),
           ),
         );
@@ -313,10 +308,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       }
 
       /*
-   * ??寃??寃곌낵?먮룄 ?좏깮 ?낆껜媛 ?ы븿?섏뼱 ?덈떎硫?
-   * 理쒖떊 ?낆껜 ?뺣낫濡?移대뱶 媛앹껜留?媛깆떊?⑸땲??
+   * 새 검색 결과에도 선택 업체가 포함되어 있다면
+   * 최신 업체 정보로 카드 객체만 갱신합니다.
    *
-   * 寃??寃곌낵?먯꽌 踰쀬뼱?щ뜑?쇰룄 湲곗〈 移대뱶???좎??⑸땲??
+   * 검색 결과에서 벗어났더라도 기존 카드는 유지합니다.
    */
       for (final store in _controller.stores) {
         if (store.storeId == selectedStoreId) {
@@ -340,8 +335,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         stores.where((store) => store.storeType == 'EVENT_COMMERCE').toList(),
 
       /*
-     * ?쒕쾭?먯꽌 諛쏆? ?꾩옱 吏???곸뿭???낆껜 以?
-     * ?ъ슜?먭? 李쒗븳 ?낆껜留??쒖떆?⑸땲??
+     * 서버에서 받은 현재 지도 영역의 업체 중
+     * 사용자가 찜한 업체만 표시합니다.
      */
       _StoreFilterType.favorites =>
         stores
@@ -351,10 +346,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   /*
- * 移댁뭅?ㅻ㏊ 留덉빱???쒖떆???꾩옱 李??낆껜 ID?낅땲??
+ * 카카오맵 마커에 표시할 현재 찜 업체 ID입니다.
  *
- * ?ㅼ젣 API Controller媛 ?덉쑝硫??쒕쾭 ?곹깭瑜??ъ슜?섍퀬,
- * ?놁쑝硫??꾩떆 濡쒖뺄 利먭꺼李얘린 ?곹깭瑜??ъ슜?⑸땲??
+ * 실제 API Controller가 있으면 서버 상태를 사용하고,
+ * 없으면 임시 로컬 즐겨찾기 상태를 사용합니다.
  */
   Set<int> get _favoriteStoreIds {
     final controller = _interestController;
@@ -399,7 +394,6 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (!kIsWeb)
         KakaoStoreMap(
           controller: _mapController,
           stores: stores,
@@ -409,39 +403,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           selectedStoreId: _selectedStore?.storeId,
           onStoreSelected: _selectStore,
           onViewportIdle: _onMapViewportIdle,
-        )
-        else
-          KakaoStoreMapWeb(
-            controller: _mapController,
-            stores: stores,
-            favoriteStoreIds: _favoriteStoreIds,
-            currentLocation: _controller.location,
-            searchCenter: _controller.searchCenter,
-            onStoreSelected: _selectStore,
-            selectedStoreId: _selectedStore?.storeId,
-            onViewportIdle: _onMapViewportIdle,
-          ),
+        ),
+
         _buildStatusOverlay(stores),
 
-        Positioned(
-          top: 12,
-          left: 12,
-          right: 12,
-          child: PointerInterceptor(
-            intercepting: kIsWeb,
-            child: _buildTopControls(),
-          ),
-        ),
+        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
 
         Positioned(
           right: 16,
           bottom: _selectedStore == null ? 20 : 158,
-          child: PointerInterceptor(
-            intercepting: kIsWeb,
-            child: _CurrentLocationButton(
-              active: _controller.location != null,
-              onPressed: _useCurrentLocation,
-            ),
+          child: _CurrentLocationButton(
+            active: _controller.location != null,
+            onPressed: _useCurrentLocation,
           ),
         ),
 
@@ -450,36 +423,32 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: PointerInterceptor(
-              intercepting: kIsWeb,
-              child: _SelectedStoreCard(
-                store: _selectedStore!,
-                favorite: _isFavorite(_selectedStore!.storeId),
-                favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
-                walkingRoute: _walkingRoute,
-                walkingRouteLoading: _walkingRouteLoading,
-                walkingRouteError: _walkingRouteError,
-                onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
-                onStoreLocationPressed: _focusSelectedStoreOnMap,
-                onFavoritePressed: _toggleFavorite,
-                onDetailsPressed: _openStoreDetail,
-                onClose: () {
-                  setState(() {
-                    _clearSelectedStoreState();
-                  });
-                },
-              ),
+            child: _SelectedStoreCard(
+              store: _selectedStore!,
+              favorite: _isFavorite(_selectedStore!.storeId),
+              favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
+              walkingRoute: _walkingRoute,
+              walkingRouteLoading: _walkingRouteLoading,
+              walkingRouteError: _walkingRouteError,
+              onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
+              onStoreLocationPressed:
+              _focusSelectedStoreOnMap,
+              onFavoritePressed: _toggleFavorite,
+              onDetailsPressed: _openStoreDetail,
+              onClose: () {
+                setState(() {
+                  _clearSelectedStoreState();
+                });
+              },
             ),
           ),
+
         if (_showInitialLocationChoice)
           Positioned.fill(
-            child: PointerInterceptor(
-              intercepting: kIsWeb,
-              child: _InitialLocationChoice(
-                requestingLocation: _requestingInitialLocation,
-                onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
-                onContinueWithBusan: _continueWithBusan,
-              ),
+            child: _InitialLocationChoice(
+              requestingLocation: _requestingInitialLocation,
+              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
+              onContinueWithBusan: _continueWithBusan,
             ),
           ),
       ],
@@ -492,12 +461,12 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         SearchBar(
           controller: _queryController,
           focusNode: _searchFocusNode,
-          hintText: '?낆껜紐? 硫붾돱, 二쇱냼 寃??,
+          hintText: '업체명, 메뉴, 주소 검색',
           leading: const Icon(Icons.search_rounded),
           trailing: [
             if (_queryController.text.isNotEmpty)
               IconButton(
-                tooltip: '寃?됱뼱 吏?곌린',
+                tooltip: '검색어 지우기',
                 onPressed: _clearSearch,
                 icon: const Icon(Icons.close_rounded),
               ),
@@ -544,7 +513,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
               child: const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                 child: Text(
-                  '?꾩옱 ?꾩튂 湲곗? 10km ?대궡 쨌 媛源뚯슫 ??,
+                  '현재 위치 기준 10km 이내 · 가까운 순',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                 ),
               ),
@@ -565,16 +534,16 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   Widget _buildStatusOverlay(List<CustomerStore> filteredStores) {
     /*
-   * 理쒖큹 議고쉶媛 ?꾨땶 吏???대룞 ?ш??됱뿉?쒕뒗
-   * 以묒븰????濡쒕뵫쨌鍮?寃곌낵 移대뱶瑜??쒖떆?섏? ?딆뒿?덈떎.
+   * 최초 조회가 아닌 지도 이동 재검색에서는
+   * 중앙의 큰 로딩·빈 결과 카드를 표시하지 않습니다.
    */
     if (_controller.isRefreshing) {
       return const SizedBox.shrink();
     }
 
     /*
-   * ?ъ슜?먭? 吏?꾨? ?대룞?댁꽌 議고쉶??寃곌낵媛 鍮꾩뼱 ?덉쓣 ?뚮뒗
-   * 以묒븰??寃곌낵 ?놁쓬 移대뱶瑜??쒖떆?섏? ?딆뒿?덈떎.
+   * 사용자가 지도를 이동해서 조회한 결과가 비어 있을 때는
+   * 중앙의 결과 없음 카드를 표시하지 않습니다.
    */
     if (_lastSearchWasMapMove) {
       final viewportHasNoResult =
@@ -591,7 +560,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       DiscoveryStatus.loading => const Center(
         child: _MapStatusCard(
           icon: Icons.location_searching_rounded,
-          message: '二쇰? ?낆껜瑜?李얘퀬 ?덉뼱??',
+          message: '주변 업체를 찾고 있어요.',
           loading: true,
         ),
       ),
@@ -600,9 +569,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         child: _MapStatusCard(
           icon: Icons.cloud_off_rounded,
           message:
-              '?명꽣???먮뒗 ?쒕쾭???곌껐?????놁뒿?덈떎.\n'
-              '?곌껐 ?곹깭瑜??뺤씤?????ㅼ떆 ?쒕룄??二쇱꽭??',
-          buttonLabel: '?ㅼ떆 ?쒕룄',
+              '인터넷 또는 서버에 연결할 수 없습니다.\n'
+              '연결 상태를 확인한 뒤 다시 시도해 주세요.',
+          buttonLabel: '다시 시도',
           onPressed: () {
             _initializeDiscovery();
           },
@@ -612,7 +581,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       DiscoveryStatus.empty => const Center(
         child: _MapStatusCard(
           icon: Icons.storefront_outlined,
-          message: '寃??議곌굔??留욌뒗 ?낆껜媛 ?놁뒿?덈떎.',
+          message: '검색 조건에 맞는 업체가 없습니다.',
         ),
       ),
 
@@ -622,8 +591,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
               ? Icons.favorite_border_rounded
               : Icons.filter_alt_off_rounded,
           message: _selectedFilter == _StoreFilterType.favorites
-              ? '??吏???곸뿭??李쒗븳 ?낆껜媛 ?놁뒿?덈떎.'
-              : '?좏깮??遺꾨쪟???낆껜媛 ?놁뒿?덈떎.',
+              ? '이 지도 영역에 찜한 업체가 없습니다.'
+              : '선택한 분류의 업체가 없습니다.',
         ),
       ),
 
@@ -635,11 +604,11 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _searchFocusNode.unfocus();
 
     /*
-   * ?ㅼ젣 利먭꺼李얘린 Controller媛 ?덈뒗??濡쒓렇?명븯吏 ?딆? 寃쎌슦,
-   * 留덉씠?쎌쓣 鍮??붾㈃?쇰줈 蹂댁뿬二쇱? ?딄퀬 濡쒓렇???붾㈃?쇰줈 ?대룞?⑸땲??
+   * 실제 즐겨찾기 Controller가 있는데 로그인하지 않은 경우,
+   * 마이픽을 빈 화면으로 보여주지 않고 로그인 화면으로 이동합니다.
    *
-   * Controller媛 ?녿뒗 硫붾え由??뚯뒪???섍꼍?먯꽌??
-   * 濡쒖뺄 利먭꺼李얘린 Set??洹몃?濡??ъ슜?⑸땲??
+   * Controller가 없는 메모리 테스트 환경에서는
+   * 로컬 즐겨찾기 Set을 그대로 사용합니다.
    */
     final interestController = _interestController;
 
@@ -683,7 +652,6 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     if (stores.length == 1) {
       _selectStore(stores.first);
-      await _focusSelectedStoreOnMap();
     }
   }
 
@@ -703,48 +671,28 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _selectSearchSuggestion(CustomerStore store) {
     _queryController
       ..text = store.name
-      ..selection = TextSelection.collapsed(
-        offset: store.name.length,
-      );
+      ..selection = TextSelection.collapsed(offset: store.name.length);
 
     _selectStore(store);
-
-    final latitude = store.latitude;
-    final longitude = store.longitude;
-
-    if (latitude == null || longitude == null) {
-      return;
-    }
-
-    _mapSearchDebounce?.cancel();
-
-    unawaited(
-      _mapController.focusStoreLocation(
-        CustomerLocation(
-          latitude: latitude,
-          longitude: longitude,
-        ),
-      ),
-    );
   }
 
   void _onMapViewportIdle(KakaoMapViewport viewport) {
     /*
-   * ?댁쟾???덉빟????吏??寃?됱씠 ?덈떎硫?痍⑥냼?⑸땲??
+   * 이전에 예약해 둔 지도 검색이 있다면 취소합니다.
    *
-   * ?ъ슜?먭? ?곗냽?댁꽌 吏?꾨? ?吏곸씪 ??
-   * 以묎컙 ?꾩튂留덈떎 API瑜??몄텧?섏? ?딄린 ?꾪븳 泥섎━?낅땲??
+   * 사용자가 연속해서 지도를 움직일 때
+   * 중간 위치마다 API를 호출하지 않기 위한 처리입니다.
    */
     _mapSearchDebounce?.cancel();
 
     _lastSearchWasMapMove = true;
 
     /*
- * 吏?꾨? ?대룞?대룄 ?좏깮 ?낆껜 移대뱶???좎??⑸땲??
+ * 지도를 이동해도 선택 업체 카드는 유지합니다.
  *
- * 寃??異붿쿇 紐⑸줉留??リ퀬,
- * ?ъ슜?먭? 移대뱶???リ린 踰꾪듉???꾨Ⅴ嫄곕굹
- * ?ㅻⅨ ?낆껜瑜??좏깮?섍린 ?꾧퉴吏 ?꾩옱 移대뱶瑜??좎??⑸땲??
+ * 검색 추천 목록만 닫고,
+ * 사용자가 카드의 닫기 버튼을 누르거나
+ * 다른 업체를 선택하기 전까지 현재 카드를 유지합니다.
  */
     if (_showSuggestions) {
       setState(() {
@@ -755,8 +703,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _searchFocusNode.unfocus();
 
     /*
-   * 吏?꾧? 硫덉텣 ??500ms ?숈븞 異붽? 議곗옉???놁쓣 ?뚮쭔
-   * ?꾩옱 吏???곸뿭???낆껜瑜??ㅼ떆 議고쉶?⑸땲??
+   * 지도가 멈춘 뒤 500ms 동안 추가 조작이 없을 때만
+   * 현재 지도 영역의 업체를 다시 조회합니다.
    */
     _mapSearchDebounce = Timer(const Duration(milliseconds: 500), () async {
       if (!mounted) {
@@ -779,8 +727,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       _selectedStore = store;
 
       /*
-     * ?댁쟾???좏깮???낆껜???꾨낫 ?뺣낫媛
-     * ???낆껜 移대뱶???좉퉸 蹂댁씠吏 ?딅룄濡?珥덇린?뷀빀?덈떎.
+     * 이전에 선택한 업체의 도보 정보가
+     * 새 업체 카드에 잠깐 보이지 않도록 초기화합니다.
      */
       _walkingRoute = null;
       _walkingRouteLoading = false;
@@ -804,7 +752,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         ..showTopSnackBar(
           const SnackBar(
             content: Text(
-              '?낆껜 ?꾩튂 ?뺣낫媛 ?놁뒿?덈떎.',
+              '업체 위치 정보가 없습니다.',
             ),
           ),
         );
@@ -813,10 +761,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     /*
-   * ?댁쟾???덉빟??吏???대룞 寃?됱씠 ?덈떎硫?痍⑥냼?⑸땲??
+   * 이전에 예약된 지도 이동 검색이 있다면 취소합니다.
    *
-   * 踰꾪듉?쇰줈 ?낆껜 ?꾩튂???대룞????諛쒖깮?섎뒗
-   * ??viewport ?대깽?몃쭔 泥섎━?섎룄濡??⑸땲??
+   * 버튼으로 업체 위치에 이동한 뒤 발생하는
+   * 새 viewport 이벤트만 처리하도록 합니다.
    */
     _mapSearchDebounce?.cancel();
 
@@ -832,18 +780,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   Future<void> _loadWalkingRoute(CustomerStore store) async {
     /*
-   * ???낆껜瑜??좏깮???뚮쭏???붿껌 踰덊샇瑜?利앷??쒗궢?덈떎.
+   * 새 업체를 선택할 때마다 요청 번호를 증가시킵니다.
    *
-   * A ?낆껜瑜?議고쉶?섎뒗 ?꾩쨷 B ?낆껜瑜??좏깮?덉쓣 ??
-   * ??쾶 ?꾩갑??A ?낆껜 ?묐떟??臾댁떆?섍린 ?꾪븳 媛믪엯?덈떎.
+   * A 업체를 조회하는 도중 B 업체를 선택했을 때
+   * 늦게 도착한 A 업체 응답을 무시하기 위한 값입니다.
    */
     final requestSerial = ++_walkingRouteRequestSerial;
 
     /*
-   * searchCenter媛 ?꾨땲???ㅼ젣 GPS ?꾩튂瑜??ъ슜?⑸땲??
+   * searchCenter가 아니라 실제 GPS 위치를 사용합니다.
    *
-   * searchCenter???ъ슜?먭? 吏?꾨? ?吏곸씠硫?諛붾뚯?留?
-   * location? ?ъ슜?먯쓽 ?ㅼ젣 ?꾩옱 ?꾩튂?낅땲??
+   * searchCenter는 사용자가 지도를 움직이면 바뀌지만,
+   * location은 사용자의 실제 현재 위치입니다.
    */
     final startLocation = _controller.location;
 
@@ -874,10 +822,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       );
 
       /*
-     * ?붿껌 以??붾㈃???ロ삍嫄곕굹,
-     * ?ㅻⅨ ?낆껜媛 ?좏깮?섏뿀嫄곕굹,
-     * ??理쒖떊 ?붿껌???쒖옉??寃쎌슦?먮뒗
-     * ?꾩옱 ?묐떟???붾㈃??諛섏쁺?섏? ?딆뒿?덈떎.
+     * 요청 중 화면이 닫혔거나,
+     * 다른 업체가 선택되었거나,
+     * 더 최신 요청이 시작된 경우에는
+     * 현재 응답을 화면에 반영하지 않습니다.
      */
       if (!mounted ||
           requestSerial != _walkingRouteRequestSerial ||
@@ -907,10 +855,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   void _clearSelectedStoreState() {
     /*
-   * 吏꾪뻾 以묒씤 ?꾨낫 寃쎈줈 ?붿껌??臾댄슚?뷀빀?덈떎.
+   * 진행 중인 도보 경로 요청을 무효화합니다.
    *
-   * ?묐떟???섏쨷???꾩갑?섎뜑?쇰룄
-   * ?ロ엺 移대뱶??寃곌낵媛 ?ㅼ떆 ?곸슜?섏? ?딆뒿?덈떎.
+   * 응답이 나중에 도착하더라도
+   * 닫힌 카드에 결과가 다시 적용되지 않습니다.
    */
     _walkingRouteRequestSerial++;
 
@@ -953,8 +901,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
     final controller = _interestController;
 
-    // ?쇱슦?곌? ???섏〈?깆쓣 ?꾨떖?섍린 ?꾧퉴吏??
-    // 湲곗〈 ?붾㈃??濡쒖뺄 ?섑듃 ?숈옉???좎??⑸땲??
+    // 라우터가 새 의존성을 전달하기 전까지는
+    // 기존 화면의 로컬 하트 동작을 유지합니다.
     if (controller == null) {
       setState(() {
         if (!_localFavoriteStoreIds.add(store.storeId)) {
@@ -971,7 +919,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     if (result == CustomerStoreInterestToggleResult.added) {
-      _showFavoriteMessage('${store.name}??瑜? 李쒖뿉 異붽??덉뼱??');
+      _showFavoriteMessage('${store.name}을(를) 찜에 추가했어요.');
       return;
     }
 
@@ -990,7 +938,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
-    _showFavoriteMessage('李??곹깭瑜?蹂寃쏀븯吏 紐삵뻽?댁슂. ?좎떆 ???ㅼ떆 ?쒕룄??二쇱꽭??');
+    _showFavoriteMessage('찜 상태를 변경하지 못했어요. 잠시 후 다시 시도해 주세요.');
   }
 
   void _showFavoriteMessage(String message) {
@@ -1013,10 +961,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
           content: Text(
-            '${store.name}??瑜? 李쒖뿉????젣?덉뼱??',
+            '${store.name}을(를) 찜에서 삭제했어요.',
           ),
           action: SnackBarAction(
-            label: '?섎룎由ш린',
+            label: '되돌리기',
             onPressed: () {
               unawaited(
                 _restoreFavorite(store),
@@ -1033,8 +981,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final controller = _interestController;
 
     /*
-   * ?ㅼ젣 愿??留ㅼ옣 而⑦듃濡ㅻ윭媛 ?꾩쭅 ?곌껐?섏? ?딆?
-   * 濡쒖뺄 ?뚯뒪???곹깭??媛숈씠 泥섎━?⑸땲??
+   * 실제 관심 매장 컨트롤러가 아직 연결되지 않은
+   * 로컬 테스트 상태도 같이 처리합니다.
    */
     if (controller == null) {
       if (!mounted) {
@@ -1048,18 +996,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       });
 
       _showFavoriteMessage(
-        '${store.name}??瑜? ?ㅼ떆 李쒗뻽?댁슂.',
+        '${store.name}을(를) 다시 찜했어요.',
       );
 
       return;
     }
 
     /*
-   * SnackBar媛 ???덈뒗 ?숈븞 ?ㅻⅨ ?붾㈃?대굹 ?숈옉?먯꽌
-   * ?대? ?ㅼ떆 李쒗뻽?ㅻ㈃ toggle???몄텧?섏? ?딆뒿?덈떎.
+   * SnackBar가 떠 있는 동안 다른 화면이나 동작에서
+   * 이미 다시 찜했다면 toggle을 호출하지 않습니다.
    *
-   * ?ш린??臾댁“嫄?toggle?섎㈃ ?대? 異붽???李쒖씠
-   * ?ㅼ떆 ??젣?????덇린 ?뚮Ц?낅땲??
+   * 여기서 무조건 toggle하면 이미 추가된 찜이
+   * 다시 삭제될 수 있기 때문입니다.
    */
     if (controller.isInterested(store.storeId)) {
       return;
@@ -1075,7 +1023,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     if (result ==
         CustomerStoreInterestToggleResult.added) {
       _showFavoriteMessage(
-        '${store.name}??瑜? ?ㅼ떆 李쒗뻽?댁슂.',
+        '${store.name}을(를) 다시 찜했어요.',
       );
       return;
     }
@@ -1083,13 +1031,13 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     if (result ==
         CustomerStoreInterestToggleResult.signInRequired) {
       _showFavoriteMessage(
-        '濡쒓렇?몄씠 留뚮즺?섏뼱 李쒖쓣 ?섎룎由ъ? 紐삵뻽?댁슂.',
+        '로그인이 만료되어 찜을 되돌리지 못했어요.',
       );
       return;
     }
 
     _showFavoriteMessage(
-      '李???젣瑜??섎룎由ъ? 紐삵뻽?댁슂. ?ㅼ떆 ?쒕룄??二쇱꽭??',
+      '찜 삭제를 되돌리지 못했어요. 다시 시도해 주세요.',
     );
   }
 
@@ -1131,10 +1079,10 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     /*
-   * 沅뚰븳 ?덉슜 ?щ?? 愿怨꾩뾾??理쒖큹 ?덈궡???レ뒿?덈떎.
+   * 권한 허용 여부와 관계없이 최초 안내는 닫습니다.
    *
-   * ?덉슜?섎㈃ GPS ?꾩튂濡??ъ“?뚮릺硫?
-   * ?덉슜?섏? ?딆쑝硫??대? 議고쉶??遺???꾩튂瑜?洹몃?濡??ъ슜?⑸땲??
+   * 허용하면 GPS 위치로 재조회되며,
+   * 허용하지 않으면 이미 조회한 부산 위치를 그대로 사용합니다.
    */
     setState(() {
       _requestingInitialLocation = false;
@@ -1199,14 +1147,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   void _showLocationDecisionMessage(PermissionDecision decision) {
     final message = switch (decision) {
-      PermissionDecision.denied => '?꾩튂 沅뚰븳???덉슜?섏? ?딆븘 遺??吏??쓣 怨꾩냽 蹂댁뿬?쒕젮??',
+      PermissionDecision.denied => '위치 권한을 허용하지 않아 부산 지역을 계속 보여드려요.',
 
       PermissionDecision.permanentlyDenied =>
-        '?꾩옱 ?꾩튂瑜??ъ슜?섎젮硫?湲곌린 ?ㅼ젙?먯꽌 ?꾩튂 沅뚰븳???덉슜??二쇱꽭??',
+        '현재 위치를 사용하려면 기기 설정에서 위치 권한을 허용해 주세요.',
 
-      PermissionDecision.serviceDisabled => '湲곌린???꾩튂 ?쒕퉬?ㅺ? 爰쇱졇 ?덉뼱??',
+      PermissionDecision.serviceDisabled => '기기의 위치 서비스가 꺼져 있어요.',
 
-      PermissionDecision.timeout => '?꾩옱 ?꾩튂瑜??뺤씤?섏? 紐삵빐 遺??吏??쓣 蹂댁뿬?쒕젮??',
+      PermissionDecision.timeout => '현재 위치를 확인하지 못해 부산 지역을 보여드려요.',
 
       PermissionDecision.granted => '',
     };
@@ -1220,7 +1168,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         content: Text(message),
         action: decision == PermissionDecision.permanentlyDenied
             ? SnackBarAction(
-                label: '?ㅼ젙',
+                label: '설정',
                 onPressed: widget.permissionGateway.openSettings,
               )
             : null,
@@ -1353,7 +1301,7 @@ class _SearchSuggestionPanel extends StatelessWidget {
                   children: [
                     Icon(Icons.search_off_rounded),
                     SizedBox(width: PopqSpacing.sm),
-                    Expanded(child: Text('?꾩옱 紐⑸줉?먯꽌 ?쇱튂?섎뒗 ?낆껜媛 ?놁뒿?덈떎.')),
+                    Expanded(child: Text('현재 목록에서 일치하는 업체가 없습니다.')),
                   ],
                 ),
               )
@@ -1386,7 +1334,7 @@ class _SearchSuggestionPanel extends StatelessWidget {
                         if (store.fullAddress.isNotEmpty) store.fullAddress,
                         if (store.distanceMeters != null)
                           _formatDistance(store.distanceMeters!),
-                      ].join(' 쨌 '),
+                      ].join(' · '),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1415,7 +1363,7 @@ class _CurrentLocationButton extends StatelessWidget {
       elevation: 6,
       shape: const CircleBorder(),
       child: IconButton(
-        tooltip: '?꾩옱 ?꾩튂濡??대룞',
+        tooltip: '현재 위치로 이동',
         onPressed: onPressed,
         icon: Icon(
           active ? Icons.my_location_rounded : Icons.location_searching_rounded,
@@ -1595,7 +1543,7 @@ class _SelectedStoreCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             store.fullAddress.isEmpty
-                                ? '二쇱냼 ?뺣낫 以鍮?以?
+                                ? '주소 정보 준비 중'
                                 : store.fullAddress,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1656,7 +1604,7 @@ class _SelectedStoreCard extends StatelessWidget {
                               const SizedBox(width: 5),
                               Expanded(
                                 child: Text(
-                                  '?꾨낫 寃쎈줈 ?뺤씤 以?..',
+                                  '도보 경로 확인 중...',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
@@ -1669,9 +1617,9 @@ class _SelectedStoreCard extends StatelessWidget {
                           )
                               : walkingRoute != null
                               ? Text(
-                            '?꾨낫 '
+                            '도보 '
                                 '${_formatDistance(walkingRoute!.distanceMeters)}'
-                                ' 쨌 ??${walkingRoute!.durationMinutes}遺?,
+                                ' · 약 ${walkingRoute!.durationMinutes}분',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -1700,7 +1648,7 @@ class _SelectedStoreCard extends StatelessWidget {
                                 size: 14,
                               ),
                               label: const Text(
-                                '?꾨낫 ?뺣낫 ?ㅼ떆 ?쒕룄',
+                                '도보 정보 다시 시도',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
@@ -1711,7 +1659,7 @@ class _SelectedStoreCard extends StatelessWidget {
                             ),
                           )
                               : Text(
-                            '?꾩옱 ?꾩튂瑜?耳쒕㈃ ?꾨낫 ?뺣낫瑜??뺤씤?????덉뼱??',
+                            '현재 위치를 켜면 도보 정보를 확인할 수 있어요.',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -1727,7 +1675,7 @@ class _SelectedStoreCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               IconButton(
-                tooltip: '?좏깮 ?낆껜 ?꾩튂濡??대룞',
+                tooltip: '선택 업체 위치로 이동',
                 onPressed:
                 store.latitude != null &&
                     store.longitude != null
@@ -1746,7 +1694,7 @@ class _SelectedStoreCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                tooltip: favorite ? '愿???낆껜 ?댁젣' : '愿???낆껜 異붽?',
+                tooltip: favorite ? '관심 업체 해제' : '관심 업체 추가',
                 onPressed: favoriteUpdating ? null : onFavoritePressed,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -1770,7 +1718,7 @@ class _SelectedStoreCard extends StatelessWidget {
               ),
               const Icon(Icons.chevron_right_rounded, size: 22),
               IconButton(
-                tooltip: '?좏깮 ?リ린',
+                tooltip: '선택 닫기',
                 onPressed: onClose,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
@@ -1840,7 +1788,7 @@ class _InitialLocationChoice extends StatelessWidget {
                       const SizedBox(height: 18),
 
                       Text(
-                        '??二쇰? ?낆껜瑜?李얠븘蹂쇨퉴??',
+                        '내 주변 업체를 찾아볼까요?',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w800,
@@ -1850,10 +1798,10 @@ class _InitialLocationChoice extends StatelessWidget {
                       const SizedBox(height: 10),
 
                       Text(
-                        '?꾩옱 ?꾩튂瑜??ъ슜?섎㈃ 媛源뚯슫 濡쒖뺄留덉폆怨?'
-                        '?됱궗쨌?대깽?몃? 癒쇱? 蹂댁뿬?쒕젮??\n\n'
-                        '?꾩튂瑜??ъ슜?섏? ?딆븘??遺??吏??쓣 '
-                        '?섎윭蹂????덉뒿?덈떎.',
+                        '현재 위치를 사용하면 가까운 로컬마켓과 '
+                        '행사·이벤트를 먼저 보여드려요.\n\n'
+                        '위치를 사용하지 않아도 부산 지역을 '
+                        '둘러볼 수 있습니다.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1885,7 +1833,7 @@ class _InitialLocationChoice extends StatelessWidget {
                                 )
                               : const Icon(Icons.my_location_rounded),
                           label: Text(
-                            requestingLocation ? '?꾩옱 ?꾩튂 ?뺤씤 以?..' : '?꾩옱 ?꾩튂濡?蹂닿린',
+                            requestingLocation ? '현재 위치 확인 중...' : '현재 위치로 보기',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
                         ),
@@ -1903,7 +1851,7 @@ class _InitialLocationChoice extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                           child: const Text(
-                            '遺?곗뿉???섎윭蹂닿린',
+                            '부산에서 둘러보기',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
@@ -1912,8 +1860,8 @@ class _InitialLocationChoice extends StatelessWidget {
                       const SizedBox(height: 8),
 
                       Text(
-                        '?꾩튂 ?ㅼ젙? 吏???꾨옒??GPS 踰꾪듉?먯꽌 '
-                        '?몄젣???ㅼ떆 蹂寃쏀븷 ???덉뼱??',
+                        '위치 설정은 지도 아래의 GPS 버튼에서 '
+                        '언제든 다시 변경할 수 있어요.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -1959,7 +1907,7 @@ class _MapRefreshIndicator extends StatelessWidget {
               ),
               SizedBox(width: 8),
               Text(
-                '??吏??쓽 ?낆껜瑜?李얘퀬 ?덉뼱??,
+                '이 지역의 업체를 찾고 있어요',
                 style: TextStyle(
                   color: _darkColor,
                   fontSize: 11,
@@ -2024,9 +1972,9 @@ class _MapStatusCard extends StatelessWidget {
 
 String _storeTypeLabel(String storeType) {
   return switch (storeType) {
-    'LOCAL_STORE' => '濡쒖뺄留덉폆',
-    'EVENT_COMMERCE' => '?됱궗쨌?대깽??,
-    _ => '?깅줉 ?낆껜',
+    'LOCAL_STORE' => '로컬마켓',
+    'EVENT_COMMERCE' => '행사·이벤트',
+    _ => '등록 업체',
   };
 }
 
@@ -2040,10 +1988,10 @@ IconData _storeTypeIcon(String storeType) {
 
 String _businessStatusLabel(String businessStatus) {
   return switch (businessStatus) {
-    'OPEN' => '?곸뾽 以?,
-    'PRE_OPEN' => '?곸뾽 以鍮?,
-    'CLOSED' => '?곸뾽 醫낅즺',
-    'TEMPORARILY_CLOSED' => '?꾩떆 ?대Т',
+    'OPEN' => '영업 중',
+    'PRE_OPEN' => '영업 준비',
+    'CLOSED' => '영업 종료',
+    'TEMPORARILY_CLOSED' => '임시 휴무',
     _ => businessStatus,
   };
 }
@@ -2055,4 +2003,3 @@ String _formatDistance(int meters) {
 
   return '${(meters / 1000).toStringAsFixed(1)}km';
 }
-

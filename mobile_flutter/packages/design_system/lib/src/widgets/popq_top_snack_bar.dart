@@ -1,37 +1,108 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-/// POPQ 怨듯넻 ?곷떒 ?뚮┝.
-///
-/// 湲곗〈 [SnackBar] 媛앹껜瑜?洹몃?濡?諛쏆븘 ?댁슜, ?≪뀡, 吏?띿떆媛꾩쓣 ?좎??섎㈃??/// ?붾㈃ ?섎떒???꾨땶 ?곷떒 SafeArea ?곸뿭???쒖떆?쒕떎.
 class PopqTopSnackBar {
   PopqTopSnackBar._();
 
   static OverlayEntry? _currentEntry;
   static Timer? _dismissTimer;
+  static ScaffoldMessengerState? _fallbackMessenger;
 
-  static void show(BuildContext context, SnackBar snackBar) {
+  static void show(
+      ScaffoldMessengerState messenger,
+      SnackBar snackBar,
+      ) {
     hide();
 
-    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    final overlay = _findOverlay(messenger.context);
+
+    // Overlay를 못 찾는 특수 상황에서는 기존 SnackBar로 fallback
     if (overlay == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(snackBar);
+      _fallbackMessenger = messenger;
+      messenger.showSnackBar(snackBar);
       return;
     }
 
     late final OverlayEntry entry;
+
     entry = OverlayEntry(
-      builder: (overlayContext) {
+      builder: (context) {
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        final snackBarTheme = theme.snackBarTheme;
+
+        final backgroundColor =
+            snackBar.backgroundColor ??
+                snackBarTheme.backgroundColor ??
+                colorScheme.inverseSurface;
+
+        final textStyle =
+            snackBarTheme.contentTextStyle ??
+                theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onInverseSurface,
+                );
+
+        final action = snackBar.action;
+
         return Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            minimum: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-            child: _PopqTopSnackBarView(
-              snackBar: snackBar,
-              onDismiss: hide,
+          top: MediaQuery.paddingOf(context).top + 12,
+          left: 12,
+          right: 12,
+          child: Material(
+            color: Colors.transparent,
+            child: TweenAnimationBuilder<double>(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              tween: Tween(begin: -20, end: 0),
+              builder: (context, offsetY, child) {
+                return Transform.translate(
+                  offset: Offset(0, offsetY),
+                  child: child,
+                );
+              },
+              child: Material(
+                color: backgroundColor,
+                elevation: snackBar.elevation ?? 6,
+                borderRadius: BorderRadius.circular(14),
+                clipBehavior: Clip.antiAlias,
+                child: Padding(
+                  padding: snackBar.padding ??
+                      const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: DefaultTextStyle.merge(
+                          style: textStyle,
+                          child: snackBar.content,
+                        ),
+                      ),
+                      if (action != null) ...[
+                        const SizedBox(width: 8),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            foregroundColor:
+                            action.textColor ??
+                                colorScheme.inversePrimary,
+                            minimumSize: const Size(0, 36),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                          ),
+                          onPressed: () {
+                            hide();
+                            action.onPressed();
+                          },
+                          child: Text(action.label),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
         );
@@ -40,7 +111,39 @@ class PopqTopSnackBar {
 
     _currentEntry = entry;
     overlay.insert(entry);
+
     _dismissTimer = Timer(snackBar.duration, hide);
+  }
+
+  static OverlayState? _findOverlay(BuildContext context) {
+    final ancestorOverlay = Overlay.maybeOf(
+      context,
+      rootOverlay: true,
+    );
+
+    if (ancestorOverlay != null) {
+      return ancestorOverlay;
+    }
+
+    OverlayState? found;
+
+    void search(Element element) {
+      if (found != null) return;
+
+      if (element is StatefulElement &&
+          element.state is OverlayState) {
+        found = element.state as OverlayState;
+        return;
+      }
+
+      element.visitChildren(search);
+    }
+
+    if (context is Element) {
+      context.visitChildren(search);
+    }
+
+    return found;
   }
 
   static void hide() {
@@ -49,101 +152,26 @@ class PopqTopSnackBar {
 
     final entry = _currentEntry;
     _currentEntry = null;
-    entry?.remove();
+
+    if (entry != null && entry.mounted) {
+      entry.remove();
+    }
+
+    final messenger = _fallbackMessenger;
+    _fallbackMessenger = null;
+
+    if (messenger != null && messenger.mounted) {
+      messenger.hideCurrentSnackBar();
+    }
   }
 }
 
 extension PopqTopSnackBarMessengerExtension on ScaffoldMessengerState {
   void showTopSnackBar(SnackBar snackBar) {
-    PopqTopSnackBar.show(context, snackBar);
+    PopqTopSnackBar.show(this, snackBar);
   }
 
   void hideCurrentTopSnackBar() {
     PopqTopSnackBar.hide();
-  }
-}
-
-class _PopqTopSnackBarView extends StatelessWidget {
-  const _PopqTopSnackBarView({
-    required this.snackBar,
-    required this.onDismiss,
-  });
-
-  final SnackBar snackBar;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final snackBarTheme = theme.snackBarTheme;
-
-    final backgroundColor =
-        snackBar.backgroundColor ??
-        snackBarTheme.backgroundColor ??
-        colorScheme.inverseSurface;
-
-    final contentTextStyle =
-        snackBarTheme.contentTextStyle ??
-        theme.textTheme.bodyMedium?.copyWith(
-          color: colorScheme.onInverseSurface,
-        );
-
-    final action = snackBar.action;
-
-    return TweenAnimationBuilder<double>(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      tween: Tween<double>(begin: -14, end: 0),
-      builder: (context, offsetY, child) {
-        return Transform.translate(
-          offset: Offset(0, offsetY),
-          child: child,
-        );
-      },
-      child: Material(
-        color: backgroundColor,
-        elevation: snackBar.elevation ?? snackBarTheme.elevation ?? 6,
-        shadowColor: Colors.black26,
-        shape:
-            snackBar.shape ??
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding:
-              snackBar.padding ??
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: DefaultTextStyle.merge(
-                  style: contentTextStyle,
-                  child: snackBar.content,
-                ),
-              ),
-              if (action != null) ...[
-                const SizedBox(width: 8),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    foregroundColor:
-                        action.textColor ?? colorScheme.inversePrimary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: const Size(0, 36),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () {
-                    onDismiss();
-                    action.onPressed();
-                  },
-                  child: Text(action.label),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

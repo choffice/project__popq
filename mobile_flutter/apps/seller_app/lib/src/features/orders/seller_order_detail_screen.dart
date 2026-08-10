@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -136,19 +136,19 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('?먮ℓ??二쇰Ц ?곸꽭')),
+      appBar: AppBar(title: const Text('판매자 주문 상세')),
       body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (_loading) {
-      return const PopqLoadingView(message: '理쒖떊 二쇰Ц ?곹깭瑜??뺤씤?섍퀬 ?덉뼱??');
+      return const PopqLoadingView(message: '최신 주문 상태를 확인하고 있어요.');
     }
 
     if (_error != null || _order == null) {
       return PopqErrorView(
-        message: '?좏깮???ㅽ넗?댁쓽 二쇰Ц ?곸꽭瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??',
+        message: '선택한 스토어의 주문 상세를 불러오지 못했습니다.',
         onRetry: _load,
       );
     }
@@ -190,7 +190,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '${sellerOrderTypeLabel(order.orderType)} 쨌 '
+                  '${sellerOrderTypeLabel(order.orderType)} · '
                   '${formatPopqOrderNumber(order.orderPublicId)}',
                   style: const TextStyle(color: Colors.white70),
                   textAlign: TextAlign.center,
@@ -199,7 +199,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             ),
           ),
           const SizedBox(height: PopqSpacing.lg),
-          Text('二쇰Ц ?곹뭹', style: Theme.of(context).textTheme.titleLarge),
+          Text('주문 상품', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: PopqSpacing.sm),
           for (final item in order.items)
             ListTile(
@@ -207,7 +207,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               title: Text(item.productName),
               subtitle: Text(
                 [
-                  '${item.quantity}媛?쨌 ?④? ${sellerWon(item.unitPrice)}',
+                  '${item.quantity}개 · 단가 ${sellerWon(item.unitPrice)}',
                   if (item.options.isNotEmpty)
                     item.options
                         .map((option) => '${option.groupName}: ${option.name}')
@@ -233,7 +233,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '?붿껌?ы빆',
+                          '요청사항',
                           style: Theme.of(context)
                               .textTheme
                               .titleMedium
@@ -241,7 +241,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                         ),
                         const SizedBox(height: PopqSpacing.xs),
                         Text(
-                          requestMessage ?? '?붿껌?ы빆 ?놁쓬',
+                          requestMessage ?? '요청사항 없음',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: requestMessage == null
                                     ? Theme.of(context)
@@ -263,17 +263,17 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           ],
           const SizedBox(height: PopqSpacing.sm),
           const Divider(),
-          _AmountRow(label: '?곹뭹 湲덉븸', amount: order.subtotalAmount),
+          _AmountRow(label: '상품 금액', amount: order.subtotalAmount),
           if (order.discountAmount != 0)
-            _AmountRow(label: '?좎씤', amount: -order.discountAmount),
+            _AmountRow(label: '할인', amount: -order.discountAmount),
           if (order.taxAmount != 0)
-            _AmountRow(label: '?멸툑', amount: order.taxAmount),
+            _AmountRow(label: '세금', amount: order.taxAmount),
           if (order.serviceFeeAmount != 0)
-            _AmountRow(label: '?쒕퉬???섏닔猷?, amount: order.serviceFeeAmount),
+            _AmountRow(label: '서비스 수수료', amount: order.serviceFeeAmount),
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text(
-              '珥?寃곗젣 湲덉븸',
+              '총 결제 금액',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
             trailing: Text(
@@ -287,12 +287,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               leading: const Icon(Icons.timer_outlined),
               title: Text(
                 order.preparationMinutes == 0
-                    ? '以鍮?利됱떆 ?쒖옉'
-                    : '以鍮꾩떆媛?${order.preparationMinutes}遺?,
+                    ? '준비 즉시 시작'
+                    : '준비시간 ${order.preparationMinutes}분',
               ),
               subtitle: order.estimatedReadyAt == null
                   ? null
-                  : Text('?덉긽 ?꾨즺 ${_formatDateTime(order.estimatedReadyAt!)}'),
+                  : Text('예상 완료 ${_formatDateTime(order.estimatedReadyAt!)}'),
             ),
           ],
           if (_shouldLoadPayment(order)) ...[
@@ -308,12 +308,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           OutlinedButton.icon(
             onPressed: _processing ? null : _sync,
             icon: const Icon(Icons.sync_rounded),
-            label: const Text('理쒖떊 ?곹깭 ?뺤씤'),
+            label: const Text('최신 상태 확인'),
           ),
           const SizedBox(height: PopqSpacing.sm),
           Text(
-            '?쒕쾭 踰꾩쟾 ${order.version} 쨌 '
-            '?좏깮???ㅽ넗??#${order.storeId} ?꾩슜 二쇰Ц',
+            '서버 버전 ${order.version} · '
+            '선택된 스토어 #${order.storeId} 전용 주문',
             textAlign: TextAlign.center,
           ),
         ],
@@ -330,7 +330,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             children: [
               LinearProgressIndicator(),
               SizedBox(height: PopqSpacing.sm),
-              Text('寃곗젣쨌?섎텋 ?뺣낫瑜??뺤씤?섍퀬 ?덉뼱??'),
+              Text('결제·환불 정보를 확인하고 있어요.'),
             ],
           ),
         ),
@@ -343,11 +343,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           padding: const EdgeInsets.all(PopqSpacing.lg),
           child: Column(
             children: [
-              const Text('寃곗젣쨌?섎텋 ?뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??'),
+              const Text('결제·환불 정보를 불러오지 못했습니다.'),
               TextButton(
                 key: const Key('retry-payment'),
                 onPressed: _processing ? null : _loadPayment,
-                child: const Text('?ㅼ떆 ?쒕룄'),
+                child: const Text('다시 시도'),
               ),
             ],
           ),
@@ -372,7 +372,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               children: [
                 Expanded(
                   child: Text(
-                    '寃곗젣쨌?섎텋',
+                    '결제·환불',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -380,23 +380,23 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ],
             ),
             const SizedBox(height: PopqSpacing.sm),
-            _PaymentRow(label: '寃곗젣 ?섎떒', value: payment.paymentMethod),
+            _PaymentRow(label: '결제 수단', value: payment.paymentMethod),
             _PaymentRow(
-              label: '?뱀씤 湲덉븸',
+              label: '승인 금액',
               value: sellerWon(payment.approvedAmount),
             ),
             _PaymentRow(
-              label: '?섎텋 湲덉븸',
+              label: '환불 금액',
               value: sellerWon(payment.refundedAmount),
             ),
             _PaymentRow(
-              label: '?섎텋 媛??湲덉븸',
+              label: '환불 가능 금액',
               value: sellerWon(payment.refundableAmount),
             ),
             if (payment.refunds.isNotEmpty) ...[
               const Divider(),
               const Text(
-                '?섎텋 ?대젰',
+                '환불 이력',
                 style: TextStyle(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: PopqSpacing.xs),
@@ -412,12 +412,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 key: const Key('refund-order'),
                 onPressed: _processing ? null : () => _refund(order),
                 icon: const Icon(Icons.currency_exchange_rounded),
-                label: Text('${sellerWon(payment.refundableAmount)} ?꾩븸 ?섎텋'),
+                label: Text('${sellerWon(payment.refundableAmount)} 전액 환불'),
               ),
             ] else if (!_canRefund && payment.refundableAmount > 0) ...[
               const SizedBox(height: PopqSpacing.sm),
               const Text(
-                '?섎텋? ?ъ뾽??OWNER ?먮뒗 MANAGER留?泥섎━?????덉뒿?덈떎.',
+                '환불은 사업장 OWNER 또는 MANAGER만 처리할 수 있습니다.',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -434,14 +434,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           key: const Key('accept-order'),
           onPressed: _processing ? null : _accept,
           icon: const Icon(Icons.check_circle_outline_rounded),
-          label: const Text('二쇰Ц ?묒닔'),
+          label: const Text('주문 접수'),
         ),
         const SizedBox(height: PopqSpacing.sm),
         OutlinedButton.icon(
           key: const Key('reject-order'),
           onPressed: _processing ? null : _reject,
           icon: const Icon(Icons.cancel_outlined),
-          label: const Text('二쇰Ц 嫄곗젅'),
+          label: const Text('주문 거절'),
         ),
       ],
       'ACCEPTED' => [
@@ -451,7 +451,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ? null
               : () => _transition(SellerOrderCommand.prepare),
           icon: const Icon(Icons.soup_kitchen_outlined),
-          label: const Text('以鍮??쒖옉'),
+          label: const Text('준비 시작'),
         ),
       ],
       'PREPARING' => [
@@ -461,7 +461,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ? null
               : () => _transition(SellerOrderCommand.ready),
           icon: const Icon(Icons.notifications_active_outlined),
-          label: const Text('以鍮??꾨즺'),
+          label: const Text('준비 완료'),
         ),
       ],
       'READY' => [
@@ -471,7 +471,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ? null
               : () => _transition(SellerOrderCommand.complete),
           icon: const Icon(Icons.task_alt_rounded),
-          label: const Text('二쇰Ц ?꾨즺'),
+          label: const Text('주문 완료'),
         ),
       ],
       _ => <Widget>[],
@@ -520,7 +520,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       storeId: storeId,
       onEvent: _handleOrderEvent,
       onError: (error) {
-        debugPrint('?먮ℓ??二쇰Ц ?곸꽭 ?ㅼ떆媛?援щ룆 ?ㅻ쪟: $error');
+        debugPrint('판매자 주문 상세 실시간 구독 오류: $error');
       },
     );
   }
@@ -550,8 +550,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       );
     });
 
-    // ACCEPTED??以鍮꾩떆媛꾩쿂???대깽?몄뿉 ?ы븿?섏? ?딆? ?꾨뱶??
-    // ?대깽??吏곸쟾 踰꾩쟾??湲곗??쇰줈 /sync ?섏뿬 ?꾩껜 二쇰Ц ?ㅻ깄?룹쑝濡?蹂댁젙?쒕떎.
+    // ACCEPTED의 준비시간처럼 이벤트에 포함되지 않은 필드는
+    // 이벤트 직전 버전을 기준으로 /sync 하여 전체 주문 스냅샷으로 보정한다.
     unawaited(_syncFromKnownVersion(knownVersion));
   }
 
@@ -583,7 +583,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
         await _loadReview();
       }
     } catch (error) {
-      debugPrint('?먮ℓ??二쇰Ц ?곸꽭 ?대깽??蹂댁젙 ?ㅻ쪟: $error');
+      debugPrint('판매자 주문 상세 이벤트 보정 오류: $error');
     }
   }
 
@@ -623,7 +623,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
         await _loadReview();
       }
     } catch (error) {
-      debugPrint('?먮ℓ??二쇰Ц ?곸꽭 REST ?숆린???ㅻ쪟: $error');
+      debugPrint('판매자 주문 상세 REST 동기화 오류: $error');
     }
   }
 
@@ -746,7 +746,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       }
 
       _showMessage(
-        result.refreshRequired ? '理쒖떊 二쇰Ц ?곹깭濡?媛깆떊?덉뒿?덈떎.' : '?대? 理쒖떊 ?곹깭?낅땲??',
+        result.refreshRequired ? '최신 주문 상태로 갱신했습니다.' : '이미 최신 상태입니다.',
       );
     } catch (_) {
       if (!mounted) {
@@ -755,7 +755,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
       setState(() => _processing = false);
 
-      _showMessage('理쒖떊 ?곹깭瑜??뺤씤?섏? 紐삵뻽?듬땲??');
+      _showMessage('최신 상태를 확인하지 못했습니다.');
     }
   }
 
@@ -798,7 +798,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('以鍮꾩떆媛??좏깮', style: Theme.of(context).textTheme.titleLarge),
+                Text('준비시간 선택', style: Theme.of(context).textTheme.titleLarge),
                 const SizedBox(height: PopqSpacing.sm),
                 Wrap(
                   spacing: PopqSpacing.xs,
@@ -815,7 +815,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                       50,
                     ])
                       ChoiceChip(
-                        label: Text(value == 0 ? '利됱떆' : '$value遺?),
+                        label: Text(value == 0 ? '즉시' : '$value분'),
                         selected: minutes == value,
                         onSelected: (_) => setSheetState(() => minutes = value),
                       ),
@@ -824,7 +824,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: applyAsDefault,
-                  title: const Text('???쒓컙???ъ뾽??湲곕낯 以鍮꾩떆媛꾩쑝濡??ъ슜'),
+                  title: const Text('이 시간을 사업장 기본 준비시간으로 사용'),
                   onChanged: (value) =>
                       setSheetState(() => applyAsDefault = value ?? false),
                 ),
@@ -834,7 +834,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                     minutes: minutes,
                     apply: applyAsDefault,
                   )),
-                  child: const Text('二쇰Ц ?묒닔'),
+                  child: const Text('주문 접수'),
                 ),
               ],
             ),
@@ -887,7 +887,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       });
 
       final latestOrder = _order ?? updated;
-      _showMessage('${sellerOrderStatusLabel(latestOrder.status)} ?곹깭濡?蹂寃쏀뻽?듬땲??');
+      _showMessage('${sellerOrderStatusLabel(latestOrder.status)} 상태로 변경했습니다.');
 
       if (_shouldLoadPayment(latestOrder)) {
         await _loadPayment();
@@ -902,7 +902,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
       setState(() => _processing = false);
 
-      _showMessage('二쇰Ц ?곹깭瑜?蹂寃쏀븯吏 紐삵뻽?듬땲?? 理쒖떊 ?곹깭瑜??뺤씤??二쇱꽭??');
+      _showMessage('주문 상태를 변경하지 못했습니다. 최신 상태를 확인해 주세요.');
     }
   }
 
@@ -979,7 +979,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
         _processing = false;
       });
 
-      _showMessage('?꾩븸 ?섎텋???꾨즺?덉뒿?덈떎.');
+      _showMessage('전액 환불을 완료했습니다.');
     } catch (_) {
       if (!mounted) {
         return;
@@ -987,7 +987,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
       setState(() => _processing = false);
 
-      _showMessage('?섎텋??泥섎━?섏? 紐삵뻽?듬땲??');
+      _showMessage('환불을 처리하지 못했습니다.');
     }
   }
 
@@ -1031,7 +1031,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 ),
                 const SizedBox(width: PopqSpacing.sm),
                 Text(
-                  isRejected ? '二쇰Ц 嫄곗젅 ?뺣낫' : '二쇰Ц 痍⑥냼 ?뺣낫',
+                  isRejected ? '주문 거절 정보' : '주문 취소 정보',
                   style: Theme.of(context)
                       .textTheme
                       .titleMedium
@@ -1041,21 +1041,21 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             ),
             const SizedBox(height: PopqSpacing.md),
             _PaymentRow(
-              label: isRejected ? '嫄곗젅 二쇱껜' : '痍⑥냼 二쇱껜',
+              label: isRejected ? '거절 주체' : '취소 주체',
               value: _orderActorLabel(history.actorType),
             ),
             _PaymentRow(
-              label: isRejected ? '嫄곗젅 ?ъ쑀' : '痍⑥냼 ?ъ쑀',
-              value: reason == null || reason.isEmpty ? '?ъ쑀 ?놁쓬' : reason,
+              label: isRejected ? '거절 사유' : '취소 사유',
+              value: reason == null || reason.isEmpty ? '사유 없음' : reason,
             ),
             _PaymentRow(
-              label: isRejected ? '嫄곗젅 ?쒓컙' : '痍⑥냼 ?쒓컙',
+              label: isRejected ? '거절 시간' : '취소 시간',
               value: _formatDateTime(history.changedAt),
             ),
             if (order.status == 'CANCELED' || order.status == 'REJECTED') ...[
               const SizedBox(height: PopqSpacing.xs),
               Text(
-                '寃곗젣??二쇰Ц? ?꾨옒 寃곗젣쨌?섎텋 ?곸뿭?먯꽌 ?섎텋 泥섎━ 寃곌낵瑜??뺤씤?????덉뒿?덈떎.',
+                '결제된 주문은 아래 결제·환불 영역에서 환불 처리 결과를 확인할 수 있습니다.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -1097,7 +1097,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               const SizedBox(width: PopqSpacing.xs),
               Expanded(
                 child: Text(
-                  '?섎텋 $index',
+                  '환불 $index',
                   style: const TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
@@ -1105,25 +1105,25 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             ],
           ),
           const SizedBox(height: PopqSpacing.xs),
-          _PaymentRow(label: '?섎텋 湲덉븸', value: sellerWon(refund.amount)),
+          _PaymentRow(label: '환불 금액', value: sellerWon(refund.amount)),
           _PaymentRow(
-            label: '泥섎━ 二쇱껜',
+            label: '처리 주체',
             value: _refundRequesterLabel(refund.requesterType),
           ),
-          _PaymentRow(label: '?섎텋 ?ъ쑀', value: refund.reason),
+          _PaymentRow(label: '환불 사유', value: refund.reason),
           _PaymentRow(
-            label: '?붿껌 ?쒓컙',
+            label: '요청 시간',
             value: _formatDateTime(refund.requestedAt),
           ),
           if (refund.completedAt != null)
             _PaymentRow(
-              label: '?꾨즺 ?쒓컙',
+              label: '완료 시간',
               value: _formatDateTime(refund.completedAt!),
             ),
           if (failed &&
               (refund.failureMessage?.trim().isNotEmpty ?? false))
             _PaymentRow(
-              label: '?ㅽ뙣 ?ъ쑀',
+              label: '실패 사유',
               value: refund.failureMessage!.trim(),
             ),
         ],
@@ -1133,41 +1133,41 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
 
   String _orderActorLabel(String actorType) {
     return switch (actorType) {
-      'SELLER' => '?먮ℓ??,
-      'CUSTOMER' => '援щℓ??,
-      'ADMIN' => '愿由ъ옄',
-      'SYSTEM' => '?쒖뒪??,
-      'GUEST' => '鍮꾪쉶??援щℓ??,
+      'SELLER' => '판매자',
+      'CUSTOMER' => '구매자',
+      'ADMIN' => '관리자',
+      'SYSTEM' => '시스템',
+      'GUEST' => '비회원 구매자',
       _ => actorType,
     };
   }
 
   String _paymentStatusLabel(String status) {
     return switch (status) {
-      'PAID' => '寃곗젣 ?꾨즺',
-      'REFUNDED' => '?섎텋 ?꾨즺',
-      'CANCELED' => '寃곗젣 痍⑥냼',
-      'PARTIALLY_REFUNDED' => '遺遺??섎텋',
-      'FAILED' => '寃곗젣 ?ㅽ뙣',
-      _ => '寃곗젣 ?뺤씤 以?,
+      'PAID' => '결제 완료',
+      'REFUNDED' => '환불 완료',
+      'CANCELED' => '결제 취소',
+      'PARTIALLY_REFUNDED' => '부분 환불',
+      'FAILED' => '결제 실패',
+      _ => '결제 확인 중',
     };
   }
 
   String _refundStatusLabel(String status) {
     return switch (status) {
-      'SUCCEEDED' => '?섎텋 ?꾨즺',
-      'FAILED' => '?섎텋 ?ㅽ뙣',
-      'PROCESSING' => '泥섎━ 以?,
-      _ => '?붿껌??,
+      'SUCCEEDED' => '환불 완료',
+      'FAILED' => '환불 실패',
+      'PROCESSING' => '처리 중',
+      _ => '요청됨',
     };
   }
 
   String _refundRequesterLabel(String requester) {
     return switch (requester) {
-      'SELLER' => '?먮ℓ???붿껌',
-      'ADMIN' => '愿由ъ옄 ?붿껌',
-      'CUSTOMER' => '怨좉컼 ?붿껌',
-      _ => '鍮꾪쉶???붿껌',
+      'SELLER' => '판매자 요청',
+      'ADMIN' => '관리자 요청',
+      'CUSTOMER' => '고객 요청',
+      _ => '비회원 요청',
     };
   }
 
@@ -1183,12 +1183,12 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       child: Padding(
         padding: const EdgeInsets.all(PopqSpacing.md),
         child: review == null
-            ? const Text('??二쇰Ц?먮뒗 ?꾩쭅 ?묒꽦??由щ럭媛 ?놁뒿?덈떎.')
+            ? const Text('이 주문에는 아직 작성된 리뷰가 없습니다.')
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '怨좉컼 由щ럭 ${List.filled(review.rating, '??).join()}',
+                    '고객 리뷰 ${List.filled(review.rating, '★').join()}',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                   if (review.content?.isNotEmpty ?? false) ...[
@@ -1197,7 +1197,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                   ],
                   if (review.sellerReply?.isNotEmpty ?? false) ...[
                     const Divider(),
-                    Text('?먮ℓ???듦?\n${review.sellerReply!}'),
+                    Text('판매자 답글\n${review.sellerReply!}'),
                   ],
                   if (_canRefund) ...[
                     const SizedBox(height: PopqSpacing.sm),
@@ -1207,13 +1207,13 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                         TextButton(
                           onPressed: () => _editReviewReply(review),
                           child: Text(
-                            review.sellerReply == null ? '?듦? ?묒꽦' : '?듦? ?섏젙',
+                            review.sellerReply == null ? '답글 작성' : '답글 수정',
                           ),
                         ),
                         if (review.sellerReply != null)
                           TextButton(
                             onPressed: () => _deleteReviewReply(review),
-                            child: const Text('?듦? ??젣'),
+                            child: const Text('답글 삭제'),
                           ),
                       ],
                     ),
@@ -1253,7 +1253,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text('由щ럭 ?듦?'),
+          title: const Text('리뷰 답글'),
           content: SizedBox(
             width: 460,
             child: Column(
@@ -1261,11 +1261,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               children: <Widget>[
                 DropdownButtonFormField<int>(
                   initialValue: selectedTemplateId,
-                  decoration: const InputDecoration(labelText: '????듦? 臾멸뎄'),
+                  decoration: const InputDecoration(labelText: '대표 답글 문구'),
                   items: <DropdownMenuItem<int>>[
                     const DropdownMenuItem<int>(
                       value: 0,
-                      child: Text('??λ맂 ?듦? ?놁쓬'),
+                      child: Text('저장된 답글 없음'),
                     ),
                     ...templates.map(
                       (template) => DropdownMenuItem<int>(
@@ -1293,7 +1293,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                   maxLength: 1000,
                   minLines: 3,
                   maxLines: 5,
-                  decoration: const InputDecoration(labelText: '?듦? ?댁슜'),
+                  decoration: const InputDecoration(labelText: '답글 내용'),
                 ),
               ],
             ),
@@ -1301,14 +1301,14 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('痍⑥냼'),
+              child: const Text('취소'),
             ),
             FilledButton(
               onPressed: () {
                 final reply = controller.text.trim();
                 if (reply.isNotEmpty) Navigator.pop(context, reply);
               },
-              child: const Text('?묒꽦 ?꾨즺'),
+              child: const Text('작성 완료'),
             ),
           ],
         ),
@@ -1321,7 +1321,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           await widget.reviewRepository.reply(_storeId, review.reviewId, value);
       if (mounted) setState(() => _review = saved);
     } catch (_) {
-      if (mounted) _showMessage('?듦?????ν븯吏 紐삵뻽?듬땲??');
+      if (mounted) _showMessage('답글을 저장하지 못했습니다.');
     }
   }
 
@@ -1329,15 +1329,15 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('?듦?????젣?좉퉴??'),
+        title: const Text('답글을 삭제할까요?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('痍⑥냼'),
+            child: const Text('취소'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('??젣'),
+            child: const Text('삭제'),
           ),
         ],
       ),
@@ -1348,7 +1348,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
           await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
       if (mounted) setState(() => _review = saved);
     } catch (_) {
-      if (mounted) _showMessage('?듦?????젣?섏? 紐삵뻽?듬땲??');
+      if (mounted) _showMessage('답글을 삭제하지 못했습니다.');
     }
   }
 
@@ -1434,30 +1434,30 @@ class _RejectDialogState extends State<_RejectDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('二쇰Ц 嫄곗젅'),
+      title: const Text('주문 거절'),
       content: TextField(
         key: const Key('reject-reason'),
         controller: _controller,
         maxLength: 500,
         autofocus: true,
         decoration: const InputDecoration(
-          labelText: '嫄곗젅 ?ъ쑀',
-          hintText: '?? ?щ즺媛 ?뚯쭊?섏뿀?듬땲??',
+          labelText: '거절 사유',
+          hintText: '예: 재료가 소진되었습니다.',
         ),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('痍⑥냼'),
+          child: const Text('취소'),
         ),
         FilledButton(
           key: const Key('confirm-reject'),
           onPressed: () {
             final value = _controller.text.trim();
 
-            Navigator.pop(context, value.isEmpty ? '?먮ℓ??二쇰Ц 嫄곗젅' : value);
+            Navigator.pop(context, value.isEmpty ? '판매자 주문 거절' : value);
           },
-          child: const Text('嫄곗젅 ?뺤젙'),
+          child: const Text('거절 확정'),
         ),
       ],
     );
@@ -1485,12 +1485,12 @@ class _RefundDialogState extends State<_RefundDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('?꾩븸 ?섎텋 ?뺤씤'),
+      title: const Text('전액 환불 확인'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('${sellerWon(widget.amount)} ?꾩븸???섎텋?⑸땲??'),
+            Text('${sellerWon(widget.amount)} 전액을 환불합니다.'),
             const SizedBox(height: PopqSpacing.sm),
             TextField(
               key: const Key('refund-reason'),
@@ -1498,8 +1498,8 @@ class _RefundDialogState extends State<_RefundDialog> {
               autofocus: true,
               maxLength: 500,
               decoration: const InputDecoration(
-                labelText: '?섎텋 ?ъ쑀',
-                hintText: '怨좉컼?먭쾶 ?덈궡???섎텋 ?ъ쑀',
+                labelText: '환불 사유',
+                hintText: '고객에게 안내할 환불 사유',
               ),
             ),
           ],
@@ -1508,7 +1508,7 @@ class _RefundDialogState extends State<_RefundDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('痍⑥냼'),
+          child: const Text('취소'),
         ),
         FilledButton(
           key: const Key('confirm-refund'),
@@ -1519,10 +1519,9 @@ class _RefundDialogState extends State<_RefundDialog> {
               Navigator.pop(context, value);
             }
           },
-          child: const Text('?꾩븸 ?섎텋 ?뺤젙'),
+          child: const Text('전액 환불 확정'),
         ),
       ],
     );
   }
 }
-
