@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import com.google.firebase.messaging.ApnsConfig;
+import com.google.firebase.messaging.Aps;
 
 @Slf4j
 @Component
@@ -46,19 +48,62 @@ public class FirebasePushNotificationGateway
       );
     }
 
-    Message firebaseMessage = Message.builder()
-        .setToken(pushMessage.token())
-        .setNotification(
-            Notification.builder()
-                .setTitle(pushMessage.title())
-                .setBody(pushMessage.body())
+    Message.Builder messageBuilder =
+        Message.builder()
+            .setToken(pushMessage.token())
+            .putAllData(pushMessage.data())
+            .setAndroidConfig(
+                androidConfig.build()
+            );
+
+    if (pushMessage.alertEnabled()) {
+      messageBuilder.setNotification(
+          Notification.builder()
+              .setTitle(pushMessage.title())
+              .setBody(pushMessage.body())
+              .build()
+      );
+    }
+
+    String rawBadgeCount =
+        pushMessage.data().get("badgeCount");
+
+    if (rawBadgeCount != null) {
+      try {
+        int badgeCount = Math.max(
+            0,
+            Integer.parseInt(rawBadgeCount)
+        );
+
+        Aps.Builder apsBuilder =
+            Aps.builder()
+                .setBadge(badgeCount);
+
+        if (!pushMessage.alertEnabled()) {
+          apsBuilder.setContentAvailable(true);
+        }
+
+        messageBuilder.setApnsConfig(
+            ApnsConfig.builder()
+                .putHeader(
+                    "apns-priority",
+                    pushMessage.alertEnabled()
+                        ? "10"
+                        : "5"
+                )
+                .setAps(apsBuilder.build())
                 .build()
-        )
-        .putAllData(pushMessage.data())
-        .setAndroidConfig(
-            androidConfig.build()
-        )
-        .build();
+        );
+      } catch (NumberFormatException exception) {
+        log.warn(
+            "Invalid push badge count. value={}",
+            rawBadgeCount
+        );
+      }
+    }
+
+    Message firebaseMessage =
+        messageBuilder.build();
 
     try {
       String messageId = FirebaseMessaging

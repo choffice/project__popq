@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'customer_app_badge_service.dart';
 
 typedef PushDeepLinkHandler = void Function(String deepLink);
 
@@ -115,6 +116,9 @@ class PushNotificationService {
   }
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    await CustomerAppBadgeService
+        .updateFromMessageData(message.data);
+
     final remoteNotification = message.notification;
 
     final title = remoteNotification?.title ?? message.data['title'];
