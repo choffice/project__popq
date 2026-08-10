@@ -46,11 +46,7 @@ public class CustomerNotificationService {
                 )
         );
         notificationRepository.flush();
-
-        //오창 : 개발시 고객앱의 주문대기 알림이 판매자앱의 주문알림음을 잡아먹지 않기 위해
-        if (event.currentStatus() != OrderStatus.PLACED) {
-            pushDeliveryService.deliver(notification);
-        }
+        pushDeliveryService.deliver(notification);
     }
 
     @Transactional(readOnly = true)
