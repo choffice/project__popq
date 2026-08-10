@@ -581,7 +581,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: statusColor,
+                color: accepting ? Colors.black : statusColor,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),
