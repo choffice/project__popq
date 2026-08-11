@@ -71,6 +71,16 @@ class CustomerActivitySummary {
       _ => '첫 뱃지 준비',
     };
   }
+
+  String? get badgeAssetPath {
+    return switch (badgeTier) {
+      'BRONZE' => 'assets/images/badges/badge_bronze.png',
+      'SILVER' => 'assets/images/badges/badge_silver.png',
+      'GOLD' => 'assets/images/badges/badge_gold.png',
+      'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+      _ => null,
+    };
+  }
 }
 
 class CustomerAttendance {

@@ -934,6 +934,24 @@ class _ProfileHeaderCard extends StatelessWidget {
                               const SizedBox(
                                 width: PopqSpacing.xs,
                               ),
+                              if (profile.activitySummary
+                                  .badgeAssetPath != null) ...[
+                                Image.asset(
+                                  profile.activitySummary
+                                      .badgeAssetPath!,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.contain,
+                                  filterQuality:
+                                  FilterQuality.high,
+                                  semanticLabel: profile
+                                      .activitySummary
+                                      .badgeLabel,
+                                ),
+                                const SizedBox(
+                                  width: PopqSpacing.xs,
+                                ),
+                              ],
                               Container(
                                 padding:
                                 const EdgeInsets
