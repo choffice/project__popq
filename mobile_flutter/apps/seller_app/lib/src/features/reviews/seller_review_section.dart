@@ -38,9 +38,18 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   @override
   void didUpdateWidget(covariant SellerReviewSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.storeId != widget.storeId ||
-        oldWidget.repository != widget.repository) {
+
+    debugPrint(
+      '[SELLER REVIEW] didUpdateWidget '
+          'oldStore=${oldWidget.storeId} '
+          'newStore=${widget.storeId} '
+          'sameRepository=${identical(oldWidget.repository, widget.repository)}',
+    );
+
+    if (oldWidget.storeId != widget.storeId) {
       _allReviews = null;
+      _error = null;
+      _loading = true;
       _load();
     }
   }
@@ -66,6 +75,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
               ),
               if (widget.canReply)
                 OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PopqSpacing.md,
+                      vertical: PopqSpacing.sm,
+                    ),
+                  ),
                   onPressed: _manageReplyTemplates,
                   icon: const Icon(Icons.quickreply_outlined),
                   label: const Text('대표 답글'),
@@ -207,9 +223,6 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     );
   }
 
-  Future<List<SellerReview>> _loadAll() =>
-      widget.repository.findAll(widget.storeId).timeout(_loadTimeout);
-
   void _changeFilter(int? value) {
     setState(() => _rating = value);
   }
@@ -217,27 +230,81 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   Future<void> _load() async {
     final storeId = widget.storeId;
     final requestSerial = ++_requestSerial;
+
+    debugPrint(
+      '[SELLER REVIEW] LOAD START '
+          'store=$storeId '
+          'serial=$requestSerial '
+          'repository=${identityHashCode(widget.repository)}',
+    );
+
     setState(() {
       _loading = true;
       _error = null;
     });
+
     try {
-      final reviews = await _loadAll();
-      if (!mounted ||
-          requestSerial != _requestSerial ||
-          widget.storeId != storeId) {
+      final reviews = await widget.repository
+          .findAll(storeId)
+          .timeout(_loadTimeout);
+
+      debugPrint(
+        '[SELLER REVIEW] LOAD SUCCESS '
+            'store=$storeId '
+            'serial=$requestSerial '
+            'count=${reviews.length} '
+            'currentSerial=$_requestSerial '
+            'currentStore=${widget.storeId}',
+      );
+
+      if (!mounted) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: unmounted',
+        );
         return;
       }
+
+      if (requestSerial != _requestSerial) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: '
+              'serial mismatch '
+              '$requestSerial != $_requestSerial',
+        );
+        return;
+      }
+
+      if (widget.storeId != storeId) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: '
+              'store changed '
+              '$storeId -> ${widget.storeId}',
+        );
+        return;
+      }
+
       setState(() {
         _allReviews = List<SellerReview>.of(reviews);
         _loading = false;
       });
-    } catch (error) {
+
+      debugPrint(
+        '[SELLER REVIEW] UI READY count=${reviews.length}',
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SELLER REVIEW] LOAD ERROR '
+            'store=$storeId '
+            'serial=$requestSerial '
+            'error=$error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted ||
           requestSerial != _requestSerial ||
           widget.storeId != storeId) {
         return;
       }
+
       setState(() {
         _error = error;
         _loading = false;
