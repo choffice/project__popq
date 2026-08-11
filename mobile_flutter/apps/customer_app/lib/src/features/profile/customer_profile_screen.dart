@@ -32,6 +32,7 @@ const _dangerColor = Color(0xFFE5484D);
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({
     required this.repository,
+    required this.activitySummaryListenable,
     required this.messageRepository,
     required this.onSignOut,
     required this.onConnectSellerAccess,
@@ -40,6 +41,7 @@ class CustomerProfileScreen extends StatefulWidget {
   });
 
   final CustomerEngagementRepository repository;
+  final ValueListenable<CustomerActivitySummary?> activitySummaryListenable;
   final CustomerOrderMessageRepository messageRepository;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onConnectSellerAccess;
@@ -84,6 +86,7 @@ class _CustomerProfileScreenState
             AppLifecycleState.resumed;
 
     _profile = widget.repository.getProfile();
+    widget.activitySummaryListenable.addListener(_handleActivitySummaryChanged);
 
     unawaited(
       _refreshUnreadMessageCount(),
@@ -137,6 +140,16 @@ class _CustomerProfileScreenState
       });
     }
 
+    if (oldWidget.activitySummaryListenable !=
+        widget.activitySummaryListenable) {
+      oldWidget.activitySummaryListenable.removeListener(
+        _handleActivitySummaryChanged,
+      );
+      widget.activitySummaryListenable.addListener(
+        _handleActivitySummaryChanged,
+      );
+    }
+
     if (oldWidget.messageRepository !=
         widget.messageRepository) {
       _requestGeneration++;
@@ -174,6 +187,10 @@ class _CustomerProfileScreenState
   void dispose() {
     _requestGeneration++;
 
+    widget.activitySummaryListenable.removeListener(
+      _handleActivitySummaryChanged,
+    );
+
     _stopUnreadPolling();
 
     _customerChatSubscription?.cancel();
@@ -187,6 +204,17 @@ class _CustomerProfileScreenState
     WidgetsBinding.instance.removeObserver(this);
 
     super.dispose();
+  }
+
+  void _handleActivitySummaryChanged() {
+    final summary = widget.activitySummaryListenable.value;
+    if (summary == null || !mounted) return;
+
+    setState(() {
+      _profile = _profile.then(
+        (profile) => profile.copyWith(activitySummary: summary),
+      );
+    });
   }
 
   @override

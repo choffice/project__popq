@@ -1,5 +1,6 @@
 package com.example.project_popq.activity.controller;
 
+import com.example.project_popq.activity.dto.CustomerAttendanceResponse;
 import com.example.project_popq.activity.dto.CustomerActivitySummaryResponse;
 import com.example.project_popq.activity.dto.RecordQrVisitRequest;
 import com.example.project_popq.activity.dto.RecordVisitResponse;
@@ -33,6 +34,22 @@ public class CustomerActivityController {
     ) {
         User user = currentUserService.getRequired(jwt);
         return ApiResponse.success(customerActivityService.getSummary(user));
+    }
+
+    @GetMapping("/attendance")
+    public ApiResponse<CustomerAttendanceResponse> attendance(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User user = currentUserService.getRequired(jwt);
+        return ApiResponse.success(customerActivityService.getAttendance(user));
+    }
+
+    @PostMapping("/attendance")
+    public ApiResponse<CustomerAttendanceResponse> recordAttendance(
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        User user = currentUserService.getRequired(jwt);
+        return ApiResponse.success(customerActivityService.recordAttendance(user));
     }
 
     @PostMapping("/visits")

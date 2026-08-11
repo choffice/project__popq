@@ -21,6 +21,40 @@ class CustomerActivitySummary {
     );
   }
 
+  factory CustomerActivitySummary.fromTotalCount(int totalCount) {
+    const checkpoints = <int>[10, 25, 50, 100, 200, 300, 500, 750, 1000];
+    final current = checkpoints
+        .where((checkpoint) => checkpoint <= totalCount)
+        .fold(0, (_, checkpoint) => checkpoint);
+    int? next;
+    for (final checkpoint in checkpoints) {
+      if (checkpoint > totalCount) {
+        next = checkpoint;
+        break;
+      }
+    }
+    final remaining = next == null ? 0 : next - totalCount;
+    final progress = next == null
+        ? 1.0
+        : (totalCount - current) / (next - current);
+    final badgeTier = switch (totalCount) {
+      >= 1000 => 'DIAMOND',
+      >= 500 => 'GOLD',
+      >= 100 => 'SILVER',
+      >= 10 => 'BRONZE',
+      _ => 'NONE',
+    };
+
+    return CustomerActivitySummary(
+      totalCount: totalCount,
+      badgeTier: badgeTier,
+      currentCheckpoint: current,
+      nextCheckpoint: next,
+      remainingCount: remaining,
+      checkpointProgress: progress,
+    );
+  }
+
   final int totalCount;
   final String badgeTier;
   final int currentCheckpoint;
@@ -37,6 +71,36 @@ class CustomerActivitySummary {
       _ => '첫 뱃지 준비',
     };
   }
+}
+
+class CustomerAttendance {
+  const CustomerAttendance({
+    required this.today,
+    required this.checkedDates,
+    required this.checkedToday,
+    required this.newlyChecked,
+    required this.activitySummary,
+  });
+
+  factory CustomerAttendance.fromJson(Map<String, Object?> json) {
+    return CustomerAttendance(
+      today: DateTime.parse(json['today'] as String),
+      checkedDates: (json['checkedDates'] as List<Object?>)
+          .map((value) => DateTime.parse(value as String))
+          .toList(growable: false),
+      checkedToday: json['checkedToday'] as bool,
+      newlyChecked: json['newlyChecked'] as bool,
+      activitySummary: CustomerActivitySummary.fromJson(
+        Map<String, Object?>.from(json['activitySummary'] as Map),
+      ),
+    );
+  }
+
+  final DateTime today;
+  final List<DateTime> checkedDates;
+  final bool checkedToday;
+  final bool newlyChecked;
+  final CustomerActivitySummary activitySummary;
 }
 
 class CustomerProfile {
@@ -314,6 +378,10 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<CustomerAttendance> getAttendance();
+
+  Future<CustomerAttendance> checkAttendance();
+
   Future<bool> recordQrVisit(String qrToken);
 
   Future<String> uploadProfileImage(String filePath);
@@ -382,6 +450,24 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
         Map<String, Object?>.from(value as Map),
         imageBaseUrl: _imageBaseUrl,
       ),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() {
+    return _apiClient.get(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() {
+    return _apiClient.post(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -649,6 +735,7 @@ class MemoryCustomerEngagementRepository
   CustomerProfile _profile;
   final List<InterestedStore> _interests;
   final List<CustomerReview> _reviews;
+  final Set<String> _attendanceDates = <String>{};
   NotificationPreference _notificationPreference = const NotificationPreference(
     pushNotificationEnabled: true,
     marketingOptIn: false,
@@ -661,6 +748,50 @@ class MemoryCustomerEngagementRepository
       reviewCount: _reviews.where((review) => review.isActive).length,
     );
     return _profile;
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() async {
+    return _attendance(newlyChecked: false);
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() async {
+    final today = DateTime.now();
+    final newlyChecked = _attendanceDates.add(_dateKey(today));
+    if (newlyChecked) {
+      _profile = _profile.copyWith(
+        activitySummary: CustomerActivitySummary.fromTotalCount(
+          _profile.activitySummary.totalCount + 1,
+        ),
+      );
+    }
+    return _attendance(newlyChecked: newlyChecked);
+  }
+
+  CustomerAttendance _attendance({required bool newlyChecked}) {
+    final today = DateTime.now();
+    final checkedDates =
+        _attendanceDates
+            .map(DateTime.parse)
+            .where(
+              (date) => date.year == today.year && date.month == today.month,
+            )
+            .toList()
+          ..sort();
+    return CustomerAttendance(
+      today: DateTime(today.year, today.month, today.day),
+      checkedDates: checkedDates,
+      checkedToday: _attendanceDates.contains(_dateKey(today)),
+      newlyChecked: newlyChecked,
+      activitySummary: _profile.activitySummary,
+    );
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
   }
 
   @override

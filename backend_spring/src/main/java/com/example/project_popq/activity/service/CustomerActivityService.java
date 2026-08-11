@@ -3,6 +3,7 @@ package com.example.project_popq.activity.service;
 import com.example.project_popq.activity.domain.CustomerActivitySource;
 import com.example.project_popq.activity.domain.CustomerActivitySourceType;
 import com.example.project_popq.activity.domain.CustomerActivityType;
+import com.example.project_popq.activity.dto.CustomerAttendanceResponse;
 import com.example.project_popq.activity.dto.CustomerActivitySummaryResponse;
 import com.example.project_popq.activity.dto.RecordVisitResponse;
 import com.example.project_popq.activity.repository.CustomerActivitySourceRepository;
@@ -14,7 +15,9 @@ import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.repository.UserRepository;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -41,6 +44,26 @@ public class CustomerActivityService {
         return CustomerActivitySummaryResponse.from(
                 activityRepository.countQualifiedActivities(userId)
         );
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerAttendanceResponse getAttendance(User user) {
+        LocalDate today = localDate(Instant.now());
+        return attendanceResponse(user.getId(), today, false);
+    }
+
+    @Transactional
+    public CustomerAttendanceResponse recordAttendance(User user) {
+        Instant occurredAt = Instant.now();
+        LocalDate today = localDate(occurredAt);
+        String sourceKey = user.getId() + ":" + today;
+        boolean newlyChecked = activityRepository.insertDailyAttendance(
+                user.getId(),
+                sourceKey,
+                today,
+                occurredAt
+        ) == 1;
+        return attendanceResponse(user.getId(), today, newlyChecked);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -140,5 +163,26 @@ public class CustomerActivityService {
 
     private LocalDate localDate(Instant occurredAt) {
         return occurredAt.atZone(BUSINESS_ZONE).toLocalDate();
+    }
+
+    private CustomerAttendanceResponse attendanceResponse(
+            Long userId,
+            LocalDate today,
+            boolean newlyChecked
+    ) {
+        YearMonth month = YearMonth.from(today);
+        List<LocalDate> checkedDates = activityRepository.findActiveDates(
+                userId,
+                CustomerActivityType.DAILY_ATTENDANCE,
+                month.atDay(1),
+                month.atEndOfMonth()
+        );
+        return new CustomerAttendanceResponse(
+                today,
+                checkedDates,
+                checkedDates.contains(today),
+                newlyChecked,
+                getSummary(userId)
+        );
     }
 }
