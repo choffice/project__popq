@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'customer_app_badge_service.dart';
 
 typedef PushDeepLinkHandler = void Function(String deepLink);
 
@@ -16,6 +17,17 @@ class PushNotificationService {
         description: '고객과 판매자의 주문 문의 메시지 알림',
         importance: Importance.max,
       );
+
+  static const AndroidNotificationChannel _silentChannel =
+  AndroidNotificationChannel(
+    'popq_silent_notifications',
+    'POPQ 조용한 알림',
+    description: '소리와 진동 없이 알림창과 앱 아이콘 배지만 표시합니다.',
+    importance: Importance.low,
+    playSound: false,
+    enableVibration: false,
+    showBadge: true,
+  );
 
   static final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
@@ -104,6 +116,12 @@ class PushNotificationService {
         >()
         ?.createNotificationChannel(_messageChannel);
 
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+    >()
+        ?.createNotificationChannel(_silentChannel);
+
     final launchDetails = await _localNotifications
         .getNotificationAppLaunchDetails();
 
@@ -115,7 +133,14 @@ class PushNotificationService {
   }
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    await CustomerAppBadgeService
+        .updateFromMessageData(message.data);
+
     final remoteNotification = message.notification;
+
+    final isSilentNotification =
+        remoteNotification?.android?.channelId ==
+            _silentChannel.id;
 
     final title = remoteNotification?.title ?? message.data['title'];
 
@@ -125,23 +150,38 @@ class PushNotificationService {
       return;
     }
 
+    final notificationDetails = NotificationDetails(
+      android: isSilentNotification
+          ? const AndroidNotificationDetails(
+        'popq_silent_notifications',
+        'POPQ 조용한 알림',
+        channelDescription:
+        '소리와 진동 없이 알림창과 앱 아이콘 배지만 표시합니다.',
+        importance: Importance.low,
+        priority: Priority.low,
+        playSound: false,
+        enableVibration: false,
+        category: AndroidNotificationCategory.message,
+        visibility: NotificationVisibility.public,
+      )
+          : const AndroidNotificationDetails(
+        'popq_chat_messages',
+        'POPQ 문의 메시지',
+        channelDescription: '고객과 판매자의 주문 문의 메시지 알림',
+        importance: Importance.max,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.message,
+        visibility: NotificationVisibility.public,
+      ),
+    );
+
     await _localNotifications.show(
       id:
           message.messageId?.hashCode ??
           DateTime.now().millisecondsSinceEpoch.remainder(2147483647),
       title: title,
       body: body,
-      notificationDetails: const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'popq_chat_messages',
-          'POPQ 문의 메시지',
-          channelDescription: '고객과 판매자의 주문 문의 메시지 알림',
-          importance: Importance.max,
-          priority: Priority.high,
-          category: AndroidNotificationCategory.message,
-          visibility: NotificationVisibility.public,
-        ),
-      ),
+      notificationDetails:notificationDetails,
       payload: jsonEncode(message.data),
     );
   }

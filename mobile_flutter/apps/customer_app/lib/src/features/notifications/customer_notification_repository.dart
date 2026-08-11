@@ -71,6 +71,8 @@ abstract interface class CustomerNotificationRepository {
 
   Future<int> unreadCount();
 
+  Future<int> badgeCount();
+
   Future<CustomerNotification> markRead(int notificationId);
 
   Future<RegisteredPushDevice> registerDevice({
@@ -109,6 +111,17 @@ class ApiCustomerNotificationRepository
       decode: (value) {
         final json = Map<String, Object?>.from(value as Map);
         return (json['unreadCount'] as num).toInt();
+      },
+    );
+  }
+
+  @override
+  Future<int> badgeCount() {
+    return _apiClient.get(
+      '/api/v1/customer/notifications/badge-count',
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return (json['badgeCount'] as num).toInt();
       },
     );
   }
@@ -167,6 +180,11 @@ class MemoryCustomerNotificationRepository
   @override
   Future<int> unreadCount() async {
     return _notifications.where((notification) => !notification.read).length;
+  }
+
+  @override
+  Future<int> badgeCount() {
+    return unreadCount();
   }
 
   @override

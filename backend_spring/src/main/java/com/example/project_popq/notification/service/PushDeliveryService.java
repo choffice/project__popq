@@ -4,6 +4,7 @@ import com.example.project_popq.notification.domain.UserNotification;
 import com.example.project_popq.notification.push.PushMessage;
 import com.example.project_popq.notification.push.PushNotificationGateway;
 import com.example.project_popq.notification.repository.PushDeviceRepository;
+import com.example.project_popq.user.repository.UserRepository;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -13,11 +14,19 @@ import org.springframework.stereotype.Service;
 public class PushDeliveryService {
 
   private final PushDeviceRepository pushDeviceRepository;
+  private final UserRepository userRepository;
+  private final CustomerBadgeCountService customerBadgeCountService;
   private final PushNotificationGateway pushNotificationGateway;
 
   public void deliver(UserNotification notification) {
+    Long userId = notification.getUser().getId();
+
+    long unreadCount =
+        customerBadgeCountService
+            .countUnread(userId);
+
     deliverToUser(
-        notification.getUser().getId(),
+        userId,
         notification.getTitle(),
         notification.getMessage(),
         Map.of(
@@ -30,7 +39,9 @@ public class PushDeliveryService {
             "targetId",
             notification.getTargetId(),
             "deepLink",
-            notification.getDeepLink()
+            notification.getDeepLink(),
+            "badgeCount",
+            Long.toString(unreadCount)
         )
     );
   }
@@ -41,15 +52,31 @@ public class PushDeliveryService {
       String body,
       Map<String, String> data
   ) {
+    boolean pushEnabled =
+        userRepository
+            .existsByIdAndPushNotificationEnabledTrue(
+                userId
+            );
+
+    boolean hasBadgeCount =
+        data.containsKey("badgeCount");
+
+    if (!pushEnabled && !hasBadgeCount) {
+      return;
+    }
+
     pushDeviceRepository
         .findAllByUserIdOrderByCreatedAtDesc(userId)
-        .forEach(device -> pushNotificationGateway.send(
-            new PushMessage(
-                device.getToken(),
-                title,
-                body,
-                data
+        .forEach(device ->
+            pushNotificationGateway.send(
+                new PushMessage(
+                    device.getToken(),
+                    title,
+                    body,
+                    data,
+                    pushEnabled
+                )
             )
-        ));
+        );
   }
 }
