@@ -58,7 +58,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       );
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text(
             pickerSource == ImageSource.camera
@@ -80,17 +80,17 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
       await _reload();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
       );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
       );
     } finally {

@@ -14,6 +14,7 @@ import 'features/auth/kakao_auth_service.dart';
 import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
+import 'features/announcements/public_announcement_repository.dart';
 import 'features/discovery/store_discovery_repository.dart';
 import 'features/home/customer_home_controller.dart';
 import 'features/home/customer_location_repository.dart';
@@ -36,6 +37,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.onboardingStore,
     this.storeDiscoveryRepository,
     this.catalogRepository,
+    this.announcementRepository,
     this.orderRepository,
     this.orderMessageRepository,
     this.engagementRepository,
@@ -55,6 +57,7 @@ class PopqCustomerApp extends StatefulWidget {
   final OnboardingStore? onboardingStore;
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
+  final PublicAnnouncementRepository? announcementRepository;
   final CustomerOrderRepository? orderRepository;
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
@@ -79,7 +82,6 @@ class PopqCustomerApp extends StatefulWidget {
 
 class _PopqCustomerAppState extends State<PopqCustomerApp>
     with WidgetsBindingObserver {
-
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
 
@@ -109,30 +111,6 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   bool _isRecoveringPendingPayment = false;
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
-
-  //오창 : 웹 개발모드 전용
-  bool get _isWebDevelopment =>
-      kIsWeb &&
-          widget.environment.flavor == AppFlavor.development;
-  Future<void> Function()? get _webSafeGoogleSignIn =>
-      _isWebDevelopment ? null : _googleSignIn;
-
-  Future<void> Function()? get _webSafeKakaoSignIn =>
-      _isWebDevelopment ? null : _kakaoSignIn;
-
-  Future<void> Function()? get _webSafeNaverSignIn =>
-      _isWebDevelopment ? null : _naverSignIn;
-
-  Future<void> Function()? get _webSafeGoogleLink =>
-      _isWebDevelopment ? null : _googleLink;
-
-  Future<void> Function()? get _webSafeKakaoLink =>
-      _isWebDevelopment ? null : _kakaoLink;
-
-  Future<void> Function()? get _webSafeNaverLink =>
-      _isWebDevelopment ? null : _naverLink;
-  //여기까지 오창
-
 
   @override
   void initState() {
@@ -173,22 +151,19 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    //오창
-    if (!_isWebDevelopment) {
-      _googleAuthService = GoogleAuthService(
-        webClientId:
+    _googleAuthService = GoogleAuthService(
+      webClientId:
           '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-      );
-
-      _kakaoAuthService = KakaoAuthService();
-      _naverAuthService = NaverAuthService();
-    }
+    );
 
     _authRepository =
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
 
     _identityRepository =
         widget.identityRepository ?? ApiCustomerIdentityRepository(_apiClient);
+
+    _kakaoAuthService = KakaoAuthService();
+    _naverAuthService = NaverAuthService();
 
     final permissionGateway =
         widget.permissionGateway ?? DeviceCustomerPermissionGateway();
@@ -202,6 +177,9 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     final catalogRepository =
         widget.catalogRepository ?? ApiCatalogRepository(_apiClient);
+
+    final announcementRepository = widget.announcementRepository ??
+        ApiPublicAnnouncementRepository(_apiClient);
 
     _orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
@@ -250,6 +228,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onboardingController: _onboardingController,
       storeDiscoveryRepository: storeDiscoveryRepository,
       catalogRepository: catalogRepository,
+      announcementRepository: announcementRepository,
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
       engagementRepository: engagementRepository,
@@ -265,18 +244,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
-      // onGoogleSignIn: _googleSignIn,
-      // onKakaoSignIn: _kakaoSignIn,
-      // onNaverSignIn: _naverSignIn,
-      // onGoogleLink: _googleLink,
-      // onKakaoLink: _kakaoLink,
-      // onNaverLink: _naverLink,
-      onGoogleSignIn: _webSafeGoogleSignIn,
-      onKakaoSignIn: _webSafeKakaoSignIn,
-      onNaverSignIn: _webSafeNaverSignIn,
-      onGoogleLink: _webSafeGoogleLink,
-      onKakaoLink: _webSafeKakaoLink,
-      onNaverLink: _webSafeNaverLink,
+      onGoogleSignIn: _googleSignIn,
+      onKakaoSignIn: _kakaoSignIn,
+      onNaverSignIn: _naverSignIn,
+      onGoogleLink: _googleLink,
+      onKakaoLink: _kakaoLink,
+      onNaverLink: _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -511,10 +484,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       return;
     }
 
-    //오창
-    if (!_isWebDevelopment) {
-      unawaited(_registerPushDevice());
-    }
+    unawaited(_registerPushDevice());
 
     final pendingPushDeepLink = _pendingPushDeepLink;
 
@@ -646,8 +616,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
       final messenger = _scaffoldMessengerKey.currentState;
 
-      messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(SnackBar(content: Text(message)));
+      messenger?.hideCurrentTopSnackBar();
+      messenger?.showTopSnackBar(SnackBar(content: Text(message)));
     });
   }
 
@@ -841,8 +811,8 @@ class _CustomerBackButtonDispatcher extends RootBackButtonDispatcher {
     final messenger = _scaffoldMessengerKey.currentState;
 
     messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
+      ?..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
           content: Text('한 번 더 누르면 앱이 종료됩니다.'),
           duration: _exitConfirmDuration,

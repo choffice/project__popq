@@ -224,7 +224,7 @@ class _CustomerFindPasswordScreenState
         _newPassword.text,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('비밀번호가 변경되었습니다. 로그인해 주세요.')),
       );
       context.go(CustomerRoutes.signIn);

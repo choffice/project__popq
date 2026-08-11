@@ -419,8 +419,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 }
 

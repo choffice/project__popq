@@ -240,7 +240,7 @@ class _ThemeSettingsCard extends StatelessWidget {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('화면 설정을 저장하지 못했어요.'),
         ),

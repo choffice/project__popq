@@ -20,22 +20,38 @@ class SellerReviewSection extends StatefulWidget {
 }
 
 class _SellerReviewSectionState extends State<SellerReviewSection> {
+  static const Duration _loadTimeout = Duration(seconds: 15);
+
   int? _rating;
   var _unanswered = false;
-  late Future<List<SellerReview>> _reviews;
-  late Future<List<SellerReview>> _allReviews;
+  List<SellerReview>? _allReviews;
+  Object? _error;
+  var _loading = true;
+  var _requestSerial = 0;
 
   @override
   void initState() {
     super.initState();
-    _reviews = _load();
-    _allReviews = widget.repository.findAll(widget.storeId);
+    _load();
   }
 
   @override
   void didUpdateWidget(covariant SellerReviewSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.storeId != widget.storeId) _reload();
+
+    debugPrint(
+      '[SELLER REVIEW] didUpdateWidget '
+          'oldStore=${oldWidget.storeId} '
+          'newStore=${widget.storeId} '
+          'sameRepository=${identical(oldWidget.repository, widget.repository)}',
+    );
+
+    if (oldWidget.storeId != widget.storeId) {
+      _allReviews = null;
+      _error = null;
+      _loading = true;
+      _load();
+    }
   }
 
   @override
@@ -52,25 +68,20 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           child: Row(
             children: [
               Expanded(
-                child: FutureBuilder<List<SellerReview>>(
-                  future: _allReviews,
-                  builder: (context, snapshot) {
-                    final reviews = snapshot.data ?? const <SellerReview>[];
-                    final average = reviews.isEmpty
-                        ? null
-                        : reviews.map((item) => item.rating).reduce((a, b) => a + b) /
-                            reviews.length;
-                    return Text(
-                      average == null
-                          ? '전체 평점 - · 리뷰 0개'
-                          : '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    );
-                  },
+                child: Text(
+                  _reviewSummary(),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               if (widget.canReply)
                 OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: PopqSpacing.md,
+                      vertical: PopqSpacing.sm,
+                    ),
+                  ),
                   onPressed: _manageReplyTemplates,
                   icon: const Icon(Icons.quickreply_outlined),
                   label: const Text('대표 답글'),
@@ -102,46 +113,64 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                 label: const Text('미답변'),
                 selected: _unanswered,
                 onSelected: (value) {
-                  setState(() {
-                    _unanswered = value;
-                    _reviews = _load();
-                  });
+                  setState(() => _unanswered = value);
                 },
               ),
             ],
           ),
         ),
-        Expanded(
-          child: FutureBuilder<List<SellerReview>>(
-            future: _reviews,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
-              }
-              if (snapshot.hasError) {
-                return PopqErrorView(message: '리뷰를 불러오지 못했습니다.', onRetry: _reload);
-              }
-              final reviews = snapshot.data ?? const <SellerReview>[];
-              if (reviews.isEmpty) {
-                return const PopqEmptyView(
-                  icon: Icons.reviews_outlined,
-                  title: '조건에 맞는 리뷰가 없어요.',
-                  description: '별점 또는 미답변 필터를 바꿔 보세요.',
-                );
-              }
-              return RefreshIndicator(
-                onRefresh: _reload,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(PopqSpacing.md),
-                  itemCount: reviews.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
-                  itemBuilder: (context, index) => _reviewCard(reviews[index]),
-                ),
-              );
-            },
-          ),
-        ),
+        Expanded(child: _buildBody()),
       ],
+    );
+  }
+
+  String _reviewSummary() {
+    final reviews = _allReviews ?? const <SellerReview>[];
+    if (reviews.isEmpty) return '전체 평점 - · 리뷰 0개';
+    final average = reviews.map((item) => item.rating).reduce((a, b) => a + b) /
+        reviews.length;
+    return '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개';
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
+    }
+    if (_error != null || _allReviews == null) {
+      return PopqErrorView(
+        message: '리뷰를 불러오지 못했습니다.',
+        onRetry: _reload,
+      );
+    }
+    if (_allReviews!.isEmpty) {
+      return const PopqEmptyView(
+        icon: Icons.reviews_outlined,
+        title: '등록된 리뷰가 없습니다.',
+        description: '고객이 리뷰를 작성하면 이곳에 표시됩니다.',
+      );
+    }
+
+    final reviews = _allReviews!
+        .where((review) => _rating == null || review.rating == _rating)
+        .where((review) => !_unanswered || review.sellerReply == null)
+        .toList(growable: false);
+    if (reviews.isEmpty) {
+      return const PopqEmptyView(
+        icon: Icons.filter_alt_off_outlined,
+        title: '조건에 맞는 리뷰가 없습니다.',
+        description: '별점 또는 미답변 필터를 바꿔 보세요.',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        itemCount: reviews.length,
+        separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
+        itemBuilder: (context, index) => _reviewCard(reviews[index]),
+      ),
     );
   }
 
@@ -154,7 +183,12 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           children: [
             Row(
               children: [
-                Expanded(child: Text(review.authorName, style: const TextStyle(fontWeight: FontWeight.w800))),
+                Expanded(
+                  child: Text(
+                    review.authorName,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
                 Text(List.filled(review.rating, '★').join()),
               ],
             ),
@@ -189,26 +223,96 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     );
   }
 
-  Future<List<SellerReview>> _load() => widget.repository.findAll(
-        widget.storeId,
-        rating: _rating,
-        unanswered: _unanswered,
+  void _changeFilter(int? value) {
+    setState(() => _rating = value);
+  }
+
+  Future<void> _load() async {
+    final storeId = widget.storeId;
+    final requestSerial = ++_requestSerial;
+
+    debugPrint(
+      '[SELLER REVIEW] LOAD START '
+          'store=$storeId '
+          'serial=$requestSerial '
+          'repository=${identityHashCode(widget.repository)}',
+    );
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final reviews = await widget.repository
+          .findAll(storeId)
+          .timeout(_loadTimeout);
+
+      debugPrint(
+        '[SELLER REVIEW] LOAD SUCCESS '
+            'store=$storeId '
+            'serial=$requestSerial '
+            'count=${reviews.length} '
+            'currentSerial=$_requestSerial '
+            'currentStore=${widget.storeId}',
       );
 
-  void _changeFilter(int? value) {
-    setState(() {
-      _rating = value;
-      _reviews = _load();
-    });
+      if (!mounted) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: unmounted',
+        );
+        return;
+      }
+
+      if (requestSerial != _requestSerial) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: '
+              'serial mismatch '
+              '$requestSerial != $_requestSerial',
+        );
+        return;
+      }
+
+      if (widget.storeId != storeId) {
+        debugPrint(
+          '[SELLER REVIEW] RESULT IGNORED: '
+              'store changed '
+              '$storeId -> ${widget.storeId}',
+        );
+        return;
+      }
+
+      setState(() {
+        _allReviews = List<SellerReview>.of(reviews);
+        _loading = false;
+      });
+
+      debugPrint(
+        '[SELLER REVIEW] UI READY count=${reviews.length}',
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[SELLER REVIEW] LOAD ERROR '
+            'store=$storeId '
+            'serial=$requestSerial '
+            'error=$error',
+      );
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.storeId != storeId) {
+        return;
+      }
+
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
   }
 
-  Future<void> _reload() async {
-    setState(() {
-      _reviews = _load();
-      _allReviews = widget.repository.findAll(widget.storeId);
-    });
-    await Future.wait([_reviews, _allReviews]);
-  }
+  Future<void> _reload() => _load();
 
   Future<void> _editReply(SellerReview review) async {
     List<SellerReviewReplyTemplate> templates;
@@ -307,8 +411,14 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         title: const Text('답글을 삭제할까요?'),
         content: const Text('삭제한 답글은 고객 화면에서도 보이지 않습니다.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제'),
+          ),
         ],
       ),
     );
@@ -325,16 +435,18 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   void _replaceReview(SellerReview saved) {
-    List<SellerReview> replace(List<SellerReview> reviews) => reviews
-        .map((item) => item.reviewId == saved.reviewId ? saved : item)
-        .toList(growable: false);
+    final reviews = _allReviews;
+    if (reviews == null) return;
     setState(() {
-      _reviews = _reviews.then(replace);
-      _allReviews = _allReviews.then(replace);
+      _allReviews = reviews
+          .map((item) => item.reviewId == saved.reviewId ? saved : item)
+          .toList(growable: false);
     });
   }
 
@@ -383,11 +495,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                                 try {
                                   final saved = await widget.repository
                                       .updateReplyTemplate(
-                                      widget.storeId,
-                                      template.templateId,
-                                      value,
-                                    );
-                                  setDialogState(() => templates[index] = saved);
+                                        widget.storeId,
+                                        template.templateId,
+                                        value,
+                                      );
+                                  setDialogState(
+                                    () => templates[index] = saved,
+                                  );
                                 } catch (_) {
                                   if (mounted) {
                                     _showError('대표 답글을 수정하지 못했습니다.');
@@ -428,11 +542,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
                       final value = await _promptTemplateText(null);
                       if (value == null) return;
                       try {
-                        final saved =
-                            await widget.repository.createReplyTemplate(
-                          widget.storeId,
-                          value,
-                        );
+                        final saved = await widget.repository
+                            .createReplyTemplate(widget.storeId, value);
                         setDialogState(() => templates.add(saved));
                       } catch (_) {
                         if (mounted) {

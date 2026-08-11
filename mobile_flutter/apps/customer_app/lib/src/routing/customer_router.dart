@@ -13,11 +13,14 @@ import '../features/auth/sign_in_screen.dart';
 import '../features/cart/cart_controller.dart';
 import '../features/cart/cart_screen.dart';
 import '../features/catalog/catalog_repository.dart';
+import '../features/announcements/public_announcement_repository.dart';
+import '../features/announcements/public_announcement_screens.dart';
 import '../features/catalog/product_detail_screen.dart';
 import '../features/catalog/product_list_screen.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
+import '../features/discovery/store_review_screen.dart';
 import '../features/favorites/customer_favorite_store_screen.dart';
 import '../features/home/customer_home_controller.dart';
 import '../features/home/customer_home_screen.dart';
@@ -77,6 +80,7 @@ GoRouter createCustomerRouter({
   required OnboardingController onboardingController,
   required StoreDiscoveryRepository storeDiscoveryRepository,
   required CatalogRepository catalogRepository,
+  required PublicAnnouncementRepository announcementRepository,
   required CustomerOrderRepository orderRepository,
   required CustomerOrderMessageRepository orderMessageRepository,
   required CustomerEngagementRepository engagementRepository,
@@ -364,6 +368,58 @@ GoRouter createCustomerRouter({
       ),
       GoRoute(
         path:
+        '${CustomerRoutes.stores}/:storeId/announcements/:announcementId',
+        builder: (context, state) {
+          final int? storeId = int.tryParse(
+            state.pathParameters['storeId'] ?? '',
+          );
+          final int? announcementId = int.tryParse(
+            state.pathParameters['announcementId'] ?? '',
+          );
+          if (storeId == null || announcementId == null) {
+            return const PopqErrorView(message: '공지사항 번호가 올바르지 않습니다.');
+          }
+          return PublicAnnouncementDetailScreen(
+            storeId: storeId,
+            announcementId: announcementId,
+            repository: announcementRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: '${CustomerRoutes.stores}/:storeId/announcements',
+        builder: (context, state) {
+          final int? storeId = int.tryParse(
+            state.pathParameters['storeId'] ?? '',
+          );
+          if (storeId == null) {
+            return const PopqErrorView(message: '사업장 번호가 올바르지 않습니다.');
+          }
+          return PublicAnnouncementListScreen(
+            storeId: storeId,
+            repository: announcementRepository,
+            storeRepository: storeDiscoveryRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: '${CustomerRoutes.stores}/:storeId/reviews',
+        builder: (context, state) {
+          final int? storeId = int.tryParse(
+            state.pathParameters['storeId'] ?? '',
+          );
+          if (storeId == null) {
+            return const PopqErrorView(message: '사업장 번호가 올바르지 않습니다.');
+          }
+          return StoreReviewScreen(
+            storeId: storeId,
+            storeRepository: storeDiscoveryRepository,
+            engagementRepository: engagementRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path:
         '${CustomerRoutes.stores}/:storeId/products/:productId',
         builder: (context, state) {
           final storeId = int.tryParse(
@@ -447,6 +503,8 @@ GoRouter createCustomerRouter({
             engagementRepository,
             sessionController:
             sessionController,
+            catalogRepository: catalogRepository,
+            announcementRepository: announcementRepository,
           );
         },
       ),

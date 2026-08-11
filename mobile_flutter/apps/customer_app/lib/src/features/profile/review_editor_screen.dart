@@ -96,7 +96,7 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
       setState(() => _saving = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('리뷰를 등록하지 못했어요.')));
+      ).showTopSnackBar(const SnackBar(content: Text('리뷰를 등록하지 못했어요.')));
     }
   }
 }

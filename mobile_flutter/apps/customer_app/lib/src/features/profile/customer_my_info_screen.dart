@@ -63,8 +63,8 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _editProfileImage() async {
@@ -189,8 +189,8 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '비밀번호가 변경되어 모든 기기에서 로그아웃됐어요. 새 비밀번호로 다시 로그인해 주세요.',

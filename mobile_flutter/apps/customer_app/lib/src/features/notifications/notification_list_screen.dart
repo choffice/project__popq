@@ -112,7 +112,7 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('알림을 열지 못했어요.')));
+      ).showTopSnackBar(const SnackBar(content: Text('알림을 열지 못했어요.')));
     }
   }
 

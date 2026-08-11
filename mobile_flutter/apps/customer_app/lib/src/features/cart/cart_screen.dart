@@ -281,7 +281,7 @@ class _CartScreenState extends State<CartScreen> {
       });
 
       if (!store.orderAcceptingEnabled) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(
             content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.'),
           ),
@@ -351,7 +351,7 @@ class _CartScreenState extends State<CartScreen> {
       );
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           SnackBar(
             content: Text(
               '주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.\n$error',

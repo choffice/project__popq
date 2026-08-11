@@ -5,6 +5,7 @@ import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreType;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
@@ -24,6 +25,8 @@ public record PublicStoreResponse(
         BigDecimal longitude,
         LocalTime openTime,
         LocalTime closeTime,
+        LocalDate operationStartDate,
+        LocalDate operationEndDate,
         List<DayOfWeek> closedDays,
         boolean takeoutAvailable,
         boolean dineInAvailable,
@@ -53,6 +56,8 @@ public record PublicStoreResponse(
                 store.getLongitude(),
                 store.getOpenTime(),
                 store.getCloseTime(),
+                store.getOperationStartDate(),
+                store.getOperationEndDate(),
                 parseClosedDays(store.getClosedDays()),
                 store.isTakeoutAvailable(),
                 store.isDineInAvailable(),

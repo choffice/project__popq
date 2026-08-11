@@ -198,7 +198,7 @@ class _SellerNotificationInboxScreenState
   Future<bool> _selectStore(int storeId) async {
     if (!_activeStoreIds.contains(storeId)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(content: Text('현재 접근 가능한 사업장을 다시 확인해 주세요.')),
         );
       }
@@ -209,7 +209,7 @@ class _SellerNotificationInboxScreenState
       return true;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(content: Text('사업장 선택을 저장하지 못했어요.')),
         );
       }

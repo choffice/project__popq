@@ -526,8 +526,8 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '팝큐 비즈 연결이 완료됐어요. 같은 계정으로 판매자 앱에 로그인해 보세요.',
@@ -537,15 +537,15 @@ class _CustomerProfileScreenState
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text('팝큐 비즈 연결에 실패했어요. ($error)'),
           ),
@@ -576,8 +576,8 @@ class _CustomerProfileScreenState
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               pickerSource == ImageSource.camera
@@ -600,22 +600,22 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(content: Text('프로필 사진이 변경됐어요.')),
         );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text('프로필 사진을 변경하지 못했어요. ($error)')),
         );
     } finally {
@@ -627,8 +627,8 @@ class _CustomerProfileScreenState
 
   void _showComingSoon() {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
           content: Text('준비 중인 기능이에요.'),
         ),
@@ -662,8 +662,8 @@ class _CustomerProfileScreenState
 
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               result.immediate
@@ -676,15 +676,15 @@ class _CustomerProfileScreenState
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text(failure.message)),
         );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text('회원 탈퇴에 실패했어요. ($error)'),
           ),

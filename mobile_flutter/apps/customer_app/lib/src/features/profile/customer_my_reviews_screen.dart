@@ -230,7 +230,7 @@ class _CustomerMyReviewsScreenState
 
                       ScaffoldMessenger.of(
                         dialogContext,
-                      ).showSnackBar(
+                      ).showTopSnackBar(
                         const SnackBar(
                           content: Text(
                             '리뷰를 수정하지 못했어요.',
@@ -307,7 +307,7 @@ class _CustomerMyReviewsScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('리뷰를 삭제하지 못했어요.'),
         ),

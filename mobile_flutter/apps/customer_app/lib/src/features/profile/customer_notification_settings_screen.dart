@@ -47,13 +47,13 @@ class _CustomerNotificationSettingsScreenState
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(failure.message)));
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(SnackBar(content: Text(failure.message)));
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(content: Text('알림 설정을 변경하지 못했어요. ($error)')),
         );
     } finally {

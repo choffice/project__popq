@@ -409,7 +409,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
 
                 if (created == true) {
                   ScaffoldMessenger.of(context)
-                      .showSnackBar(
+                      .showTopSnackBar(
                     const SnackBar(
                       content: Text(
                         '리뷰를 등록했어요.',
@@ -549,7 +549,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '최신 주문 정보를 불러오지 못했습니다.',
@@ -681,7 +681,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _syncing = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text(
             result.refreshRequired
@@ -699,7 +699,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _syncing = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '최신 상태를 확인하지 못했습니다.',
@@ -781,7 +781,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _error = null;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '주문을 취소했고 결제 금액도 환불 처리했어요.',
@@ -800,7 +800,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
         _canceling = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '주문을 취소하지 못했습니다. 판매자가 이미 접수했거나 환불 처리에 실패했을 수 있어요.',

@@ -426,7 +426,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
         _signingOut = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('로그아웃하지 못했어요.'),
         ),
@@ -440,7 +440,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       stores = await widget.storeRepository.findInactive();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('휴업·폐업 사업장을 불러오지 못했습니다.')),
       );
       return;
@@ -523,7 +523,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       await widget.selectionController.select(reopened.storeId);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('사업장을 재개하지 못했습니다.')),
       );
       return;
@@ -580,7 +580,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       await widget.onConnectCustomerAccess();
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '팝큐 고객 연결이 완료됐어요. 같은 계정으로 고객 앱에 로그인해 보세요.',
@@ -589,12 +589,12 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       );
     } on PopqFailure catch (failure) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text('팝큐 고객 연결에 실패했어요. ($error)'),
         ),
@@ -608,7 +608,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       identity = await widget.identityRepository.getCurrent();
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('계정 정보를 불러오지 못했어요.'),
         ),
@@ -638,7 +638,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text(
             result.immediate
@@ -653,7 +653,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       setState(() {
         _withdrawing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(content: Text(failure.message)),
       );
     } catch (error) {
@@ -661,7 +661,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
       setState(() {
         _withdrawing = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         SnackBar(
           content: Text('회원 탈퇴에 실패했어요. ($error)'),
         ),

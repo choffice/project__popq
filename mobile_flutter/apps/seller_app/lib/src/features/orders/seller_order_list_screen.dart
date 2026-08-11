@@ -581,7 +581,7 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: statusColor,
+                color: accepting ? Colors.black : statusColor,
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
               ),
@@ -656,6 +656,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         longitude: store.longitude,
         openTime: store.openTime,
         closeTime: store.closeTime,
+        operationStartDate: store.operationStartDate,
+        operationEndDate: store.operationEndDate,
         closedDays: store.closedDays,
         takeoutAvailable: store.takeoutAvailable,
         dineInAvailable: store.dineInAvailable,
@@ -674,8 +676,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       });
 
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               nextValue
@@ -687,14 +689,14 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(SnackBar(content: Text(failure.message)));
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(SnackBar(content: Text(failure.message)));
     } catch (error) {
       debugPrint('판매자 주문 접수 상태 변경 오류: $error');
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text('주문 접수 상태를 변경하지 못했습니다. 다시 시도해 주세요.'),
           ),

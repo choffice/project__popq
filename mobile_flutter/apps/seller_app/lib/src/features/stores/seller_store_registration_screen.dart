@@ -150,6 +150,8 @@ class _SellerStoreRegistrationScreenState
 
   String _storeType = 'LOCAL_STORE';
   String? _representativeCategory;
+  DateTime? _operationStartDate;
+  DateTime? _operationEndDate;
 
   SellerBusinessSchedule _schedule = SellerBusinessSchedule.standard();
   final List<String> _tags = <String>[];
@@ -234,6 +236,10 @@ class _SellerStoreRegistrationScreenState
               ),
 
               _buildBasicInformationCard(context),
+              const SizedBox(
+                height: PopqSpacing.md,
+              ),
+              _buildOperationPeriodCard(context),
               const SizedBox(
                 height: PopqSpacing.md,
               ),
@@ -1161,6 +1167,113 @@ class _SellerStoreRegistrationScreenState
         ),
       ),
     );
+  }
+
+  Widget _buildOperationPeriodCard(BuildContext context) {
+    final bool eventStore = _storeType == 'EVENT_COMMERCE';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              eventStore ? '행사 운영 기간' : '영업 시작일',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            Text(
+              eventStore
+                  ? '행사 시작일과 종료일을 선택해 주세요.'
+                  : '정식 영업 시작일을 선택할 수 있습니다. 종료일은 선택 사항입니다.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            _operationDateTile(
+              label: eventStore ? '행사 시작일' : '영업 시작일',
+              value: _operationStartDate,
+              onTap: () => _selectOperationDate(start: true),
+              onClear: _operationStartDate == null
+                  ? null
+                  : () => setState(() => _operationStartDate = null),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            _operationDateTile(
+              label: eventStore ? '행사 종료일' : '영업 종료일(선택)',
+              value: _operationEndDate,
+              onTap: () => _selectOperationDate(start: false),
+              onClear: _operationEndDate == null
+                  ? null
+                  : () => setState(() => _operationEndDate = null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _operationDateTile({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+    required VoidCallback? onClear,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.event_outlined),
+      title: Text(label),
+      subtitle: Text(value == null ? '선택 안 함' : _formatDate(value)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (onClear != null)
+            IconButton(
+              tooltip: '날짜 지우기',
+              onPressed: _submitting ? null : onClear,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          IconButton(
+            tooltip: '날짜 선택',
+            onPressed: _submitting ? null : onTap,
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectOperationDate({required bool start}) async {
+    final DateTime today = DateUtils.dateOnly(DateTime.now());
+    final DateTime first = DateTime(today.year - 10);
+    final DateTime last = DateTime(today.year + 20);
+    final DateTime candidate = start
+        ? (_operationStartDate ?? today)
+        : (_operationEndDate ?? _operationStartDate ?? today);
+    final DateTime initial = candidate.isBefore(first)
+        ? first
+        : candidate.isAfter(last)
+            ? last
+            : candidate;
+    final DateTime? selected = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _operationStartDate = DateUtils.dateOnly(selected);
+      } else {
+        _operationEndDate = DateUtils.dateOnly(selected);
+      }
+    });
+  }
+
+  String _formatDate(DateTime value) {
+    final String month = value.month.toString().padLeft(2, '0');
+    final String day = value.day.toString().padLeft(2, '0');
+    return '${value.year}.$month.$day';
   }
 
   Widget _buildOrderPolicyCard(
@@ -2831,16 +2944,73 @@ class _SellerStoreRegistrationScreenState
           ),
         ),
       );
+      final Position resolvedPosition = position;
 
       if (!mounted) {
         return;
       }
 
+      if (requestPermission) {
+        final SellerReverseGeocodeResult result =
+        await widget.repository.reverseGeocode(
+          latitude: resolvedPosition.latitude,
+          longitude: resolvedPosition.longitude,
+        );
+        if (!mounted) return;
+
+        final String currentAddress = _addressController.text.trim();
+        final String resolvedAddress = result.displayAddress.trim();
+        bool applyAddress = currentAddress.isEmpty ||
+            _normalizeComparisonText(currentAddress) ==
+                _normalizeComparisonText(resolvedAddress) ||
+            result.addressCandidates.any(
+              (String candidate) =>
+                  _normalizeComparisonText(candidate) ==
+                  _normalizeComparisonText(currentAddress),
+            );
+
+        if (!applyAddress) {
+          applyAddress = await showDialog<bool>(
+                context: context,
+                builder: (BuildContext dialogContext) => AlertDialog(
+                  title: const Text('현재 위치 주소 적용'),
+                  content: Text(
+                    '기존 주소\n$currentAddress\n\n현재 위치 주소\n$resolvedAddress\n\n'
+                    '현재 위치 주소와 좌표로 변경할까요?',
+                  ),
+                  actions: <Widget>[
+                    TextButton(
+                      onPressed: () => Navigator.pop(dialogContext, false),
+                      child: const Text('기존 주소 유지'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(dialogContext, true),
+                      child: const Text('현재 위치 적용'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+        }
+
+        if (applyAddress && mounted) {
+          setState(() {
+            _addressController.text = resolvedAddress;
+            _selectedStoreLocation = _SelectedStoreLocation(
+              latitude: resolvedPosition.latitude,
+              longitude: resolvedPosition.longitude,
+              address: resolvedAddress,
+              sourceLabel: '현재 위치',
+            );
+          });
+        }
+      }
+
       setState(() {
         _currentDeviceLocation =
             _DeviceLocation(
-              latitude: position!.latitude,
-              longitude: position.longitude,
+              latitude: resolvedPosition.latitude,
+              longitude: resolvedPosition.longitude,
             );
 
         _currentLocationMessage =
@@ -3271,6 +3441,13 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
+    if (_operationStartDate != null &&
+        _operationEndDate != null &&
+        _operationEndDate!.isBefore(_operationStartDate!)) {
+      _showMessage('운영 종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     if (!_takeoutAvailable &&
         !_dineInAvailable) {
       _showMessage(
@@ -3337,6 +3514,8 @@ class _SellerStoreRegistrationScreenState
 
         openTime: _schedule.legacyOpenTimeForApi,
         closeTime: _schedule.legacyCloseTimeForApi,
+        operationStartDate: _operationStartDate,
+        operationEndDate: _operationEndDate,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
         takeoutAvailable:
@@ -3417,8 +3596,8 @@ class _SellerStoreRegistrationScreenState
       String message,
       ) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         SnackBar(
           content: Text(message),
         ),

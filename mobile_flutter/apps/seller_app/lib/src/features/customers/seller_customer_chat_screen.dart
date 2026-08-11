@@ -800,7 +800,7 @@ class _SellerCustomerChatScreenState
         _loadingOlder = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('이전 메시지를 불러오지 못했어요.'),
         ),
@@ -874,7 +874,7 @@ class _SellerCustomerChatScreenState
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('최신 메시지를 불러오지 못했어요.'),
         ),
@@ -1006,7 +1006,7 @@ class _SellerCustomerChatScreenState
     }
 
     if (content.length > 2000) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text('메시지는 2,000자 이하로 입력해 주세요.'),
         ),
@@ -1172,7 +1172,7 @@ class _SellerCustomerChatScreenState
 
       debugPrint('판매자 메시지 전송 실패: $error');
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(
           content: Text(
             '메시지 전송에 실패했어요. 말풍선 아래 재전송을 눌러 주세요.',
