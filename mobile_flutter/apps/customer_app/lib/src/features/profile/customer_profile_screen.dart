@@ -274,7 +274,7 @@ class _CustomerProfileScreenState
                   _MenuRowData(
                     icon:
                     Icons.confirmation_number_outlined,
-                    title: '예약 내역',
+                    title: '주문 내역',
                     subtitle: _unreadMessageCount > 0
                         ? '매장에서 보낸 새 답변이 '
                         '$_unreadMessageCount개 있어요'
@@ -508,7 +508,7 @@ class _CustomerProfileScreenState
       });
     } catch (error, stackTrace) {
       debugPrint(
-        '예약 내역의 읽지 않은 답변 수를 '
+        '주문 내역의 읽지 않은 답변 수를 '
             '불러오지 못했습니다: $error',
       );
 
