@@ -46,6 +46,9 @@ public class Announcement extends BaseTimeEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
+    @Column(name = "pinned", nullable = false)
+    private boolean pinned;
+
     private Announcement(Store store, String title, String content) {
         this.store = store;
         this.title = title;
@@ -70,7 +73,19 @@ public class Announcement extends BaseTimeEntity {
         this.status = status;
         if (status == AnnouncementStatus.PUBLISHED) {
             this.publishedAt = now;
+        } else {
+            this.pinned = false;
         }
     }
-}
 
+    public void pin() {
+        if (status != AnnouncementStatus.PUBLISHED) {
+            throw new IllegalStateException("only published announcements can be pinned");
+        }
+        this.pinned = true;
+    }
+
+    public void unpin() {
+        this.pinned = false;
+    }
+}

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../routing/customer_router.dart';
 import '../announcements/public_announcement_repository.dart';
+import '../announcements/announcement_pinned_badge.dart';
 import '../catalog/catalog_repository.dart';
 import '../profile/customer_engagement_repository.dart';
 import 'store_discovery_repository.dart';
@@ -544,7 +545,15 @@ class _LatestAnnouncementPreview extends StatelessWidget {
                 return Card(
                   child: ListTile(
                     leading: const Icon(Icons.campaign_outlined),
-                    title: Text(latest.title),
+                    title: Row(
+                      children: <Widget>[
+                        if (latest.pinned) ...<Widget>[
+                          const AnnouncementPinnedBadge(),
+                          const SizedBox(width: PopqSpacing.xs),
+                        ],
+                        Expanded(child: Text(latest.title)),
+                      ],
+                    ),
                     subtitle: Text(_announcementDateLabel(latest.publishedAt)),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => context.push(

@@ -9,6 +9,7 @@ class SellerAnnouncement {
     required this.status,
     required this.createdAt,
     required this.updatedAt,
+    this.pinned = false,
     this.publishedAt,
   });
 
@@ -19,6 +20,7 @@ class SellerAnnouncement {
       title: json['title'] as String,
       content: json['content'] as String,
       status: json['status'] as String,
+      pinned: json['pinned'] as bool? ?? false,
       publishedAt: json['publishedAt'] == null
           ? null
           : DateTime.parse(json['publishedAt'] as String),
@@ -32,6 +34,7 @@ class SellerAnnouncement {
   final String title;
   final String content;
   final String status;
+  final bool pinned;
   final DateTime? publishedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -40,6 +43,7 @@ class SellerAnnouncement {
     String? title,
     String? content,
     String? status,
+    bool? pinned,
     DateTime? publishedAt,
     DateTime? updatedAt,
   }) {
@@ -49,6 +53,7 @@ class SellerAnnouncement {
       title: title ?? this.title,
       content: content ?? this.content,
       status: status ?? this.status,
+      pinned: pinned ?? this.pinned,
       publishedAt: publishedAt ?? this.publishedAt,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -79,10 +84,15 @@ abstract interface class SellerAnnouncementRepository {
     SellerAnnouncement announcement,
     String status,
   );
+
+  Future<SellerAnnouncement> changePin(
+    int storeId,
+    SellerAnnouncement announcement,
+    bool pinned,
+  );
 }
 
-class ApiSellerAnnouncementRepository
-    implements SellerAnnouncementRepository {
+class ApiSellerAnnouncementRepository implements SellerAnnouncementRepository {
   ApiSellerAnnouncementRepository(this._apiClient);
 
   final PopqApiClient _apiClient;
@@ -118,9 +128,8 @@ class ApiSellerAnnouncementRepository
         'content': content,
         'notifyInterestedCustomers': notifyInterestedCustomers,
       },
-      decode: (value) => SellerAnnouncement.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerAnnouncement.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -140,9 +149,8 @@ class ApiSellerAnnouncementRepository
         'content': content,
         'notifyInterestedCustomers': notifyInterestedCustomers,
       },
-      decode: (value) => SellerAnnouncement.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerAnnouncement.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -156,9 +164,23 @@ class ApiSellerAnnouncementRepository
     return _apiClient.patch(
       '${_basePath(storeId)}/${announcement.announcementId}/status',
       body: {'status': status},
-      decode: (value) => SellerAnnouncement.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerAnnouncement.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<SellerAnnouncement> changePin(
+    int storeId,
+    SellerAnnouncement announcement,
+    bool pinned,
+  ) {
+    _requireStore(storeId, announcement);
+    return _apiClient.patch(
+      '${_basePath(storeId)}/${announcement.announcementId}/pin',
+      body: {'pinned': pinned},
+      decode: (value) =>
+          SellerAnnouncement.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -179,10 +201,9 @@ class MemorySellerAnnouncementRepository
 
   @override
   Future<List<SellerAnnouncement>> findAll(int storeId) async {
-    final result = _announcements
-        .where((item) => item.storeId == storeId)
-        .toList()
-      ..sort((left, right) => right.createdAt.compareTo(left.createdAt));
+    final result =
+        _announcements.where((item) => item.storeId == storeId).toList()
+          ..sort(_compareAnnouncements);
     return List.unmodifiable(result);
   }
 
@@ -194,7 +215,8 @@ class MemorySellerAnnouncementRepository
     required bool notifyInterestedCustomers,
   }) async {
     final now = DateTime.now().toUtc();
-    final nextId = _announcements.fold<int>(
+    final nextId =
+        _announcements.fold<int>(
           0,
           (value, item) =>
               item.announcementId > value ? item.announcementId : value,
@@ -206,6 +228,7 @@ class MemorySellerAnnouncementRepository
       title: title,
       content: content,
       status: notifyInterestedCustomers ? 'PUBLISHED' : 'DRAFT',
+      pinned: false,
       publishedAt: notifyInterestedCustomers ? now : null,
       createdAt: now,
       updatedAt: now,
@@ -244,8 +267,35 @@ class MemorySellerAnnouncementRepository
     final now = DateTime.now().toUtc();
     final updated = announcement.copyWith(
       status: status,
+      pinned: status == 'PUBLISHED' ? announcement.pinned : false,
       publishedAt: status == 'PUBLISHED' ? now : announcement.publishedAt,
       updatedAt: now,
+    );
+    _announcements[index] = updated;
+    return updated;
+  }
+
+  @override
+  Future<SellerAnnouncement> changePin(
+    int storeId,
+    SellerAnnouncement announcement,
+    bool pinned,
+  ) async {
+    final index = _findIndex(storeId, announcement);
+    if (pinned && announcement.status != 'PUBLISHED') {
+      throw StateError('only published announcements can be pinned');
+    }
+    if (pinned && !announcement.pinned) {
+      final pinnedCount = _announcements
+          .where((item) => item.storeId == storeId && item.pinned)
+          .length;
+      if (pinnedCount >= 3) {
+        throw StateError('announcement pin limit exceeded');
+      }
+    }
+    final updated = announcement.copyWith(
+      pinned: pinned,
+      updatedAt: DateTime.now().toUtc(),
     );
     _announcements[index] = updated;
     return updated;
@@ -262,4 +312,17 @@ class MemorySellerAnnouncementRepository
     }
     return index;
   }
+}
+
+int _compareAnnouncements(SellerAnnouncement left, SellerAnnouncement right) {
+  if (left.pinned != right.pinned) return left.pinned ? -1 : 1;
+  if (left.pinned) {
+    final publishedOrder = (right.publishedAt ?? right.createdAt).compareTo(
+      left.publishedAt ?? left.createdAt,
+    );
+    if (publishedOrder != 0) return publishedOrder;
+  }
+  final createdOrder = right.createdAt.compareTo(left.createdAt);
+  if (createdOrder != 0) return createdOrder;
+  return right.announcementId.compareTo(left.announcementId);
 }

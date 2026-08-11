@@ -5,6 +5,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../discovery/store_section_widgets.dart';
+import 'announcement_pinned_badge.dart';
 import 'public_announcement_repository.dart';
 
 class PublicAnnouncementListScreen extends StatefulWidget {
@@ -100,7 +101,15 @@ class _PublicAnnouncementListScreenState
                                     PopqSpacing.sm,
                                   ),
                                   child: ListTile(
-                                    title: Text(item.title),
+                                    title: Row(
+                                      children: <Widget>[
+                                        if (item.pinned) ...<Widget>[
+                                          const AnnouncementPinnedBadge(),
+                                          const SizedBox(width: PopqSpacing.xs),
+                                        ],
+                                        Expanded(child: Text(item.title)),
+                                      ],
+                                    ),
                                     subtitle: Text(
                                       _formatDate(item.publishedAt),
                                     ),
@@ -159,9 +168,23 @@ class PublicAnnouncementDetailScreen extends StatelessWidget {
               return ListView(
                 padding: const EdgeInsets.all(PopqSpacing.lg),
                 children: <Widget>[
-                  Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      if (item.pinned) ...<Widget>[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: AnnouncementPinnedBadge(),
+                        ),
+                        const SizedBox(width: PopqSpacing.sm),
+                      ],
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: PopqSpacing.xs),
                   Text(_formatDate(item.publishedAt)),

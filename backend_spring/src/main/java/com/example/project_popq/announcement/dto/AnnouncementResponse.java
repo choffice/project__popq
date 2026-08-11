@@ -10,6 +10,7 @@ public record AnnouncementResponse(
         String title,
         String content,
         AnnouncementStatus status,
+        boolean pinned,
         Instant publishedAt,
         Instant createdAt,
         Instant updatedAt
@@ -21,10 +22,10 @@ public record AnnouncementResponse(
                 announcement.getTitle(),
                 announcement.getContent(),
                 announcement.getStatus(),
+                announcement.isPinned(),
                 announcement.getPublishedAt(),
                 announcement.getCreatedAt(),
                 announcement.getUpdatedAt()
         );
     }
 }
-

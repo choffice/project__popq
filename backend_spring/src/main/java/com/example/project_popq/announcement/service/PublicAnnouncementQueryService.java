@@ -24,7 +24,7 @@ public class PublicAnnouncementQueryService {
     public List<AnnouncementResponse> findAll(Long storeId) {
         requireDiscoverableStore(storeId);
         return announcementRepository
-                .findAllByStoreIdAndStatusOrderByPublishedAtDescIdDesc(
+                .findAllByStoreIdAndStatusOrderByPinnedDescPublishedAtDescIdDesc(
                         storeId,
                         AnnouncementStatus.PUBLISHED
                 )

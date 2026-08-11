@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'seller_announcement_repository.dart';
@@ -62,10 +63,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
     }
     if (_error != null || _announcements == null) {
-      return PopqErrorView(
-        message: '공지사항을 불러오지 못했습니다.',
-        onRetry: _load,
-      );
+      return PopqErrorView(message: '공지사항을 불러오지 못했습니다.', onRetry: _load);
     }
     if (_announcements!.isEmpty) {
       return Center(
@@ -94,32 +92,60 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        key: const Key('announcement-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          PopqSpacing.md,
-          0,
-          PopqSpacing.md,
-          PopqSpacing.md,
-        ),
-        itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
-        separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
-        itemBuilder: (BuildContext context, int index) {
-          if (index == _announcements!.length) {
-            return const Padding(
-              padding: EdgeInsets.only(top: PopqSpacing.sm),
-              child: Text(
-                'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
-                textAlign: TextAlign.center,
+    return Column(
+      children: [
+        if (widget.canManage)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PopqSpacing.md,
+              0,
+              PopqSpacing.md,
+              PopqSpacing.sm,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('add-another-announcement'),
+                onPressed: () => _edit(),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('새 공지 작성'),
               ),
-            );
-          }
-          return _announcementCard(_announcements![index]);
-        },
-      ),
+            ),
+          ),
+
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
+              key: const Key('announcement-list'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                PopqSpacing.md,
+                0,
+                PopqSpacing.md,
+                PopqSpacing.md,
+              ),
+              itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: PopqSpacing.sm),
+              itemBuilder: (BuildContext context, int index) {
+                if (index == _announcements!.length) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: PopqSpacing.sm),
+                    child: Text(
+                      'STAFF는 공지사항을 조회할 수 있으며 '
+                      '작성·수정·게시 권한은 없습니다.',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                return _announcementCard(_announcements![index]);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -139,8 +165,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          if (widget.canManage &&
-              (_announcements?.isNotEmpty ?? false))
+          if (widget.canManage && (_announcements?.isNotEmpty ?? false))
             FilledButton.icon(
               key: const Key('add-announcement'),
               onPressed: () => _edit(),
@@ -172,6 +197,10 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                     ),
                   ),
                 ),
+                if (announcement.pinned) ...<Widget>[
+                  const _PinnedBadge(),
+                  const SizedBox(width: PopqSpacing.xs),
+                ],
                 Chip(
                   label: Text(_statusLabel(announcement.status)),
                   backgroundColor: _statusColor(announcement.status),
@@ -200,6 +229,22 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('수정'),
                   ),
+                  if (announcement.status == 'PUBLISHED')
+                    TextButton.icon(
+                      key: Key(
+                        'pin-announcement-${announcement.announcementId}',
+                      ),
+                      onPressed: updating
+                          ? null
+                          : () =>
+                                _changePin(announcement, !announcement.pinned),
+                      icon: Icon(
+                        announcement.pinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin_rounded,
+                      ),
+                      label: Text(announcement.pinned ? '고정 해제' : '고정'),
+                    ),
                   TextButton.icon(
                     key: Key(
                       'toggle-announcement-${announcement.announcementId}',
@@ -295,6 +340,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
         } else {
           announcements[index] = saved;
         }
+        announcements.sort(_compareAnnouncements);
         _announcements = announcements;
         _error = null;
       });
@@ -322,6 +368,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
           (item) => item.announcementId == saved.announcementId,
         );
         if (index >= 0) _announcements![index] = saved;
+        _announcements!.sort(_compareAnnouncements);
         _updatingIds.remove(announcement.announcementId);
       });
       _showMessage('${saved.title} 공지를 ${_statusLabel(status)} 상태로 변경했습니다.');
@@ -329,6 +376,43 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       if (!mounted) return;
       setState(() => _updatingIds.remove(announcement.announcementId));
       _showMessage('공지 게시 상태를 변경하지 못했습니다.');
+    }
+  }
+
+  Future<void> _changePin(SellerAnnouncement announcement, bool pinned) async {
+    setState(() => _updatingIds.add(announcement.announcementId));
+    try {
+      final saved = await widget.repository.changePin(
+        widget.storeId,
+        announcement,
+        pinned,
+      );
+      if (!mounted) return;
+      setState(() {
+        final index = _announcements!.indexWhere(
+          (item) => item.announcementId == saved.announcementId,
+        );
+        if (index >= 0) _announcements![index] = saved;
+        _announcements!.sort(_compareAnnouncements);
+        _updatingIds.remove(announcement.announcementId);
+      });
+      _showMessage(
+        pinned ? '${saved.title} 공지를 상단에 고정했습니다.' : '공지 고정을 해제했습니다.',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _updatingIds.remove(announcement.announcementId));
+      if (error is ApiRequestFailure &&
+          error.code == 'ANNOUNCEMENT_PIN_LIMIT_EXCEEDED') {
+        _showMessage('고정 공지는 최대 3개까지 설정할 수 있습니다.');
+        return;
+      }
+      if (error is ApiRequestFailure &&
+          error.code == 'ANNOUNCEMENT_PIN_REQUIRES_PUBLISHED') {
+        _showMessage('게시 중인 공지만 고정할 수 있습니다.');
+        return;
+      }
+      _showMessage('공지 고정 상태를 변경하지 못했습니다.');
     }
   }
 
@@ -355,6 +439,42 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       context,
     ).showTopSnackBar(SnackBar(content: Text(message)));
   }
+}
+
+class _PinnedBadge extends StatelessWidget {
+  const _PinnedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '고정',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colors.onPrimaryContainer,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+int _compareAnnouncements(SellerAnnouncement left, SellerAnnouncement right) {
+  if (left.pinned != right.pinned) return left.pinned ? -1 : 1;
+  if (left.pinned) {
+    final publishedOrder = (right.publishedAt ?? right.createdAt).compareTo(
+      left.publishedAt ?? left.createdAt,
+    );
+    if (publishedOrder != 0) return publishedOrder;
+  }
+  final createdOrder = right.createdAt.compareTo(left.createdAt);
+  if (createdOrder != 0) return createdOrder;
+  return right.announcementId.compareTo(left.announcementId);
 }
 
 class _AnnouncementDraft {
