@@ -24,18 +24,25 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
 
   int? _rating;
   var _unanswered = false;
-  late Future<List<SellerReview>> _allReviews;
+  List<SellerReview>? _allReviews;
+  Object? _error;
+  var _loading = true;
+  var _requestSerial = 0;
 
   @override
   void initState() {
     super.initState();
-    _allReviews = _loadAll();
+    _load();
   }
 
   @override
   void didUpdateWidget(covariant SellerReviewSection oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.storeId != widget.storeId) _reload();
+    if (oldWidget.storeId != widget.storeId ||
+        oldWidget.repository != widget.repository) {
+      _allReviews = null;
+      _load();
+    }
   }
 
   @override
@@ -52,23 +59,9 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           child: Row(
             children: [
               Expanded(
-                child: FutureBuilder<List<SellerReview>>(
-                  future: _allReviews,
-                  builder: (context, snapshot) {
-                    final reviews = snapshot.data ?? const <SellerReview>[];
-                    final average = reviews.isEmpty
-                        ? null
-                        : reviews
-                                  .map((item) => item.rating)
-                                  .reduce((a, b) => a + b) /
-                              reviews.length;
-                    return Text(
-                      average == null
-                          ? '전체 평점 - · 리뷰 0개'
-                          : '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    );
-                  },
+                child: Text(
+                  _reviewSummary(),
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
               ),
               if (widget.canReply)
@@ -110,46 +103,58 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
             ],
           ),
         ),
-        Expanded(
-          child: FutureBuilder<List<SellerReview>>(
-            future: _allReviews,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
-              }
-              if (snapshot.hasError) {
-                return PopqErrorView(
-                  message: '리뷰를 불러오지 못했습니다.',
-                  onRetry: _reload,
-                );
-              }
-              final reviews = (snapshot.data ?? const <SellerReview>[])
-                  .where(
-                    (review) => _rating == null || review.rating == _rating,
-                  )
-                  .where((review) => !_unanswered || review.sellerReply == null)
-                  .toList(growable: false);
-              if (reviews.isEmpty) {
-                return const PopqEmptyView(
-                  icon: Icons.reviews_outlined,
-                  title: '조건에 맞는 리뷰가 없어요.',
-                  description: '별점 또는 미답변 필터를 바꿔 보세요.',
-                );
-              }
-              return RefreshIndicator(
-                onRefresh: _reload,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(PopqSpacing.md),
-                  itemCount: reviews.length,
-                  separatorBuilder: (_, _) =>
-                      const SizedBox(height: PopqSpacing.sm),
-                  itemBuilder: (context, index) => _reviewCard(reviews[index]),
-                ),
-              );
-            },
-          ),
-        ),
+        Expanded(child: _buildBody()),
       ],
+    );
+  }
+
+  String _reviewSummary() {
+    final reviews = _allReviews ?? const <SellerReview>[];
+    if (reviews.isEmpty) return '전체 평점 - · 리뷰 0개';
+    final average = reviews.map((item) => item.rating).reduce((a, b) => a + b) /
+        reviews.length;
+    return '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개';
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
+    }
+    if (_error != null || _allReviews == null) {
+      return PopqErrorView(
+        message: '리뷰를 불러오지 못했습니다.',
+        onRetry: _reload,
+      );
+    }
+    if (_allReviews!.isEmpty) {
+      return const PopqEmptyView(
+        icon: Icons.reviews_outlined,
+        title: '등록된 리뷰가 없습니다.',
+        description: '고객이 리뷰를 작성하면 이곳에 표시됩니다.',
+      );
+    }
+
+    final reviews = _allReviews!
+        .where((review) => _rating == null || review.rating == _rating)
+        .where((review) => !_unanswered || review.sellerReply == null)
+        .toList(growable: false);
+    if (reviews.isEmpty) {
+      return const PopqEmptyView(
+        icon: Icons.filter_alt_off_outlined,
+        title: '조건에 맞는 리뷰가 없습니다.',
+        description: '별점 또는 미답변 필터를 바꿔 보세요.',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        itemCount: reviews.length,
+        separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
+        itemBuilder: (context, index) => _reviewCard(reviews[index]),
+      ),
     );
   }
 
@@ -209,16 +214,38 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
     setState(() => _rating = value);
   }
 
-  Future<void> _reload() async {
+  Future<void> _load() async {
+    final storeId = widget.storeId;
+    final requestSerial = ++_requestSerial;
     setState(() {
-      _allReviews = _loadAll();
+      _loading = true;
+      _error = null;
     });
     try {
-      await _allReviews;
-    } catch (_) {
-      // FutureBuilder가 오류 상태와 재시도 UI를 표시한다.
+      final reviews = await _loadAll();
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.storeId != storeId) {
+        return;
+      }
+      setState(() {
+        _allReviews = List<SellerReview>.of(reviews);
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted ||
+          requestSerial != _requestSerial ||
+          widget.storeId != storeId) {
+        return;
+      }
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
     }
   }
+
+  Future<void> _reload() => _load();
 
   Future<void> _editReply(SellerReview review) async {
     List<SellerReviewReplyTemplate> templates;
@@ -347,11 +374,12 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   }
 
   void _replaceReview(SellerReview saved) {
-    List<SellerReview> replace(List<SellerReview> reviews) => reviews
-        .map((item) => item.reviewId == saved.reviewId ? saved : item)
-        .toList(growable: false);
+    final reviews = _allReviews;
+    if (reviews == null) return;
     setState(() {
-      _allReviews = _allReviews.then(replace);
+      _allReviews = reviews
+          .map((item) => item.reviewId == saved.reviewId ? saved : item)
+          .toList(growable: false);
     });
   }
 

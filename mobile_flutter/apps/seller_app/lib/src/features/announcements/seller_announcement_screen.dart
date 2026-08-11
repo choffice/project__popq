@@ -49,75 +49,76 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
+        _buildHeader(context),
+        Expanded(child: _buildBody()),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
+    }
+    if (_error != null || _announcements == null) {
+      return PopqErrorView(
+        message: '공지사항을 불러오지 못했습니다.',
+        onRetry: _load,
+      );
+    }
+    if (_announcements!.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(PopqSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const PopqEmptyView(
+                icon: Icons.campaign_outlined,
+                title: '등록된 공지사항이 없어요.',
+                description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
+              ),
+              if (widget.canManage) ...<Widget>[
+                const SizedBox(height: PopqSpacing.md),
+                FilledButton.icon(
+                  key: const Key('add-first-announcement'),
+                  onPressed: () => _edit(),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('첫 공지 작성'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
-      child: CustomScrollView(
+      child: ListView.separated(
         key: const Key('announcement-list'),
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: <Widget>[
-          SliverToBoxAdapter(child: _buildHeader(context)),
-          if (_loading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.'),
-            )
-          else if (_error != null || _announcements == null)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: PopqErrorView(
-                message: '공지사항을 불러오지 못했습니다.',
-                onRetry: _load,
+        padding: const EdgeInsets.fromLTRB(
+          PopqSpacing.md,
+          0,
+          PopqSpacing.md,
+          PopqSpacing.md,
+        ),
+        itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
+        separatorBuilder: (_, _) => const SizedBox(height: PopqSpacing.sm),
+        itemBuilder: (BuildContext context, int index) {
+          if (index == _announcements!.length) {
+            return const Padding(
+              padding: EdgeInsets.only(top: PopqSpacing.sm),
+              child: Text(
+                'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
+                textAlign: TextAlign.center,
               ),
-            )
-          else if (_announcements!.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.all(PopqSpacing.lg),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    const PopqEmptyView(
-                      icon: Icons.campaign_outlined,
-                      title: '등록된 공지사항이 없어요.',
-                      description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
-                    ),
-                    if (widget.canManage) ...<Widget>[
-                      const SizedBox(height: PopqSpacing.md),
-                      FilledButton.icon(
-                        key: const Key('add-first-announcement'),
-                        onPressed: () => _edit(),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('첫 공지 작성'),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(PopqSpacing.md),
-              sliver: SliverList.builder(
-                itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
-                itemBuilder: (BuildContext context, int index) {
-                  if (index == _announcements!.length) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: PopqSpacing.sm),
-                      child: Text(
-                        'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
-                    child: _announcementCard(_announcements![index]),
-                  );
-                },
-              ),
-            ),
-        ],
+            );
+          }
+          return _announcementCard(_announcements![index]);
+        },
       ),
     );
   }
@@ -138,7 +139,8 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          if (widget.canManage)
+          if (widget.canManage &&
+              (_announcements?.isNotEmpty ?? false))
             FilledButton.icon(
               key: const Key('add-announcement'),
               onPressed: () => _edit(),
