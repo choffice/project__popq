@@ -574,6 +574,8 @@ GoRouter createCustomerRouter({
             orderRepository,
             messageRepository:
             orderMessageRepository,
+            notificationRepository:
+            notificationRepository,
           );
         },
       ),

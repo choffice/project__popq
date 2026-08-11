@@ -22,6 +22,7 @@ public class ChatPushNotificationService {
   private final StoreMemberRepository storeMemberRepository;
   private final StoreRepository storeRepository;
   private final PushDeliveryService pushDeliveryService;
+  private final CustomerBadgeCountService customerBadgeCountService;
 
   @Transactional(readOnly = true)
   public void sendFor(OrderChatEvent event) {
@@ -54,7 +55,8 @@ public class ChatPushNotificationService {
         "targetId", orderPublicId,
         "orderPublicId", orderPublicId,
         "senderType", MessageSenderType.CUSTOMER.name(),
-        "deepLink", "/customers/" + orderPublicId + "?storeId=" + event.storeId()
+        "deepLink", "/customers/" + orderPublicId
+            + "?storeId=" + event.storeId()
     );
 
     storeMemberRepository
@@ -87,13 +89,18 @@ public class ChatPushNotificationService {
 
     String body = messagePreview(event.message().content());
 
+    long badgeCount =
+        customerBadgeCountService
+            .countUnread(event.customerUserId());
+
     Map<String, String> data = Map.of(
         "type", "CHAT_MESSAGE",
         "targetType", "ORDER_CHAT",
         "targetId", orderPublicId,
         "orderPublicId", orderPublicId,
         "senderType", MessageSenderType.SELLER.name(),
-        "deepLink", "/orders/" + orderPublicId + "/messages"
+        "deepLink", "/orders/" + orderPublicId + "/messages",
+        "badgeCount", Long.toString(badgeCount)
     );
 
     pushDeliveryService.deliverToUser(

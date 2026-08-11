@@ -4,6 +4,7 @@ import com.example.project_popq.auth.dto.AuthUserResponse;
 import com.example.project_popq.auth.dto.DevLoginRequest;
 import com.example.project_popq.auth.dto.DevLoginResponse;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedAccessToken;
+import com.example.project_popq.auth.service.JwtTokenService.IssuedRefreshToken;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.seller.domain.SellerProfile;
@@ -26,37 +27,68 @@ public class DevAuthService {
     @Transactional
     public DevLoginResponse login(DevLoginRequest request) {
         validateRole(request.role());
-        String normalizedEmail = request.email().trim().toLowerCase();
 
-        User user = userRepository.findByEmailIgnoreCase(normalizedEmail)
-                .orElseGet(() -> createUser(request, normalizedEmail));
+        String normalizedEmail = request
+            .email()
+            .trim()
+            .toLowerCase();
+
+        User user = userRepository
+            .findByEmailIgnoreCase(normalizedEmail)
+            .orElseGet(
+                () -> createUser(
+                    request,
+                    normalizedEmail
+                )
+            );
 
         if (!user.isActive()) {
-            throw new BusinessException(ErrorCode.USER_INACTIVE);
+            throw new BusinessException(
+                ErrorCode.USER_INACTIVE
+            );
         }
+
         user.addRole(request.role());
 
-        ensureSellerProfile(user, request.role());
+        ensureSellerProfile(
+            user,
+            request.role()
+        );
 
         IssuedAccessToken accessToken =
             jwtTokenService.issueAccessToken(
                 user,
                 request.role()
             );
+
+        IssuedRefreshToken refreshToken =
+            jwtTokenService.issueRefreshToken(
+                user,
+                request.role()
+            );
+
         return new DevLoginResponse(
-                accessToken.value(),
-                "Bearer",
-                accessToken.expiresInSeconds(),
-                AuthUserResponse.from(user,request.role())
+            accessToken.value(),
+            refreshToken.value(),
+            "Bearer",
+            accessToken.expiresInSeconds(),
+            AuthUserResponse.from(
+                user,
+                request.role()
+            )
         );
     }
 
-    private User createUser(DevLoginRequest request, String normalizedEmail) {
+    private User createUser(
+        DevLoginRequest request,
+        String normalizedEmail
+    ) {
         User created = User.create(
-                normalizedEmail,
-                request.name().trim(),
-                request.role()
+            normalizedEmail,
+            request.name().trim(),
+            request.role()
         );
+
         return userRepository.save(created);
     }
 
@@ -68,16 +100,20 @@ public class DevAuthService {
             && sellerProfileRepository
             .findByUserId(user.getId())
             .isEmpty()) {
+
             sellerProfileRepository.save(
                 SellerProfile.createPending(user)
             );
         }
     }
 
-    private void validateRole(PlatformRole role) {
+    private void validateRole(
+        PlatformRole role
+    ) {
         if (role == PlatformRole.ADMIN) {
-            throw new BusinessException(ErrorCode.INVALID_DEV_ROLE);
+            throw new BusinessException(
+                ErrorCode.INVALID_DEV_ROLE
+            );
         }
     }
 }
-

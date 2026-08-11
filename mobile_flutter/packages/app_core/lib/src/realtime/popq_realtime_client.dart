@@ -17,6 +17,8 @@ typedef _PopqRealtimeJsonCallback = void Function(Map<String, Object?> json);
 
 typedef PopqRealtimeErrorCallback = void Function(Object error);
 
+typedef AccessTokenRefresher = Future<bool> Function();
+
 class PopqRealtimeSubscription {
   PopqRealtimeSubscription._({required VoidCallback onCancel})
     : _onCancel = onCancel;
@@ -41,14 +43,17 @@ class PopqRealtimeClient extends ChangeNotifier {
   PopqRealtimeClient({
     required Uri webSocketUri,
     required AccessTokenReader accessTokenReader,
+    AccessTokenRefresher? accessTokenRefresher,
     this.enableLogs = false,
     this.connectionTimeout = const Duration(seconds: 10),
     this.heartbeatInterval = const Duration(seconds: 10),
   }) : _webSocketUri = webSocketUri,
-       _accessTokenReader = accessTokenReader;
+       _accessTokenReader = accessTokenReader,
+       _accessTokenRefresher = accessTokenRefresher;
 
   final Uri _webSocketUri;
   final AccessTokenReader _accessTokenReader;
+  final AccessTokenRefresher? _accessTokenRefresher;
 
   final bool enableLogs;
   final Duration connectionTimeout;
@@ -67,6 +72,7 @@ class PopqRealtimeClient extends ChangeNotifier {
 
   bool _shouldStayConnected = false;
   bool _connectionAttemptInProgress = false;
+  bool _authRefreshInProgress = false;
   bool _disposed = false;
 
   int _clientGeneration = 0;
@@ -381,13 +387,25 @@ class PopqRealtimeClient extends ChangeNotifier {
           _handleConnectionLost(generation, StateError('STOMP 연결이 종료되었습니다.'));
         },
         onStompError: (StompFrame frame) {
+          final error = StateError(
+            frame.body?.trim().isNotEmpty == true
+                ? frame.body!.trim()
+                : 'STOMP 서버 오류가 발생했습니다.',
+          );
+
+          if (_isAuthenticationError(frame)) {
+            unawaited(
+              _handleAuthenticationFailure(
+                generation,
+                error,
+              ),
+            );
+            return;
+          }
+
           _handleConnectionLost(
             generation,
-            StateError(
-              frame.body?.trim().isNotEmpty == true
-                  ? frame.body!.trim()
-                  : 'STOMP 서버 오류가 발생했습니다.',
-            ),
+            error,
           );
         },
         onWebSocketError: (dynamic error) {
@@ -439,6 +457,99 @@ class PopqRealtimeClient extends ChangeNotifier {
     _setStatus(PopqRealtimeConnectionStatus.connected);
 
     _activateAllSubscriptions();
+  }
+
+  Future<void> _handleAuthenticationFailure(
+    int generation,
+    Object error,
+  ) async {
+    if (_disposed || generation != _clientGeneration) {
+      return;
+    }
+
+    _lastError = error;
+    _connectionAttemptInProgress = false;
+
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
+
+    _stopCurrentClient();
+
+    if (!_shouldStayConnected) {
+      _setStatus(PopqRealtimeConnectionStatus.disconnected);
+      return;
+    }
+
+    final refreshAccessToken = _accessTokenRefresher;
+
+    if (refreshAccessToken == null) {
+      _setStatus(PopqRealtimeConnectionStatus.failed);
+      _log('STOMP 인증 오류가 발생했지만 Access Token 갱신기가 연결되어 있지 않습니다.');
+      return;
+    }
+
+    if (_authRefreshInProgress) {
+      return;
+    }
+
+    _authRefreshInProgress = true;
+    _setStatus(PopqRealtimeConnectionStatus.reconnecting);
+    _log('STOMP 인증 오류 감지: Access Token 갱신을 시도합니다.');
+
+    try {
+      final refreshed = await refreshAccessToken();
+
+      if (_disposed || !_shouldStayConnected) {
+        return;
+      }
+
+      if (!refreshed) {
+        _setStatus(PopqRealtimeConnectionStatus.failed);
+        _log('Access Token 갱신에 실패하여 STOMP 자동 재연결을 중단합니다.');
+        return;
+      }
+
+      _lastError = null;
+      _reconnectAttempt = 0;
+
+      await _startConnection(reconnecting: true);
+    } on Object catch (refreshError) {
+      if (_disposed || !_shouldStayConnected) {
+        return;
+      }
+
+      _lastError = refreshError;
+      _log('Access Token 갱신 중 오류: $refreshError');
+      _scheduleReconnect();
+    } finally {
+      _authRefreshInProgress = false;
+    }
+  }
+
+  bool _isAuthenticationError(StompFrame frame) {
+    final message = <String?>[
+      frame.body,
+      frame.headers['message'],
+    ].whereType<String>().join(' ').trim().toLowerCase();
+
+    if (message.isEmpty) {
+      return false;
+    }
+
+    final mentionsJwt = message.contains('jwt');
+    final mentionsInvalidToken =
+        message.contains('만료') ||
+        message.contains('유효하지') ||
+        message.contains('expired') ||
+        message.contains('invalid');
+
+    if (mentionsJwt && mentionsInvalidToken) {
+      return true;
+    }
+
+    return message.contains('unauthorized') ||
+        message.contains('authentication') ||
+        message.contains('인증 정보');
   }
 
   void _handleConnectionLost(int generation, Object error) {

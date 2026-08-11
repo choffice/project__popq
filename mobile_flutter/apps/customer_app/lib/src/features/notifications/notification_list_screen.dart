@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../notifications/customer_app_badge_service.dart';
 import '../../routing/customer_router.dart';
 import 'customer_notification_repository.dart';
 
@@ -90,7 +91,20 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
   Future<void> _open(CustomerNotification notification) async {
     try {
       if (!notification.read) {
-        await widget.repository.markRead(notification.notificationId);
+        await widget.repository.markRead(
+          notification.notificationId,
+        );
+
+        try {
+          final unreadCount =
+          await widget.repository.badgeCount();
+
+          await CustomerAppBadgeService.updateBadge(
+            unreadCount,
+          );
+        } catch (_) {
+          // 배지 동기화 실패가 알림 열기를 막지 않도록 합니다.
+        }
       }
       if (!mounted) return;
       if (notification.targetType == 'ORDER' &&

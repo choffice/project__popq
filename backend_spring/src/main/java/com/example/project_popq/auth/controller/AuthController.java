@@ -27,6 +27,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.project_popq.user.domain.PlatformRole;
+import com.example.project_popq.auth.dto.RefreshTokenRequest;
+
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -80,6 +82,15 @@ public class AuthController {
     ) {
         return ApiResponse.success(
             socialAuthService.login(request)
+        );
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthTokenResponse> refresh(
+        @RequestBody RefreshTokenRequest request
+    ) {
+        return ApiResponse.success(
+            authService.refresh(request)
         );
     }
 

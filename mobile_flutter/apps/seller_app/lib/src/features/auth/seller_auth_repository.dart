@@ -3,7 +3,10 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'seller_identity_repository.dart';
 
 class SellerAuthResult {
-  const SellerAuthResult({required this.session, required this.identity});
+  const SellerAuthResult({
+    required this.session,
+    required this.identity,
+  });
 
   final AuthSession session;
   final SellerIdentity identity;
@@ -124,7 +127,9 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
       session: AuthSession(
         accessToken: 'memory-access',
         refreshToken: '',
-        expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
+        expiresAt: DateTime.now().toUtc().add(
+          const Duration(hours: 1),
+        ),
       ),
       identity: identity,
     );
@@ -143,13 +148,16 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
     required String name,
     required String phone,
   }) {
-    return _submit('/api/v1/auth/signup', {
-      'email': email,
-      'password': password,
-      'name': name,
-      'phone': phone,
-      'role': 'SELLER',
-    });
+    return _submit(
+      '/api/v1/auth/signup',
+      {
+        'email': email,
+        'password': password,
+        'name': name,
+        'phone': phone,
+        'role': 'SELLER',
+      },
+    );
   }
 
   @override
@@ -157,11 +165,14 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
     required String email,
     required String password,
   }) {
-    return _submit('/api/v1/auth/login', {
-      'email': email,
-      'password': password,
-      'role': 'SELLER',
-    });
+    return _submit(
+      '/api/v1/auth/login',
+      {
+        'email': email,
+        'password': password,
+        'role': 'SELLER',
+      },
+    );
   }
 
   @override
@@ -186,9 +197,17 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
   }) async {
     final response = await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/find-id',
-      body: {'name': name, 'phone': phone},
-      decode: (value) => Map<String, Object?>.from(value as Map),
+      body: {
+        'name': name,
+        'phone': phone,
+      },
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
+
     return response['maskedEmail'] as String;
   }
 
@@ -199,8 +218,15 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
   }) async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/password-reset/verify',
-      body: {'email': email, 'phone': phone},
-      decode: (value) => Map<String, Object?>.from(value as Map),
+      body: {
+        'email': email,
+        'phone': phone,
+      },
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
   }
 
@@ -212,19 +238,35 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
   }) async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/password-reset/confirm',
-      body: {'email': email, 'phone': phone, 'newPassword': newPassword},
-      decode: (value) => Map<String, Object?>.from(value as Map),
+      body: {
+        'email': email,
+        'phone': phone,
+        'newPassword': newPassword,
+      },
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
   }
 
   @override
-  Future<void> withdraw({String? confirmationPhrase}) async {
+  Future<void> withdraw({
+    String? confirmationPhrase,
+  }) async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/withdraw',
       body: confirmationPhrase == null
           ? null
-          : {'confirmationPhrase': confirmationPhrase},
-      decode: (value) => Map<String, Object?>.from(value as Map),
+          : {
+        'confirmationPhrase': confirmationPhrase,
+      },
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
   }
 
@@ -232,34 +274,51 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
   Future<void> connectCustomerAccess() async {
     await _apiClient.post<Map<String, Object?>>(
       '/api/v1/auth/connect-customer',
-      decode: (value) => Map<String, Object?>.from(value as Map),
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
   }
 
   Future<SellerAuthResult> _submit(
-    String path,
-    Map<String, Object?> body,
-  ) async {
+      String path,
+      Map<String, Object?> body,
+      ) async {
     final response = await _apiClient.post<Map<String, Object?>>(
       path,
       body: body,
-      decode: (value) => Map<String, Object?>.from(value as Map),
+      decode: (value) {
+        return Map<String, Object?>.from(
+          value as Map,
+        );
+      },
     );
 
     final identity = SellerIdentity.fromJson(
-      Map<String, Object?>.from(response['user'] as Map),
+      Map<String, Object?>.from(
+        response['user'] as Map,
+      ),
     );
+
     if (!identity.isSeller) {
       throw StateError('seller role is required');
     }
 
     final expiresIn = (response['expiresIn'] as num).toInt();
+
     final session = AuthSession(
       accessToken: response['accessToken'] as String,
-      refreshToken: '',
-      expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
+      refreshToken: response['refreshToken'] as String,
+      expiresAt: DateTime.now().toUtc().add(
+        Duration(seconds: expiresIn),
+      ),
     );
 
-    return SellerAuthResult(session: session, identity: identity);
+    return SellerAuthResult(
+      session: session,
+      identity: identity,
+    );
   }
 }

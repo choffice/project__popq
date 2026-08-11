@@ -2,12 +2,14 @@ package com.example.project_popq.notification.controller;
 
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
+import com.example.project_popq.notification.dto.CustomerBadgeCountResponse;
 import com.example.project_popq.notification.dto.NotificationResponse;
 import com.example.project_popq.notification.dto.PushDeviceResponse;
 import com.example.project_popq.notification.dto.RegisterPushDeviceRequest;
 import com.example.project_popq.notification.dto.UnreadNotificationCountResponse;
 import com.example.project_popq.notification.service.CustomerNotificationService;
 import com.example.project_popq.notification.service.PushDeviceService;
+import com.example.project_popq.notification.service.CustomerBadgeCountService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,7 @@ public class CustomerNotificationController {
     private final CurrentUserService currentUserService;
     private final PushDeviceService pushDeviceService;
     private final CustomerNotificationService notificationService;
+    private final CustomerBadgeCountService customerBadgeCountService;
 
     @PostMapping("/devices")
     public ApiResponse<PushDeviceResponse> registerDevice(
@@ -89,6 +92,21 @@ public class CustomerNotificationController {
                 notificationService.unreadCount(
                         currentUserService.getRequired(jwt)
                 )
+        );
+    }
+
+    @GetMapping("/notifications/badge-count")
+    public ApiResponse<CustomerBadgeCountResponse> badgeCount(
+        @AuthenticationPrincipal Jwt jwt
+    ) {
+        return ApiResponse.success(
+            new CustomerBadgeCountResponse(
+                customerBadgeCountService.countUnread(
+                    currentUserService
+                        .getRequired(jwt)
+                        .getId()
+                )
+            )
         );
     }
 

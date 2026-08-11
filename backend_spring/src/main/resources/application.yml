@@ -57,6 +57,7 @@ popq:
       issuer: ${POPQ_JWT_ISSUER:popq}
       secret: ${POPQ_JWT_SECRET}
       access-token-expiration: ${POPQ_ACCESS_TOKEN_EXPIRATION:PT1H}
+      refresh-token-expiration: ${POPQ_REFRESH_TOKEN_EXPIRATION:P14D}
 
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
