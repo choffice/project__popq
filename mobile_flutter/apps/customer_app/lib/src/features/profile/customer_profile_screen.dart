@@ -11,14 +11,8 @@ import '../../routing/customer_router.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
 
-/// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
-///
-/// 레벨, 방문 횟수, 보유 포인트는 아직 백엔드에
-/// 관련 API가 없어 화면 디자인 확인용 임시값입니다.
-/// 실제 API가 준비되면 [CustomerProfile]에 필드를 추가해 교체합니다.
+/// 마이페이지 상단 카드에 아직 API가 없는 임시 정보입니다.
 abstract final class _ProfileTemporaryStats {
-  static const levelLabel = 'Lv.12';
-  static const visitCount = 37;
   static const pointLabel = '2,450P';
   static const locationLabel = '위치 정보를 설정해 보세요';
 }
@@ -931,8 +925,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  _ProfileTemporaryStats
-                                      .levelLabel,
+                                  profile.activitySummary
+                                      .badgeLabel,
                                   style: theme
                                       .textTheme
                                       .labelMedium
@@ -994,6 +988,10 @@ class _ProfileHeaderCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: PopqSpacing.md),
+                _ActivityCheckpointProgress(
+                  summary: profile.activitySummary,
+                ),
               ],
             ),
           ),
@@ -1033,9 +1031,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                   child: _StatItem(
                     icon: Icons
                         .calendar_today_outlined,
-                    label: '방문 횟수',
-                    value:
-                    '${_ProfileTemporaryStats.visitCount}',
+                    label: '누적 활동',
+                    value: '${profile.activitySummary.totalCount}',
                   ),
                 ),
                 _StatDivider(isDark: isDark),
@@ -1053,6 +1050,61 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ActivityCheckpointProgress extends StatelessWidget {
+  const _ActivityCheckpointProgress({
+    required this.summary,
+  });
+
+  final CustomerActivitySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = isDark ? PopqPalette.lime : PopqPalette.forest;
+    final muted = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+    final next = summary.nextCheckpoint;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                next == null
+                    ? '다이아 뱃지를 달성했어요'
+                    : '다음 체크포인트 ${next}회',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              next == null ? '완료' : '${summary.remainingCount}회 남음',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: muted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: PopqSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 7,
+            value: summary.checkpointProgress.clamp(0.0, 1.0).toDouble(),
+            backgroundColor: accent.withValues(alpha: 0.14),
+            valueColor: AlwaysStoppedAnimation<Color>(accent),
+          ),
+        ),
+      ],
     );
   }
 }

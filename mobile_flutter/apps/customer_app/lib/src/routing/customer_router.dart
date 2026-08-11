@@ -604,6 +604,7 @@ GoRouter createCustomerRouter({
             builder: (context, state) {
               return CustomerQrScannerScreen(
                 apiBaseUrl: apiBaseUrl,
+                engagementRepository: engagementRepository,
               );
             },
           ),

@@ -1,5 +1,44 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+class CustomerActivitySummary {
+  const CustomerActivitySummary({
+    required this.totalCount,
+    required this.badgeTier,
+    required this.currentCheckpoint,
+    required this.nextCheckpoint,
+    required this.remainingCount,
+    required this.checkpointProgress,
+  });
+
+  factory CustomerActivitySummary.fromJson(Map<String, Object?> json) {
+    return CustomerActivitySummary(
+      totalCount: (json['totalCount'] as num).toInt(),
+      badgeTier: json['badgeTier'] as String,
+      currentCheckpoint: (json['currentCheckpoint'] as num).toInt(),
+      nextCheckpoint: (json['nextCheckpoint'] as num?)?.toInt(),
+      remainingCount: (json['remainingCount'] as num).toInt(),
+      checkpointProgress: (json['checkpointProgress'] as num).toDouble(),
+    );
+  }
+
+  final int totalCount;
+  final String badgeTier;
+  final int currentCheckpoint;
+  final int? nextCheckpoint;
+  final int remainingCount;
+  final double checkpointProgress;
+
+  String get badgeLabel {
+    return switch (badgeTier) {
+      'BRONZE' => '동 뱃지',
+      'SILVER' => '은 뱃지',
+      'GOLD' => '금 뱃지',
+      'DIAMOND' => '다이아 뱃지',
+      _ => '첫 뱃지 준비',
+    };
+  }
+}
+
 class CustomerProfile {
   const CustomerProfile({
     required this.userId,
@@ -8,6 +47,14 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.activitySummary = const CustomerActivitySummary(
+      totalCount: 0,
+      badgeTier: 'NONE',
+      currentCheckpoint: 0,
+      nextCheckpoint: 10,
+      remainingCount: 10,
+      checkpointProgress: 0,
+    ),
     this.profileImageUrl,
     this.phone,
     this.joinedAt,
@@ -25,6 +72,18 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      activitySummary: json['activitySummary'] == null
+          ? const CustomerActivitySummary(
+              totalCount: 0,
+              badgeTier: 'NONE',
+              currentCheckpoint: 0,
+              nextCheckpoint: 10,
+              remainingCount: 10,
+              checkpointProgress: 0,
+            )
+          : CustomerActivitySummary.fromJson(
+              Map<String, Object?>.from(json['activitySummary'] as Map),
+            ),
       profileImageUrl: _resolveImageUrl(
         user['profileImageUrl'] as String?,
         imageBaseUrl,
@@ -42,6 +101,7 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final CustomerActivitySummary activitySummary;
   final String? profileImageUrl;
   final String? phone;
   final DateTime? joinedAt;
@@ -63,6 +123,7 @@ class CustomerProfile {
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    CustomerActivitySummary? activitySummary,
     String? profileImageUrl,
     String? phone,
   }) {
@@ -73,6 +134,7 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      activitySummary: activitySummary ?? this.activitySummary,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
       joinedAt: joinedAt,
@@ -252,6 +314,8 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<bool> recordQrVisit(String qrToken);
+
   Future<String> uploadProfileImage(String filePath);
 
   Future<bool> updateName(String name);
@@ -318,6 +382,18 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
         Map<String, Object?>.from(value as Map),
         imageBaseUrl: _imageBaseUrl,
       ),
+    );
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) {
+    return _apiClient.post(
+      '/api/v1/customer/activities/visits',
+      body: {'qrToken': qrToken},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['counted'] as bool;
+      },
     );
   }
 
@@ -585,6 +661,11 @@ class MemoryCustomerEngagementRepository
       reviewCount: _reviews.where((review) => review.isActive).length,
     );
     return _profile;
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) async {
+    return false;
   }
 
   @override
