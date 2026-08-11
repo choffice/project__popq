@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -93,12 +95,15 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   late bool _takeoutAvailable;
   late bool _dineInAvailable;
   late bool _orderAcceptingEnabled;
+  DateTime? _operationStartDate;
+  DateTime? _operationEndDate;
 
   bool _pickingRepresentativeImage = false;
   bool _recognizingBusinessRegistration = false;
   bool _searchingKakaoPlace = false;
   bool _searchingAddress = false;
   bool _selectingMapLocation = false;
+  bool _loadingCurrentLocation = false;
   bool _submitting = false;
   bool _saveCompleted = false;
   bool _addressLocationWarningShown = false;
@@ -125,6 +130,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _takeoutAvailable = store.takeoutAvailable;
     _dineInAvailable = store.dineInAvailable;
     _orderAcceptingEnabled = store.orderAcceptingEnabled;
+    _operationStartDate = store.operationStartDate;
+    _operationEndDate = store.operationEndDate;
 
     if (store.latitude != null && store.longitude != null) {
       _selectedLocation = _SelectedStoreLocation(
@@ -280,6 +287,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               ),
               _buildAddressSection(context),
               _buildImageSection(context),
+              _buildOperationPeriodSection(context),
               _buildOperatingSection(context),
               _buildOrderSection(context),
               _buildSection(
@@ -326,7 +334,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       _recognizingBusinessRegistration ||
       _searchingKakaoPlace ||
       _searchingAddress ||
-      _selectingMapLocation;
+      _selectingMapLocation ||
+      _loadingCurrentLocation;
 
   List<String> get _categoryOptions {
     final String? current = _representativeCategory;
@@ -421,6 +430,20 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: PopqSpacing.sm),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            key: const Key('edit-load-current-location'),
+            onPressed: _busy ? null : _applyCurrentLocation,
+            icon: _loadingCurrentLocation
+                ? const _ButtonProgress()
+                : const Icon(Icons.my_location_rounded),
+            label: Text(
+              _loadingCurrentLocation ? '현재 위치 확인 중...' : '현재 위치로 주소 찾기',
+            ),
+          ),
         ),
         const SizedBox(height: PopqSpacing.md),
         Container(
@@ -549,6 +572,97 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     );
   }
 
+  Widget _buildOperationPeriodSection(BuildContext context) {
+    final bool eventStore = _storeType == 'EVENT_COMMERCE';
+    return _buildSection(
+      context,
+      title: eventStore ? '행사 운영 기간' : '영업 시작일',
+      children: <Widget>[
+        _operationDateTile(
+          label: eventStore ? '행사 시작일' : '영업 시작일',
+          value: _operationStartDate,
+          onTap: () => _selectOperationDate(start: true),
+          onClear: _operationStartDate == null
+              ? null
+              : () => setState(() => _operationStartDate = null),
+        ),
+        const SizedBox(height: PopqSpacing.sm),
+        _operationDateTile(
+          label: eventStore ? '행사 종료일' : '영업 종료일(선택)',
+          value: _operationEndDate,
+          onTap: () => _selectOperationDate(start: false),
+          onClear: _operationEndDate == null
+              ? null
+              : () => setState(() => _operationEndDate = null),
+        ),
+      ],
+    );
+  }
+
+  Widget _operationDateTile({
+    required String label,
+    required DateTime? value,
+    required VoidCallback onTap,
+    required VoidCallback? onClear,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.event_outlined),
+      title: Text(label),
+      subtitle: Text(value == null ? '선택 안 함' : _formatDate(value)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (onClear != null)
+            IconButton(
+              tooltip: '날짜 지우기',
+              onPressed: _busy ? null : onClear,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          IconButton(
+            tooltip: '날짜 선택',
+            onPressed: _busy ? null : onTap,
+            icon: const Icon(Icons.calendar_month_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _selectOperationDate({required bool start}) async {
+    final DateTime today = DateUtils.dateOnly(DateTime.now());
+    final DateTime first = DateTime(today.year - 10);
+    final DateTime last = DateTime(today.year + 20);
+    final DateTime candidate = start
+        ? (_operationStartDate ?? today)
+        : (_operationEndDate ?? _operationStartDate ?? today);
+    final DateTime initial = candidate.isBefore(first)
+        ? first
+        : candidate.isAfter(last)
+            ? last
+            : candidate;
+    final DateTime? selected = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (start) {
+        _operationStartDate = DateUtils.dateOnly(selected);
+      } else {
+        _operationEndDate = DateUtils.dateOnly(selected);
+      }
+    });
+  }
+
+  String _formatDate(DateTime value) {
+    final String month = value.month.toString().padLeft(2, '0');
+    final String day = value.day.toString().padLeft(2, '0');
+    return '${value.year}.$month.$day';
+  }
+
   Widget _buildOrderSection(BuildContext context) {
     return _buildSection(
       context,
@@ -596,6 +710,93 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     if (!_addressLocationWarningShown) {
       _addressLocationWarningShown = true;
       _showMessage('주소가 변경되었습니다. 주소 검색이나 지도에서 위치를 다시 확인해 주세요.');
+    }
+  }
+
+  Future<void> _applyCurrentLocation() async {
+    if (_loadingCurrentLocation) return;
+    setState(() => _loadingCurrentLocation = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _showMessage('기기의 위치 서비스를 켜 주세요.');
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _showMessage('현재 위치를 사용하려면 위치 권한을 허용해 주세요.');
+        return;
+      }
+
+      Position? position = await Geolocator.getLastKnownPosition();
+      position ??= await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+      final Position resolvedPosition = position;
+      final SellerReverseGeocodeResult result =
+          await widget.repository.reverseGeocode(
+        latitude: resolvedPosition.latitude,
+        longitude: resolvedPosition.longitude,
+      );
+      if (!mounted) return;
+
+      final String currentAddress = _addressController.text.trim();
+      final String resolvedAddress = result.displayAddress.trim();
+      bool apply = currentAddress.isEmpty ||
+          _normalizeText(currentAddress) == _normalizeText(resolvedAddress) ||
+          result.addressCandidates.any(
+            (String candidate) =>
+                _normalizeText(candidate) == _normalizeText(currentAddress),
+          );
+      if (!apply) {
+        apply = await showDialog<bool>(
+              context: context,
+              builder: (BuildContext dialogContext) => AlertDialog(
+                title: const Text('현재 위치 주소 적용'),
+                content: Text(
+                  '기존 주소\n$currentAddress\n\n현재 위치 주소\n$resolvedAddress\n\n'
+                  '현재 위치 주소와 좌표로 변경할까요?',
+                ),
+                actions: <Widget>[
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('기존 주소 유지'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(dialogContext, true),
+                    child: const Text('현재 위치 적용'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+      if (!apply || !mounted) return;
+      setState(() {
+        _addressController.text = resolvedAddress;
+        _selectedLocation = _SelectedStoreLocation(
+          latitude: resolvedPosition.latitude,
+          longitude: resolvedPosition.longitude,
+          address: resolvedAddress,
+          sourceLabel: '현재 위치',
+        );
+        _addressLocationWarningShown = false;
+      });
+      _showMessage('현재 위치의 주소와 좌표를 반영했습니다.');
+    } on TimeoutException {
+      _showMessage('현재 위치 확인 시간이 초과되었습니다. 기존 주소는 유지됩니다.');
+    } on PopqFailure catch (failure) {
+      _showMessage('${failure.message} 기존 주소는 유지됩니다.');
+    } catch (_) {
+      _showMessage('현재 위치를 확인하지 못했습니다. 기존 주소는 유지됩니다.');
+    } finally {
+      if (mounted) setState(() => _loadingCurrentLocation = false);
     }
   }
 
@@ -1258,6 +1459,12 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       _showMessage(scheduleError);
       return;
     }
+    if (_operationStartDate != null &&
+        _operationEndDate != null &&
+        _operationEndDate!.isBefore(_operationStartDate!)) {
+      _showMessage('운영 종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
     if (!_takeoutAvailable && !_dineInAvailable) {
       _showMessage('포장 또는 매장 식사 중 하나는 가능해야 합니다.');
       return;
@@ -1296,6 +1503,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         longitude: location?.longitude,
         openTime: _schedule.legacyOpenTimeForApi,
         closeTime: _schedule.legacyCloseTimeForApi,
+        operationStartDate: _operationStartDate,
+        operationEndDate: _operationEndDate,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
         takeoutAvailable: _takeoutAvailable,
@@ -1349,8 +1558,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       return;
     }
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 }
 

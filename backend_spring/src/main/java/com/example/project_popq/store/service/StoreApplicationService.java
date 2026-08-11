@@ -40,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -81,6 +82,11 @@ public class StoreApplicationService {
         validateOperatingHours(
             request.openTime(),
             request.closeTime()
+        );
+
+        validateOperationPeriod(
+            request.operationStartDate(),
+            request.operationEndDate()
         );
 
         Store store = Store.create(
@@ -129,6 +135,11 @@ public class StoreApplicationService {
             defaultTrue(
                 request.orderAcceptingEnabled()
             )
+        );
+
+        store.updateOperationPeriod(
+            request.operationStartDate(),
+            request.operationEndDate()
         );
 
         storeRepository.save(store);
@@ -312,6 +323,11 @@ public class StoreApplicationService {
             closeTime
         );
 
+        validateOperationPeriod(
+            request.operationStartDate(),
+            request.operationEndDate()
+        );
+
         store.updateSellerProfile(
             request.name().trim(),
             normalizeOptionalText(
@@ -360,6 +376,11 @@ public class StoreApplicationService {
             request.orderAcceptingEnabled() == null
                 ? store.isOrderAcceptingEnabled()
                 : request.orderAcceptingEnabled()
+        );
+
+        store.updateOperationPeriod(
+            request.operationStartDate(),
+            request.operationEndDate()
         );
 
         storeScheduleService.replace(store, request.schedule());
@@ -599,6 +620,19 @@ public class StoreApplicationService {
     ) {
         if ((openTime == null)
             != (closeTime == null)) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
+        }
+    }
+
+    private void validateOperationPeriod(
+        LocalDate operationStartDate,
+        LocalDate operationEndDate
+    ) {
+        if (operationStartDate != null
+            && operationEndDate != null
+            && operationEndDate.isBefore(operationStartDate)) {
             throw new BusinessException(
                 ErrorCode.INVALID_REQUEST
             );

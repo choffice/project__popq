@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../profile/customer_engagement_repository.dart';
@@ -61,8 +62,8 @@ class _CustomerQrScannerScreenState
       }
 
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text('올바른 URL 형식의 QR 코드가 아닙니다.'),
           ),

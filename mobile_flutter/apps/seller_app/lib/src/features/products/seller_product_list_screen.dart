@@ -361,8 +361,7 @@ class _SellerProductListScreenState
         size: 16,
       ),
       label: Text(
-        '${category.displayOrder}. '
-            '${category.name}',
+        category.name,
       ),
       onPressed: deleting
           ? null
@@ -682,8 +681,6 @@ class _SellerProductListScreenState
     await showSellerCategoryEditor(
       context,
       category: category,
-      suggestedOrder:
-      _categories?.length ?? 0,
     );
 
     if (draft == null) {
@@ -691,22 +688,26 @@ class _SellerProductListScreenState
     }
 
     try {
+      final int nextDisplayOrder = (_categories == null || _categories!.isEmpty)
+          ? 0
+          : _categories!
+                  .map((SellerCategory item) => item.displayOrder)
+                  .reduce((int left, int right) => left > right ? left : right) +
+              1;
       final SellerCategory saved =
       category == null
           ? await widget.repository
           .createCategory(
         _storeId,
         name: draft.name,
-        displayOrder:
-        draft.displayOrder,
+        displayOrder: nextDisplayOrder,
       )
           : await widget.repository
           .updateCategory(
         _storeId,
         category.categoryId,
         name: draft.name,
-        displayOrder:
-        draft.displayOrder,
+        displayOrder: category.displayOrder,
       );
 
       if (!mounted) {
@@ -1219,8 +1220,8 @@ class _SellerProductListScreenState
       String message,
       ) {
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         SnackBar(
           content: Text(message),
         ),

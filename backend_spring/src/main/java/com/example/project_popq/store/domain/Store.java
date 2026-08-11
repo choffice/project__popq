@@ -14,6 +14,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Getter
@@ -63,6 +64,12 @@ public class Store extends BaseTimeEntity {
 
     @Column(name = "close_time")
     private LocalTime closeTime;
+
+    @Column(name = "operation_start_date")
+    private LocalDate operationStartDate;
+
+    @Column(name = "operation_end_date")
+    private LocalDate operationEndDate;
 
     @Column(name = "closed_days", length = 100)
     private String closedDays;
@@ -158,6 +165,14 @@ public class Store extends BaseTimeEntity {
         this.takeoutAvailable = takeoutAvailable;
         this.dineInAvailable = dineInAvailable;
         this.orderAcceptingEnabled = orderAcceptingEnabled;
+    }
+
+    public void updateOperationPeriod(
+            LocalDate operationStartDate,
+            LocalDate operationEndDate
+    ) {
+        this.operationStartDate = operationStartDate;
+        this.operationEndDate = operationEndDate;
     }
 
     public void changeBusinessStatus(BusinessStatus businessStatus) {

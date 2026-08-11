@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class SellerMapLocationPickResult {
@@ -244,7 +245,7 @@ class _SellerStoreLocationPickerScreenState
       }
 
       ScaffoldMessenger.of(context)
-          .showSnackBar(
+          .showTopSnackBar(
         const SnackBar(
           content: Text(
             '현재 위치로 지도를 이동하지 못했습니다.',

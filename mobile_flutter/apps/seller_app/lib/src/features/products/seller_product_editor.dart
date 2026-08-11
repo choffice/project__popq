@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 import 'seller_product_repository.dart';
 
 class SellerCategoryDraft {
-  const SellerCategoryDraft({required this.name, required this.displayOrder});
+  const SellerCategoryDraft({required this.name});
 
   final String name;
-  final int displayOrder;
 }
 
 class SellerProductDraft {
@@ -28,12 +27,10 @@ class SellerProductDraft {
 Future<SellerCategoryDraft?> showSellerCategoryEditor(
   BuildContext context, {
   SellerCategory? category,
-  required int suggestedOrder,
 }) {
   return showDialog<SellerCategoryDraft>(
     context: context,
-    builder: (_) =>
-        _CategoryEditor(category: category, suggestedOrder: suggestedOrder),
+    builder: (_) => _CategoryEditor(category: category),
   );
 }
 
@@ -61,10 +58,9 @@ Future<List<SellerProductOptionGroup>?> showSellerOptionEditor(
 }
 
 class _CategoryEditor extends StatefulWidget {
-  const _CategoryEditor({required this.category, required this.suggestedOrder});
+  const _CategoryEditor({required this.category});
 
   final SellerCategory? category;
-  final int suggestedOrder;
 
   @override
   State<_CategoryEditor> createState() => _CategoryEditorState();
@@ -72,21 +68,16 @@ class _CategoryEditor extends StatefulWidget {
 
 class _CategoryEditorState extends State<_CategoryEditor> {
   late final TextEditingController _name;
-  late final TextEditingController _order;
 
   @override
   void initState() {
     super.initState();
     _name = TextEditingController(text: widget.category?.name);
-    _order = TextEditingController(
-      text: (widget.category?.displayOrder ?? widget.suggestedOrder).toString(),
-    );
   }
 
   @override
   void dispose() {
     _name.dispose();
-    _order.dispose();
     super.dispose();
   }
 
@@ -103,12 +94,6 @@ class _CategoryEditorState extends State<_CategoryEditor> {
             autofocus: true,
             maxLength: 100,
             decoration: const InputDecoration(labelText: '카테고리 이름'),
-          ),
-          TextField(
-            key: const Key('category-order'),
-            controller: _order,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '정렬 순서'),
           ),
         ],
       ),
@@ -128,11 +113,10 @@ class _CategoryEditorState extends State<_CategoryEditor> {
 
   void _submit() {
     final name = _name.text.trim();
-    final order = int.tryParse(_order.text.trim());
-    if (name.isEmpty || order == null || order < 0) return;
+    if (name.isEmpty) return;
     Navigator.pop(
       context,
-      SellerCategoryDraft(name: name, displayOrder: order),
+      SellerCategoryDraft(name: name),
     );
   }
 }

@@ -198,7 +198,7 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
       );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('회원가입이 완료되었습니다. 로그인해 주세요.')),
       );
       context.go(CustomerRoutes.signIn);

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -732,8 +733,8 @@ class _SellerBackButtonDispatcher extends RootBackButtonDispatcher {
     final messenger = _scaffoldMessengerKey.currentState;
 
     messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
+      ?..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
           content: Text('한 번 더 누르면 앱이 종료됩니다.'),
           duration: _exitConfirmDuration,

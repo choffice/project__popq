@@ -693,8 +693,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       return;
     }
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         SnackBar(content: Text(message)),
       );
   }
@@ -764,6 +764,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
         closeTime: identical(closeTime, _unchanged)
             ? current.closeTime
             : closeTime as String?,
+        operationStartDate: current.operationStartDate,
+        operationEndDate: current.operationEndDate,
         closedDays: identical(closedDays, _unchanged)
             ? current.closedDays
             : closedDays as List<String>,
@@ -1578,8 +1580,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                         final error = edited.validationMessage;
                         if (error != null) {
                           ScaffoldMessenger.of(sheetContext)
-                            ..hideCurrentSnackBar()
-                            ..showSnackBar(SnackBar(content: Text(error)));
+                            ..hideCurrentTopSnackBar()
+                            ..showTopSnackBar(SnackBar(content: Text(error)));
                           return;
                         }
                         Navigator.pop(sheetContext, edited);
@@ -1709,8 +1711,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       });
 
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '영업 상태를 변경하지 못했습니다.',
@@ -1748,8 +1750,8 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     });
 
     ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         const SnackBar(
           content: Text(
             '사업장 정보를 수정했습니다.',
@@ -1895,7 +1897,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       summary = await _loadSuspensionSummary(store.storeId);
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('휴업 전 운영 요약을 불러오지 못했습니다.')),
       );
       return;
@@ -1937,7 +1939,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _endingOperation = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showTopSnackBar(
         const SnackBar(content: Text('사업장을 휴업하지 못했습니다.')),
       );
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 
 import '../auth/seller_identity_repository.dart';
 
@@ -129,7 +130,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
     final String suffix = current.contains('-')
         ? current.substring(current.indexOf('-') + 1)
         : '';
-    widget.controller.text = suffix.isEmpty ? '$prefix-' : '$prefix-$suffix';
+    widget.controller.text = suffix.isEmpty ? '$prefix' : '$prefix$suffix';
     widget.controller.selection = TextSelection.collapsed(
       offset: widget.controller.text.length,
     );
@@ -147,7 +148,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
       if (!mounted) return;
       final String phone = identity.phone?.trim() ?? '';
       if (phone.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(content: Text('내 정보에 저장된 연락처가 없습니다.')),
         );
         return;
@@ -159,7 +160,7 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
       });
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(content: Text('내 연락처를 불러오지 못했습니다.')),
         );
       }

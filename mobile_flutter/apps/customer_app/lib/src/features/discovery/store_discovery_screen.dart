@@ -9,8 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
-import 'package:flutter/foundation.dart';
-import 'package:pointer_interceptor/pointer_interceptor.dart';
 
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
@@ -19,9 +17,6 @@ import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
-
-import 'kakao_store_map_web_stub.dart'
-if (dart.library.js_interop) 'kakao_store_map_web.dart';
 
 class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
@@ -293,7 +288,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           return;
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showTopSnackBar(
           const SnackBar(
             content: Text(
               '새 지역의 업체를 불러오지 못했습니다. '
@@ -380,11 +375,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           final addressMatches =
               store.address?.toLowerCase().contains(query) ?? false;
 
+          final categoryMatches = store.representativeCategory
+                  ?.toLowerCase()
+                  .contains(query) ??
+              false;
+
           final tagMatches = store.tags.any(
             (tag) => tag.toLowerCase().contains(query),
           );
 
           return nameMatches ||
+              categoryMatches ||
               addressMatches ||
               tagMatches;
         })
@@ -399,7 +400,6 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (!kIsWeb)
         KakaoStoreMap(
           controller: _mapController,
           stores: stores,
@@ -409,39 +409,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
           selectedStoreId: _selectedStore?.storeId,
           onStoreSelected: _selectStore,
           onViewportIdle: _onMapViewportIdle,
-        )
-        else
-          KakaoStoreMapWeb(
-            controller: _mapController,
-            stores: stores,
-            favoriteStoreIds: _favoriteStoreIds,
-            currentLocation: _controller.location,
-            searchCenter: _controller.searchCenter,
-            onStoreSelected: _selectStore,
-            selectedStoreId: _selectedStore?.storeId,
-            onViewportIdle: _onMapViewportIdle,
-          ),
+        ),
+
         _buildStatusOverlay(stores),
 
-        Positioned(
-          top: 12,
-          left: 12,
-          right: 12,
-          child: PointerInterceptor(
-            intercepting: kIsWeb,
-            child: _buildTopControls(),
-          ),
-        ),
+        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
 
         Positioned(
           right: 16,
           bottom: _selectedStore == null ? 20 : 158,
-          child: PointerInterceptor(
-            intercepting: kIsWeb,
-            child: _CurrentLocationButton(
-              active: _controller.location != null,
-              onPressed: _useCurrentLocation,
-            ),
+          child: _CurrentLocationButton(
+            active: _controller.location != null,
+            onPressed: _useCurrentLocation,
           ),
         ),
 
@@ -450,36 +429,32 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: PointerInterceptor(
-              intercepting: kIsWeb,
-              child: _SelectedStoreCard(
-                store: _selectedStore!,
-                favorite: _isFavorite(_selectedStore!.storeId),
-                favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
-                walkingRoute: _walkingRoute,
-                walkingRouteLoading: _walkingRouteLoading,
-                walkingRouteError: _walkingRouteError,
-                onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
-                onStoreLocationPressed: _focusSelectedStoreOnMap,
-                onFavoritePressed: _toggleFavorite,
-                onDetailsPressed: _openStoreDetail,
-                onClose: () {
-                  setState(() {
-                    _clearSelectedStoreState();
-                  });
-                },
-              ),
+            child: _SelectedStoreCard(
+              store: _selectedStore!,
+              favorite: _isFavorite(_selectedStore!.storeId),
+              favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
+              walkingRoute: _walkingRoute,
+              walkingRouteLoading: _walkingRouteLoading,
+              walkingRouteError: _walkingRouteError,
+              onWalkingRouteRetry: _reloadWalkingRouteForSelectedStore,
+              onStoreLocationPressed:
+              _focusSelectedStoreOnMap,
+              onFavoritePressed: _toggleFavorite,
+              onDetailsPressed: _openStoreDetail,
+              onClose: () {
+                setState(() {
+                  _clearSelectedStoreState();
+                });
+              },
             ),
           ),
+
         if (_showInitialLocationChoice)
           Positioned.fill(
-            child: PointerInterceptor(
-              intercepting: kIsWeb,
-              child: _InitialLocationChoice(
-                requestingLocation: _requestingInitialLocation,
-                onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
-                onContinueWithBusan: _continueWithBusan,
-              ),
+            child: _InitialLocationChoice(
+              requestingLocation: _requestingInitialLocation,
+              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
+              onContinueWithBusan: _continueWithBusan,
             ),
           ),
       ],
@@ -492,7 +467,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         SearchBar(
           controller: _queryController,
           focusNode: _searchFocusNode,
-          hintText: '업체명, 메뉴, 주소 검색',
+          hintText: '업체명, 업종, 주소, 태그 검색',
           leading: const Icon(Icons.search_rounded),
           trailing: [
             if (_queryController.text.isNotEmpty)
@@ -679,11 +654,47 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
+    if (value.trim().isNotEmpty &&
+        _controller.status == DiscoveryStatus.empty &&
+        _controller.error == null) {
+      Timer? dismissTimer;
+      await showDialog<void>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          dismissTimer ??= Timer(const Duration(seconds: 3), () {
+            if (dialogContext.mounted && Navigator.of(dialogContext).canPop()) {
+              Navigator.of(dialogContext).pop();
+            }
+          });
+          return AlertDialog(
+            title: const Text('검색 결과가 없습니다'),
+            content: const Text('다른 검색어로 다시 찾아보세요.'),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('확인'),
+              ),
+            ],
+          );
+        },
+      );
+      dismissTimer?.cancel();
+      if (!mounted) return;
+      _queryController.clear();
+      _controller.selectedTag = null;
+      setState(() {
+        _selectedFilter = _StoreFilterType.all;
+        _showSuggestions = false;
+        _clearSelectedStoreState();
+      });
+      await _controller.search();
+      return;
+    }
+
     final stores = _filteredStores;
 
     if (stores.length == 1) {
       _selectStore(stores.first);
-      await _focusSelectedStoreOnMap();
     }
   }
 
@@ -703,29 +714,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _selectSearchSuggestion(CustomerStore store) {
     _queryController
       ..text = store.name
-      ..selection = TextSelection.collapsed(
-        offset: store.name.length,
-      );
+      ..selection = TextSelection.collapsed(offset: store.name.length);
 
     _selectStore(store);
-
-    final latitude = store.latitude;
-    final longitude = store.longitude;
-
-    if (latitude == null || longitude == null) {
-      return;
-    }
-
-    _mapSearchDebounce?.cancel();
-
-    unawaited(
-      _mapController.focusStoreLocation(
-        CustomerLocation(
-          latitude: latitude,
-          longitude: longitude,
-        ),
-      ),
-    );
   }
 
   void _onMapViewportIdle(KakaoMapViewport viewport) {
@@ -800,8 +791,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         latitude == null ||
         longitude == null) {
       ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '업체 위치 정보가 없습니다.',
@@ -997,8 +988,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showFavoriteRemovedMessage(
@@ -1007,8 +998,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     final messenger = ScaffoldMessenger.of(context);
 
     messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
+      ..hideCurrentTopSnackBar()
+      ..showTopSnackBar(
         SnackBar(
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
@@ -1215,7 +1206,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    ScaffoldMessenger.of(context).showTopSnackBar(
       SnackBar(
         content: Text(message),
         action: decision == PermissionDecision.permanentlyDenied
@@ -1620,7 +1611,7 @@ class _SelectedStoreCard extends StatelessWidget {
                         const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            store.resolvedSchedule.todayLabel(),
+                            _mapStoreHoursLabel(store),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -2028,6 +2019,23 @@ String _storeTypeLabel(String storeType) {
     'EVENT_COMMERCE' => '행사·이벤트',
     _ => '등록 업체',
   };
+}
+
+String _mapStoreHoursLabel(CustomerStore store) {
+  final String hours = store.resolvedSchedule.todayLabel();
+  final DateTime? start = store.operationStartDate;
+  final DateTime? end = store.operationEndDate;
+  if (start == null && end == null) return hours;
+  final String startLabel = start == null
+      ? ''
+      : '${start.month}/${start.day}';
+  final String endLabel = end == null ? '' : '${end.month}/${end.day}';
+  final String period = start != null && end != null
+      ? '$startLabel~$endLabel'
+      : start != null
+          ? '${store.storeType == 'EVENT_COMMERCE' ? '행사' : '영업'} $startLabel 시작'
+          : '$endLabel까지';
+  return '$hours · $period';
 }
 
 IconData _storeTypeIcon(String storeType) {

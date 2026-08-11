@@ -1,7 +1,10 @@
 package com.example.project_popq.analytics.service;
 
 import com.example.project_popq.analytics.dto.SalesSummaryResponse;
+import com.example.project_popq.analytics.dto.SalesSummaryResponse.CancellationDetailResponse;
 import com.example.project_popq.analytics.dto.SalesSummaryResponse.DailySalesResponse;
+import com.example.project_popq.analytics.dto.SalesSummaryResponse.OrderSalesDetailResponse;
+import com.example.project_popq.analytics.dto.SalesSummaryResponse.RefundDetailResponse;
 import com.example.project_popq.analytics.dto.SalesSummaryResponse.TopProductResponse;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
@@ -25,6 +28,7 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,11 +90,20 @@ public class SalesAnalyticsService {
             .forEach(date -> daily.put(date, new DailyAccumulator()));
 
         Map<String, ProductAccumulator> products = new LinkedHashMap<>();
+        Map<Order, Payment> paymentsByOrder = new IdentityHashMap<>();
+        payments.forEach(payment -> paymentsByOrder.put(
+            payment.getOrder(),
+            payment
+        ));
+
+        List<OrderSalesDetailResponse> orderHistory = new ArrayList<>();
+        List<RefundDetailResponse> refundHistory = new ArrayList<>();
+        List<CancellationDetailResponse> cancellationHistory =
+            new ArrayList<>();
 
         long grossSales = 0;
         long refundedAmount = 0;
         int refundCount = 0;
-        int paidOrderCount = 0;
         int canceledOrderCount = 0;
         long canceledAmount = 0;
         long dineInSales = 0;
@@ -100,92 +113,129 @@ public class SalesAnalyticsService {
         for (Order order : orders) {
             if (order.getStatus() == OrderStatus.CANCELED
                 || order.getStatus() == OrderStatus.REJECTED) {
-                Instant canceledAt = statusChangedAt(order, order.getStatus());
+                OrderStatusHistory cancellation = latestStatusHistory(
+                    order,
+                    order.getStatus()
+                );
+                Instant canceledAt = cancellation == null
+                    ? order.getCreatedAt()
+                    : cancellation.getChangedAt();
                 if (isInRange(canceledAt, from, to)) {
                     canceledOrderCount++;
                     canceledAmount = Math.addExact(
                         canceledAmount,
                         order.getTotalAmount()
                     );
+                    cancellationHistory.add(new CancellationDetailResponse(
+                        order.getOrderPublicId(),
+                        order.getStatus(),
+                        order.getTotalAmount(),
+                        cancellation == null ? null : cancellation.getReason(),
+                        canceledAt
+                    ));
                 }
             }
 
-            if (order.getStatus() == OrderStatus.COMPLETED
-                && isInRange(completedAt(order), from, to)) {
-                completedOrderCount++;
+            if (order.getStatus() != OrderStatus.COMPLETED) {
+                continue;
             }
-        }
 
-        for (Payment payment : payments) {
-            if (isApprovedPayment(payment)
-                && isInRange(payment.getApprovedAt(), from, to)) {
-                long approvedAmount = payment.getApprovedAmount();
-                Order order = payment.getOrder();
+            Instant completedAt = completedAt(order);
+            if (!isInRange(completedAt, from, to)) {
+                continue;
+            }
 
+            completedOrderCount++;
+            Payment payment = paymentsByOrder.get(order);
+            long approvedAmount = 0;
+            long orderRefundedAmount = 0;
+            long orderNetSales = 0;
+
+            if (payment != null && isApprovedPayment(payment)) {
+                approvedAmount = payment.getApprovedAmount();
                 grossSales = Math.addExact(grossSales, approvedAmount);
-                paidOrderCount++;
 
-                if (order.getOrderType() == OrderType.DINE_IN) {
-                    dineInSales = Math.addExact(dineInSales, approvedAmount);
-                } else {
-                    takeoutSales = Math.addExact(takeoutSales, approvedAmount);
-                }
+                for (Refund refund : payment.getRefunds()) {
+                    if (refund.getStatus() != RefundStatus.SUCCEEDED) {
+                        continue;
+                    }
 
-                LocalDate approvedDate = payment.getApprovedAt()
-                    .atZone(BUSINESS_ZONE)
-                    .toLocalDate();
-                DailyAccumulator day = daily.get(approvedDate);
-                if (day != null) {
-                    day.sales = Math.addExact(day.sales, approvedAmount);
-                    day.orderCount++;
-                }
-
-                for (OrderItem item : order.getItems()) {
-                    ProductAccumulator product = products.computeIfAbsent(
-                        item.getProductNameSnapshot(),
-                        ignored -> new ProductAccumulator()
+                    orderRefundedAmount = Math.addExact(
+                        orderRefundedAmount,
+                        refund.getAmount()
                     );
-                    product.quantity = Math.addExact(
-                        product.quantity,
-                        item.getQuantity()
-                    );
-                    product.sales = Math.addExact(
-                        product.sales,
-                        item.getItemTotalPrice()
-                    );
-                }
-            }
-
-            for (Refund refund : payment.getRefunds()) {
-                if (refund.getStatus() != RefundStatus.SUCCEEDED
-                    || refund.getCompletedAt() == null
-                    || !isInRange(refund.getCompletedAt(), from, to)) {
-                    continue;
+                    refundCount++;
+                    refundHistory.add(new RefundDetailResponse(
+                        refund.getId(),
+                        order.getOrderPublicId(),
+                        refund.getAmount(),
+                        refund.getReason(),
+                        refund.getRequesterType() == null
+                            ? "UNKNOWN"
+                            : refund.getRequesterType().name(),
+                        refund.getCompletedAt()
+                    ));
                 }
 
                 refundedAmount = Math.addExact(
                     refundedAmount,
-                    refund.getAmount()
+                    orderRefundedAmount
                 );
-                refundCount++;
+                orderNetSales = Math.max(
+                    0,
+                    Math.subtractExact(approvedAmount, orderRefundedAmount)
+                );
 
-                LocalDate refundDate = refund.getCompletedAt()
-                    .atZone(BUSINESS_ZONE)
-                    .toLocalDate();
-                DailyAccumulator day = daily.get(refundDate);
-                if (day != null) {
-                    day.sales = Math.subtractExact(
-                        day.sales,
-                        refund.getAmount()
-                    );
+                if (order.getOrderType() == OrderType.DINE_IN) {
+                    dineInSales = Math.addExact(dineInSales, orderNetSales);
+                } else {
+                    takeoutSales = Math.addExact(takeoutSales, orderNetSales);
                 }
             }
+
+            LocalDate completedDate = completedAt
+                    .atZone(BUSINESS_ZONE)
+                    .toLocalDate();
+            DailyAccumulator day = daily.get(completedDate);
+            if (day != null) {
+                day.sales = Math.addExact(day.sales, orderNetSales);
+                day.orderCount++;
+            }
+
+            for (OrderItem item : order.getItems()) {
+                ProductAccumulator product = products.computeIfAbsent(
+                    item.getProductNameSnapshot(),
+                    ignored -> new ProductAccumulator()
+                );
+                product.quantity = Math.addExact(
+                    product.quantity,
+                    item.getQuantity()
+                );
+                product.sales = Math.addExact(
+                    product.sales,
+                    item.getItemTotalPrice()
+                );
+            }
+
+            int itemCount = order.getItems().stream()
+                .mapToInt(OrderItem::getQuantity)
+                .sum();
+            orderHistory.add(new OrderSalesDetailResponse(
+                order.getOrderPublicId(),
+                order.getOrderType(),
+                approvedAmount,
+                orderRefundedAmount,
+                orderNetSales,
+                completedAt,
+                itemCount,
+                itemSummary(order)
+            ));
         }
 
         long netSales = Math.subtractExact(grossSales, refundedAmount);
-        long averageOrderAmount = paidOrderCount == 0
+        long averageOrderAmount = completedOrderCount == 0
             ? 0
-            : grossSales / paidOrderCount;
+            : netSales / completedOrderCount;
 
         List<DailySalesResponse> dailySales = daily.entrySet().stream()
             .map(entry -> new DailySalesResponse(
@@ -209,6 +259,19 @@ public class SalesAnalyticsService {
             .limit(5)
             .toList();
 
+        orderHistory.sort(Comparator.comparing(
+            OrderSalesDetailResponse::completedAt,
+            Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+        refundHistory.sort(Comparator.comparing(
+            RefundDetailResponse::completedAt,
+            Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+        cancellationHistory.sort(Comparator.comparing(
+            CancellationDetailResponse::canceledAt,
+            Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+
         return new SalesSummaryResponse(
             from,
             to,
@@ -223,7 +286,10 @@ public class SalesAnalyticsService {
             dineInSales,
             takeoutSales,
             new ArrayList<>(dailySales),
-            new ArrayList<>(topProducts)
+            new ArrayList<>(topProducts),
+            orderHistory,
+            refundHistory,
+            cancellationHistory
         );
     }
 
@@ -259,12 +325,30 @@ public class SalesAnalyticsService {
         return statusChangedAt(order, OrderStatus.COMPLETED);
     }
 
+    private String itemSummary(Order order) {
+        if (order.getItems().isEmpty()) {
+            return "주문 상품 없음";
+        }
+        String firstProduct = order.getItems().get(0).getProductNameSnapshot();
+        int remaining = order.getItems().size() - 1;
+        return remaining == 0
+            ? firstProduct
+            : firstProduct + " 외 " + remaining + "개";
+    }
+
     private Instant statusChangedAt(Order order, OrderStatus status) {
+        OrderStatusHistory history = latestStatusHistory(order, status);
+        return history == null ? order.getCreatedAt() : history.getChangedAt();
+    }
+
+    private OrderStatusHistory latestStatusHistory(
+        Order order,
+        OrderStatus status
+    ) {
         return order.getStatusHistories().stream()
             .filter(history -> history.getCurrentStatus() == status)
-            .map(OrderStatusHistory::getChangedAt)
-            .max(Instant::compareTo)
-            .orElse(order.getCreatedAt());
+            .max(Comparator.comparing(OrderStatusHistory::getChangedAt))
+            .orElse(null);
     }
 
     private boolean isInRange(

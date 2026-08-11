@@ -7,3 +7,4 @@ export 'src/widgets/popq_image_source_sheet.dart';
 export 'src/widgets/popq_splash_screen.dart';
 
 export 'src/formatters/popq_order_number_formatter.dart';
+export 'src/widgets/popq_top_snack_bar.dart';

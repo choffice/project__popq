@@ -1174,7 +1174,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
   void _showMessage(String message) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ).showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   Widget _reviewSection() {

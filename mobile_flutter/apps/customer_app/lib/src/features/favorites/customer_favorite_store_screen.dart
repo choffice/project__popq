@@ -203,8 +203,8 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               '${store.name}을(를) 찜에서 삭제했어요.',
@@ -233,8 +233,8 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '찜을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.',
@@ -287,8 +287,8 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           SnackBar(
             content: Text(
               '${store.name}을(를) 다시 찜했어요.',
@@ -305,8 +305,8 @@ class _CustomerFavoriteStoreScreenState
       ScaffoldMessenger.of(context);
 
       messenger
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
+        ..hideCurrentTopSnackBar()
+        ..showTopSnackBar(
           const SnackBar(
             content: Text(
               '찜을 다시 등록하지 못했어요.',
