@@ -65,10 +65,11 @@ class _SellerPhoneInputState extends State<SellerPhoneInput> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             SizedBox(
-              width: 116,
+              width: 132, // 116 → 132
               child: DropdownButtonFormField<String>(
                 key: ValueKey<String>(_selectedPrefix),
                 initialValue: _selectedPrefix,
+                isExpanded: true, // 이것만 추가
                 decoration: const InputDecoration(labelText: '번호 구분'),
                 items: <DropdownMenuItem<String>>[
                   ..._prefixes.map(
