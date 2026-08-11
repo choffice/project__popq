@@ -27,6 +27,7 @@ import 'features/orders/pending_payment_recovery_service.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_engagement_repository.dart';
 import 'notifications/customer_push_notification_service.dart';
+import 'notifications/customer_app_badge_service.dart';
 import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
@@ -474,6 +475,34 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     });
   }
 
+  Future<void> _syncAppBadge() async {
+    if (!_sessionController.isSignedIn) {
+      await CustomerAppBadgeService.clearBadge();
+      return;
+    }
+
+    try {
+      final unreadCount =
+      await _notificationRepository.badgeCount();
+
+      if (!_sessionController.isSignedIn) {
+        return;
+      }
+
+      await CustomerAppBadgeService.updateBadge(
+        unreadCount,
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Customer 앱 아이콘 배지 동기화 실패: '
+            '$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   void _handleSessionChanged() {
     if (_sessionController.status == SessionStatus.restoring) {
       return;
@@ -481,10 +510,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     if (!_sessionController.isSignedIn) {
       _realtimeClient.disconnect(clearSubscriptions: true);
+      unawaited(_syncAppBadge());
       return;
     }
 
     unawaited(_registerPushDevice());
+    unawaited(_syncAppBadge());
 
     final pendingPushDeepLink = _pendingPushDeepLink;
 
@@ -678,6 +709,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         if (_sessionController.isSignedIn) {
           unawaited(_realtimeClient.connect());
           unawaited(_recoverPendingPaymentIfNeeded());
+          unawaited(_syncAppBadge());
         }
 
         return;

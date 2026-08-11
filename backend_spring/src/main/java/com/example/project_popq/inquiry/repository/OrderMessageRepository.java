@@ -145,6 +145,18 @@ public interface OrderMessageRepository
       @Param("senderType") MessageSenderType senderType
   );
 
+  @Query("""
+    select count(message)
+    from OrderMessage message
+    where message.order.user.id = :customerUserId
+      and message.senderType = :senderType
+      and message.readAt is null
+    """)
+  long countUnreadByCustomerUserId(
+      @Param("customerUserId") Long customerUserId,
+      @Param("senderType") MessageSenderType senderType
+  );
+
   @EntityGraph(
       attributePaths = {
           "order",
