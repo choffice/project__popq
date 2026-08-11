@@ -476,7 +476,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     try {
       final unreadCount =
-      await _notificationRepository.unreadCount();
+      await _notificationRepository.badgeCount();
 
       if (!_sessionController.isSignedIn) {
         return;

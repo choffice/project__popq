@@ -48,6 +48,16 @@ public class FirebasePushNotificationGateway
       );
     }
 
+    if (!pushMessage.alertEnabled()) {
+      androidConfig.setNotification(
+          AndroidNotification.builder()
+              .setChannelId("popq_silent_notifications")
+              .setTitle(pushMessage.title())
+              .setBody(pushMessage.body())
+              .build()
+      );
+    }
+
     Message.Builder messageBuilder =
         Message.builder()
             .setToken(pushMessage.token())

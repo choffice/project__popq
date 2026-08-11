@@ -97,7 +97,7 @@ class _NotificationListScreenState extends State<NotificationListScreen> {
 
         try {
           final unreadCount =
-          await widget.repository.unreadCount();
+          await widget.repository.badgeCount();
 
           await CustomerAppBadgeService.updateBadge(
             unreadCount,

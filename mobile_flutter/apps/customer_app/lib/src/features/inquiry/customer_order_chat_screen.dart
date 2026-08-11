@@ -8,18 +8,22 @@ import '../../realtime/customer_realtime_scope.dart';
 import '../orders/customer_order_repository.dart';
 import 'customer_order_message.dart';
 import 'customer_order_message_repository.dart';
+import '../../notifications/customer_app_badge_service.dart';
+import '../notifications/customer_notification_repository.dart';
 
 class CustomerOrderChatScreen extends StatefulWidget {
   const CustomerOrderChatScreen({
     required this.orderPublicId,
     required this.orderRepository,
     required this.messageRepository,
+    required this.notificationRepository,
     super.key,
   });
 
   final String orderPublicId;
   final CustomerOrderRepository orderRepository;
   final CustomerOrderMessageRepository messageRepository;
+  final CustomerNotificationRepository notificationRepository;
 
   @override
   State<CustomerOrderChatScreen> createState() {
@@ -399,6 +403,20 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     unawaited(_synchronizeAfterRealtimeConnection());
   }
 
+  Future<void> _syncAppBadge() async {
+    try {
+      final badgeCount =
+      await widget.notificationRepository.badgeCount();
+
+      await CustomerAppBadgeService.updateBadge(
+        badgeCount,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('앱 아이콘 배지 갱신 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   Future<void> _synchronizeAfterRealtimeConnection() async {
     if (!mounted ||
         !_isAppActive ||
@@ -518,6 +536,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
         );
 
         _lastReadRequestMessageId = targetMessageId;
+        await _syncAppBadge();
       } catch (error, stackTrace) {
         _pendingReadMessageId = _lastReadRequestMessageId;
         debugPrint('구매자 문의 읽음 처리 실패: $error');

@@ -4,7 +4,6 @@ import com.example.project_popq.notification.domain.UserNotification;
 import com.example.project_popq.notification.push.PushMessage;
 import com.example.project_popq.notification.push.PushNotificationGateway;
 import com.example.project_popq.notification.repository.PushDeviceRepository;
-import com.example.project_popq.notification.repository.UserNotificationRepository;
 import com.example.project_popq.user.repository.UserRepository;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -15,16 +14,16 @@ import org.springframework.stereotype.Service;
 public class PushDeliveryService {
 
   private final PushDeviceRepository pushDeviceRepository;
-  private final UserNotificationRepository userNotificationRepository;
   private final UserRepository userRepository;
+  private final CustomerBadgeCountService customerBadgeCountService;
   private final PushNotificationGateway pushNotificationGateway;
 
   public void deliver(UserNotification notification) {
     Long userId = notification.getUser().getId();
 
     long unreadCount =
-        userNotificationRepository
-            .countByUserIdAndReadFalse(userId);
+        customerBadgeCountService
+            .countUnread(userId);
 
     deliverToUser(
         userId,
