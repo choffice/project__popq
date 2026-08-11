@@ -14,7 +14,8 @@ import 'customer_engagement_repository.dart';
 
 /// 마이페이지 상단 카드에 아직 API가 없는 임시 정보입니다.
 abstract final class _ProfileTemporaryStats {
-  static const pointLabel = '2,450P';
+  static const levelLabel = 'Lv.12';
+  static const visitCount = 37;
   static const locationLabel = '위치 정보를 설정해 보세요';
 }
 
@@ -310,9 +311,9 @@ class _CustomerProfileScreenState
                   ),
                   _MenuRowData(
                     icon: Icons.star_border_rounded,
-                    title: '포인트 내역',
+                    title: '공지사항',
                     subtitle:
-                    '포인트 적립 및 사용 내역을 확인해요',
+                    '버그 수정 / 업데이트 내역',
                     onTap: _showComingSoon,
                   ),
                   _MenuRowData(
@@ -1065,15 +1066,6 @@ class _ProfileHeaderCard extends StatelessWidget {
                   ),
                 ),
                 _StatDivider(isDark: isDark),
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.paid_outlined,
-                    label: '보유 포인트',
-                    value: _ProfileTemporaryStats
-                        .pointLabel,
-                    highlight: true,
-                  ),
-                ),
               ],
             ),
           ),
