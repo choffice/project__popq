@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -42,7 +43,7 @@ public class CustomerActivityService {
         );
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordOrderPurchase(
             Long userId,
             Long storeId,
@@ -61,6 +62,21 @@ public class CustomerActivityService {
 
     @Transactional
     public void revokeOrderPurchase(String orderPublicId, Instant revokedAt) {
+        revokeOrderPurchaseSource(orderPublicId, revokedAt);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void revokeOrderPurchaseAfterCommit(
+            String orderPublicId,
+            Instant revokedAt
+    ) {
+        revokeOrderPurchaseSource(orderPublicId, revokedAt);
+    }
+
+    private void revokeOrderPurchaseSource(
+            String orderPublicId,
+            Instant revokedAt
+    ) {
         activityRepository.findBySourceTypeAndSourceKey(
                         CustomerActivitySourceType.ORDER,
                         orderPublicId

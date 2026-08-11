@@ -32,7 +32,7 @@ public class CustomerOrderActivityEventListener {
 
         if (event.currentStatus() == OrderStatus.CANCELED
                 || event.currentStatus() == OrderStatus.REJECTED) {
-            customerActivityService.revokeOrderPurchase(
+            customerActivityService.revokeOrderPurchaseAfterCommit(
                     event.orderPublicId(),
                     event.occurredAt()
             );
