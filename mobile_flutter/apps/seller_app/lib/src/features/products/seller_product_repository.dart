@@ -273,6 +273,10 @@ SellerProductRepository {
       int categoryId,
       );
 
+  Future<String> uploadProductImage(
+      String filePath,
+      );
+
   Future<List<SellerProduct>> findAll(
       int storeId,
       );
@@ -337,6 +341,35 @@ class ApiSellerProductRepository
   String _categoryPath(int storeId) {
     return '/api/v1/seller/stores/'
         '$storeId/categories';
+  }
+
+  @override
+  Future<String> uploadProductImage(
+      String filePath,
+      ) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (Object? value) {
+        final Map<String, Object?> json =
+        Map<String, Object?>.from(
+          value as Map,
+        );
+
+        final Object? imageUrl =
+        json['imageUrl'];
+
+        if (imageUrl is! String ||
+            imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure(
+            '업로드된 이미지 URL이 없습니다.',
+          );
+        }
+
+        return imageUrl;
+      },
+    );
   }
 
   @override
@@ -931,6 +964,13 @@ class MemorySellerProductRepository
     }
 
     _categories.removeAt(index);
+  }
+
+  @override
+  Future<String> uploadProductImage(
+      String filePath,
+      ) async {
+    return filePath;
   }
 
   @override

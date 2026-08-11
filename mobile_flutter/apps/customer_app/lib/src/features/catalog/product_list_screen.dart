@@ -92,7 +92,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           storeId: widget.storeId,
                           selected: StoreSection.products,
                         ),
-                      if (store != null && !store.orderAcceptingEnabled)
+                      if (store != null &&
+                          (store.businessStatus != 'OPEN' ||
+                              !store.orderAcceptingEnabled))
                         const Padding(
                           padding: EdgeInsets.fromLTRB(
                             PopqSpacing.md,
