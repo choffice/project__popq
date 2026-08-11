@@ -183,7 +183,7 @@ public class AuthService {
                 ErrorCode.INVALID_REFRESH_TOKEN
             );
         }
-        
+
         String tokenType = jwt.getClaimAsString(
             "token_type"
         );

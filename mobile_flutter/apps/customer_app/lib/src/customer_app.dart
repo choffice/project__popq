@@ -139,13 +139,31 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       accessTokenReader: () async {
         return (await _sessionStore.read())?.accessToken;
       },
+      refreshTokenReader: () async {
+        return (await _sessionStore.read())?.refreshToken;
+      },
+      authSessionUpdater: ({
+        required String accessToken,
+        required String refreshToken,
+        required int expiresInSeconds,
+      }) async {
+        await _sessionController.save(
+          AuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: DateTime.now().toUtc().add(
+              Duration(seconds: expiresInSeconds),
+            ),
+          ),
+        );
+      },
     );
-
     _realtimeClient = PopqRealtimeClient(
       webSocketUri: widget.environment.realtimeWebSocketUri,
       accessTokenReader: () async {
         return _sessionController.accessToken;
       },
+      accessTokenRefresher: _apiClient.refreshAccessToken,
       enableLogs: widget.environment.enableNetworkLogs,
     );
 
@@ -301,8 +319,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     await _sessionController.save(
       AuthSession(
         accessToken: response['accessToken'] as String,
-        refreshToken: '',
-        expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
+        refreshToken: response['refreshToken'] as String,
+        expiresAt: DateTime.now()
+            .toUtc()
+            .add(Duration(seconds: expiresIn)),
       ),
     );
   }
