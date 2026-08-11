@@ -412,6 +412,23 @@ class _SellerProductListScreenState
     );
   }
 
+  Widget _productImageFallback(
+      SellerProduct product,
+      ) {
+    return Container(
+      color: product.soldOut
+          ? const Color(0xFFE7E4EA)
+          : PopqPalette.lime,
+      alignment: Alignment.center,
+      child: Icon(
+        product.soldOut
+            ? Icons.remove_shopping_cart_outlined
+            : Icons.local_cafe_outlined,
+        color: PopqPalette.ink,
+      ),
+    );
+  }
+
   Widget _productCard(
       SellerProduct product,
       ) {
@@ -446,16 +463,28 @@ class _SellerProductListScreenState
               PopqSpacing.md,
               PopqSpacing.sm,
             ),
-            leading: CircleAvatar(
-              backgroundColor: product.soldOut
-                  ? const Color(0xFFE7E4EA)
-                  : PopqPalette.lime,
-              child: Icon(
-                product.soldOut
-                    ? Icons
-                    .remove_shopping_cart_outlined
-                    : Icons.local_cafe_outlined,
-                color: PopqPalette.ink,
+            leading: SizedBox.square(
+              dimension: 56,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: product.imageUrl != null &&
+                    product.imageUrl!.trim().isNotEmpty
+                    ? Image.network(
+                  product.imageUrl!,
+                  fit: BoxFit.cover,
+                  errorBuilder: (
+                      BuildContext context,
+                      Object error,
+                      StackTrace? stackTrace,
+                      ) {
+                    return _productImageFallback(
+                      product,
+                    );
+                  },
+                )
+                    : _productImageFallback(
+                  product,
+                ),
               ),
             ),
             title: Text(

@@ -38,6 +38,21 @@ class _ProductListScreenState extends State<ProductListScreen> {
     _store = widget.storeDiscoveryRepository.findDetail(widget.storeId);
   }
 
+  Widget _productImageFallback(
+      CatalogProduct product,
+      ) {
+    return Container(
+      color: PopqPalette.lime,
+      alignment: Alignment.center,
+      child: Icon(
+        product.soldOut
+            ? Icons.remove_shopping_cart_outlined
+            : Icons.local_cafe_outlined,
+        color: PopqPalette.forest,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,13 +186,28 @@ class _ProductListScreenState extends State<ProductListScreen> {
                                 contentPadding: const EdgeInsets.all(
                                   PopqSpacing.md,
                                 ),
-                                leading: CircleAvatar(
-                                  backgroundColor: PopqPalette.lime,
-                                  child: Icon(
-                                    product.soldOut
-                                        ? Icons.remove_shopping_cart_outlined
-                                        : Icons.local_cafe_outlined,
-                                    color: PopqPalette.forest,
+                                leading: SizedBox.square(
+                                  dimension: 64,
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: product.imageUrl != null &&
+                                        product.imageUrl!.trim().isNotEmpty
+                                        ? Image.network(
+                                      product.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (
+                                          BuildContext context,
+                                          Object error,
+                                          StackTrace? stackTrace,
+                                          ) {
+                                        return _productImageFallback(
+                                          product,
+                                        );
+                                      },
+                                    )
+                                        : _productImageFallback(
+                                      product,
+                                    ),
                                   ),
                                 ),
                                 title: Text(product.name),

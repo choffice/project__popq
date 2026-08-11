@@ -106,16 +106,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           const SizedBox(height: PopqSpacing.md),
                         ],
-                        Container(
-                          height: 180,
-                          decoration: BoxDecoration(
-                            color: PopqPalette.lime,
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          child: const Icon(
-                            Icons.local_cafe_rounded,
-                            size: 72,
-                            color: PopqPalette.forest,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(28),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 220,
+                            child: product.imageUrl != null &&
+                                product.imageUrl!.trim().isNotEmpty
+                                ? Image.network(
+                              product.imageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (
+                                  BuildContext context,
+                                  Object error,
+                                  StackTrace? stackTrace,
+                                  ) {
+                                return Container(
+                                  color: PopqPalette.lime,
+                                  alignment: Alignment.center,
+                                  child: const Icon(
+                                    Icons.local_cafe_rounded,
+                                    size: 72,
+                                    color: PopqPalette.forest,
+                                  ),
+                                );
+                              },
+                            )
+                                : Container(
+                              color: PopqPalette.lime,
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.local_cafe_rounded,
+                                size: 72,
+                                color: PopqPalette.forest,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: PopqSpacing.lg),
