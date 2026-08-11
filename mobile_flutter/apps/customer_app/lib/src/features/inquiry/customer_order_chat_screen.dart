@@ -74,9 +74,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   bool _hasMoreOlder = false;
   bool _hasLoadedOlderPages = false;
   bool _pendingRealtimeSync = false;
-  bool _allowPop = false;
-  bool _popInProgress = false;
-
   @override
   void initState() {
     super.initState();
@@ -132,8 +129,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       _lastReadRequestMessageId = 0;
       _pendingReadMessageId = 0;
       _readReceiptFuture = null;
-      _allowPop = false;
-      _popInProgress = false;
       _nextBeforeMessageId = null;
 
       _subscribeToCurrentOrder();
@@ -186,13 +181,11 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   @override
   Widget build(BuildContext context) {
     return PopScope<Object?>(
-      canPop: _allowPop,
+      canPop: true,
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop || _allowPop) {
-          return;
+        if (didPop) {
+          _markLatestSellerMessageAsRead();
         }
-
-        unawaited(_handleBack(result));
       },
       child: Scaffold(
         appBar: AppBar(
@@ -559,32 +552,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     }
   }
 
-  Future<void> _handleBack(Object? result) async {
-    if (_popInProgress) {
-      return;
-    }
 
-    _popInProgress = true;
-    _markLatestSellerMessageAsRead();
-
-    try {
-      await _readReceiptFuture;
-    } finally {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _allowPop = true;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pop(result);
-        }
-      });
-    }
-  }
 
   void _handleScroll() {
     if (!_scrollController.hasClients ||
