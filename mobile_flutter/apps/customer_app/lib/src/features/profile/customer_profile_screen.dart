@@ -1126,7 +1126,7 @@ class _ActivityCheckpointProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 next == null
-                    ? '다이아 뱃지를 달성했어요'
+                    ? '다이아 엠블럼을 달성했어요'
                     : '다음 체크포인트 ${summary.remainingCount}회',
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w800,

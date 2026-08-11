@@ -140,7 +140,29 @@ class _SellerNotificationInboxScreenState
     final content = review.content?.trim();
     return ListTile(
       leading: CircleAvatar(child: Text('${review.rating}★')),
-      title: Text('$storeName · ${review.authorName}'),
+      title: Row(
+        children: [
+          if (review.authorEmblemAssetPath != null) ...[
+            Image.asset(
+              review.authorEmblemAssetPath!,
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+              semanticLabel: review.authorEmblemLabel,
+            ),
+            const SizedBox(width: PopqSpacing.xs),
+          ],
+          Expanded(
+            child: Text(
+              review.authorBadgeTier == 'NONE'
+                  ? '$storeName · ${review.authorName}'
+                  : '$storeName · ${review.authorName} · ${review.authorEmblemLabel}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
       subtitle: Text(
         '${_dateTime(review.createdAt)}\n${content == null || content.isEmpty ? '내용 없는 리뷰' : content}',
         maxLines: 3,

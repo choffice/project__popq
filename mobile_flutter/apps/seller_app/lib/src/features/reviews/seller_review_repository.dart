@@ -1,5 +1,25 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+String sellerReviewEmblemLabel(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => '브론즈',
+    'SILVER' => '실버',
+    'GOLD' => '골드',
+    'DIAMOND' => '다이아',
+    _ => '',
+  };
+}
+
+String? sellerReviewEmblemAssetPath(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => 'assets/images/badges/badge_bronze.png',
+    'SILVER' => 'assets/images/badges/badge_silver.png',
+    'GOLD' => 'assets/images/badges/badge_gold.png',
+    'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+    _ => null,
+  };
+}
+
 class SellerReviewReplyTemplate {
   const SellerReviewReplyTemplate({
     required this.templateId,
@@ -28,6 +48,7 @@ class SellerReview {
     this.content,
     this.sellerReply,
     this.sellerRepliedAt,
+    this.authorBadgeTier = 'NONE',
   });
 
   factory SellerReview.fromJson(Map<String, Object?> json) {
@@ -36,6 +57,7 @@ class SellerReview {
       orderPublicId: json['orderPublicId'] as String,
       storeId: (json['storeId'] as num).toInt(),
       authorName: json['authorName'] as String,
+      authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
       sellerReply: json['sellerReply'] as String?,
@@ -50,11 +72,15 @@ class SellerReview {
   final String orderPublicId;
   final int storeId;
   final String authorName;
+  final String authorBadgeTier;
   final int rating;
   final String? content;
   final DateTime createdAt;
   final String? sellerReply;
   final DateTime? sellerRepliedAt;
+  String get authorEmblemLabel => sellerReviewEmblemLabel(authorBadgeTier);
+  String? get authorEmblemAssetPath =>
+      sellerReviewEmblemAssetPath(authorBadgeTier);
 
   SellerReview copyWith({String? sellerReply, bool clearReply = false}) {
     return SellerReview(
@@ -62,6 +88,7 @@ class SellerReview {
       orderPublicId: orderPublicId,
       storeId: storeId,
       authorName: authorName,
+      authorBadgeTier: authorBadgeTier,
       rating: rating,
       content: content,
       createdAt: createdAt,

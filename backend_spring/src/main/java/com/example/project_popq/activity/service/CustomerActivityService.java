@@ -3,6 +3,7 @@ package com.example.project_popq.activity.service;
 import com.example.project_popq.activity.domain.CustomerActivitySource;
 import com.example.project_popq.activity.domain.CustomerActivitySourceType;
 import com.example.project_popq.activity.domain.CustomerActivityType;
+import com.example.project_popq.activity.domain.CustomerBadgeTier;
 import com.example.project_popq.activity.dto.CustomerAttendanceResponse;
 import com.example.project_popq.activity.dto.CustomerActivitySummaryResponse;
 import com.example.project_popq.activity.dto.RecordVisitResponse;
@@ -42,6 +43,13 @@ public class CustomerActivityService {
     @Transactional(readOnly = true)
     public CustomerActivitySummaryResponse getSummary(Long userId) {
         return CustomerActivitySummaryResponse.from(
+                activityRepository.countQualifiedActivities(userId)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerBadgeTier getBadgeTier(Long userId) {
+        return CustomerBadgeTier.from(
                 activityRepository.countQualifiedActivities(userId)
         );
     }

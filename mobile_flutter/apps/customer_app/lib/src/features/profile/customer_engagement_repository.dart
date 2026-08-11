@@ -1,5 +1,25 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+String customerEmblemLabel(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => '브론즈',
+    'SILVER' => '실버',
+    'GOLD' => '골드',
+    'DIAMOND' => '다이아',
+    _ => '첫 엠블럼 준비',
+  };
+}
+
+String? customerEmblemAssetPath(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => 'assets/images/badges/badge_bronze.png',
+    'SILVER' => 'assets/images/badges/badge_silver.png',
+    'GOLD' => 'assets/images/badges/badge_gold.png',
+    'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+    _ => null,
+  };
+}
+
 class CustomerActivitySummary {
   const CustomerActivitySummary({
     required this.totalCount,
@@ -63,23 +83,11 @@ class CustomerActivitySummary {
   final double checkpointProgress;
 
   String get badgeLabel {
-    return switch (badgeTier) {
-      'BRONZE' => '동 뱃지',
-      'SILVER' => '은 뱃지',
-      'GOLD' => '금 뱃지',
-      'DIAMOND' => '다이아 뱃지',
-      _ => '첫 뱃지 준비',
-    };
+    return customerEmblemLabel(badgeTier);
   }
 
   String? get badgeAssetPath {
-    return switch (badgeTier) {
-      'BRONZE' => 'assets/images/badges/badge_bronze.png',
-      'SILVER' => 'assets/images/badges/badge_silver.png',
-      'GOLD' => 'assets/images/badges/badge_gold.png',
-      'DIAMOND' => 'assets/images/badges/badge_diamond.png',
-      _ => null,
-    };
+    return customerEmblemAssetPath(badgeTier);
   }
 }
 
@@ -331,6 +339,7 @@ class CustomerReview {
     this.storeCategory,
     this.sellerReply,
     this.sellerRepliedAt,
+    this.authorBadgeTier = 'NONE',
   });
 
   factory CustomerReview.fromJson(Map<String, Object?> json) {
@@ -341,6 +350,7 @@ class CustomerReview {
       storeName: json['storeName'] as String,
       storeCategory: json['storeCategory'] as String?,
       authorName: json['authorName'] as String,
+      authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
       status: json['status'] as String,
@@ -358,6 +368,7 @@ class CustomerReview {
   final String storeName;
   final String? storeCategory;
   final String authorName;
+  final String authorBadgeTier;
   final int rating;
   final String? content;
   final String status;
@@ -366,6 +377,9 @@ class CustomerReview {
   final DateTime? sellerRepliedAt;
 
   bool get isActive => status == 'ACTIVE';
+  String get authorEmblemLabel => customerEmblemLabel(authorBadgeTier);
+  String? get authorEmblemAssetPath =>
+      customerEmblemAssetPath(authorBadgeTier);
 
   CustomerReview copyWith({int? rating, String? content, String? status}) {
     return CustomerReview(
@@ -375,6 +389,7 @@ class CustomerReview {
       storeName: storeName,
       storeCategory: storeCategory,
       authorName: authorName,
+      authorBadgeTier: authorBadgeTier,
       rating: rating ?? this.rating,
       content: content ?? this.content,
       status: status ?? this.status,
@@ -918,6 +933,7 @@ class MemoryCustomerEngagementRepository
       storeId: 1,
       storeName: 'POPQ 스토어',
       authorName: _profile.name,
+      authorBadgeTier: _profile.activitySummary.badgeTier,
       rating: rating,
       content: content,
       status: 'ACTIVE',

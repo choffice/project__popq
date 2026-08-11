@@ -183,9 +183,21 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
           children: [
             Row(
               children: [
+                if (review.authorEmblemAssetPath != null) ...[
+                  Image.asset(
+                    review.authorEmblemAssetPath!,
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.contain,
+                    semanticLabel: review.authorEmblemLabel,
+                  ),
+                  const SizedBox(width: PopqSpacing.xs),
+                ],
                 Expanded(
                   child: Text(
-                    review.authorName,
+                    review.authorBadgeTier == 'NONE'
+                        ? review.authorName
+                        : '${review.authorName} · ${review.authorEmblemLabel}',
                     style: const TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),

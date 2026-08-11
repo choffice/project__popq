@@ -1,5 +1,6 @@
 package com.example.project_popq.store.service;
 
+import com.example.project_popq.activity.service.CustomerActivityService;
 import com.example.project_popq.engagement.domain.ReviewStatus;
 import com.example.project_popq.engagement.dto.ReviewResponse;
 import com.example.project_popq.engagement.repository.ReviewRepository;
@@ -29,6 +30,7 @@ public class SellerOperationalAlertService {
     private final OrderRepository orderRepository;
     private final OrderMessageRepository orderMessageRepository;
     private final ReviewRepository reviewRepository;
+    private final CustomerActivityService customerActivityService;
 
     @Transactional(readOnly = true)
     public SellerOperationalAlertsResponse find(User user, int requestedLimit) {
@@ -77,7 +79,12 @@ public class SellerOperationalAlertService {
                         page
                 )
                 .stream()
-                .map(ReviewResponse::from)
+                .map(review -> ReviewResponse.from(
+                        review,
+                        customerActivityService.getBadgeTier(
+                                review.getUser().getId()
+                        )
+                ))
                 .toList();
         return new SellerOperationalAlertsResponse(orders, chats, reviews);
     }

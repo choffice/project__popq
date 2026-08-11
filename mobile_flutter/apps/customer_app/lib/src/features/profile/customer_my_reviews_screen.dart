@@ -356,6 +356,25 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (review.authorEmblemAssetPath != null) ...[
+              const SizedBox(height: PopqSpacing.xs),
+              Row(
+                children: [
+                  Image.asset(
+                    review.authorEmblemAssetPath!,
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.contain,
+                    semanticLabel: review.authorEmblemLabel,
+                  ),
+                  const SizedBox(width: PopqSpacing.xs),
+                  Text(
+                    '${review.authorName} · ${review.authorEmblemLabel}',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
+              ),
+            ],
             if (review.content?.isNotEmpty ??
                 false) ...[
               const SizedBox(

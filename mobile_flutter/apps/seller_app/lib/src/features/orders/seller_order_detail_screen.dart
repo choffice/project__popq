@@ -1187,9 +1187,28 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '고객 리뷰 ${List.filled(review.rating, '★').join()}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      if (review.authorEmblemAssetPath != null) ...[
+                        Image.asset(
+                          review.authorEmblemAssetPath!,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.contain,
+                          semanticLabel: review.authorEmblemLabel,
+                        ),
+                        const SizedBox(width: PopqSpacing.xs),
+                      ],
+                      Expanded(
+                        child: Text(
+                          review.authorBadgeTier == 'NONE'
+                              ? review.authorName
+                              : '${review.authorName} · ${review.authorEmblemLabel}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Text(List.filled(review.rating, '★').join()),
+                    ],
                   ),
                   if (review.content?.isNotEmpty ?? false) ...[
                     const SizedBox(height: PopqSpacing.sm),

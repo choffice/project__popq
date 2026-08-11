@@ -124,9 +124,9 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (context) => _TextEditDialog(
-        title: '이름 변경',
+        title: '닉네임 변경',
         initialValue: currentName,
-        hintText: '이름을 입력하세요',
+        hintText: '닉네임을 입력하세요',
       ),
     );
 
@@ -137,13 +137,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       await _reloadProfile();
       if (!mounted) return;
-      _showMessage('이름이 변경됐어요.');
+      _showMessage('닉네임이 변경됐어요.');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('이름을 변경하지 못했어요. ($error)');
+      _showMessage('닉네임을 변경하지 못했어요. ($error)');
     }
   }
 
@@ -329,7 +329,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.badge_outlined),
-                        title: const Text('이름'),
+                        title: const Text('닉네임'),
                         subtitle: Text(profile.name),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editName(profile.name),
@@ -504,9 +504,15 @@ class _TextEditDialog extends StatefulWidget {
 }
 
 class _TextEditDialogState extends State<_TextEditDialog> {
+  static final _nicknamePattern = RegExp(
+    r'^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$',
+    unicode: true,
+  );
+
   late final TextEditingController _controller = TextEditingController(
     text: widget.initialValue ?? '',
   );
+  String? _errorText;
 
   @override
   void dispose() {
@@ -520,7 +526,17 @@ class _TextEditDialogState extends State<_TextEditDialog> {
       title: Text(widget.title),
       content: TextField(
         controller: _controller,
-        decoration: InputDecoration(hintText: widget.hintText),
+        maxLength: 7,
+        decoration: InputDecoration(
+          hintText: widget.hintText,
+          helperText: '7자 이하 · 한글/영문/숫자/일본어/한자/공백',
+          errorText: _errorText,
+        ),
+        onChanged: (_) {
+          if (_errorText != null) {
+            setState(() => _errorText = null);
+          }
+        },
       ),
       actions: [
         TextButton(
@@ -530,7 +546,18 @@ class _TextEditDialogState extends State<_TextEditDialog> {
         FilledButton(
           onPressed: () {
             final value = _controller.text.trim();
-            if (value.isEmpty) return;
+            if (value.isEmpty) {
+              setState(() => _errorText = '닉네임을 입력해 주세요.');
+              return;
+            }
+            if (value.length > 7) {
+              setState(() => _errorText = '닉네임은 7자 이하로 입력해 주세요.');
+              return;
+            }
+            if (!_nicknamePattern.hasMatch(value)) {
+              setState(() => _errorText = '사용할 수 없는 문자가 포함되어 있어요.');
+              return;
+            }
             Navigator.of(context).pop(value);
           },
           child: const Text('저장'),

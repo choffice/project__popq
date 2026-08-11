@@ -16,6 +16,7 @@ type SellerAuthProps = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).+$/
 const PHONE_PATTERN = /^01[0-9]-?\d{3,4}-?\d{4}$/
+const NICKNAME_PATTERN = /^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$/u
 
 export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [mode, setMode] = useState<AuthMode>('seller-login')
@@ -121,8 +122,12 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       setError('올바른 이메일 주소를 입력해 주세요.')
       return
     }
-    if (normalizedName.length < 2 || normalizedName.length > 100) {
-      setError('이름은 2자 이상 100자 이하로 입력해 주세요.')
+    if (
+      normalizedName.length === 0 ||
+      Array.from(normalizedName).length > 7 ||
+      !NICKNAME_PATTERN.test(normalizedName)
+    ) {
+      setError('닉네임은 허용된 문자로 7자 이하로 입력해 주세요.')
       return
     }
     if (!PHONE_PATTERN.test(normalizedPhone)) {
@@ -302,11 +307,11 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
           {mode === 'signup' && (
             <>
               <label>
-                이름 (대표자명)
+                닉네임
                 <input
                   type="text"
                   autoComplete="name"
-                  maxLength={100}
+                  maxLength={7}
                   value={name}
                   onChange={(event) => setName(event.target.value)}
                   disabled={busy}
