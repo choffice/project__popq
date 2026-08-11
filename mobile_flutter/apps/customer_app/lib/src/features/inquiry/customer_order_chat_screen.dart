@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../routing/customer_router.dart';
 import '../../realtime/customer_realtime_scope.dart';
 import '../orders/customer_order_repository.dart';
 import 'customer_order_message.dart';
@@ -178,17 +180,38 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     super.dispose();
   }
 
+  void _goBack() {
+    _markLatestSellerMessageAsRead();
+
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go(CustomerRoutes.profile);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope<Object?>(
-      canPop: true,
+      canPop: context.canPop(),
       onPopInvokedWithResult: (bool didPop, Object? result) {
+        _markLatestSellerMessageAsRead();
+
         if (didPop) {
-          _markLatestSellerMessageAsRead();
+          return;
         }
+
+        context.go(CustomerRoutes.profile);
       },
       child: Scaffold(
         appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            tooltip: '뒤로가기',
+            onPressed: _goBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
           title: Text(_order?.storeName ?? '주문 문의'),
           actions: [
             IconButton(
