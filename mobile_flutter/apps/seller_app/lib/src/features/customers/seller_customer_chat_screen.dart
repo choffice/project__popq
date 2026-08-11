@@ -185,6 +185,17 @@ class _SellerCustomerChatScreenState extends State<SellerCustomerChatScreen>
     super.dispose();
   }
 
+  void _goBack() {
+    _markLatestCustomerMessageAsRead();
+
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go(SellerRoutes.customers);
+  }
+
   @override
   Widget build(BuildContext context) {
     final conversation = _conversation;
@@ -200,6 +211,12 @@ class _SellerCustomerChatScreenState extends State<SellerCustomerChatScreen>
       },
       child: Scaffold(
         appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            tooltip: '뒤로가기',
+            onPressed: _goBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
           title: Text(conversation?.customerName ?? '고객 문의'),
           actions: [
             IconButton(
