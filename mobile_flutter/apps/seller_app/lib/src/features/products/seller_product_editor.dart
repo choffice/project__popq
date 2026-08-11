@@ -1,5 +1,6 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-
+import 'package:image_picker/image_picker.dart';
 import 'seller_product_repository.dart';
 
 class SellerCategoryDraft {
@@ -15,6 +16,8 @@ class SellerProductDraft {
     required this.description,
     required this.imageUrl,
     required this.basePrice,
+    this.imageFilePath,
+    this.removeImage = false,
   });
 
   final int categoryId;
@@ -22,6 +25,9 @@ class SellerProductDraft {
   final String? description;
   final String? imageUrl;
   final int basePrice;
+
+  final String? imageFilePath;
+  final bool removeImage;
 }
 
 Future<SellerCategoryDraft?> showSellerCategoryEditor(
@@ -135,8 +141,13 @@ class _ProductEditorState extends State<_ProductEditor> {
   late int _categoryId;
   late final TextEditingController _name;
   late final TextEditingController _description;
-  late final TextEditingController _imageUrl;
   late final TextEditingController _price;
+
+  final ImagePicker _imagePicker = ImagePicker();
+
+  XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
+  bool _removeImage = false;
 
   @override
   void initState() {
@@ -145,7 +156,6 @@ class _ProductEditorState extends State<_ProductEditor> {
         widget.product?.categoryId ?? widget.categories.first.categoryId;
     _name = TextEditingController(text: widget.product?.name);
     _description = TextEditingController(text: widget.product?.description);
-    _imageUrl = TextEditingController(text: widget.product?.imageUrl);
     _price = TextEditingController(
       text: widget.product?.basePrice.toString() ?? '',
     );
@@ -155,7 +165,6 @@ class _ProductEditorState extends State<_ProductEditor> {
   void dispose() {
     _name.dispose();
     _description.dispose();
-    _imageUrl.dispose();
     _price.dispose();
     super.dispose();
   }
@@ -205,14 +214,74 @@ class _ProductEditorState extends State<_ProductEditor> {
                 maxLines: 3,
                 decoration: const InputDecoration(labelText: '설명 (선택)'),
               ),
-              TextField(
-                key: const Key('product-image-url'),
-                controller: _imageUrl,
-                maxLength: 1000,
-                decoration: const InputDecoration(
-                  labelText: '이미지 URL (선택)',
+              const SizedBox(height: 16),
+
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '메뉴 사진 (선택)',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
               ),
+
+              const SizedBox(height: 8),
+
+              Container(
+                width: double.infinity,
+                height: 180,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: _buildImagePreview(),
+              ),
+
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _pickImage(ImageSource.camera);
+                      },
+                      icon: const Icon(
+                        Icons.camera_alt_outlined,
+                      ),
+                      label: const Text('사진 촬영'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        _pickImage(ImageSource.gallery);
+                      },
+                      icon: const Icon(
+                        Icons.photo_library_outlined,
+                      ),
+                      label: const Text('앨범 선택'),
+                    ),
+                  ),
+                ],
+              ),
+
+              if (_pickedImage != null ||
+                  (!_removeImage &&
+                      widget.product?.imageUrl?.trim().isNotEmpty == true))
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _clearImage,
+                    icon: const Icon(
+                      Icons.delete_outline,
+                    ),
+                    label: const Text('사진 삭제'),
+                  ),
+                ),
             ],
           ),
         ),
@@ -231,6 +300,89 @@ class _ProductEditorState extends State<_ProductEditor> {
     );
   }
 
+  Future<void> _pickImage(
+      ImageSource source,
+      ) async {
+    final XFile? picked =
+    await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 85,
+      maxWidth: 1600,
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    final Uint8List bytes =
+    await picked.readAsBytes();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _pickedImage = picked;
+      _pickedImageBytes = bytes;
+      _removeImage = false;
+    });
+  }
+
+  void _clearImage() {
+    setState(() {
+      _pickedImage = null;
+      _pickedImageBytes = null;
+      _removeImage = true;
+    });
+  }
+
+  Widget _buildImagePreview() {
+    if (_pickedImageBytes != null) {
+      return Image.memory(
+        _pickedImageBytes!,
+        fit: BoxFit.cover,
+      );
+    }
+
+    final String? existingUrl =
+        widget.product?.imageUrl;
+
+    if (!_removeImage &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty) {
+      return Image.network(
+        existingUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (
+            BuildContext context,
+            Object error,
+            StackTrace? stackTrace,
+            ) {
+          return const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              size: 48,
+            ),
+          );
+        },
+      );
+    }
+
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.add_photo_alternate_outlined,
+            size: 48,
+          ),
+          SizedBox(height: 8),
+          Text('등록된 메뉴 사진이 없습니다.'),
+        ],
+      ),
+    );
+  }
+
   void _submit() {
     final name = _name.text.trim();
     final price = int.tryParse(_price.text.trim());
@@ -240,8 +392,14 @@ class _ProductEditorState extends State<_ProductEditor> {
       SellerProductDraft(
         categoryId: _categoryId,
         name: name,
-        description: _nullable(_description.text),
-        imageUrl: _nullable(_imageUrl.text),
+        description: _nullable(
+          _description.text,
+        ),
+        imageUrl: _removeImage
+            ? null
+            : widget.product?.imageUrl,
+        imageFilePath: _pickedImage?.path,
+        removeImage: _removeImage,
         basePrice: price,
       ),
     );
