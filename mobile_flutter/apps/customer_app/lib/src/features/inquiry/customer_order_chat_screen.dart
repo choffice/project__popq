@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../routing/customer_router.dart';
 import '../../realtime/customer_realtime_scope.dart';
 import '../orders/customer_order_repository.dart';
 import 'customer_order_message.dart';
@@ -181,11 +183,15 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   @override
   Widget build(BuildContext context) {
     return PopScope<Object?>(
-      canPop: true,
+      canPop: context.canPop(),
       onPopInvokedWithResult: (bool didPop, Object? result) {
+        _markLatestSellerMessageAsRead();
+
         if (didPop) {
-          _markLatestSellerMessageAsRead();
+          return;
         }
+
+        context.go(CustomerRoutes.profile);
       },
       child: Scaffold(
         appBar: AppBar(
