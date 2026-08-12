@@ -1,5 +1,25 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+String customerEmblemLabel(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => '브론즈',
+    'SILVER' => '실버',
+    'GOLD' => '골드',
+    'DIAMOND' => '다이아',
+    _ => '첫 엠블럼 준비',
+  };
+}
+
+String? customerEmblemAssetPath(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => 'assets/images/badges/badge_bronze.png',
+    'SILVER' => 'assets/images/badges/badge_silver.png',
+    'GOLD' => 'assets/images/badges/badge_gold.png',
+    'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+    _ => null,
+  };
+}
+
 class CustomerActivitySummary {
   const CustomerActivitySummary({
     required this.totalCount,
@@ -63,13 +83,11 @@ class CustomerActivitySummary {
   final double checkpointProgress;
 
   String get badgeLabel {
-    return switch (badgeTier) {
-      'BRONZE' => '동 뱃지',
-      'SILVER' => '은 뱃지',
-      'GOLD' => '금 뱃지',
-      'DIAMOND' => '다이아 뱃지',
-      _ => '첫 뱃지 준비',
-    };
+    return customerEmblemLabel(badgeTier);
+  }
+
+  String? get badgeAssetPath {
+    return customerEmblemAssetPath(badgeTier);
   }
 }
 
@@ -111,6 +129,7 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.emblemVisible = true,
     this.activitySummary = const CustomerActivitySummary(
       totalCount: 0,
       badgeTier: 'NONE',
@@ -136,6 +155,7 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      emblemVisible: json['emblemVisible'] as bool? ?? true,
       activitySummary: json['activitySummary'] == null
           ? const CustomerActivitySummary(
               totalCount: 0,
@@ -165,6 +185,7 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final bool emblemVisible;
   final CustomerActivitySummary activitySummary;
   final String? profileImageUrl;
   final String? phone;
@@ -187,6 +208,7 @@ class CustomerProfile {
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    bool? emblemVisible,
     CustomerActivitySummary? activitySummary,
     String? profileImageUrl,
     String? phone,
@@ -198,6 +220,7 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      emblemVisible: emblemVisible ?? this.emblemVisible,
       activitySummary: activitySummary ?? this.activitySummary,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
@@ -321,6 +344,7 @@ class CustomerReview {
     this.storeCategory,
     this.sellerReply,
     this.sellerRepliedAt,
+    this.authorBadgeTier = 'NONE',
   });
 
   factory CustomerReview.fromJson(Map<String, Object?> json) {
@@ -331,6 +355,7 @@ class CustomerReview {
       storeName: json['storeName'] as String,
       storeCategory: json['storeCategory'] as String?,
       authorName: json['authorName'] as String,
+      authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
       status: json['status'] as String,
@@ -348,6 +373,7 @@ class CustomerReview {
   final String storeName;
   final String? storeCategory;
   final String authorName;
+  final String authorBadgeTier;
   final int rating;
   final String? content;
   final String status;
@@ -356,6 +382,9 @@ class CustomerReview {
   final DateTime? sellerRepliedAt;
 
   bool get isActive => status == 'ACTIVE';
+  String get authorEmblemLabel => customerEmblemLabel(authorBadgeTier);
+  String? get authorEmblemAssetPath =>
+      customerEmblemAssetPath(authorBadgeTier);
 
   CustomerReview copyWith({int? rating, String? content, String? status}) {
     return CustomerReview(
@@ -365,6 +394,7 @@ class CustomerReview {
       storeName: storeName,
       storeCategory: storeCategory,
       authorName: authorName,
+      authorBadgeTier: authorBadgeTier,
       rating: rating ?? this.rating,
       content: content ?? this.content,
       status: status ?? this.status,
@@ -387,6 +417,8 @@ abstract interface class CustomerEngagementRepository {
   Future<String> uploadProfileImage(String filePath);
 
   Future<bool> updateName(String name);
+
+  Future<bool> updateEmblemVisibility(bool emblemVisible);
 
   Future<bool> updatePhone(String phone);
 
@@ -502,6 +534,18 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
       '/api/v1/users/me/name',
       body: {'name': name},
       decode: _decodeAck,
+    );
+  }
+
+  @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) {
+    return _apiClient.patch<bool>(
+      '/api/v1/users/me/emblem-visibility',
+      body: {'emblemVisible': emblemVisible},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['emblemVisible'] as bool;
+      },
     );
   }
 
@@ -813,6 +857,12 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) async {
+    _profile = _profile.copyWith(emblemVisible: emblemVisible);
+    return emblemVisible;
+  }
+
+  @override
   Future<bool> updatePhone(String phone) async {
     _profile = _profile.copyWith(phone: phone);
     return true;
@@ -908,6 +958,9 @@ class MemoryCustomerEngagementRepository
       storeId: 1,
       storeName: 'POPQ 스토어',
       authorName: _profile.name,
+      authorBadgeTier: _profile.emblemVisible
+          ? _profile.activitySummary.badgeTier
+          : 'NONE',
       rating: rating,
       content: content,
       status: 'ACTIVE',

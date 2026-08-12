@@ -201,7 +201,7 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                     ),
                     title: const Text('내 프로필'),
                     subtitle: const Text(
-                      '이름, 이메일과 프로필 사진을 확인합니다.',
+                      '닉네임, 이메일과 프로필 사진을 확인합니다.',
                     ),
                     trailing: const Icon(
                       Icons.chevron_right_rounded,

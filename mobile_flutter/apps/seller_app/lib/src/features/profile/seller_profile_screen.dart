@@ -192,7 +192,7 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.badge_outlined),
-                        title: const Text('이름'),
+                        title: const Text('닉네임'),
                         subtitle: Text(identity.name),
                       ),
                       const Divider(height: 1),

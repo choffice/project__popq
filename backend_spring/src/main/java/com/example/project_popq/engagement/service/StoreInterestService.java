@@ -6,6 +6,7 @@ import com.example.project_popq.engagement.domain.StoreInterest;
 import com.example.project_popq.engagement.dto.InterestStateResponse;
 import com.example.project_popq.engagement.dto.StoreInterestResponse;
 import com.example.project_popq.engagement.repository.StoreInterestRepository;
+import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.user.domain.PlatformRole;
@@ -55,7 +56,8 @@ public class StoreInterestService {
         }
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
-        if (!store.isOpen()) {
+        if (!store.isActive()
+                || store.getBusinessStatus() == BusinessStatus.CLOSED) {
             throw new BusinessException(ErrorCode.STORE_NOT_FOUND);
         }
         storeInterestRepository.save(StoreInterest.create(user, store));

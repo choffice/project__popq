@@ -8,6 +8,7 @@ public record CustomerProfileResponse(
         long interestCount,
         long reviewCount,
         long orderCount,
-        CustomerActivitySummaryResponse activitySummary
+        CustomerActivitySummaryResponse activitySummary,
+        boolean emblemVisible
 ) {
 }

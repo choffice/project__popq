@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
+import '../discovery/store_hours_dialog.dart';
 import 'customer_order_repository.dart';
 import 'pending_payment_store.dart';
 import 'pending_payment_recovery_service.dart';
@@ -244,7 +246,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
         }
 
-        if (store.orderAcceptingEnabled || _createdOrder != null) {
+        if (store.isOrderAcceptingAt()) {
           return const SizedBox.shrink();
         }
 
@@ -268,8 +270,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const SizedBox(width: PopqSpacing.sm),
                 Expanded(
                   child: Text(
-                    '현재 매장이 신규 주문 접수를 잠시 중지했어요. '
-                    '접수가 재개되면 결제를 진행할 수 있습니다.',
+                    '현재 영업시간이 아니거나 주문 접수가 중지되어 있어요. '
+                    '영업시간에 결제를 진행할 수 있습니다.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onErrorContainer,
                           fontWeight: FontWeight.w700,
@@ -584,13 +586,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             final storeLoadFailed = snapshot.hasError ||
                 (snapshot.connectionState == ConnectionState.done &&
                     store == null);
-            final orderPaused = _createdOrder == null &&
-                store != null &&
-                !store.orderAcceptingEnabled;
+            final orderPaused =
+                store != null && !store.isOrderAcceptingAt();
             final paymentEnabled = canPay &&
                 (!checkingStore || _createdOrder != null) &&
-                (!storeLoadFailed || _createdOrder != null) &&
-                !orderPaused;
+                (!storeLoadFailed || _createdOrder != null);
 
             return FilledButton(
               onPressed: paymentEnabled ? _placeOrder : null,
@@ -601,7 +601,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 _busy
                     ? '결제 상태를 확인하고 있어요...'
                     : orderPaused
-                        ? '현재 주문 접수 중지'
+                        ? '영업시간 확인하고 결제하기'
                         : checkingStore && _createdOrder == null
                             ? '주문 가능 여부 확인 중...'
                             : storeLoadFailed && _createdOrder == null
@@ -617,6 +617,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Future<void> _placeOrder() async {
     final storeId = widget.cartController.storeId;
+    PendingPayment? paymentPendingThisAttempt;
+    CustomerStore? latestStore;
 
     if (storeId == null) {
       return;
@@ -635,20 +637,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     });
 
     try {
-      if (_createdOrder == null) {
-        final store = await widget.storeDiscoveryRepository.findDetail(storeId);
+      final store = await widget.storeDiscoveryRepository.findDetail(storeId);
+      latestStore = store;
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
+      setState(() {
+        _storeFuture = Future<CustomerStore>.value(store);
+      });
+
+      if (!store.isOrderAcceptingAt()) {
         setState(() {
-          _storeFuture = Future<CustomerStore>.value(store);
+          _busy = false;
         });
-
-        if (!store.orderAcceptingEnabled) {
-          throw StateError('현재 매장이 신규 주문 접수를 잠시 중지했어요.');
-        }
+        await showStoreHoursDialog(
+          context,
+          store: store,
+          description: '현재는 결제할 수 없는 시간이에요. '
+              '영업시간을 확인한 뒤 다시 시도해주세요.',
+        );
+        return;
       }
 
       if (widget.tossClientKey.trim().isEmpty) {
@@ -723,6 +733,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         amount: created.totalAmount,
         savedAt: DateTime.now(),
       );
+      paymentPendingThisAttempt = pending;
 
       await _pendingPaymentStore.save(pending);
 
@@ -749,6 +760,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         debugPrint('결제 승인 응답 오류: $error');
         debugPrintStack(stackTrace: stackTrace);
 
+        if (error is ApiRequestFailure && error.code == 'STORE_NOT_OPEN') {
+          rethrow;
+        }
+
         final recovered = await _tryRecoverPendingPayment(pending);
 
         if (recovered) {
@@ -762,6 +777,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       debugPrintStack(stackTrace: stackTrace);
 
       if (!mounted) {
+        return;
+      }
+
+      if (error is ApiRequestFailure && error.code == 'STORE_NOT_OPEN') {
+        final blockedPayment = paymentPendingThisAttempt;
+        if (blockedPayment != null) {
+          await _pendingPaymentStore.clearIfMatches(
+            orderPublicId: blockedPayment.orderPublicId,
+            paymentKey: blockedPayment.paymentKey,
+          );
+        }
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+        });
+        if (latestStore != null) {
+          await showStoreHoursDialog(
+            context,
+            store: latestStore,
+            description: '현재는 결제할 수 없는 시간이에요. '
+                '영업시간을 확인한 뒤 다시 시도해주세요.',
+          );
+        } else {
+          setState(() {
+            _errorMessage = '현재 매장 영업시간이 아니에요. '
+                '영업시간을 확인한 뒤 다시 시도해주세요.';
+          });
+        }
         return;
       }
 

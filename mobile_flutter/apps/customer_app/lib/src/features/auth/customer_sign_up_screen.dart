@@ -34,6 +34,10 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
 
   static final _passwordPattern = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$');
   static final _phonePattern = RegExp(r'^01[0-9]-?\d{3,4}-?\d{4}$');
+  static final _nicknamePattern = RegExp(
+    r'^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$',
+    unicode: true,
+  );
 
   @override
   void dispose() {
@@ -81,11 +85,21 @@ class _CustomerSignUpScreenState extends State<CustomerSignUpScreen> {
                   TextFormField(
                     key: const Key('sign-up-name'),
                     controller: _name,
-                    maxLength: 100,
-                    decoration: const InputDecoration(labelText: '이름'),
+                    maxLength: 7,
+                    decoration: const InputDecoration(
+                      labelText: '닉네임',
+                      helperText: '7자 이하 · 한글/영문/숫자/일본어/한자/공백',
+                    ),
                     validator: (value) {
-                      if (value == null || value.trim().length < 2) {
-                        return '이름을 2자 이상 입력해 주세요.';
+                      final nickname = value?.trim() ?? '';
+                      if (nickname.isEmpty) {
+                        return '닉네임을 입력해 주세요.';
+                      }
+                      if (nickname.length > 7) {
+                        return '닉네임은 7자 이하로 입력해 주세요.';
+                      }
+                      if (!_nicknamePattern.hasMatch(nickname)) {
+                        return '사용할 수 없는 문자가 포함되어 있어요.';
                       }
                       return null;
                     },

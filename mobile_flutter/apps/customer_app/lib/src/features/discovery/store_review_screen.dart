@@ -114,8 +114,31 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                                     PopqSpacing.sm,
                                   ),
                                   child: ListTile(
-                                    title: Text(
-                                      '${review.authorName} · ${review.rating}점',
+                                    title: Row(
+                                      children: <Widget>[
+                                        if (review.authorEmblemAssetPath !=
+                                            null) ...<Widget>[
+                                          Image.asset(
+                                            review.authorEmblemAssetPath!,
+                                            width: 36,
+                                            height: 36,
+                                            fit: BoxFit.contain,
+                                            semanticLabel:
+                                                review.authorEmblemLabel,
+                                          ),
+                                          const SizedBox(
+                                            width: PopqSpacing.xs,
+                                          ),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            review.authorBadgeTier == 'NONE'
+                                                ? review.authorName
+                                                : '${review.authorName} · ${review.authorEmblemLabel}',
+                                          ),
+                                        ),
+                                        Text('${review.rating}점'),
+                                      ],
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment:

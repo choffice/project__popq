@@ -107,6 +107,12 @@ class CustomerStore {
         closedDays: closedDays,
       );
 
+  bool isOrderAcceptingAt({DateTime? now}) {
+    return businessStatus == 'OPEN' &&
+        orderAcceptingEnabled &&
+        resolvedSchedule.isOpenAt(now: now);
+  }
+
   String get fullAddress {
     return <String?>[address, detailAddress]
         .whereType<String>()

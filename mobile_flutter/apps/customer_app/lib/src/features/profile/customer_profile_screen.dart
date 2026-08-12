@@ -266,10 +266,13 @@ class _CustomerProfileScreenState
                     title: '내 정보',
                     subtitle:
                     '프로필 사진, 연락처, 비밀번호를 관리해요',
-                    onTap: () {
-                      context.push(
+                    onTap: () async {
+                      await context.push(
                         CustomerRoutes.myInfo,
                       );
+                      if (context.mounted) {
+                        await _reload();
+                      }
                     },
                   ),
                   _MenuRowData(
@@ -935,7 +938,27 @@ class _ProfileHeaderCard extends StatelessWidget {
                               const SizedBox(
                                 width: PopqSpacing.xs,
                               ),
-                              Container(
+                              if (profile.emblemVisible &&
+                                  profile.activitySummary
+                                  .badgeAssetPath != null) ...[
+                                Image.asset(
+                                  profile.activitySummary
+                                      .badgeAssetPath!,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.contain,
+                                  filterQuality:
+                                  FilterQuality.high,
+                                  semanticLabel: profile
+                                      .activitySummary
+                                      .badgeLabel,
+                                ),
+                                const SizedBox(
+                                  width: PopqSpacing.xs,
+                                ),
+                              ],
+                              if (profile.emblemVisible)
+                                Container(
                                 padding:
                                 const EdgeInsets
                                     .symmetric(
@@ -1100,7 +1123,7 @@ class _ActivityCheckpointProgress extends StatelessWidget {
             Expanded(
               child: Text(
                 next == null
-                    ? '다이아 뱃지를 달성했어요'
+                    ? '다이아 엠블럼을 달성했어요'
                     : '다음 체크포인트 ${summary.remainingCount}회',
                 style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w800,

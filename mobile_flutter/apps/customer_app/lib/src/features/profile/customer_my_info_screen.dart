@@ -36,6 +36,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 
   final ImagePicker _imagePicker = ImagePicker();
   bool _uploadingProfileImage = false;
+  bool _savingEmblemVisibility = false;
   String? _linkingProvider;
 
   @override
@@ -124,9 +125,9 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (context) => _TextEditDialog(
-        title: '이름 변경',
+        title: '닉네임 변경',
         initialValue: currentName,
-        hintText: '이름을 입력하세요',
+        hintText: '닉네임을 입력하세요',
       ),
     );
 
@@ -137,13 +138,13 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
       if (!mounted) return;
       await _reloadProfile();
       if (!mounted) return;
-      _showMessage('이름이 변경됐어요.');
+      _showMessage('닉네임이 변경됐어요.');
     } on PopqFailure catch (failure) {
       if (!mounted) return;
       _showMessage(failure.message);
     } catch (error) {
       if (!mounted) return;
-      _showMessage('이름을 변경하지 못했어요. ($error)');
+      _showMessage('닉네임을 변경하지 못했어요. ($error)');
     }
   }
 
@@ -167,6 +168,37 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     } catch (error) {
       if (!mounted) return;
       _showMessage('전화번호를 변경하지 못했어요. ($error)');
+    }
+  }
+
+  Future<void> _updateEmblemVisibility(
+    CustomerProfile profile,
+    bool emblemVisible,
+  ) async {
+    if (_savingEmblemVisibility) return;
+
+    setState(() => _savingEmblemVisibility = true);
+    try {
+      final saved = await widget.repository.updateEmblemVisibility(
+        emblemVisible,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = Future<CustomerProfile>.value(
+          profile.copyWith(emblemVisible: saved),
+        );
+      });
+      _showMessage(saved ? '엠블럼을 표시합니다.' : '엠블럼을 숨겼습니다.');
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      _showMessage(failure.message);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('엠블럼 표시 설정을 변경하지 못했어요. ($error)');
+    } finally {
+      if (mounted) {
+        setState(() => _savingEmblemVisibility = false);
+      }
     }
   }
 
@@ -329,7 +361,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.badge_outlined),
-                        title: const Text('이름'),
+                        title: const Text('닉네임'),
                         subtitle: Text(profile.name),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editName(profile.name),
@@ -350,6 +382,73 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editPhone(profile.phone),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: PopqSpacing.md),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: profile.activitySummary.badgeAssetPath == null
+                            ? const Icon(Icons.workspace_premium_outlined)
+                            : Image.asset(
+                                profile.activitySummary.badgeAssetPath!,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                                semanticLabel:
+                                    profile.activitySummary.badgeLabel,
+                              ),
+                        title: Text(profile.activitySummary.badgeLabel),
+                        subtitle: const Text('내가 달성한 엠블럼'),
+                      ),
+                      const Divider(height: 1),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.visibility_outlined),
+                        title: const Text('엠블럼 표시'),
+                        subtitle: Text(
+                          profile.emblemVisible
+                              ? '프로필과 리뷰 등에 엠블럼을 표시해요.'
+                              : '다른 사람에게 엠블럼을 표시하지 않아요.',
+                        ),
+                        value: profile.emblemVisible,
+                        thumbIcon: const WidgetStatePropertyAll(
+                          Icon(Icons.circle, size: 0),
+                        ),
+                        thumbColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.disabled)
+                              ? Colors.white.withValues(alpha: 0.72)
+                              : Colors.white,
+                        ),
+                        trackColor: WidgetStateProperty.resolveWith(
+                          (states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return Theme.of(context).colorScheme.primary;
+                            }
+                            return Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.38);
+                          },
+                        ),
+                        trackOutlineColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? Colors.transparent
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.64),
+                        ),
+                        onChanged: _savingEmblemVisibility
+                            ? null
+                            : (value) => _updateEmblemVisibility(
+                                  profile,
+                                  value,
+                                ),
                       ),
                     ],
                   ),
@@ -504,9 +603,15 @@ class _TextEditDialog extends StatefulWidget {
 }
 
 class _TextEditDialogState extends State<_TextEditDialog> {
+  static final _nicknamePattern = RegExp(
+    r'^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$',
+    unicode: true,
+  );
+
   late final TextEditingController _controller = TextEditingController(
     text: widget.initialValue ?? '',
   );
+  String? _errorText;
 
   @override
   void dispose() {
@@ -520,7 +625,17 @@ class _TextEditDialogState extends State<_TextEditDialog> {
       title: Text(widget.title),
       content: TextField(
         controller: _controller,
-        decoration: InputDecoration(hintText: widget.hintText),
+        maxLength: 7,
+        decoration: InputDecoration(
+          hintText: widget.hintText,
+          helperText: '7자 이하 · 한글/영문/숫자/일본어/한자/공백',
+          errorText: _errorText,
+        ),
+        onChanged: (_) {
+          if (_errorText != null) {
+            setState(() => _errorText = null);
+          }
+        },
       ),
       actions: [
         TextButton(
@@ -530,7 +645,18 @@ class _TextEditDialogState extends State<_TextEditDialog> {
         FilledButton(
           onPressed: () {
             final value = _controller.text.trim();
-            if (value.isEmpty) return;
+            if (value.isEmpty) {
+              setState(() => _errorText = '닉네임을 입력해 주세요.');
+              return;
+            }
+            if (value.length > 7) {
+              setState(() => _errorText = '닉네임은 7자 이하로 입력해 주세요.');
+              return;
+            }
+            if (!_nicknamePattern.hasMatch(value)) {
+              setState(() => _errorText = '사용할 수 없는 문자가 포함되어 있어요.');
+              return;
+            }
             Navigator.of(context).pop(value);
           },
           child: const Text('저장'),

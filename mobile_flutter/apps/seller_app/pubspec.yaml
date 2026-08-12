@@ -80,6 +80,7 @@ flutter:
     - assets/images/google_g.png
     - assets/images/kakao_k.png
     - assets/images/naver_n.png
+    - assets/images/badges/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
