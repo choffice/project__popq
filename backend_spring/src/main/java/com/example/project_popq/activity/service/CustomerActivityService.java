@@ -55,6 +55,16 @@ public class CustomerActivityService {
     }
 
     @Transactional(readOnly = true)
+    public CustomerBadgeTier getPublicBadgeTier(User user) {
+        if (!user.isEmblemVisible()) {
+            return CustomerBadgeTier.NONE;
+        }
+        return CustomerBadgeTier.from(
+                activityRepository.countQualifiedActivities(user.getId())
+        );
+    }
+
+    @Transactional(readOnly = true)
     public CustomerAttendanceResponse getAttendance(User user) {
         LocalDate today = localDate(Instant.now());
         return attendanceResponse(user.getId(), today, false);

@@ -36,6 +36,7 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 
   final ImagePicker _imagePicker = ImagePicker();
   bool _uploadingProfileImage = false;
+  bool _savingEmblemVisibility = false;
   String? _linkingProvider;
 
   @override
@@ -167,6 +168,37 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
     } catch (error) {
       if (!mounted) return;
       _showMessage('전화번호를 변경하지 못했어요. ($error)');
+    }
+  }
+
+  Future<void> _updateEmblemVisibility(
+    CustomerProfile profile,
+    bool emblemVisible,
+  ) async {
+    if (_savingEmblemVisibility) return;
+
+    setState(() => _savingEmblemVisibility = true);
+    try {
+      final saved = await widget.repository.updateEmblemVisibility(
+        emblemVisible,
+      );
+      if (!mounted) return;
+      setState(() {
+        _profile = Future<CustomerProfile>.value(
+          profile.copyWith(emblemVisible: saved),
+        );
+      });
+      _showMessage(saved ? '엠블럼을 표시합니다.' : '엠블럼을 숨겼습니다.');
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      _showMessage(failure.message);
+    } catch (error) {
+      if (!mounted) return;
+      _showMessage('엠블럼 표시 설정을 변경하지 못했어요. ($error)');
+    } finally {
+      if (mounted) {
+        setState(() => _savingEmblemVisibility = false);
+      }
     }
   }
 
@@ -350,6 +382,46 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                         ),
                         trailing: const Icon(Icons.chevron_right_rounded),
                         onTap: () => _editPhone(profile.phone),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: PopqSpacing.md),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: profile.activitySummary.badgeAssetPath == null
+                            ? const Icon(Icons.workspace_premium_outlined)
+                            : Image.asset(
+                                profile.activitySummary.badgeAssetPath!,
+                                width: 48,
+                                height: 48,
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.high,
+                                semanticLabel:
+                                    profile.activitySummary.badgeLabel,
+                              ),
+                        title: Text(profile.activitySummary.badgeLabel),
+                        subtitle: const Text('내가 달성한 엠블럼'),
+                      ),
+                      const Divider(height: 1),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.visibility_outlined),
+                        title: const Text('엠블럼 표시'),
+                        subtitle: Text(
+                          profile.emblemVisible
+                              ? '프로필과 리뷰 등에 엠블럼을 표시해요.'
+                              : '다른 사람에게 엠블럼을 표시하지 않아요.',
+                        ),
+                        value: profile.emblemVisible,
+                        onChanged: _savingEmblemVisibility
+                            ? null
+                            : (value) => _updateEmblemVisibility(
+                                  profile,
+                                  value,
+                                ),
                       ),
                     ],
                   ),

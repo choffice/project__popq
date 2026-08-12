@@ -1,0 +1,2 @@
+ALTER TABLE users
+    ADD COLUMN emblem_visible BOOLEAN NOT NULL DEFAULT TRUE;

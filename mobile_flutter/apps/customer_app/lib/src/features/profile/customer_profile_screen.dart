@@ -265,10 +265,13 @@ class _CustomerProfileScreenState
                     title: '내 정보',
                     subtitle:
                     '프로필 사진, 연락처, 비밀번호를 관리해요',
-                    onTap: () {
-                      context.push(
+                    onTap: () async {
+                      await context.push(
                         CustomerRoutes.myInfo,
                       );
+                      if (context.mounted) {
+                        await _reload();
+                      }
                     },
                   ),
                   _MenuRowData(
@@ -934,7 +937,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                               const SizedBox(
                                 width: PopqSpacing.xs,
                               ),
-                              if (profile.activitySummary
+                              if (profile.emblemVisible &&
+                                  profile.activitySummary
                                   .badgeAssetPath != null) ...[
                                 Image.asset(
                                   profile.activitySummary
@@ -952,7 +956,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                                   width: PopqSpacing.xs,
                                 ),
                               ],
-                              Container(
+                              if (profile.emblemVisible)
+                                Container(
                                 padding:
                                 const EdgeInsets
                                     .symmetric(

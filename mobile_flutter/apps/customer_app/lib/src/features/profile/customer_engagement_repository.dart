@@ -129,6 +129,7 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.emblemVisible = true,
     this.activitySummary = const CustomerActivitySummary(
       totalCount: 0,
       badgeTier: 'NONE',
@@ -154,6 +155,7 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      emblemVisible: json['emblemVisible'] as bool? ?? true,
       activitySummary: json['activitySummary'] == null
           ? const CustomerActivitySummary(
               totalCount: 0,
@@ -183,6 +185,7 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final bool emblemVisible;
   final CustomerActivitySummary activitySummary;
   final String? profileImageUrl;
   final String? phone;
@@ -205,6 +208,7 @@ class CustomerProfile {
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    bool? emblemVisible,
     CustomerActivitySummary? activitySummary,
     String? profileImageUrl,
     String? phone,
@@ -216,6 +220,7 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      emblemVisible: emblemVisible ?? this.emblemVisible,
       activitySummary: activitySummary ?? this.activitySummary,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
@@ -413,6 +418,8 @@ abstract interface class CustomerEngagementRepository {
 
   Future<bool> updateName(String name);
 
+  Future<bool> updateEmblemVisibility(bool emblemVisible);
+
   Future<bool> updatePhone(String phone);
 
   Future<bool> changePassword({
@@ -527,6 +534,18 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
       '/api/v1/users/me/name',
       body: {'name': name},
       decode: _decodeAck,
+    );
+  }
+
+  @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) {
+    return _apiClient.patch<bool>(
+      '/api/v1/users/me/emblem-visibility',
+      body: {'emblemVisible': emblemVisible},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['emblemVisible'] as bool;
+      },
     );
   }
 
@@ -838,6 +857,12 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) async {
+    _profile = _profile.copyWith(emblemVisible: emblemVisible);
+    return emblemVisible;
+  }
+
+  @override
   Future<bool> updatePhone(String phone) async {
     _profile = _profile.copyWith(phone: phone);
     return true;
@@ -933,7 +958,9 @@ class MemoryCustomerEngagementRepository
       storeId: 1,
       storeName: 'POPQ 스토어',
       authorName: _profile.name,
-      authorBadgeTier: _profile.activitySummary.badgeTier,
+      authorBadgeTier: _profile.emblemVisible
+          ? _profile.activitySummary.badgeTier
+          : 'NONE',
       rating: rating,
       content: content,
       status: 'ACTIVE',

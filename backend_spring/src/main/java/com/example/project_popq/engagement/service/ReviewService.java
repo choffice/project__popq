@@ -289,7 +289,7 @@ public class ReviewService {
     private ReviewResponse toResponse(Review review) {
         return ReviewResponse.from(
                 review,
-                customerActivityService.getBadgeTier(review.getUser().getId())
+                customerActivityService.getPublicBadgeTier(review.getUser())
         );
     }
 

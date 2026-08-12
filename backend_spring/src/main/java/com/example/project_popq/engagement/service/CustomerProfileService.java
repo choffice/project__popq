@@ -37,7 +37,8 @@ public class CustomerProfileService {
                         ReviewStatus.ACTIVE
                 ),
                 orderRepository.countByUserId(user.getId()),
-                customerActivityService.getSummary(user)
+                customerActivityService.getSummary(user),
+                user.isEmblemVisible()
         );
     }
 }

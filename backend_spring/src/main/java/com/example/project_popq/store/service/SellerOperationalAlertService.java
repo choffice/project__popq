@@ -81,8 +81,8 @@ public class SellerOperationalAlertService {
                 .stream()
                 .map(review -> ReviewResponse.from(
                         review,
-                        customerActivityService.getBadgeTier(
-                                review.getUser().getId()
+                        customerActivityService.getPublicBadgeTier(
+                                review.getUser()
                         )
                 ))
                 .toList();
