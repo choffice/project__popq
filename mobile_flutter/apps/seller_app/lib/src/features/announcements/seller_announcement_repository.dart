@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
 
 class SellerAnnouncement {
@@ -69,25 +71,26 @@ abstract interface class SellerAnnouncementRepository {
   Future<List<SellerAnnouncement>> findAll(int storeId);
 
   Future<String> uploadAnnouncementImage(
-      String filePath,
-      );
+    Uint8List bytes, {
+    required String fileName,
+  });
 
   Future<SellerAnnouncement> create(
-      int storeId, {
-        required String title,
-        required String content,
-        String? imageUrl,
-        required bool notifyInterestedCustomers,
-      });
+    int storeId, {
+    required String title,
+    required String content,
+    String? imageUrl,
+    required bool notifyInterestedCustomers,
+  });
 
   Future<SellerAnnouncement> update(
-      int storeId,
-      SellerAnnouncement announcement, {
-        required String title,
-        required String content,
-        String? imageUrl,
-        required bool notifyInterestedCustomers,
-      });
+    int storeId,
+    SellerAnnouncement announcement, {
+    required String title,
+    required String content,
+    String? imageUrl,
+    required bool notifyInterestedCustomers,
+  });
 
   Future<SellerAnnouncement> changeStatus(
     int storeId,
@@ -200,24 +203,21 @@ class ApiSellerAnnouncementRepository implements SellerAnnouncementRepository {
 
   @override
   Future<String> uploadAnnouncementImage(
-      String filePath,
-      ) {
-    return _apiClient.postMultipartFile<String>(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
       '/api/v1/seller/store-images',
       fieldName: 'file',
-      filePath: filePath,
+      bytes: bytes,
+      fileName: fileName,
       decode: (Object? value) {
-        final json = Map<String, Object?>.from(
-          value as Map,
-        );
+        final json = Map<String, Object?>.from(value as Map);
 
         final imageUrl = json['imageUrl'];
 
-        if (imageUrl is! String ||
-            imageUrl.trim().isEmpty) {
-          throw const InvalidResponseFailure(
-            '업로드된 이미지 URL이 없습니다.',
-          );
+        if (imageUrl is! String || imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
         }
 
         return imageUrl;
@@ -250,9 +250,10 @@ class MemorySellerAnnouncementRepository
 
   @override
   Future<String> uploadAnnouncementImage(
-      String filePath,
-      ) async {
-    return filePath;
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    return 'memory://announcement-images/$fileName';
   }
 
   @override
@@ -305,13 +306,9 @@ class MemorySellerAnnouncementRepository
       title: title,
       content: content,
       imageUrl: imageUrl,
-      status: notifyInterestedCustomers
-          ? 'PUBLISHED'
-          : announcement.status,
+      status: notifyInterestedCustomers ? 'PUBLISHED' : announcement.status,
       pinned: announcement.pinned,
-      publishedAt: notifyInterestedCustomers
-          ? now
-          : announcement.publishedAt,
+      publishedAt: notifyInterestedCustomers ? now : announcement.publishedAt,
       createdAt: announcement.createdAt,
       updatedAt: now,
     );

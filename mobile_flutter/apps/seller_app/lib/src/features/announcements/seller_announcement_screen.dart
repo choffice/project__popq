@@ -222,22 +222,21 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                   width: double.infinity,
                   height: 180,
                   fit: BoxFit.cover,
-                  errorBuilder: (
-                      BuildContext context,
-                      Object error,
-                      StackTrace? stackTrace,
+                  errorBuilder:
+                      (
+                        BuildContext context,
+                        Object error,
+                        StackTrace? stackTrace,
                       ) {
-                    return Container(
-                      height: 100,
-                      alignment: Alignment.center,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      child: const Icon(
-                        Icons.broken_image_outlined,
-                      ),
-                    );
-                  },
+                        return Container(
+                          height: 100,
+                          alignment: Alignment.center,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.broken_image_outlined),
+                        );
+                      },
                 ),
               ),
             ],
@@ -351,39 +350,47 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     );
     if (draft == null) return;
     try {
-      String? imageUrl = draft.removeImage
-          ? null
-          : draft.imageUrl;
+      String? imageUrl = draft.removeImage ? null : draft.imageUrl;
 
-      final String? imageFilePath =
-          draft.imageFilePath;
+      final Uint8List? imageBytes = draft.imageBytes;
+      final String? imageFileName = draft.imageFileName;
+      final bool hasNewImageSelection =
+          imageBytes != null || imageFileName != null;
 
-      if (imageFilePath != null &&
-          imageFilePath.trim().isNotEmpty) {
-        imageUrl = await widget.repository
-            .uploadAnnouncementImage(
-          imageFilePath,
+      if (hasNewImageSelection &&
+          (imageBytes == null ||
+              imageBytes.isEmpty ||
+              imageFileName == null ||
+              imageFileName.trim().isEmpty)) {
+        throw StateError('선택한 공지 이미지 데이터를 읽지 못했습니다.');
+      }
+
+      if (imageBytes != null &&
+          imageBytes.isNotEmpty &&
+          imageFileName != null &&
+          imageFileName.trim().isNotEmpty) {
+        imageUrl = await widget.repository.uploadAnnouncementImage(
+          imageBytes,
+          fileName: imageFileName,
         );
       }
 
       final saved = announcement == null
           ? await widget.repository.create(
-            storeId,
-            title: draft.title,
-            content: draft.content,
-            imageUrl: imageUrl,
-            notifyInterestedCustomers:
-            draft.notifyInterestedCustomers,
-          )
+              storeId,
+              title: draft.title,
+              content: draft.content,
+              imageUrl: imageUrl,
+              notifyInterestedCustomers: draft.notifyInterestedCustomers,
+            )
           : await widget.repository.update(
-            storeId,
-            announcement,
-            title: draft.title,
-            content: draft.content,
-            imageUrl: imageUrl,
-            notifyInterestedCustomers:
-            draft.notifyInterestedCustomers,
-          );
+              storeId,
+              announcement,
+              title: draft.title,
+              content: draft.content,
+              imageUrl: imageUrl,
+              notifyInterestedCustomers: draft.notifyInterestedCustomers,
+            );
       if (!mounted || widget.storeId != storeId) return;
       setState(() {
         final announcements = _announcements ?? <SellerAnnouncement>[];
@@ -538,7 +545,8 @@ class _AnnouncementDraft {
     required this.content,
     required this.notifyInterestedCustomers,
     this.imageUrl,
-    this.imageFilePath,
+    this.imageBytes,
+    this.imageFileName,
     this.removeImage = false,
   });
 
@@ -546,7 +554,8 @@ class _AnnouncementDraft {
   final String content;
 
   final String? imageUrl;
-  final String? imageFilePath;
+  final Uint8List? imageBytes;
+  final String? imageFileName;
   final bool removeImage;
 
   final bool notifyInterestedCustomers;
@@ -604,60 +613,42 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 maxLength: 200,
                 decoration: const InputDecoration(labelText: '제목'),
               ),
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
+              const SizedBox(height: PopqSpacing.sm),
 
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
                 child: _buildImagePreview(),
               ),
 
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
+              const SizedBox(height: PopqSpacing.sm),
 
               Wrap(
                 spacing: PopqSpacing.sm,
                 runSpacing: PopqSpacing.xs,
                 children: [
                   OutlinedButton.icon(
-                    onPressed: () => _pickImage(
-                      ImageSource.camera,
-                    ),
-                    icon: const Icon(
-                      Icons.photo_camera_outlined,
-                    ),
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined),
                     label: const Text('사진 촬영'),
                   ),
                   OutlinedButton.icon(
-                    onPressed: () => _pickImage(
-                      ImageSource.gallery,
-                    ),
-                    icon: const Icon(
-                      Icons.photo_library_outlined,
-                    ),
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
                     label: const Text('앨범 선택'),
                   ),
                   if (_pickedImage != null ||
                       (!_removeImage &&
-                          (widget.announcement?.imageUrl
-                              ?.trim()
-                              .isNotEmpty ??
+                          (widget.announcement?.imageUrl?.trim().isNotEmpty ??
                               false)))
                     TextButton.icon(
                       onPressed: _clearImage,
-                      icon: const Icon(
-                        Icons.delete_outline,
-                      ),
+                      icon: const Icon(Icons.delete_outline),
                       label: const Text('사진 삭제'),
                     ),
                 ],
               ),
 
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
+              const SizedBox(height: PopqSpacing.sm),
               TextField(
                 key: const Key('announcement-content'),
                 controller: _content,
@@ -697,13 +688,11 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
               _AnnouncementDraft(
                 title: title,
                 content: content,
-                imageUrl: _removeImage
-                    ? null
-                    : widget.announcement?.imageUrl,
-                imageFilePath: _pickedImage?.path,
+                imageUrl: _removeImage ? null : widget.announcement?.imageUrl,
+                imageBytes: _pickedImageBytes,
+                imageFileName: _pickedImage?.name,
                 removeImage: _removeImage,
-                notifyInterestedCustomers:
-                _notifyInterestedCustomers,
+                notifyInterestedCustomers: _notifyInterestedCustomers,
               ),
             );
           },
@@ -713,9 +702,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
     );
   }
 
-  Future<void> _pickImage(
-      ImageSource source,
-      ) async {
+  Future<void> _pickImage(ImageSource source) async {
     final picked = await _imagePicker.pickImage(
       source: source,
       imageQuality: 85,
@@ -756,24 +743,18 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
       );
     }
 
-    final existingUrl =
-        widget.announcement?.imageUrl;
+    final existingUrl = widget.announcement?.imageUrl;
 
-    if (!_removeImage &&
-        existingUrl != null &&
-        existingUrl.trim().isNotEmpty) {
+    if (!_removeImage && existingUrl != null && existingUrl.trim().isNotEmpty) {
       return Image.network(
         existingUrl,
         width: double.infinity,
         height: 180,
         fit: BoxFit.cover,
-        errorBuilder: (
-            BuildContext context,
-            Object error,
-            StackTrace? stackTrace,
-            ) {
-          return _emptyImagePreview();
-        },
+        errorBuilder:
+            (BuildContext context, Object error, StackTrace? stackTrace) {
+              return _emptyImagePreview();
+            },
       );
     }
 
@@ -786,18 +767,13 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
       height: 180,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(12),
       ),
       child: const Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.image_outlined,
-            size: 40,
-          ),
+          Icon(Icons.image_outlined, size: 40),
           SizedBox(height: 6),
           Text('첨부된 사진이 없습니다.'),
         ],

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
 
 String customerEmblemLabel(String badgeTier) {
@@ -402,10 +404,7 @@ class InterestedStore {
       address: json['address'] as String?,
       detailAddress: json['detailAddress'] as String?,
       representativeCategory: json['representativeCategory'] as String?,
-      imageUrl: _resolveImageUrl(
-        json['imageUrl'] as String?,
-        imageBaseUrl,
-      ),
+      imageUrl: _resolveImageUrl(json['imageUrl'] as String?, imageBaseUrl),
     );
   }
 
@@ -439,13 +438,17 @@ class CustomerReview {
     required this.status,
     required this.createdAt,
     this.content,
+    this.imageUrl,
     this.storeCategory,
     this.sellerReply,
     this.sellerRepliedAt,
     this.authorBadgeTier = 'NONE',
   });
 
-  factory CustomerReview.fromJson(Map<String, Object?> json) {
+  factory CustomerReview.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
     return CustomerReview(
       reviewId: (json['reviewId'] as num).toInt(),
       orderPublicId: json['orderPublicId'] as String,
@@ -456,6 +459,7 @@ class CustomerReview {
       authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
+      imageUrl: _resolveImageUrl(json['imageUrl'] as String?, imageBaseUrl),
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       sellerReply: json['sellerReply'] as String?,
@@ -474,6 +478,7 @@ class CustomerReview {
   final String authorBadgeTier;
   final int rating;
   final String? content;
+  final String? imageUrl;
   final String status;
   final DateTime createdAt;
   final String? sellerReply;
@@ -481,10 +486,15 @@ class CustomerReview {
 
   bool get isActive => status == 'ACTIVE';
   String get authorEmblemLabel => customerEmblemLabel(authorBadgeTier);
-  String? get authorEmblemAssetPath =>
-      customerEmblemAssetPath(authorBadgeTier);
+  String? get authorEmblemAssetPath => customerEmblemAssetPath(authorBadgeTier);
 
-  CustomerReview copyWith({int? rating, String? content, String? status}) {
+  CustomerReview copyWith({
+    int? rating,
+    String? content,
+    String? imageUrl,
+    bool clearImage = false,
+    String? status,
+  }) {
     return CustomerReview(
       reviewId: reviewId,
       orderPublicId: orderPublicId,
@@ -495,6 +505,7 @@ class CustomerReview {
       authorBadgeTier: authorBadgeTier,
       rating: rating ?? this.rating,
       content: content ?? this.content,
+      imageUrl: clearImage ? null : imageUrl ?? this.imageUrl,
       status: status ?? this.status,
       createdAt: createdAt,
       sellerReply: sellerReply,
@@ -519,6 +530,8 @@ abstract interface class CustomerEngagementRepository {
   Future<bool> recordQrVisit(String qrToken);
 
   Future<String> uploadProfileImage(String filePath);
+
+  Future<String> uploadReviewImage(Uint8List bytes, {required String fileName});
 
   Future<bool> updateName(String name);
 
@@ -558,12 +571,14 @@ abstract interface class CustomerEngagementRepository {
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   });
 
   Future<CustomerReview> updateReview({
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   });
 
   Future<CustomerReview> deleteReview(int reviewId);
@@ -621,9 +636,8 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   Future<MonthlyRaffleStatus> getMonthlyRaffleStatus() {
     return _apiClient.get(
       '/api/v1/customer/monthly-raffle',
-      decode: (value) => MonthlyRaffleStatus.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          MonthlyRaffleStatus.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -631,9 +645,8 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket() {
     return _apiClient.post(
       '/api/v1/customer/monthly-raffle/tickets',
-      decode: (value) => MonthlyRaffleStatus.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          MonthlyRaffleStatus.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -699,10 +712,7 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }) {
     return _apiClient.post<bool>(
       '/api/v1/users/me/password',
-      body: {
-        'currentPassword': currentPassword,
-        'newPassword': newPassword,
-      },
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
       decode: _decodeAck,
     );
   }
@@ -824,10 +834,11 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) {
     return _apiClient.post(
       '/api/v1/customer/reviews/orders/$orderPublicId',
-      body: {'rating': rating, 'content': content},
+      body: {'rating': rating, 'content': content, 'imageUrl': imageUrl},
       decode: _decodeReview,
     );
   }
@@ -837,10 +848,11 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) {
     return _apiClient.put(
       '/api/v1/customer/reviews/$reviewId',
-      body: {'rating': rating, 'content': content},
+      body: {'rating': rating, 'content': content, 'imageUrl': imageUrl},
       decode: _decodeReview,
     );
   }
@@ -859,16 +871,42 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }
 
   CustomerReview _decodeReview(Object? value) {
-    return CustomerReview.fromJson(Map<String, Object?>.from(value as Map));
+    return CustomerReview.fromJson(
+      Map<String, Object?>.from(value as Map),
+      imageBaseUrl: _imageBaseUrl,
+    );
   }
 
   List<CustomerReview> _decodeReviews(Object? value) {
     return (value as List<Object?>)
         .map(
-          (item) =>
-              CustomerReview.fromJson(Map<String, Object?>.from(item as Map)),
+          (item) => CustomerReview.fromJson(
+            Map<String, Object?>.from(item as Map),
+            imageBaseUrl: _imageBaseUrl,
+          ),
         )
         .toList();
+  }
+
+  @override
+  Future<String> uploadReviewImage(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/customer/review-images',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        final rawImageUrl = json['imageUrl'];
+        if (rawImageUrl is! String || rawImageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return _resolveImageUrl(rawImageUrl, _imageBaseUrl)!;
+      },
+    );
   }
 }
 
@@ -1026,6 +1064,14 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<String> uploadReviewImage(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    return 'memory://review-images/$fileName';
+  }
+
+  @override
   Future<bool> updateName(String name) async {
     _profile = _profile.copyWith(name: name);
     return true;
@@ -1126,6 +1172,7 @@ class MemoryCustomerEngagementRepository
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) async {
     final review = CustomerReview(
       reviewId: _reviews.length + 1,
@@ -1138,6 +1185,7 @@ class MemoryCustomerEngagementRepository
           : 'NONE',
       rating: rating,
       content: content,
+      imageUrl: imageUrl,
       status: 'ACTIVE',
       createdAt: DateTime.now(),
     );
@@ -1150,9 +1198,15 @@ class MemoryCustomerEngagementRepository
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) async {
     final index = _reviews.indexWhere((review) => review.reviewId == reviewId);
-    final updated = _reviews[index].copyWith(rating: rating, content: content);
+    final updated = _reviews[index].copyWith(
+      rating: rating,
+      content: content,
+      imageUrl: imageUrl,
+      clearImage: imageUrl == null,
+    );
     _reviews[index] = updated;
     return updated;
   }
