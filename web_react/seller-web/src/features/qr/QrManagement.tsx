@@ -7,6 +7,7 @@ import {
 import {
   archiveQrCode,
   changeQrStatus,
+  createStoreTable,
   getQrCodeDetail,
   getQrCodes,
   getStoreTables,
@@ -64,6 +65,11 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
   const [processingId, setProcessingId] = useState<number | null>(null)
   const [showIssue, setShowIssue] = useState(false)
   const [tableId, setTableId] = useState('7')
+  const [showTableForm, setShowTableForm] = useState(false)
+  const [tableCode, setTableCode] = useState('')
+  const [tableName, setTableName] = useState('')
+  const [creatingTable, setCreatingTable] = useState(false)
+  const [createdTableName, setCreatedTableName] = useState('')
   const [expiresOn, setExpiresOn] = useState('')
   const [artifact, setArtifact] = useState<QrArtifact | null>(null)
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('stored')
@@ -126,6 +132,53 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
     [tables],
   )
 
+  function closeIssue() {
+    setShowIssue(false)
+    setShowTableForm(false)
+    setTableCode('')
+    setTableName('')
+    setCreatedTableName('')
+  }
+
+  async function addTableAndContinue() {
+    const code = tableCode.trim().toUpperCase()
+    const name = tableName.trim()
+    if (!/^[A-Z0-9_-]+$/.test(code)) {
+      onError('테이블 코드는 영문·숫자·밑줄·하이픈으로 입력해 주세요.')
+      return
+    }
+    if (!name) {
+      onError('테이블 표시 이름을 입력해 주세요.')
+      return
+    }
+
+    setCreatingTable(true)
+    try {
+      const created = isDemo
+        ? {
+            storeTableId:
+              Math.max(0, ...tables.map((table) => table.storeTableId)) + 1,
+            tableCode: code,
+            name,
+            status: 'ACTIVE' as const,
+          }
+        : await createStoreTable(connection, code, name)
+      setTables((current) => [...current, created])
+      setTableId(String(created.storeTableId))
+      setCreatedTableName(created.name)
+      setTableCode('')
+      setTableName('')
+      setShowTableForm(false)
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error ? caught.message : '테이블을 추가하지 못했습니다.',
+      )
+    } finally {
+      setCreatingTable(false)
+    }
+  }
+
   async function issue() {
     const selectedTableId = Number(tableId)
     if (!Number.isInteger(selectedTableId)) {
@@ -178,7 +231,7 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
         publicUrl: result.publicUrl,
       })
       setArtifactMode('issued')
-      setShowIssue(false)
+      closeIssue()
       onError(null)
     } catch (caught) {
       onError(
@@ -619,42 +672,93 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
             <button
               className="modal-close"
               aria-label="닫기"
-              onClick={() => setShowIssue(false)}
+              onClick={closeIssue}
             >
               ×
             </button>
             <p className="eyebrow">ISSUE QR</p>
             <h2 id="issue-title">새 QR 발급</h2>
             <p>테이블과 선택 만료일을 지정해 새 주문 입구를 만듭니다.</p>
-            <label>
-              연결 테이블
-              <select
-                value={tableId}
-                onChange={(event) => setTableId(event.target.value)}
-              >
-                {availableTables.map((table) => (
-                  <option key={table.storeTableId} value={table.storeTableId}>
-                    {table.name} · {table.tableCode}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              만료일
-              <input
-                type="date"
-                value={expiresOn}
-                onChange={(event) => setExpiresOn(event.target.value)}
-              />
-              <small>비워두면 만료 없이 발급합니다.</small>
-            </label>
-            <button
-              className="primary-action"
-              disabled={processingId === -1 || availableTables.length === 0}
-              onClick={() => void issue()}
-            >
-              {processingId === -1 ? '발급 중…' : 'QR 발급하기'}
-            </button>
+            {availableTables.length === 0 ? (
+              <div className="qr-table-empty">
+                <div>
+                  <strong>먼저 테이블을 추가해 주세요</strong>
+                  <p>테이블을 추가하면 이 화면에서 바로 QR 발급을 이어갈 수 있습니다.</p>
+                </div>
+                {showTableForm ? (
+                  <div className="qr-table-form">
+                    <label>
+                      테이블 코드
+                      <input
+                        placeholder="TABLE-01"
+                        value={tableCode}
+                        onChange={(event) => setTableCode(event.target.value)}
+                        autoFocus
+                      />
+                    </label>
+                    <label>
+                      표시 이름
+                      <input
+                        placeholder="테이블 1"
+                        value={tableName}
+                        onChange={(event) => setTableName(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="primary-action"
+                      disabled={creatingTable}
+                      onClick={() => void addTableAndContinue()}
+                    >
+                      {creatingTable ? '추가 중…' : '추가하고 QR 발급 계속하기'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="primary-action"
+                    onClick={() => setShowTableForm(true)}
+                  >
+                    + 테이블 추가
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {createdTableName && (
+                  <p className="qr-table-created">
+                    {createdTableName} 테이블이 추가되어 연결 테이블로 선택되었습니다.
+                  </p>
+                )}
+                <label>
+                  연결 테이블
+                  <select
+                    value={tableId}
+                    onChange={(event) => setTableId(event.target.value)}
+                  >
+                    {availableTables.map((table) => (
+                      <option key={table.storeTableId} value={table.storeTableId}>
+                        {table.name} · {table.tableCode}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  만료일
+                  <input
+                    type="date"
+                    value={expiresOn}
+                    onChange={(event) => setExpiresOn(event.target.value)}
+                  />
+                  <small>비워두면 만료 없이 발급합니다.</small>
+                </label>
+                <button
+                  className="primary-action"
+                  disabled={processingId === -1}
+                  onClick={() => void issue()}
+                >
+                  {processingId === -1 ? '발급 중…' : 'QR 발급하기'}
+                </button>
+              </>
+            )}
           </section>
         </div>
       )}

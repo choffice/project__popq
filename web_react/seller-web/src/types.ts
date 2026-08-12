@@ -463,12 +463,29 @@ export type AdminOverview = {
   suspendedStores: number
 }
 
+export type PageResponse<T> = {
+  content: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+  first: boolean
+  last: boolean
+}
+
+export type UserStatus =
+  | 'ACTIVE'
+  | 'SUSPENDED'
+  | 'WITHDRAWAL_PENDING'
+  | 'WITHDRAWN'
+
 export type AdminUser = {
   userId: number
   email: string
   name: string
   role: 'CUSTOMER' | 'SELLER' | 'ADMIN'
-  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
+  roles: ('CUSTOMER' | 'SELLER' | 'ADMIN')[]
+  status: UserStatus
   createdAt: string
 }
 
@@ -480,7 +497,7 @@ export type AdminSeller = {
   businessName: string | null
   businessRegistrationNumber: string | null
   verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
-  userStatus: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
+  userStatus: UserStatus
   createdAt: string
 }
 
@@ -491,4 +508,72 @@ export type AdminStore = {
   status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
   businessStatus: BusinessStatus
   createdAt: string
+}
+
+export type AppAudience = 'ALL' | 'CUSTOMER_APP' | 'SELLER_APP'
+export type ContentStatus = 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
+
+export type PlatformAnnouncement = {
+  platformAnnouncementId: number
+  audience: AppAudience
+  title: string
+  content: string
+  status: ContentStatus
+  publishStartAt: string | null
+  publishEndAt: string | null
+  authorName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type Faq = {
+  faqId: number
+  audience: AppAudience
+  category: string
+  question: string
+  answer: string
+  displayOrder: number
+  status: ContentStatus
+  authorName: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type SupportRequesterType = 'CUSTOMER' | 'SELLER'
+export type SupportCategory =
+  | 'ACCOUNT'
+  | 'STORE_VISIBILITY'
+  | 'ORDER_PAYMENT'
+  | 'OTHER'
+export type SupportTicketStatus =
+  | 'RECEIVED'
+  | 'WAITING_ADMIN'
+  | 'WAITING_REQUESTER'
+  | 'CLOSED'
+
+export type SupportTicketSummary = {
+  supportTicketId: number
+  requesterUserId: number
+  requesterName: string
+  requesterEmail: string | null
+  requesterType: SupportRequesterType
+  category: SupportCategory
+  subject: string
+  status: SupportTicketStatus
+  lastMessageAt: string
+  createdAt: string
+}
+
+export type SupportMessage = {
+  supportMessageId: number
+  senderUserId: number
+  senderName: string
+  senderType: 'REQUESTER' | 'ADMIN'
+  content: string
+  createdAt: string
+}
+
+export type SupportTicketDetail = {
+  ticket: SupportTicketSummary
+  messages: SupportMessage[]
 }

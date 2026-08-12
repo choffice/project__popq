@@ -16,6 +16,8 @@ import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
+import { AdminContentManagement } from './features/admin/AdminContentManagement'
+import { AdminSupportManagement } from './features/admin/AdminSupportManagement'
 import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
 import { SellerAuth } from './features/auth/SellerAuth'
 import { MessageManagement } from './features/messages/MessageManagement'
@@ -40,7 +42,12 @@ type SellerView =
   | 'messages'
   | 'reviews'
   | 'settings'
-  | 'admin'
+  | 'admin-customers'
+  | 'admin-sellers'
+  | 'admin-stores'
+  | 'admin-announcements'
+  | 'admin-support'
+  | 'admin-faqs'
 type TransitionAction =
   | 'accept'
   | 'reject'
@@ -141,7 +148,12 @@ const VIEW_COPY: Record<
   messages: { eyebrow: 'CUSTOMER CONVERSATIONS', title: '고객 문의' },
   reviews: { eyebrow: 'CUSTOMER REVIEWS', title: '리뷰 관리' },
   settings: { eyebrow: 'STORE OPERATIONS', title: '스토어 설정' },
-  admin: { eyebrow: 'PLATFORM CONTROL', title: '관리자 운영' },
+  'admin-customers': { eyebrow: 'MEMBER CONTROL', title: '구매자 회원 관리' },
+  'admin-sellers': { eyebrow: 'SELLER CONTROL', title: '판매자 회원 · 인증' },
+  'admin-stores': { eyebrow: 'STORE CONTROL', title: '스토어 관리' },
+  'admin-announcements': { eyebrow: 'PLATFORM CONTENT', title: '플랫폼 공지' },
+  'admin-support': { eyebrow: 'CUSTOMER SUPPORT', title: '문의 관리' },
+  'admin-faqs': { eyebrow: 'PLATFORM CONTENT', title: 'FAQ 관리' },
 }
 
 function money(value: number) {
@@ -218,7 +230,7 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
 function App() {
   const { theme, toggleTheme } = useThemePreference()
   const [activeView, setActiveView] = useState<SellerView>(() =>
-    readConnection()?.user?.role === 'ADMIN' ? 'admin' : 'orders',
+    readConnection()?.user?.role === 'ADMIN' ? 'admin-customers' : 'orders',
   )
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
@@ -596,7 +608,7 @@ function App() {
     activeConnectionScope.current = connectionScope(nextConnection)
     setConnection(nextConnection)
     setAuthenticated(true)
-    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
+    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin-customers' : 'orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
@@ -715,10 +727,16 @@ function App() {
         </div>
         <nav aria-label={isAdmin ? '관리자 메뉴' : '판매자 메뉴'}>
           {isAdmin ? (
-            <button className="active" onClick={() => setActiveView('admin')}>
-              <span>◇</span>
-              관리자 운영
-            </button>
+            <>
+              <small className="sidebar-section-label">회원 관리</small>
+              <button className={activeView === 'admin-customers' ? 'active' : ''} onClick={() => setActiveView('admin-customers')}><span>◎</span>구매자 회원</button>
+              <button className={activeView === 'admin-sellers' ? 'active' : ''} onClick={() => setActiveView('admin-sellers')}><span>◇</span>판매자 · 인증</button>
+              <button className={activeView === 'admin-stores' ? 'active' : ''} onClick={() => setActiveView('admin-stores')}><span>□</span>스토어 관리</button>
+              <small className="sidebar-section-label">콘텐츠 · 지원</small>
+              <button className={activeView === 'admin-announcements' ? 'active' : ''} onClick={() => setActiveView('admin-announcements')}><span>◉</span>플랫폼 공지</button>
+              <button className={activeView === 'admin-support' ? 'active' : ''} onClick={() => setActiveView('admin-support')}><span>◌</span>문의 관리</button>
+              <button className={activeView === 'admin-faqs' ? 'active' : ''} onClick={() => setActiveView('admin-faqs')}><span>?</span>FAQ 관리</button>
+            </>
           ) : (
             <>
               <button
@@ -1057,9 +1075,12 @@ function App() {
             onError={setError}
           />
         )}
-        {isAdmin && activeView === 'admin' && (
-          <AdminManagement connection={connection} onError={setError} />
-        )}
+        {isAdmin && activeView === 'admin-customers' && <AdminManagement connection={connection} section="customers" onError={setError} />}
+        {isAdmin && activeView === 'admin-sellers' && <AdminManagement connection={connection} section="sellers" onError={setError} />}
+        {isAdmin && activeView === 'admin-stores' && <AdminManagement connection={connection} section="stores" onError={setError} />}
+        {isAdmin && activeView === 'admin-announcements' && <AdminContentManagement connection={connection} kind="announcements" onError={setError} />}
+        {isAdmin && activeView === 'admin-support' && <AdminSupportManagement connection={connection} onError={setError} />}
+        {isAdmin && activeView === 'admin-faqs' && <AdminContentManagement connection={connection} kind="faqs" onError={setError} />}
       </div>
 
       <aside

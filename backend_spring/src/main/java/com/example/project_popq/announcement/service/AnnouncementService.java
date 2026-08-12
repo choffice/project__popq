@@ -4,6 +4,7 @@ import com.example.project_popq.announcement.domain.Announcement;
 import com.example.project_popq.announcement.domain.AnnouncementStatus;
 import com.example.project_popq.announcement.dto.AnnouncementResponse;
 import com.example.project_popq.announcement.dto.ChangeAnnouncementStatusRequest;
+import com.example.project_popq.announcement.dto.ChangeAnnouncementPinRequest;
 import com.example.project_popq.announcement.dto.SaveAnnouncementRequest;
 import com.example.project_popq.announcement.repository.AnnouncementRepository;
 import com.example.project_popq.common.error.BusinessException;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AnnouncementService {
 
+    private static final long MAX_PINNED_ANNOUNCEMENTS = 3L;
+
     private final AnnouncementRepository announcementRepository;
     private final StoreRepository storeRepository;
     private final StoreAuthorizationService storeAuthorizationService;
@@ -33,7 +36,7 @@ public class AnnouncementService {
     public List<AnnouncementResponse> findAll(User user, Long storeId) {
         requireStoreMember(user, storeId);
         return announcementRepository
-                .findAllByStoreIdOrderByCreatedAtDescIdDesc(storeId)
+                .findAllForSeller(storeId)
                 .stream()
                 .map(AnnouncementResponse::from)
                 .toList();
@@ -49,11 +52,12 @@ public class AnnouncementService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         Announcement announcement = announcementRepository.save(
-                Announcement.create(
-                        store,
-                        request.title().trim(),
-                        request.content().trim()
-                )
+            Announcement.create(
+                store,
+                request.title().trim(),
+                request.content().trim(),
+                normalizeImageUrl(request.imageUrl())
+            )
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -67,10 +71,11 @@ public class AnnouncementService {
             SaveAnnouncementRequest request
     ) {
         requireManager(user, storeId);
-        Announcement announcement = findOne(storeId, announcementId);
+        Announcement announcement = findOneForUpdate(storeId, announcementId);
         announcement.update(
-                request.title().trim(),
-                request.content().trim()
+            request.title().trim(),
+            request.content().trim(),
+            normalizeImageUrl(request.imageUrl())
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -84,14 +89,49 @@ public class AnnouncementService {
             ChangeAnnouncementStatusRequest request
     ) {
         requireManager(user, storeId);
-        Announcement announcement = findOne(storeId, announcementId);
+        Announcement announcement = findOneForUpdate(storeId, announcementId);
         announcement.changeStatus(request.status(), Instant.now());
         return AnnouncementResponse.from(announcement);
     }
 
-    private Announcement findOne(Long storeId, Long announcementId) {
+    @Transactional
+    public AnnouncementResponse changePin(
+            User user,
+            Long storeId,
+            Long announcementId,
+            ChangeAnnouncementPinRequest request
+    ) {
+        requireManager(user, storeId);
+        storeRepository.findForUpdateById(storeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
+        Announcement announcement = findOneForUpdate(storeId, announcementId);
+
+        if (!request.pinned()) {
+            announcement.unpin();
+            return AnnouncementResponse.from(announcement);
+        }
+        if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
+            throw new BusinessException(
+                    ErrorCode.ANNOUNCEMENT_PIN_REQUIRES_PUBLISHED
+            );
+        }
+        if (announcement.isPinned()) {
+            return AnnouncementResponse.from(announcement);
+        }
+        if (announcementRepository.countByStoreIdAndPinnedTrue(storeId)
+                >= MAX_PINNED_ANNOUNCEMENTS) {
+            throw new BusinessException(
+                    ErrorCode.ANNOUNCEMENT_PIN_LIMIT_EXCEEDED
+            );
+        }
+
+        announcement.pin();
+        return AnnouncementResponse.from(announcement);
+    }
+
+    private Announcement findOneForUpdate(Long storeId, Long announcementId) {
         return announcementRepository
-                .findByIdAndStoreId(announcementId, storeId)
+                .findForUpdateByIdAndStoreId(announcementId, storeId)
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.ANNOUNCEMENT_NOT_FOUND
                 ));
@@ -124,6 +164,20 @@ public class AnnouncementService {
                 StoreRole.MANAGER,
                 StoreRole.STAFF
         );
+    }
+
+    private String normalizeImageUrl(
+        String imageUrl
+    ) {
+        if (imageUrl == null) {
+            return null;
+        }
+
+        String normalized = imageUrl.trim();
+
+        return normalized.isEmpty()
+            ? null
+            : normalized;
     }
 
     private void requireManager(User user, Long storeId) {

@@ -6,11 +6,19 @@ import com.example.project_popq.store.domain.StoreStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface StoreRepository extends JpaRepository<Store, Long> {
+public interface StoreRepository extends JpaRepository<Store, Long>,
+        JpaSpecificationExecutor<Store> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select store from Store store where store.id = :storeId")
+    Optional<Store> findForUpdateById(@Param("storeId") Long storeId);
 
     List<Store> findAllByStatusAndBusinessStatus(
             StoreStatus status,
@@ -47,4 +55,6 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
             com.example.project_popq.store.domain.StoreStatus status,
             Collection<com.example.project_popq.store.domain.BusinessStatus> businessStatuses
     );
+
+    long countByStatus(StoreStatus status);
 }

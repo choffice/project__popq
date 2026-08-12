@@ -5,6 +5,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../discovery/store_section_widgets.dart';
+import 'announcement_pinned_badge.dart';
 import 'public_announcement_repository.dart';
 
 class PublicAnnouncementListScreen extends StatefulWidget {
@@ -100,7 +101,43 @@ class _PublicAnnouncementListScreenState
                                     PopqSpacing.sm,
                                   ),
                                   child: ListTile(
-                                    title: Text(item.title),
+                                    leading: item.imageUrl?.trim().isNotEmpty == true
+                                        ? SizedBox(
+                                      width: 64,
+                                      height: 64,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.network(
+                                          item.imageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                              BuildContext context,
+                                              Object error,
+                                              StackTrace? stackTrace,
+                                              ) {
+                                            return Container(
+                                              alignment: Alignment.center,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                              child: const Icon(
+                                                Icons.broken_image_outlined,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                        : null,
+                                    title: Row(
+                                      children: <Widget>[
+                                        if (item.pinned) ...<Widget>[
+                                          const AnnouncementPinnedBadge(),
+                                          const SizedBox(width: PopqSpacing.xs),
+                                        ],
+                                        Expanded(child: Text(item.title)),
+                                      ],
+                                    ),
                                     subtitle: Text(
                                       _formatDate(item.publishedAt),
                                     ),
@@ -159,12 +196,64 @@ class PublicAnnouncementDetailScreen extends StatelessWidget {
               return ListView(
                 padding: const EdgeInsets.all(PopqSpacing.lg),
                 children: <Widget>[
-                  Text(
-                    item.title,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      if (item.pinned) ...<Widget>[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: AnnouncementPinnedBadge(),
+                        ),
+                        const SizedBox(width: PopqSpacing.sm),
+                      ],
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: PopqSpacing.xs),
                   Text(_formatDate(item.publishedAt)),
+                  if (item.imageUrl?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: PopqSpacing.lg),
+
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        item.imageUrl!,
+                        width: double.infinity,
+                        height: 240,
+                        fit: BoxFit.cover,
+                        errorBuilder: (
+                            BuildContext context,
+                            Object error,
+                            StackTrace? stackTrace,
+                            ) {
+                          return Container(
+                            width: double.infinity,
+                            height: 160,
+                            alignment: Alignment.center,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 36,
+                                ),
+                                SizedBox(height: 6),
+                                Text('이미지를 불러오지 못했습니다.'),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const Divider(height: PopqSpacing.xl),
                   SelectableText(item.content),
                 ],

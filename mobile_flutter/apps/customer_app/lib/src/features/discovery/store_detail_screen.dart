@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../routing/customer_router.dart';
 import '../announcements/public_announcement_repository.dart';
+import '../announcements/announcement_pinned_badge.dart';
 import '../catalog/catalog_repository.dart';
 import '../profile/customer_engagement_repository.dart';
 import 'store_discovery_repository.dart';
@@ -543,8 +544,45 @@ class _LatestAnnouncementPreview extends StatelessWidget {
                 final PublicAnnouncement latest = items.first;
                 return Card(
                   child: ListTile(
-                    leading: const Icon(Icons.campaign_outlined),
-                    title: Text(latest.title),
+                    leading: latest.imageUrl?.trim().isNotEmpty == true
+                        ? SizedBox(
+                      width: 56,
+                      height: 56,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.network(
+                          latest.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (
+                              BuildContext context,
+                              Object error,
+                              StackTrace? stackTrace,
+                              ) {
+                            return Container(
+                              alignment: Alignment.center,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surfaceContainerHighest,
+                              child: const Icon(
+                                Icons.campaign_outlined,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    )
+                        : const Icon(
+                      Icons.campaign_outlined,
+                    ),
+                    title: Row(
+                      children: <Widget>[
+                        if (latest.pinned) ...<Widget>[
+                          const AnnouncementPinnedBadge(),
+                          const SizedBox(width: PopqSpacing.xs),
+                        ],
+                        Expanded(child: Text(latest.title)),
+                      ],
+                    ),
                     subtitle: Text(_announcementDateLabel(latest.publishedAt)),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => context.push(

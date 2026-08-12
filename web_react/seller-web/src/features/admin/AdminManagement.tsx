@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getAdminOverview,
-  getAdminSellers,
-  getAdminStores,
-  getAdminUsers,
+  getAdminSellersPage,
+  getAdminStoresPage,
+  getAdminUsersPage,
   updateAdminSellerVerification,
   updateAdminStoreStatus,
   updateAdminUserStatus,
@@ -13,509 +13,284 @@ import type {
   AdminSeller,
   AdminStore,
   AdminUser,
+  PageResponse,
   SellerConnection,
+  UserStatus,
 } from '../../types'
+
+export type AdminManagementSection = 'customers' | 'sellers' | 'stores'
 
 type Props = {
   connection: SellerConnection | null
+  section?: AdminManagementSection
   onError: (message: string | null) => void
 }
 
-type AdminTab = 'users' | 'sellers' | 'stores'
-
 const demoUsers: AdminUser[] = [
-  {
-    userId: 1,
-    email: 'admin@popq.test',
-    name: 'POPQ 운영자',
-    role: 'ADMIN',
-    status: 'ACTIVE',
-    createdAt: '2026-07-01T09:00:00Z',
-  },
-  {
-    userId: 12,
-    email: 'seller@seongsu.test',
-    name: '성수 라운지',
-    role: 'SELLER',
-    status: 'ACTIVE',
-    createdAt: '2026-07-12T03:30:00Z',
-  },
-  {
-    userId: 28,
-    email: 'guest@example.com',
-    name: '김고객',
-    role: 'CUSTOMER',
-    status: 'SUSPENDED',
-    createdAt: '2026-07-25T08:20:00Z',
-  },
+  { userId: 1, email: 'admin@popq.test', name: 'POPQ 운영자', role: 'ADMIN', roles: ['ADMIN'], status: 'ACTIVE', createdAt: '2026-07-01T09:00:00Z' },
+  { userId: 12, email: 'seller@seongsu.test', name: '성수 라운지', role: 'SELLER', roles: ['SELLER'], status: 'ACTIVE', createdAt: '2026-07-12T03:30:00Z' },
+  { userId: 28, email: 'guest@example.com', name: '김고객', role: 'CUSTOMER', roles: ['CUSTOMER'], status: 'SUSPENDED', createdAt: '2026-07-25T08:20:00Z' },
 ]
 
 const demoSellers: AdminSeller[] = [
-  {
-    sellerProfileId: 3,
-    userId: 12,
-    email: 'seller@seongsu.test',
-    name: '성수 라운지',
-    businessName: 'POPQ 성수 라운지',
-    businessRegistrationNumber: '123-45-67890',
-    verificationStatus: 'VERIFIED',
-    userStatus: 'ACTIVE',
-    createdAt: '2026-07-12T03:30:00Z',
-  },
-  {
-    sellerProfileId: 8,
-    userId: 31,
-    email: 'new-seller@popq.test',
-    name: '신규 판매자',
-    businessName: '여름 마켓',
-    businessRegistrationNumber: '987-65-43210',
-    verificationStatus: 'PENDING',
-    userStatus: 'ACTIVE',
-    createdAt: '2026-07-28T01:10:00Z',
-  },
+  { sellerProfileId: 3, userId: 12, email: 'seller@seongsu.test', name: '성수 라운지', businessName: 'POPQ 성수 라운지', businessRegistrationNumber: '123-45-67890', verificationStatus: 'VERIFIED', userStatus: 'ACTIVE', createdAt: '2026-07-12T03:30:00Z' },
+  { sellerProfileId: 8, userId: 31, email: 'new-seller@popq.test', name: '신규 판매자', businessName: '여름 마켓', businessRegistrationNumber: '987-65-43210', verificationStatus: 'PENDING', userStatus: 'ACTIVE', createdAt: '2026-07-28T01:10:00Z' },
 ]
 
 const demoStores: AdminStore[] = [
-  {
-    storeId: 1,
-    storeType: 'LOCAL_STORE',
-    name: 'POPQ 성수 라운지',
-    status: 'ACTIVE',
-    businessStatus: 'OPEN',
-    createdAt: '2026-07-12T03:40:00Z',
-  },
-  {
-    storeId: 5,
-    storeType: 'EVENT_COMMERCE',
-    name: '서울 여름 마켓',
-    status: 'SUSPENDED',
-    businessStatus: 'CLOSED',
-    createdAt: '2026-07-20T06:00:00Z',
-  },
+  { storeId: 1, storeType: 'LOCAL_STORE', name: 'POPQ 성수 라운지', status: 'ACTIVE', businessStatus: 'OPEN', createdAt: '2026-07-12T03:40:00Z' },
+  { storeId: 5, storeType: 'EVENT_COMMERCE', name: '서울 여름 마켓', status: 'SUSPENDED', businessStatus: 'CLOSED', createdAt: '2026-07-20T06:00:00Z' },
 ]
 
-function summarize(
-  users: AdminUser[],
-  sellers: AdminSeller[],
-  stores: AdminStore[],
-): AdminOverview {
+const userStatusLabel: Record<UserStatus, string> = {
+  ACTIVE: '활성',
+  SUSPENDED: '이용정지',
+  WITHDRAWAL_PENDING: '탈퇴 대기',
+  WITHDRAWN: '탈퇴',
+}
+
+const emptyPage = <T,>(): PageResponse<T> => ({
+  content: [], page: 0, size: 20, totalElements: 0, totalPages: 0, first: true, last: true,
+})
+
+function summarize(): AdminOverview {
   return {
-    totalUsers: users.length,
-    activeUsers: users.filter((user) => user.status === 'ACTIVE').length,
-    sellerProfiles: sellers.length,
-    pendingSellers: sellers.filter(
-      (seller) => seller.verificationStatus === 'PENDING',
-    ).length,
-    totalStores: stores.length,
-    activeStores: stores.filter((store) => store.status === 'ACTIVE').length,
-    suspendedStores: stores.filter((store) => store.status === 'SUSPENDED')
-      .length,
+    totalUsers: demoUsers.length,
+    activeUsers: demoUsers.filter((item) => item.status === 'ACTIVE').length,
+    sellerProfiles: demoSellers.length,
+    pendingSellers: demoSellers.filter((item) => item.verificationStatus === 'PENDING').length,
+    totalStores: demoStores.length,
+    activeStores: demoStores.filter((item) => item.status === 'ACTIVE').length,
+    suspendedStores: demoStores.filter((item) => item.status === 'SUSPENDED').length,
   }
 }
 
-function freshDemoData() {
+function demoPage<T>(items: T[], page: number): PageResponse<T> {
+  const size = 20
   return {
-    users: structuredClone(demoUsers),
-    sellers: structuredClone(demoSellers),
-    stores: structuredClone(demoStores),
+    content: items.slice(page * size, page * size + size),
+    page,
+    size,
+    totalElements: items.length,
+    totalPages: Math.ceil(items.length / size),
+    first: page === 0,
+    last: (page + 1) * size >= items.length,
   }
 }
 
-const roleLabel = {
-  CUSTOMER: '고객',
-  SELLER: '판매자',
-  ADMIN: '관리자',
-}
-
-export function AdminManagement({ connection, onError }: Props) {
-  const isDemo = !connection
-  const initial = freshDemoData()
-  const [overview, setOverview] = useState<AdminOverview>(() =>
-    summarize(initial.users, initial.sellers, initial.stores),
-  )
-  const [users, setUsers] = useState<AdminUser[]>(() =>
-    isDemo ? freshDemoData().users : [],
-  )
-  const [sellers, setSellers] = useState<AdminSeller[]>(() =>
-    isDemo ? freshDemoData().sellers : [],
-  )
-  const [stores, setStores] = useState<AdminStore[]>(() =>
-    isDemo ? freshDemoData().stores : [],
-  )
-  const [tab, setTab] = useState<AdminTab>('users')
+export function AdminManagement({ connection, section = 'customers', onError }: Props) {
+  const [overview, setOverview] = useState<AdminOverview>(summarize)
+  const [users, setUsers] = useState<PageResponse<AdminUser>>(emptyPage)
+  const [sellers, setSellers] = useState<PageResponse<AdminSeller>>(emptyPage)
+  const [stores, setStores] = useState<PageResponse<AdminStore>>(emptyPage)
   const [query, setQuery] = useState('')
-  const [loading, setLoading] = useState(!isDemo)
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [userStatus, setUserStatus] = useState<UserStatus | ''>('')
+  const [verificationStatus, setVerificationStatus] = useState<AdminSeller['verificationStatus'] | ''>('')
+  const [storeStatus, setStoreStatus] = useState<AdminStore['status'] | ''>('')
+  const [page, setPage] = useState(0)
+  const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
 
   useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
-      if (!connection) {
-        const demo = freshDemoData()
-        setUsers(demo.users)
-        setSellers(demo.sellers)
-        setStores(demo.stores)
-        setOverview(summarize(demo.users, demo.sellers, demo.stores))
-        setLoading(false)
-        return
-      }
-      setLoading(true)
-      void Promise.all([
-        getAdminOverview(connection),
-        getAdminUsers(connection),
-        getAdminSellers(connection),
-        getAdminStores(connection),
-      ])
-        .then(([nextOverview, nextUsers, nextSellers, nextStores]) => {
-          setOverview(nextOverview)
-          setUsers(nextUsers)
-          setSellers(nextSellers)
-          setStores(nextStores)
-          onError(null)
-        })
-        .catch((caught: unknown) =>
-          onError(
-            caught instanceof Error
-              ? caught.message
-              : '관리자 데이터를 불러오지 못했습니다.',
-          ),
-        )
-        .finally(() => setLoading(false))
+      setPage(0)
+      setQuery('')
+      setDebouncedQuery('')
+      setUserStatus('')
+      setVerificationStatus('')
+      setStoreStatus('')
     }, 0)
     return () => window.clearTimeout(timer)
-  }, [connection, onError])
+  }, [section])
 
-  const normalizedQuery = query.trim().toLocaleLowerCase('ko-KR')
-  const visibleUsers = useMemo(
-    () =>
-      users.filter((user) =>
-        `${user.name} ${user.email} ${user.role}`
-          .toLocaleLowerCase('ko-KR')
-          .includes(normalizedQuery),
-      ),
-    [normalizedQuery, users],
-  )
-  const visibleSellers = useMemo(
-    () =>
-      sellers.filter((seller) =>
-        `${seller.name} ${seller.email} ${seller.businessName ?? ''}`
-          .toLocaleLowerCase('ko-KR')
-          .includes(normalizedQuery),
-      ),
-    [normalizedQuery, sellers],
-  )
-  const visibleStores = useMemo(
-    () =>
-      stores.filter((store) =>
-        store.name.toLocaleLowerCase('ko-KR').includes(normalizedQuery),
-      ),
-    [normalizedQuery, stores],
-  )
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      if (!connection) {
+        setOverview(summarize())
+        const search = debouncedQuery.toLocaleLowerCase('ko-KR')
+        if (section === 'customers') {
+          const filtered = demoUsers.filter((item) =>
+            item.roles.includes('CUSTOMER') &&
+            (!userStatus || item.status === userStatus) &&
+            `${item.name} ${item.email ?? ''}`.toLocaleLowerCase('ko-KR').includes(search),
+          )
+          setUsers(demoPage(filtered, page))
+        } else if (section === 'sellers') {
+          const filtered = demoSellers.filter((item) =>
+            (!verificationStatus || item.verificationStatus === verificationStatus) &&
+            (!userStatus || item.userStatus === userStatus) &&
+            `${item.name} ${item.email ?? ''} ${item.businessName ?? ''}`.toLocaleLowerCase('ko-KR').includes(search),
+          )
+          setSellers(demoPage(filtered, page))
+        } else {
+          const filtered = demoStores.filter((item) =>
+            (!storeStatus || item.status === storeStatus) &&
+            item.name.toLocaleLowerCase('ko-KR').includes(search),
+          )
+          setStores(demoPage(filtered, page))
+        }
+        onError(null)
+        return
+      }
 
-  function updateOverview(
-    nextUsers: AdminUser[],
-    nextSellers: AdminSeller[],
-    nextStores: AdminStore[],
-  ) {
-    setOverview(summarize(nextUsers, nextSellers, nextStores))
-  }
+      const overviewPromise = getAdminOverview(connection)
+      if (section === 'customers') {
+        const [nextOverview, result] = await Promise.all([
+          overviewPromise,
+          getAdminUsersPage(connection, { page, size: 20, query: debouncedQuery, role: 'CUSTOMER', status: userStatus || undefined }),
+        ])
+        setOverview(nextOverview)
+        setUsers(result)
+      } else if (section === 'sellers') {
+        const [nextOverview, result] = await Promise.all([
+          overviewPromise,
+          getAdminSellersPage(connection, { page, size: 20, query: debouncedQuery, verificationStatus: verificationStatus || undefined, userStatus: userStatus || undefined }),
+        ])
+        setOverview(nextOverview)
+        setSellers(result)
+      } else {
+        const [nextOverview, result] = await Promise.all([
+          overviewPromise,
+          getAdminStoresPage(connection, { page, size: 20, query: debouncedQuery, status: storeStatus || undefined }),
+        ])
+        setOverview(nextOverview)
+        setStores(result)
+      }
+      onError(null)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '관리자 데이터를 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }, [connection, debouncedQuery, onError, page, section, storeStatus, userStatus, verificationStatus])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void load() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [load])
+
+  const currentPage = section === 'customers' ? users : section === 'sellers' ? sellers : stores
+  const title = section === 'customers' ? '구매자 회원 관리' : section === 'sellers' ? '판매자 회원 · 인증' : '스토어 관리'
+  const description = section === 'customers'
+    ? '구매자 계정의 활성·이용정지·탈퇴 상태를 조회하고 관리합니다.'
+    : section === 'sellers'
+      ? '판매자 계정과 사업자 인증 상태를 함께 점검합니다.'
+      : '플랫폼에 등록된 스토어의 운영 상태를 관리합니다.'
 
   async function toggleUser(user: AdminUser) {
-    const status: AdminUser['status'] =
-      user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    const status: UserStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    const reason = window.prompt(`${user.name} 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`)
+    if (!reason?.trim()) return
     setUpdating(`user-${user.userId}`)
     try {
-      const updated = isDemo
-        ? { ...user, status }
-        : await updateAdminUserStatus(connection, user.userId, status)
-      const next = users.map((item) =>
-        item.userId === updated.userId ? updated : item,
-      )
-      setUsers(next)
-      updateOverview(next, sellers, stores)
-      onError(null)
+      if (connection) await updateAdminUserStatus(connection, user.userId, status, reason)
+      else user.status = status
+      await load()
     } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : '사용자 상태를 변경하지 못했습니다.',
-      )
-    } finally {
-      setUpdating(null)
-    }
+      onError(caught instanceof Error ? caught.message : '사용자 상태를 변경하지 못했습니다.')
+    } finally { setUpdating(null) }
   }
 
-  async function verifySeller(
-    seller: AdminSeller,
-    verificationStatus: AdminSeller['verificationStatus'],
-  ) {
+  async function verifySeller(seller: AdminSeller, status: AdminSeller['verificationStatus']) {
+    const reason = window.prompt(`${seller.name} 판매자를 ${status === 'VERIFIED' ? '승인' : '반려'}하는 사유를 입력해 주세요.`)
+    if (!reason?.trim()) return
     setUpdating(`seller-${seller.sellerProfileId}`)
     try {
-      const updated = isDemo
-        ? { ...seller, verificationStatus }
-        : await updateAdminSellerVerification(
-            connection,
-            seller.sellerProfileId,
-            verificationStatus,
-          )
-      const next = sellers.map((item) =>
-        item.sellerProfileId === updated.sellerProfileId ? updated : item,
-      )
-      setSellers(next)
-      updateOverview(users, next, stores)
-      onError(null)
+      if (connection) await updateAdminSellerVerification(connection, seller.sellerProfileId, status, reason)
+      else seller.verificationStatus = status
+      await load()
     } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : '판매자 인증 상태를 변경하지 못했습니다.',
-      )
-    } finally {
-      setUpdating(null)
-    }
+      onError(caught instanceof Error ? caught.message : '판매자 인증 상태를 변경하지 못했습니다.')
+    } finally { setUpdating(null) }
+  }
+
+  async function toggleSellerUser(seller: AdminSeller) {
+    if (!['ACTIVE', 'SUSPENDED'].includes(seller.userStatus)) return
+    const status: UserStatus = seller.userStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    const reason = window.prompt(`${seller.name} 판매자 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`)
+    if (!reason?.trim()) return
+    setUpdating(`seller-user-${seller.userId}`)
+    try {
+      if (connection) await updateAdminUserStatus(connection, seller.userId, status, reason)
+      else seller.userStatus = status
+      await load()
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '판매자 계정 상태를 변경하지 못했습니다.')
+    } finally { setUpdating(null) }
   }
 
   async function toggleStore(store: AdminStore) {
-    const status: AdminStore['status'] =
-      store.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    const status: AdminStore['status'] = store.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
+    const reason = window.prompt(`${store.name} 스토어를 ${status === 'ACTIVE' ? '활성' : '운영정지'} 상태로 변경하는 사유를 입력해 주세요.`)
+    if (!reason?.trim()) return
     setUpdating(`store-${store.storeId}`)
     try {
-      const updated = isDemo
-        ? { ...store, status }
-        : await updateAdminStoreStatus(connection, store.storeId, status)
-      const next = stores.map((item) =>
-        item.storeId === updated.storeId ? updated : item,
-      )
-      setStores(next)
-      updateOverview(users, sellers, next)
-      onError(null)
+      if (connection) await updateAdminStoreStatus(connection, store.storeId, status, reason)
+      else store.status = status
+      await load()
     } catch (caught) {
-      onError(
-        caught instanceof Error
-          ? caught.message
-          : '스토어 상태를 변경하지 못했습니다.',
-      )
-    } finally {
-      setUpdating(null)
-    }
+      onError(caught instanceof Error ? caught.message : '스토어 상태를 변경하지 못했습니다.')
+    } finally { setUpdating(null) }
   }
+
+  const metrics = useMemo(() => [
+    ['전체 사용자', overview.totalUsers, `활성 ${overview.activeUsers}`],
+    ['판매자 인증 대기', overview.pendingSellers, `전체 ${overview.sellerProfiles}`],
+    ['운영 스토어', overview.activeStores, `정지 ${overview.suspendedStores}`],
+  ], [overview])
 
   return (
     <main className="management-page admin-page">
       <section className="management-hero admin-hero">
-        <div>
-          <p className="eyebrow">PLATFORM CONTROL</p>
-          <h2>플랫폼 운영 현황</h2>
-          <p>
-            사용자, 판매자 인증, 스토어 운영 상태를 관리자 권한으로 점검합니다.
-          </p>
-        </div>
+        <div><p className="eyebrow">PLATFORM CONTROL</p><h2>{title}</h2><p>{description}</p></div>
         <div className="admin-metrics">
-          <article>
-            <small>전체 사용자</small>
-            <strong>{overview.totalUsers}</strong>
-            <span>활성 {overview.activeUsers}</span>
-          </article>
-          <article>
-            <small>판매자 인증 대기</small>
-            <strong>{overview.pendingSellers}</strong>
-            <span>전체 {overview.sellerProfiles}</span>
-          </article>
-          <article>
-            <small>운영 스토어</small>
-            <strong>{overview.activeStores}</strong>
-            <span>정지 {overview.suspendedStores}</span>
-          </article>
+          {metrics.map(([label, value, sub]) => <article key={String(label)}><small>{label}</small><strong>{value}</strong><span>{sub}</span></article>)}
         </div>
       </section>
 
       <section className="admin-toolbar">
-        <div className="admin-tabs" role="tablist" aria-label="관리자 데이터">
-          <button
-            role="tab"
-            aria-selected={tab === 'users'}
-            className={tab === 'users' ? 'active' : ''}
-            onClick={() => setTab('users')}
-          >
-            사용자
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'sellers'}
-            className={tab === 'sellers' ? 'active' : ''}
-            onClick={() => setTab('sellers')}
-          >
-            판매자 인증
-          </button>
-          <button
-            role="tab"
-            aria-selected={tab === 'stores'}
-            className={tab === 'stores' ? 'active' : ''}
-            onClick={() => setTab('stores')}
-          >
-            스토어
-          </button>
+        <label className="search-field"><span>⌕</span><input aria-label="관리자 목록 검색" placeholder="이름, 이메일 또는 사업자 정보 검색" value={query} onChange={(event) => { setQuery(event.target.value); setPage(0) }} /></label>
+        <div className="admin-filter-group">
+          {(section === 'customers' || section === 'sellers') && (
+            <select aria-label="회원 상태 필터" value={userStatus} onChange={(event) => { setUserStatus(event.target.value as UserStatus | ''); setPage(0) }}>
+              <option value="">상태 전체</option><option value="ACTIVE">활성</option><option value="SUSPENDED">이용정지</option><option value="WITHDRAWAL_PENDING">탈퇴 대기</option><option value="WITHDRAWN">탈퇴</option>
+            </select>
+          )}
+          {section === 'sellers' && (
+            <select aria-label="판매자 인증 필터" value={verificationStatus} onChange={(event) => { setVerificationStatus(event.target.value as AdminSeller['verificationStatus'] | ''); setPage(0) }}>
+              <option value="">인증 전체</option><option value="PENDING">대기</option><option value="VERIFIED">인증</option><option value="REJECTED">반려</option>
+            </select>
+          )}
+          {section === 'stores' && (
+            <select aria-label="스토어 상태 필터" value={storeStatus} onChange={(event) => { setStoreStatus(event.target.value as AdminStore['status'] | ''); setPage(0) }}>
+              <option value="">상태 전체</option><option value="ACTIVE">활성</option><option value="SUSPENDED">운영정지</option><option value="CLOSED">폐점</option>
+            </select>
+          )}
         </div>
-        <label className="search-field">
-          <span>⌕</span>
-          <input
-            aria-label="관리자 목록 검색"
-            placeholder="이름 또는 이메일 검색"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
       </section>
 
-      {loading ? (
-        <div className="management-empty">관리자 데이터를 불러오는 중입니다.</div>
-      ) : (
+      {loading ? <div className="management-empty">관리자 데이터를 불러오는 중입니다.</div> : (
         <section className="admin-table" aria-label="관리자 운영 목록">
-          {tab === 'users' && (
-            <>
-              <header className="admin-user-row">
-                <span>사용자</span>
-                <span>역할</span>
-                <span>상태</span>
-                <span>관리</span>
-              </header>
-              {visibleUsers.map((user) => (
-                <article className="admin-user-row" key={user.userId}>
-                  <div>
-                    <strong>{user.name}</strong>
-                    <small>{user.email}</small>
-                  </div>
-                  <span>{roleLabel[user.role]}</span>
-                  <b className={`admin-status ${user.status.toLowerCase()}`}>
-                    {user.status === 'ACTIVE'
-                      ? '활성'
-                      : user.status === 'SUSPENDED'
-                        ? '정지'
-                        : '탈퇴'}
-                  </b>
-                  <button
-                    disabled={
-                      updating === `user-${user.userId}` ||
-                      user.role === 'ADMIN' ||
-                      user.status === 'WITHDRAWN'
-                    }
-                    onClick={() => void toggleUser(user)}
-                  >
-                    {user.status === 'ACTIVE' ? '이용 정지' : '활성화'}
-                  </button>
-                </article>
-              ))}
-            </>
-          )}
-
-          {tab === 'sellers' && (
-            <>
-              <header className="admin-seller-row">
-                <span>판매자</span>
-                <span>사업자 정보</span>
-                <span>인증</span>
-                <span>관리</span>
-              </header>
-              {visibleSellers.map((seller) => (
-                <article
-                  className="admin-seller-row"
-                  key={seller.sellerProfileId}
-                >
-                  <div>
-                    <strong>{seller.name}</strong>
-                    <small>{seller.email}</small>
-                  </div>
-                  <div>
-                    <strong>{seller.businessName ?? '미입력'}</strong>
-                    <small>
-                      {seller.businessRegistrationNumber ?? '등록번호 미입력'}
-                    </small>
-                  </div>
-                  <b
-                    className={`admin-status ${seller.verificationStatus.toLowerCase()}`}
-                  >
-                    {seller.verificationStatus === 'VERIFIED'
-                      ? '인증'
-                      : seller.verificationStatus === 'REJECTED'
-                        ? '반려'
-                        : '대기'}
-                  </b>
-                  <div className="admin-row-actions">
-                    <button
-                      disabled={
-                        updating === `seller-${seller.sellerProfileId}`
-                      }
-                      onClick={() => void verifySeller(seller, 'VERIFIED')}
-                    >
-                      승인
-                    </button>
-                    <button
-                      className="danger"
-                      disabled={
-                        updating === `seller-${seller.sellerProfileId}`
-                      }
-                      onClick={() => void verifySeller(seller, 'REJECTED')}
-                    >
-                      반려
-                    </button>
-                  </div>
-                </article>
-              ))}
-            </>
-          )}
-
-          {tab === 'stores' && (
-            <>
-              <header className="admin-store-row">
-                <span>스토어</span>
-                <span>유형</span>
-                <span>영업</span>
-                <span>상태</span>
-                <span>관리</span>
-              </header>
-              {visibleStores.map((store) => (
-                <article className="admin-store-row" key={store.storeId}>
-                  <div>
-                    <strong>{store.name}</strong>
-                    <small>ID {store.storeId}</small>
-                  </div>
-                  <span>
-                    {store.storeType === 'LOCAL_STORE' ? '일반 매장' : '행사'}
-                  </span>
-                  <span>
-                    {store.businessStatus === 'OPEN'
-                      ? '영업 중'
-                      : store.businessStatus === 'PRE_OPEN'
-                        ? '오픈 준비'
-                        : '영업 종료'}
-                  </span>
-                  <b className={`admin-status ${store.status.toLowerCase()}`}>
-                    {store.status === 'ACTIVE'
-                      ? '활성'
-                      : store.status === 'SUSPENDED'
-                        ? '정지'
-                        : '폐점'}
-                  </b>
-                  <button
-                    disabled={
-                      updating === `store-${store.storeId}` ||
-                      store.status === 'CLOSED'
-                    }
-                    onClick={() => void toggleStore(store)}
-                  >
-                    {store.status === 'ACTIVE' ? '운영 정지' : '재활성화'}
-                  </button>
-                </article>
-              ))}
-            </>
-          )}
+          {section === 'customers' && <><header className="admin-user-row"><span>구매자</span><span>가입일</span><span>상태</span><span>관리</span></header>{users.content.map((user) => <article className="admin-user-row" key={user.userId}><div><strong>{user.name}</strong><small>{user.email ?? '이메일 없음'}</small></div><span>{new Date(user.createdAt).toLocaleDateString('ko-KR')}</span><b className={`admin-status ${user.status.toLowerCase()}`}>{userStatusLabel[user.status]}</b><button disabled={updating === `user-${user.userId}` || !['ACTIVE', 'SUSPENDED'].includes(user.status)} onClick={() => void toggleUser(user)}>{user.status === 'ACTIVE' ? '이용 정지' : user.status === 'SUSPENDED' ? '활성화' : '조회 전용'}</button></article>)}</>}
+          {section === 'sellers' && <><header className="admin-seller-row"><span>판매자</span><span>사업자 정보</span><span>인증</span><span>관리</span></header>{sellers.content.map((seller) => <article className="admin-seller-row" key={seller.sellerProfileId}><div><strong>{seller.name}</strong><small>{seller.email ?? '이메일 없음'} · {userStatusLabel[seller.userStatus]}</small></div><div><strong>{seller.businessName ?? '미입력'}</strong><small>{seller.businessRegistrationNumber ?? '등록번호 미입력'}</small></div><b className={`admin-status ${seller.verificationStatus.toLowerCase()}`}>{seller.verificationStatus === 'VERIFIED' ? '인증' : seller.verificationStatus === 'REJECTED' ? '반려' : '대기'}</b><div className="admin-row-actions"><button disabled={updating === `seller-${seller.sellerProfileId}`} onClick={() => void verifySeller(seller, 'VERIFIED')}>승인</button><button className="danger" disabled={updating === `seller-${seller.sellerProfileId}`} onClick={() => void verifySeller(seller, 'REJECTED')}>반려</button><button disabled={updating === `seller-user-${seller.userId}` || !['ACTIVE', 'SUSPENDED'].includes(seller.userStatus)} onClick={() => void toggleSellerUser(seller)}>{seller.userStatus === 'ACTIVE' ? '계정 정지' : seller.userStatus === 'SUSPENDED' ? '계정 활성화' : '조회 전용'}</button></div></article>)}</>}
+          {section === 'stores' && <><header className="admin-store-row"><span>스토어</span><span>유형</span><span>영업</span><span>상태</span><span>관리</span></header>{stores.content.map((store) => <article className="admin-store-row" key={store.storeId}><div><strong>{store.name}</strong><small>ID {store.storeId}</small></div><span>{store.storeType === 'LOCAL_STORE' ? '일반 매장' : '행사'}</span><span>{store.businessStatus === 'OPEN' ? '영업 중' : store.businessStatus === 'PRE_OPEN' ? '오픈 준비' : '영업 종료'}</span><b className={`admin-status ${store.status.toLowerCase()}`}>{store.status === 'ACTIVE' ? '활성' : store.status === 'SUSPENDED' ? '운영정지' : '폐점'}</b><button disabled={updating === `store-${store.storeId}` || store.status === 'CLOSED'} onClick={() => void toggleStore(store)}>{store.status === 'ACTIVE' ? '운영 정지' : store.status === 'SUSPENDED' ? '재활성화' : '조회 전용'}</button></article>)}</>}
+          {currentPage.totalElements === 0 && <div className="management-empty">조건에 맞는 항목이 없습니다.</div>}
         </section>
       )}
 
-      <p className="source-note">
-        {isDemo
-          ? '데모 관리자 데이터는 새로고침 시 초기화됩니다.'
-          : 'ADMIN 역할 토큰만 조회와 상태 변경을 실행할 수 있습니다.'}
-      </p>
+      <footer className="admin-pagination" aria-label="목록 페이지">
+        <button disabled={currentPage.first || loading} onClick={() => setPage((value) => Math.max(0, value - 1))}>이전</button>
+        <span>{currentPage.totalPages === 0 ? 0 : currentPage.page + 1} / {currentPage.totalPages} · 총 {currentPage.totalElements.toLocaleString('ko-KR')}건</span>
+        <button disabled={currentPage.last || loading} onClick={() => setPage((value) => value + 1)}>다음</button>
+      </footer>
+      <p className="source-note">탈퇴 대기와 탈퇴 상태는 개인정보 정리 절차 보호를 위해 조회만 가능합니다.</p>
     </main>
   )
 }
