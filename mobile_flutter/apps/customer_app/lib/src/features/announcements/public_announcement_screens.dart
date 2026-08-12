@@ -101,6 +101,34 @@ class _PublicAnnouncementListScreenState
                                     PopqSpacing.sm,
                                   ),
                                   child: ListTile(
+                                    leading: item.imageUrl?.trim().isNotEmpty == true
+                                        ? SizedBox(
+                                      width: 64,
+                                      height: 64,
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(10),
+                                        child: Image.network(
+                                          item.imageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (
+                                              BuildContext context,
+                                              Object error,
+                                              StackTrace? stackTrace,
+                                              ) {
+                                            return Container(
+                                              alignment: Alignment.center,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .surfaceContainerHighest,
+                                              child: const Icon(
+                                                Icons.broken_image_outlined,
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                    )
+                                        : null,
                                     title: Row(
                                       children: <Widget>[
                                         if (item.pinned) ...<Widget>[
@@ -188,6 +216,44 @@ class PublicAnnouncementDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: PopqSpacing.xs),
                   Text(_formatDate(item.publishedAt)),
+                  if (item.imageUrl?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: PopqSpacing.lg),
+
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.network(
+                        item.imageUrl!,
+                        width: double.infinity,
+                        height: 240,
+                        fit: BoxFit.cover,
+                        errorBuilder: (
+                            BuildContext context,
+                            Object error,
+                            StackTrace? stackTrace,
+                            ) {
+                          return Container(
+                            width: double.infinity,
+                            height: 160,
+                            alignment: Alignment.center,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            child: const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.broken_image_outlined,
+                                  size: 36,
+                                ),
+                                SizedBox(height: 6),
+                                Text('이미지를 불러오지 못했습니다.'),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                   const Divider(height: PopqSpacing.xl),
                   SelectableText(item.content),
                 ],

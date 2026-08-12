@@ -52,11 +52,12 @@ public class AnnouncementService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         Announcement announcement = announcementRepository.save(
-                Announcement.create(
-                        store,
-                        request.title().trim(),
-                        request.content().trim()
-                )
+            Announcement.create(
+                store,
+                request.title().trim(),
+                request.content().trim(),
+                normalizeImageUrl(request.imageUrl())
+            )
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -72,8 +73,9 @@ public class AnnouncementService {
         requireManager(user, storeId);
         Announcement announcement = findOneForUpdate(storeId, announcementId);
         announcement.update(
-                request.title().trim(),
-                request.content().trim()
+            request.title().trim(),
+            request.content().trim(),
+            normalizeImageUrl(request.imageUrl())
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -162,6 +164,20 @@ public class AnnouncementService {
                 StoreRole.MANAGER,
                 StoreRole.STAFF
         );
+    }
+
+    private String normalizeImageUrl(
+        String imageUrl
+    ) {
+        if (imageUrl == null) {
+            return null;
+        }
+
+        String normalized = imageUrl.trim();
+
+        return normalized.isEmpty()
+            ? null
+            : normalized;
     }
 
     private void requireManager(User user, Long storeId) {

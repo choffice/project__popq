@@ -49,24 +49,44 @@ public class Announcement extends BaseTimeEntity {
     @Column(name = "pinned", nullable = false)
     private boolean pinned;
 
-    private Announcement(Store store, String title, String content) {
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
+    private Announcement(
+        Store store,
+        String title,
+        String content,
+        String imageUrl
+    ) {
         this.store = store;
         this.title = title;
         this.content = content;
+        this.imageUrl = imageUrl;
         this.status = AnnouncementStatus.DRAFT;
     }
 
     public static Announcement create(
-            Store store,
-            String title,
-            String content
+        Store store,
+        String title,
+        String content,
+        String imageUrl
     ) {
-        return new Announcement(store, title, content);
+        return new Announcement(
+            store,
+            title,
+            content,
+            imageUrl
+        );
     }
 
-    public void update(String title, String content) {
+    public void update(
+        String title,
+        String content,
+        String imageUrl
+    ) {
         this.title = title;
         this.content = content;
+        this.imageUrl = imageUrl;
     }
 
     public void changeStatus(AnnouncementStatus status, Instant now) {

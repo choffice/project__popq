@@ -7,17 +7,23 @@ class PublicAnnouncement {
     required this.title,
     required this.content,
     required this.publishedAt,
+    this.imageUrl,
     this.pinned = false,
   });
 
   factory PublicAnnouncement.fromJson(Map<String, Object?> json) {
     return PublicAnnouncement(
-      announcementId: (json['announcementId'] as num).toInt(),
-      storeId: (json['storeId'] as num).toInt(),
+      announcementId:
+      (json['announcementId'] as num).toInt(),
+      storeId:
+      (json['storeId'] as num).toInt(),
       title: json['title'] as String,
       content: json['content'] as String,
+      imageUrl: json['imageUrl'] as String?,
       pinned: json['pinned'] as bool? ?? false,
-      publishedAt: DateTime.tryParse(json['publishedAt']?.toString() ?? ''),
+      publishedAt: DateTime.tryParse(
+        json['publishedAt']?.toString() ?? '',
+      ),
     );
   }
 
@@ -25,6 +31,7 @@ class PublicAnnouncement {
   final int storeId;
   final String title;
   final String content;
+  final String? imageUrl;
   final bool pinned;
   final DateTime? publishedAt;
 }

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -207,7 +210,40 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                 ),
               ],
             ),
+
+            if (announcement.imageUrl != null &&
+                announcement.imageUrl!.trim().isNotEmpty) ...[
+              const SizedBox(height: PopqSpacing.sm),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  announcement.imageUrl!,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder: (
+                      BuildContext context,
+                      Object error,
+                      StackTrace? stackTrace,
+                      ) {
+                    return Container(
+                      height: 100,
+                      alignment: Alignment.center,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+
             const SizedBox(height: PopqSpacing.xs),
+
             Text(announcement.content),
             if (announcement.publishedAt != null) ...[
               const SizedBox(height: PopqSpacing.xs),
@@ -315,20 +351,39 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     );
     if (draft == null) return;
     try {
+      String? imageUrl = draft.removeImage
+          ? null
+          : draft.imageUrl;
+
+      final String? imageFilePath =
+          draft.imageFilePath;
+
+      if (imageFilePath != null &&
+          imageFilePath.trim().isNotEmpty) {
+        imageUrl = await widget.repository
+            .uploadAnnouncementImage(
+          imageFilePath,
+        );
+      }
+
       final saved = announcement == null
           ? await widget.repository.create(
-              storeId,
-              title: draft.title,
-              content: draft.content,
-              notifyInterestedCustomers: draft.notifyInterestedCustomers,
-            )
+            storeId,
+            title: draft.title,
+            content: draft.content,
+            imageUrl: imageUrl,
+            notifyInterestedCustomers:
+            draft.notifyInterestedCustomers,
+          )
           : await widget.repository.update(
-              storeId,
-              announcement,
-              title: draft.title,
-              content: draft.content,
-              notifyInterestedCustomers: draft.notifyInterestedCustomers,
-            );
+            storeId,
+            announcement,
+            title: draft.title,
+            content: draft.content,
+            imageUrl: imageUrl,
+            notifyInterestedCustomers:
+            draft.notifyInterestedCustomers,
+          );
       if (!mounted || widget.storeId != storeId) return;
       setState(() {
         final announcements = _announcements ?? <SellerAnnouncement>[];
@@ -482,10 +537,18 @@ class _AnnouncementDraft {
     required this.title,
     required this.content,
     required this.notifyInterestedCustomers,
+    this.imageUrl,
+    this.imageFilePath,
+    this.removeImage = false,
   });
 
   final String title;
   final String content;
+
+  final String? imageUrl;
+  final String? imageFilePath;
+  final bool removeImage;
+
   final bool notifyInterestedCustomers;
 }
 
@@ -502,6 +565,13 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   late final TextEditingController _title;
   late final TextEditingController _content;
   bool _notifyInterestedCustomers = false;
+
+  final ImagePicker _imagePicker = ImagePicker();
+
+  XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
+
+  bool _removeImage = false;
 
   @override
   void initState() {
@@ -533,6 +603,60 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 autofocus: true,
                 maxLength: 200,
                 decoration: const InputDecoration(labelText: '제목'),
+              ),
+              const SizedBox(
+                height: PopqSpacing.sm,
+              ),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildImagePreview(),
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.sm,
+              ),
+
+              Wrap(
+                spacing: PopqSpacing.sm,
+                runSpacing: PopqSpacing.xs,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(
+                      ImageSource.camera,
+                    ),
+                    icon: const Icon(
+                      Icons.photo_camera_outlined,
+                    ),
+                    label: const Text('사진 촬영'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(
+                      ImageSource.gallery,
+                    ),
+                    icon: const Icon(
+                      Icons.photo_library_outlined,
+                    ),
+                    label: const Text('앨범 선택'),
+                  ),
+                  if (_pickedImage != null ||
+                      (!_removeImage &&
+                          (widget.announcement?.imageUrl
+                              ?.trim()
+                              .isNotEmpty ??
+                              false)))
+                    TextButton.icon(
+                      onPressed: _clearImage,
+                      icon: const Icon(
+                        Icons.delete_outline,
+                      ),
+                      label: const Text('사진 삭제'),
+                    ),
+                ],
+              ),
+
+              const SizedBox(
+                height: PopqSpacing.sm,
               ),
               TextField(
                 key: const Key('announcement-content'),
@@ -573,13 +697,111 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
               _AnnouncementDraft(
                 title: title,
                 content: content,
-                notifyInterestedCustomers: _notifyInterestedCustomers,
+                imageUrl: _removeImage
+                    ? null
+                    : widget.announcement?.imageUrl,
+                imageFilePath: _pickedImage?.path,
+                removeImage: _removeImage,
+                notifyInterestedCustomers:
+                _notifyInterestedCustomers,
               ),
             );
           },
           child: const Text('저장'),
         ),
       ],
+    );
+  }
+
+  Future<void> _pickImage(
+      ImageSource source,
+      ) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    final bytes = await picked.readAsBytes();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _pickedImage = picked;
+      _pickedImageBytes = bytes;
+      _removeImage = false;
+    });
+  }
+
+  void _clearImage() {
+    setState(() {
+      _pickedImage = null;
+      _pickedImageBytes = null;
+      _removeImage = true;
+    });
+  }
+
+  Widget _buildImagePreview() {
+    if (_pickedImageBytes != null) {
+      return Image.memory(
+        _pickedImageBytes!,
+        width: double.infinity,
+        height: 180,
+        fit: BoxFit.cover,
+      );
+    }
+
+    final existingUrl =
+        widget.announcement?.imageUrl;
+
+    if (!_removeImage &&
+        existingUrl != null &&
+        existingUrl.trim().isNotEmpty) {
+      return Image.network(
+        existingUrl,
+        width: double.infinity,
+        height: 180,
+        fit: BoxFit.cover,
+        errorBuilder: (
+            BuildContext context,
+            Object error,
+            StackTrace? stackTrace,
+            ) {
+          return _emptyImagePreview();
+        },
+      );
+    }
+
+    return _emptyImagePreview();
+  }
+
+  Widget _emptyImagePreview() {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.image_outlined,
+            size: 40,
+          ),
+          SizedBox(height: 6),
+          Text('첨부된 사진이 없습니다.'),
+        ],
+      ),
     );
   }
 }
