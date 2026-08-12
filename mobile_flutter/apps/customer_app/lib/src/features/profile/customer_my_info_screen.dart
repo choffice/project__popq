@@ -416,6 +416,30 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                               : '다른 사람에게 엠블럼을 표시하지 않아요.',
                         ),
                         value: profile.emblemVisible,
+                        thumbColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.disabled)
+                              ? Colors.white.withValues(alpha: 0.72)
+                              : Colors.white,
+                        ),
+                        trackColor: WidgetStateProperty.resolveWith(
+                          (states) {
+                            if (states.contains(WidgetState.selected)) {
+                              return Theme.of(context).colorScheme.primary;
+                            }
+                            return Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.38);
+                          },
+                        ),
+                        trackOutlineColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? Colors.transparent
+                              : Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.64),
+                        ),
                         onChanged: _savingEmblemVisibility
                             ? null
                             : (value) => _updateEmblemVisibility(
