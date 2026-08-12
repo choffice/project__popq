@@ -416,6 +416,9 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
                               : '다른 사람에게 엠블럼을 표시하지 않아요.',
                         ),
                         value: profile.emblemVisible,
+                        thumbIcon: const WidgetStatePropertyAll(
+                          Icon(Icons.circle, size: 0),
+                        ),
                         thumbColor: WidgetStateProperty.resolveWith(
                           (states) => states.contains(WidgetState.disabled)
                               ? Colors.white.withValues(alpha: 0.72)
