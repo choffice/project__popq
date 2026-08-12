@@ -10,7 +10,14 @@ import com.example.project_popq.admin.dto.UpdateAdminStatuses.UserStatusRequest;
 import com.example.project_popq.admin.service.AdminOperationsService;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
+import com.example.project_popq.common.api.PageResponse;
+import com.example.project_popq.seller.domain.SellerVerificationStatus;
+import com.example.project_popq.store.domain.StoreStatus;
+import com.example.project_popq.user.domain.PlatformRole;
+import com.example.project_popq.user.domain.UserStatus;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +28,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -42,29 +50,69 @@ public class AdminOperationsController {
     }
 
     @GetMapping("/users")
-    public ApiResponse<List<AdminUserResponse>> users(
-            @AuthenticationPrincipal Jwt jwt
+    public ApiResponse<PageResponse<AdminUserResponse>> users(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) PlatformRole role,
+            @RequestParam(required = false) UserStatus status,
+            @RequestParam(defaultValue = "desc") String sort
     ) {
         return ApiResponse.success(
-                adminOperationsService.users(currentUserService.getRequired(jwt))
+                adminOperationsService.users(
+                        currentUserService.getRequired(jwt),
+                        page,
+                        size,
+                        query,
+                        role,
+                        status,
+                        sort
+                )
         );
     }
 
     @GetMapping("/sellers")
-    public ApiResponse<List<AdminSellerResponse>> sellers(
-            @AuthenticationPrincipal Jwt jwt
+    public ApiResponse<PageResponse<AdminSellerResponse>> sellers(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) SellerVerificationStatus verificationStatus,
+            @RequestParam(required = false) UserStatus userStatus,
+            @RequestParam(defaultValue = "desc") String sort
     ) {
         return ApiResponse.success(
-                adminOperationsService.sellers(currentUserService.getRequired(jwt))
+                adminOperationsService.sellers(
+                        currentUserService.getRequired(jwt),
+                        page,
+                        size,
+                        query,
+                        verificationStatus,
+                        userStatus,
+                        sort
+                )
         );
     }
 
     @GetMapping("/stores")
-    public ApiResponse<List<AdminStoreResponse>> stores(
-            @AuthenticationPrincipal Jwt jwt
+    public ApiResponse<PageResponse<AdminStoreResponse>> stores(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) StoreStatus status,
+            @RequestParam(defaultValue = "desc") String sort
     ) {
         return ApiResponse.success(
-                adminOperationsService.stores(currentUserService.getRequired(jwt))
+                adminOperationsService.stores(
+                        currentUserService.getRequired(jwt),
+                        page,
+                        size,
+                        query,
+                        status,
+                        sort
+                )
         );
     }
 
@@ -78,7 +126,8 @@ public class AdminOperationsController {
                 adminOperationsService.changeUserStatus(
                         currentUserService.getRequired(jwt),
                         userId,
-                        request.status()
+                        request.status(),
+                        request.reason()
                 )
         );
     }
@@ -93,7 +142,8 @@ public class AdminOperationsController {
                 adminOperationsService.changeSellerVerification(
                         currentUserService.getRequired(jwt),
                         sellerProfileId,
-                        request.verificationStatus()
+                        request.verificationStatus(),
+                        request.reason()
                 )
         );
     }
@@ -108,7 +158,8 @@ public class AdminOperationsController {
                 adminOperationsService.changeStoreStatus(
                         currentUserService.getRequired(jwt),
                         storeId,
-                        request.status()
+                        request.status(),
+                        request.reason()
                 )
         );
     }

@@ -7,10 +7,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface StoreRepository extends JpaRepository<Store, Long> {
+public interface StoreRepository extends JpaRepository<Store, Long>, JpaSpecificationExecutor<Store> {
 
     List<Store> findAllByStatusAndBusinessStatus(
             StoreStatus status,
@@ -47,4 +48,6 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
             com.example.project_popq.store.domain.StoreStatus status,
             Collection<com.example.project_popq.store.domain.BusinessStatus> businessStatuses
     );
+
+    long countByStatus(StoreStatus status);
 }

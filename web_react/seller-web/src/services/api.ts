@@ -3,6 +3,7 @@ import type {
   AdminSeller,
   AdminStore,
   AdminUser,
+  AppAudience,
   Announcement,
   AnnouncementStatus,
   ApiEnvelope,
@@ -30,6 +31,16 @@ import type {
   StoreSavePayload,
   StoreSummary,
   StoreTable,
+  ContentStatus,
+  Faq,
+  PageResponse,
+  PlatformAnnouncement,
+  SupportCategory,
+  SupportRequesterType,
+  SupportTicketDetail,
+  SupportTicketStatus,
+  SupportTicketSummary,
+  UserStatus,
 } from '../types'
 
 type TransitionAction =
@@ -110,28 +121,98 @@ export function getAdminOverview(connection: SellerConnection) {
 }
 
 export function getAdminUsers(connection: SellerConnection) {
-  return request<AdminUser[]>(adminPath('/users'), connection)
+  return getAdminUsersPage(connection, {}).then((page) => page.content)
 }
 
 export function getAdminSellers(connection: SellerConnection) {
-  return request<AdminSeller[]>(adminPath('/sellers'), connection)
+  return getAdminSellersPage(connection, {}).then((page) => page.content)
 }
 
 export function getAdminStores(connection: SellerConnection) {
-  return request<AdminStore[]>(adminPath('/stores'), connection)
+  return getAdminStoresPage(connection, {}).then((page) => page.content)
+}
+
+function withQuery(path: string, values: Record<string, string | number | undefined>) {
+  const params = new URLSearchParams()
+  Object.entries(values).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') params.set(key, String(value))
+  })
+  const query = params.toString()
+  return query ? `${path}?${query}` : path
+}
+
+function normalizePage<T>(value: PageResponse<T> | T[]): PageResponse<T> {
+  if (!Array.isArray(value)) return value
+  return {
+    content: value,
+    page: 0,
+    size: value.length || 20,
+    totalElements: value.length,
+    totalPages: value.length > 0 ? 1 : 0,
+    first: true,
+    last: true,
+  }
+}
+
+export function getAdminUsersPage(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    role?: AdminUser['role']
+    status?: UserStatus
+  },
+) {
+  return request<PageResponse<AdminUser> | AdminUser[]>(
+    withQuery(adminPath('/users'), filters),
+    connection,
+  ).then(normalizePage)
+}
+
+export function getAdminSellersPage(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    verificationStatus?: AdminSeller['verificationStatus']
+    userStatus?: UserStatus
+  },
+) {
+  return request<PageResponse<AdminSeller> | AdminSeller[]>(
+    withQuery(adminPath('/sellers'), filters),
+    connection,
+  ).then(normalizePage)
+}
+
+export function getAdminStoresPage(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    status?: AdminStore['status']
+  },
+) {
+  return request<PageResponse<AdminStore> | AdminStore[]>(
+    withQuery(adminPath('/stores'), filters),
+    connection,
+  ).then(normalizePage)
 }
 
 export function updateAdminUserStatus(
   connection: SellerConnection,
   userId: number,
   status: AdminUser['status'],
+  reason?: string,
 ) {
   return request<AdminUser>(
     adminPath(`/users/${userId}/status`),
     connection,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reason }),
     },
   )
 }
@@ -140,13 +221,14 @@ export function updateAdminSellerVerification(
   connection: SellerConnection,
   sellerProfileId: number,
   verificationStatus: AdminSeller['verificationStatus'],
+  reason?: string,
 ) {
   return request<AdminSeller>(
     adminPath(`/sellers/${sellerProfileId}/verification`),
     connection,
     {
       method: 'PATCH',
-      body: JSON.stringify({ verificationStatus }),
+      body: JSON.stringify({ verificationStatus, reason }),
     },
   )
 }
@@ -155,14 +237,162 @@ export function updateAdminStoreStatus(
   connection: SellerConnection,
   storeId: number,
   status: AdminStore['status'],
+  reason?: string,
 ) {
   return request<AdminStore>(
     adminPath(`/stores/${storeId}/status`),
     connection,
     {
       method: 'PATCH',
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ status, reason }),
     },
+  )
+}
+
+export function getAdminPlatformAnnouncements(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    audience?: AppAudience
+    status?: ContentStatus
+  },
+) {
+  return request<PageResponse<PlatformAnnouncement>>(
+    withQuery(adminPath('/content/announcements'), filters),
+    connection,
+  )
+}
+
+export function saveAdminPlatformAnnouncement(
+  connection: SellerConnection,
+  payload: {
+    platformAnnouncementId?: number
+    audience: AppAudience
+    title: string
+    content: string
+    publishStartAt: string | null
+    publishEndAt: string | null
+  },
+) {
+  const path = payload.platformAnnouncementId
+    ? adminPath(`/content/announcements/${payload.platformAnnouncementId}`)
+    : adminPath('/content/announcements')
+  return request<PlatformAnnouncement>(path, connection, {
+    method: payload.platformAnnouncementId ? 'PUT' : 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateAdminPlatformAnnouncementStatus(
+  connection: SellerConnection,
+  id: number,
+  status: ContentStatus,
+) {
+  return request<PlatformAnnouncement>(
+    adminPath(`/content/announcements/${id}/status`),
+    connection,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
+  )
+}
+
+export function getAdminFaqs(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    audience?: AppAudience
+    status?: ContentStatus
+    category?: string
+  },
+) {
+  return request<PageResponse<Faq>>(
+    withQuery(adminPath('/content/faqs'), filters),
+    connection,
+  )
+}
+
+export function saveAdminFaq(
+  connection: SellerConnection,
+  payload: {
+    faqId?: number
+    audience: AppAudience
+    category: string
+    question: string
+    answer: string
+    displayOrder: number
+  },
+) {
+  const path = payload.faqId
+    ? adminPath(`/content/faqs/${payload.faqId}`)
+    : adminPath('/content/faqs')
+  return request<Faq>(path, connection, {
+    method: payload.faqId ? 'PUT' : 'POST',
+    body: JSON.stringify(payload),
+  })
+}
+
+export function updateAdminFaqStatus(
+  connection: SellerConnection,
+  id: number,
+  status: ContentStatus,
+) {
+  return request<Faq>(adminPath(`/content/faqs/${id}/status`), connection, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  })
+}
+
+export function getAdminSupportTickets(
+  connection: SellerConnection,
+  filters: {
+    page?: number
+    size?: number
+    query?: string
+    requesterType?: SupportRequesterType
+    category?: SupportCategory
+    status?: SupportTicketStatus
+  },
+) {
+  return request<PageResponse<SupportTicketSummary>>(
+    withQuery(adminPath('/support/tickets'), filters),
+    connection,
+  )
+}
+
+export function getAdminSupportTicket(
+  connection: SellerConnection,
+  ticketId: number,
+) {
+  return request<SupportTicketDetail>(
+    adminPath(`/support/tickets/${ticketId}`),
+    connection,
+  )
+}
+
+export function replyAdminSupportTicket(
+  connection: SellerConnection,
+  ticketId: number,
+  content: string,
+) {
+  return request<SupportTicketDetail>(
+    adminPath(`/support/tickets/${ticketId}/messages`),
+    connection,
+    { method: 'POST', body: JSON.stringify({ content }) },
+  )
+}
+
+export function updateAdminSupportTicketStatus(
+  connection: SellerConnection,
+  ticketId: number,
+  status: SupportTicketStatus,
+) {
+  return request<SupportTicketDetail>(
+    adminPath(`/support/tickets/${ticketId}/status`),
+    connection,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
   )
 }
 

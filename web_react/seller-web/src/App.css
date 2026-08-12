@@ -3174,6 +3174,7 @@ main {
 
 .admin-row-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
@@ -3216,6 +3217,307 @@ main {
 
 .admin-page .source-note {
   font-size: 11px;
+}
+
+.sidebar-section-label {
+  margin: 14px 14px 5px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.admin-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-filter-group select,
+.admin-content-editor select,
+.admin-content-editor input,
+.admin-content-editor textarea,
+.support-detail select,
+.support-detail textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.admin-filter-group select {
+  min-height: 42px;
+  padding: 0 34px 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-pagination {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-pagination button,
+.admin-content-card footer button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-pagination button:disabled {
+  opacity: 0.45;
+}
+
+.admin-status.withdrawal_pending,
+.admin-status.received,
+.admin-status.waiting_admin,
+.admin-status.draft {
+  background: #f2ead6;
+  color: #8a692f;
+}
+
+.admin-status.waiting_requester,
+.admin-status.published {
+  background: #e7efdc;
+  color: #58733d;
+}
+
+.admin-status.hidden {
+  background: #eceae5;
+  color: #716d65;
+}
+
+.admin-content-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-content-card {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--paper);
+}
+
+.admin-content-card header,
+.admin-content-card footer,
+.support-detail > header,
+.support-detail > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-content-card header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-content-card h3 {
+  width: 100%;
+  margin: 4px 0 0;
+  color: var(--ink);
+}
+
+.admin-content-card p {
+  margin: 16px 0;
+  color: var(--muted);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.admin-content-card time,
+.admin-content-card > small,
+.content-audience {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-content-card footer {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.admin-content-editor {
+  max-width: 650px;
+}
+
+.admin-content-editor label {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.admin-content-editor input,
+.admin-content-editor select,
+.admin-content-editor textarea {
+  width: 100%;
+  padding: 11px 12px;
+}
+
+.content-period {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.support-workspace {
+  min-height: 600px;
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(440px, 1.6fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--paper);
+}
+
+.support-ticket-list {
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+}
+
+.support-ticket-list > button {
+  width: 100%;
+  padding: 16px;
+  display: grid;
+  gap: 7px;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.support-ticket-list > button.active {
+  background: color-mix(in srgb, var(--accent) 8%, var(--paper));
+}
+
+.support-ticket-list > button > span {
+  display: flex;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.support-ticket-list > button > small {
+  color: var(--muted);
+}
+
+.support-ticket-list .admin-status {
+  font-style: normal;
+}
+
+.support-detail {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+}
+
+.support-detail > header,
+.support-detail > footer {
+  padding: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.support-detail > header h3 {
+  margin: 4px 0;
+}
+
+.support-detail > header span,
+.support-detail > header small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.support-detail select {
+  padding: 9px 11px;
+}
+
+.support-message-stream {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.support-message {
+  max-width: 75%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--canvas);
+}
+
+.support-message.admin {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
+}
+
+.support-message p {
+  margin: 6px 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.support-message small {
+  color: var(--muted);
+}
+
+.support-detail > footer {
+  align-items: stretch;
+  border-top: 1px solid var(--line);
+  border-bottom: 0;
+}
+
+.support-detail textarea {
+  flex: 1;
+  padding: 11px;
+  resize: vertical;
+}
+
+@media (max-width: 900px) {
+  .admin-toolbar,
+  .support-detail > footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-toolbar .search-field {
+    width: 100%;
+  }
+
+  .admin-filter-group,
+  .content-period {
+    grid-template-columns: 1fr;
+    flex-wrap: wrap;
+  }
+
+  .support-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .support-ticket-list {
+    max-height: 300px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
 }
 
 :root[data-theme='dark'] .admin-tabs {

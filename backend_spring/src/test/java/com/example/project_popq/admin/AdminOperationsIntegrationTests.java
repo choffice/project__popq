@@ -111,6 +111,45 @@ class AdminOperationsIntegrationTests {
         );
     }
 
+    @Test
+    void adminCannotBypassWithdrawalLifecycleWithStatusEndpoint() {
+        User admin = createUser(PlatformRole.ADMIN, "탈퇴 보호 관리자");
+        User customer = createUser(PlatformRole.CUSTOMER, "탈퇴 보호 고객");
+
+        assertErrorCode(
+                () -> adminOperationsService.changeUserStatus(
+                        admin,
+                        customer.getId(),
+                        UserStatus.WITHDRAWN,
+                        "즉시 탈퇴 시도"
+                ),
+                ErrorCode.INVALID_REQUEST
+        );
+        assertThat(customer.getStatus()).isEqualTo(UserStatus.ACTIVE);
+    }
+
+    @Test
+    void pagedUsersCanBeFilteredByRoleAndStatus() {
+        User admin = createUser(PlatformRole.ADMIN, "검색 관리자");
+        User activeCustomer = createUser(PlatformRole.CUSTOMER, "검색 고객");
+        User suspendedCustomer = createUser(PlatformRole.CUSTOMER, "정지 고객");
+        suspendedCustomer.changeStatus(UserStatus.SUSPENDED);
+
+        var result = adminOperationsService.users(
+                admin,
+                0,
+                20,
+                "검색 고객",
+                PlatformRole.CUSTOMER,
+                UserStatus.ACTIVE,
+                "desc"
+        );
+
+        assertThat(result.content())
+                .extracting("userId")
+                .containsExactly(activeCustomer.getId());
+    }
+
     private User createUser(PlatformRole role, String name) {
         return userRepository.save(
                 User.create(

@@ -355,7 +355,7 @@ describe('판매자 주문 운영', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: '플랫폼 운영 현황' }),
+      await screen.findByRole('heading', { name: '구매자 회원 관리', level: 1 }),
     ).toBeVisible()
     expect(screen.getByRole('navigation', { name: '관리자 메뉴' })).toBeVisible()
     expect(screen.queryByRole('button', { name: /주문 운영/ })).not.toBeInTheDocument()

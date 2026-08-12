@@ -4,12 +4,14 @@ import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.domain.UserStatus;
 import java.time.Instant;
+import java.util.Set;
 
 public record AdminUserResponse(
         Long userId,
         String email,
         String name,
         PlatformRole role,
+        Set<PlatformRole> roles,
         UserStatus status,
         Instant createdAt
 ) {
@@ -19,6 +21,7 @@ public record AdminUserResponse(
                 user.getEmail(),
                 user.getName(),
                 user.getRole(),
+                Set.copyOf(user.getRoles()),
                 user.getStatus(),
                 user.getCreatedAt()
         );
