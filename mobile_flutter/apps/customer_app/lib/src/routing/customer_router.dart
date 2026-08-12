@@ -628,7 +628,7 @@ GoRouter createCustomerRouter({
                     repository: supportRepository,
                     customerEmail: snapshot.data!.email,
                     onCreated: (created) {
-                      context.go(
+                      context.pushReplacement(
                         CustomerRoutes.supportInquiryDetail(
                           created.inquiry.supportInquiryId,
                         ),
