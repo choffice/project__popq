@@ -9,6 +9,7 @@ import com.example.project_popq.qr.domain.QrCodeStatus;
 import com.example.project_popq.qr.dto.QrContextResponse;
 import com.example.project_popq.qr.repository.GuestSessionRepository;
 import com.example.project_popq.qr.repository.QrCodeRepository;
+import com.example.project_popq.store.domain.Store;
 import java.time.Duration;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
@@ -117,6 +118,11 @@ public class GuestQrService {
     public Duration cookieMaxAge(Instant expiresAt) {
         Duration duration = Duration.between(Instant.now(), expiresAt);
         return duration.isNegative() ? Duration.ZERO : duration;
+    }
+
+    @Transactional(readOnly = true)
+    public Store resolveStoreForVisit(String rawQrToken) {
+        return findAndValidateQr(rawQrToken, Instant.now()).getStore();
     }
 
     private QrCode findAndValidateQr(String rawQrToken, Instant now) {

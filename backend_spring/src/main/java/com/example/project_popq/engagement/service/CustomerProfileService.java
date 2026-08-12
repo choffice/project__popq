@@ -1,5 +1,6 @@
 package com.example.project_popq.engagement.service;
 
+import com.example.project_popq.activity.service.CustomerActivityService;
 import com.example.project_popq.auth.dto.AuthUserResponse;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
@@ -21,6 +22,7 @@ public class CustomerProfileService {
     private final StoreInterestRepository storeInterestRepository;
     private final ReviewRepository reviewRepository;
     private final OrderRepository orderRepository;
+    private final CustomerActivityService customerActivityService;
 
     @Transactional(readOnly = true)
     public CustomerProfileResponse get(User user) {
@@ -34,7 +36,8 @@ public class CustomerProfileService {
                         user.getId(),
                         ReviewStatus.ACTIVE
                 ),
-                orderRepository.countByUserId(user.getId())
+                orderRepository.countByUserId(user.getId()),
+                customerActivityService.getSummary(user)
         );
     }
 }

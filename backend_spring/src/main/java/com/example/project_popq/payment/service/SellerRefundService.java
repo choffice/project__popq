@@ -1,5 +1,6 @@
 package com.example.project_popq.payment.service;
 
+import com.example.project_popq.activity.service.CustomerActivityService;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.order.domain.Order;
@@ -35,6 +36,7 @@ public class SellerRefundService {
   private final OrderRepository orderRepository;
   private final PaymentRepository paymentRepository;
   private final PaymentProviderRegistry paymentProviderRegistry;
+  private final CustomerActivityService customerActivityService;
 
   @Transactional(readOnly = true)
   public SellerPaymentSummaryResponse findSummary(
@@ -200,6 +202,11 @@ public class SellerRefundService {
     } else {
       payment.markPartiallyRefunded();
     }
+
+    customerActivityService.revokeOrderPurchase(
+        order.getOrderPublicId(),
+        processedAt
+    );
 
     payment.addTransaction(
         PaymentTransaction.succeeded(

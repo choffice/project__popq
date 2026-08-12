@@ -191,7 +191,7 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     final expiresIn = (response['expiresIn'] as num).toInt();
     return AuthSession(
       accessToken: response['accessToken'] as String,
-      refreshToken: '',
+      refreshToken: response['refreshToken'] as String,
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
     );
   }

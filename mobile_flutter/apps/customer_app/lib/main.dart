@@ -6,6 +6,8 @@ import 'src/customer_app.dart';
 import 'package:naver_login_sdk/naver_login_sdk.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'src/notifications/customer_push_notification_service.dart';
+import 'dart:ui';
+import 'src/notifications/customer_app_badge_service.dart';
 
 const naverClientId = String.fromEnvironment('NAVER_CLIENT_ID');
 const naverClientSecret = String.fromEnvironment('NAVER_CLIENT_SECRET');
@@ -14,10 +16,16 @@ const naverClientSecret = String.fromEnvironment('NAVER_CLIENT_SECRET');
 Future<void> firebaseMessagingBackgroundHandler(
     RemoteMessage message,
     ) async {
+  DartPluginRegistrant.ensureInitialized();
+
   await Firebase.initializeApp();
 
+  await CustomerAppBadgeService
+      .updateFromMessageData(message.data);
+
   debugPrint(
-    'Customer 백그라운드 FCM 수신: ${message.messageId}',
+    'Customer 백그라운드 FCM 수신: '
+        '${message.messageId}',
   );
 }
 

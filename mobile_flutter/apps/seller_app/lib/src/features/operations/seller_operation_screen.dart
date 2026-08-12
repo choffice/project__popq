@@ -1429,6 +1429,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                         ),
                         const SizedBox(width: PopqSpacing.sm),
                         FilledButton(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                          ),
                           onPressed: searching ? null : submit,
                           child: const Text('저장'),
                         ),

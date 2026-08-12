@@ -25,8 +25,10 @@ import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/orders/pending_payment_recovery_service.dart';
 import 'features/permissions/customer_permission_gateway.dart';
+import 'features/profile/customer_attendance_dialog.dart';
 import 'features/profile/customer_engagement_repository.dart';
 import 'notifications/customer_push_notification_service.dart';
+import 'notifications/customer_app_badge_service.dart';
 import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
@@ -84,6 +86,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
+  final GlobalKey<NavigatorState> _rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+  final ValueNotifier<CustomerActivitySummary?> _activitySummaryNotifier =
+      ValueNotifier<CustomerActivitySummary?>(null);
 
   late final SessionController _sessionController;
   late final OnboardingController _onboardingController;
@@ -91,6 +97,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final PopqApiClient _apiClient;
   late final CustomerNotificationRepository _notificationRepository;
   late final CustomerOrderRepository _orderRepository;
+  late final CustomerEngagementRepository _engagementRepository;
   late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
@@ -109,6 +116,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
   bool _isAppActive = true;
   bool _isRecoveringPendingPayment = false;
+  bool _attendanceDialogScheduled = false;
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
 
@@ -139,13 +147,31 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       accessTokenReader: () async {
         return (await _sessionStore.read())?.accessToken;
       },
+      refreshTokenReader: () async {
+        return (await _sessionStore.read())?.refreshToken;
+      },
+      authSessionUpdater: ({
+        required String accessToken,
+        required String refreshToken,
+        required int expiresInSeconds,
+      }) async {
+        await _sessionController.save(
+          AuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: DateTime.now().toUtc().add(
+              Duration(seconds: expiresInSeconds),
+            ),
+          ),
+        );
+      },
     );
-
     _realtimeClient = PopqRealtimeClient(
       webSocketUri: widget.environment.realtimeWebSocketUri,
       accessTokenReader: () async {
         return _sessionController.accessToken;
       },
+      accessTokenRefresher: _apiClient.refreshAccessToken,
       enableLogs: widget.environment.enableNetworkLogs,
     );
 
@@ -192,7 +218,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         widget.orderMessageRepository ??
         ApiCustomerOrderMessageRepository(_apiClient);
 
-    final engagementRepository =
+    _engagementRepository =
         widget.engagementRepository ??
         ApiCustomerEngagementRepository(
           _apiClient,
@@ -231,7 +257,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       announcementRepository: announcementRepository,
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
-      engagementRepository: engagementRepository,
+      engagementRepository: _engagementRepository,
+      activitySummaryListenable: _activitySummaryNotifier,
       notificationRepository: _notificationRepository,
       locationRepository: locationRepository,
       cartController: _cartController,
@@ -241,6 +268,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       apiBaseUrl: widget.environment.apiBaseUrl,
       tossClientKey: widget.environment.tossClientKey,
       themeController: _themeController,
+      navigatorKey: _rootNavigatorKey,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
@@ -301,10 +329,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     await _sessionController.save(
       AuthSession(
         accessToken: response['accessToken'] as String,
-        refreshToken: '',
-        expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
+        refreshToken: response['refreshToken'] as String,
+        expiresAt: DateTime.now()
+            .toUtc()
+            .add(Duration(seconds: expiresIn)),
       ),
     );
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _signIn(String email, String password) async {
@@ -314,6 +345,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _signUp({
@@ -366,6 +398,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _kakaoSignIn() async {
@@ -382,6 +415,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _naverSignIn() async {
@@ -398,6 +432,37 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
+  }
+
+  void _scheduleAttendanceDialog() {
+    if (_attendanceDialogScheduled) return;
+    _attendanceDialogScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sessionController.isSignedIn) {
+        _attendanceDialogScheduled = false;
+        return;
+      }
+
+      final dialogContext = _rootNavigatorKey.currentContext;
+      if (dialogContext == null) {
+        _attendanceDialogScheduled = false;
+        return;
+      }
+
+      unawaited(
+        showCustomerAttendanceDialog(
+          context: dialogContext,
+          repository: _engagementRepository,
+          onSummaryChanged: (summary) {
+            _activitySummaryNotifier.value = summary;
+          },
+        ).whenComplete(() {
+          _attendanceDialogScheduled = false;
+        }),
+      );
+    });
   }
 
   Future<void> _googleLink() async {
@@ -474,17 +539,48 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     });
   }
 
+  Future<void> _syncAppBadge() async {
+    if (!_sessionController.isSignedIn) {
+      await CustomerAppBadgeService.clearBadge();
+      return;
+    }
+
+    try {
+      final unreadCount =
+      await _notificationRepository.badgeCount();
+
+      if (!_sessionController.isSignedIn) {
+        return;
+      }
+
+      await CustomerAppBadgeService.updateBadge(
+        unreadCount,
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Customer 앱 아이콘 배지 동기화 실패: '
+            '$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   void _handleSessionChanged() {
     if (_sessionController.status == SessionStatus.restoring) {
       return;
     }
 
     if (!_sessionController.isSignedIn) {
+      _activitySummaryNotifier.value = null;
       _realtimeClient.disconnect(clearSubscriptions: true);
+      unawaited(_syncAppBadge());
       return;
     }
 
     unawaited(_registerPushDevice());
+    unawaited(_syncAppBadge());
 
     final pendingPushDeepLink = _pendingPushDeepLink;
 
@@ -678,6 +774,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         if (_sessionController.isSignedIn) {
           unawaited(_realtimeClient.connect());
           unawaited(_recoverPendingPaymentIfNeeded());
+          unawaited(_syncAppBadge());
         }
 
         return;
@@ -708,6 +805,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _homeController.dispose();
     _onboardingController.dispose();
     _sessionController.dispose();
+    _activitySummaryNotifier.dispose();
 
     if (_ownsThemeController) {
       _themeController.dispose();

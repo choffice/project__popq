@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -76,6 +77,7 @@ abstract final class CustomerRoutes {
 }
 
 GoRouter createCustomerRouter({
+  required GlobalKey<NavigatorState> navigatorKey,
   required SessionController sessionController,
   required OnboardingController onboardingController,
   required StoreDiscoveryRepository storeDiscoveryRepository,
@@ -84,6 +86,7 @@ GoRouter createCustomerRouter({
   required CustomerOrderRepository orderRepository,
   required CustomerOrderMessageRepository orderMessageRepository,
   required CustomerEngagementRepository engagementRepository,
+  required ValueListenable<CustomerActivitySummary?> activitySummaryListenable,
   required CustomerNotificationRepository notificationRepository,
   required CartController cartController,
   required CustomerHomeController homeController,
@@ -137,6 +140,7 @@ GoRouter createCustomerRouter({
 
   late final GoRouter router;
   router = GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: CustomerRoutes.home,
     refreshListenable: Listenable.merge([
       sessionController,
@@ -570,6 +574,8 @@ GoRouter createCustomerRouter({
             orderRepository,
             messageRepository:
             orderMessageRepository,
+            notificationRepository:
+            notificationRepository,
           );
         },
       ),
@@ -662,6 +668,7 @@ GoRouter createCustomerRouter({
             builder: (context, state) {
               return CustomerQrScannerScreen(
                 apiBaseUrl: apiBaseUrl,
+                engagementRepository: engagementRepository,
               );
             },
           ),
@@ -737,6 +744,7 @@ GoRouter createCustomerRouter({
               return CustomerProfileScreen(
                 repository:
                 engagementRepository,
+                activitySummaryListenable: activitySummaryListenable,
                 messageRepository:
                 orderMessageRepository,
                 onSignOut:

@@ -24,6 +24,7 @@ import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
+import com.example.project_popq.store.domain.BusinessStatus;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -450,7 +451,7 @@ public class CatalogService {
     public List<ProductSummaryResponse> findCustomerProducts(
         Long storeId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Instant now = Instant.now();
 
@@ -482,7 +483,7 @@ public class CatalogService {
         Long storeId,
         Long productId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Product product =
             getActiveDetailedProduct(
@@ -637,12 +638,14 @@ public class CatalogService {
             );
     }
 
-    private void requirePublicOpenStore(
+    private void requirePublicVisibleStore(
         Long storeId
     ) {
         Store store = getStore(storeId);
 
-        if (!store.isOpen()) {
+        if (!store.isActive()
+            || (store.getBusinessStatus() != BusinessStatus.OPEN
+            && store.getBusinessStatus() != BusinessStatus.PRE_OPEN)) {
             throw new BusinessException(
                 ErrorCode.STORE_NOT_FOUND
             );

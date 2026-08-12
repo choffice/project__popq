@@ -1,5 +1,108 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+class CustomerActivitySummary {
+  const CustomerActivitySummary({
+    required this.totalCount,
+    required this.badgeTier,
+    required this.currentCheckpoint,
+    required this.nextCheckpoint,
+    required this.remainingCount,
+    required this.checkpointProgress,
+  });
+
+  factory CustomerActivitySummary.fromJson(Map<String, Object?> json) {
+    return CustomerActivitySummary(
+      totalCount: (json['totalCount'] as num).toInt(),
+      badgeTier: json['badgeTier'] as String,
+      currentCheckpoint: (json['currentCheckpoint'] as num).toInt(),
+      nextCheckpoint: (json['nextCheckpoint'] as num?)?.toInt(),
+      remainingCount: (json['remainingCount'] as num).toInt(),
+      checkpointProgress: (json['checkpointProgress'] as num).toDouble(),
+    );
+  }
+
+  factory CustomerActivitySummary.fromTotalCount(int totalCount) {
+    const checkpoints = <int>[10, 25, 50, 100, 200, 300, 500, 750, 1000];
+    final current = checkpoints
+        .where((checkpoint) => checkpoint <= totalCount)
+        .fold(0, (_, checkpoint) => checkpoint);
+    int? next;
+    for (final checkpoint in checkpoints) {
+      if (checkpoint > totalCount) {
+        next = checkpoint;
+        break;
+      }
+    }
+    final remaining = next == null ? 0 : next - totalCount;
+    final progress = next == null
+        ? 1.0
+        : (totalCount - current) / (next - current);
+    final badgeTier = switch (totalCount) {
+      >= 1000 => 'DIAMOND',
+      >= 500 => 'GOLD',
+      >= 100 => 'SILVER',
+      >= 10 => 'BRONZE',
+      _ => 'NONE',
+    };
+
+    return CustomerActivitySummary(
+      totalCount: totalCount,
+      badgeTier: badgeTier,
+      currentCheckpoint: current,
+      nextCheckpoint: next,
+      remainingCount: remaining,
+      checkpointProgress: progress,
+    );
+  }
+
+  final int totalCount;
+  final String badgeTier;
+  final int currentCheckpoint;
+  final int? nextCheckpoint;
+  final int remainingCount;
+  final double checkpointProgress;
+
+  String get badgeLabel {
+    return switch (badgeTier) {
+      'BRONZE' => '동 뱃지',
+      'SILVER' => '은 뱃지',
+      'GOLD' => '금 뱃지',
+      'DIAMOND' => '다이아 뱃지',
+      _ => '첫 뱃지 준비',
+    };
+  }
+}
+
+class CustomerAttendance {
+  const CustomerAttendance({
+    required this.today,
+    required this.checkedDates,
+    required this.checkedToday,
+    required this.newlyChecked,
+    required this.activitySummary,
+  });
+
+  factory CustomerAttendance.fromJson(Map<String, Object?> json) {
+    return CustomerAttendance(
+      today: DateTime.parse(json['today'] as String),
+      checkedDates: (json['checkedDates'] as List<Object?>)
+          .map((value) => DateTime.parse(value as String))
+          .toList(growable: false),
+      checkedToday: json['checkedToday'] as bool,
+      newlyChecked: json['newlyChecked'] as bool,
+      activitySummary: CustomerActivitySummary.fromJson(
+        Map<String, Object?>.from(json['activitySummary'] as Map),
+      ),
+    );
+  }
+
+  final DateTime today;
+  final List<DateTime> checkedDates;
+  final bool checkedToday;
+  final bool newlyChecked;
+  final CustomerActivitySummary activitySummary;
+}
+
 class CustomerProfile {
   const CustomerProfile({
     required this.userId,
@@ -8,6 +111,14 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.activitySummary = const CustomerActivitySummary(
+      totalCount: 0,
+      badgeTier: 'NONE',
+      currentCheckpoint: 0,
+      nextCheckpoint: 10,
+      remainingCount: 10,
+      checkpointProgress: 0,
+    ),
     this.profileImageUrl,
     this.phone,
     this.joinedAt,
@@ -25,6 +136,18 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      activitySummary: json['activitySummary'] == null
+          ? const CustomerActivitySummary(
+              totalCount: 0,
+              badgeTier: 'NONE',
+              currentCheckpoint: 0,
+              nextCheckpoint: 10,
+              remainingCount: 10,
+              checkpointProgress: 0,
+            )
+          : CustomerActivitySummary.fromJson(
+              Map<String, Object?>.from(json['activitySummary'] as Map),
+            ),
       profileImageUrl: _resolveImageUrl(
         user['profileImageUrl'] as String?,
         imageBaseUrl,
@@ -42,6 +165,7 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final CustomerActivitySummary activitySummary;
   final String? profileImageUrl;
   final String? phone;
   final DateTime? joinedAt;
@@ -63,6 +187,7 @@ class CustomerProfile {
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    CustomerActivitySummary? activitySummary,
     String? profileImageUrl,
     String? phone,
   }) {
@@ -73,6 +198,7 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      activitySummary: activitySummary ?? this.activitySummary,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
       joinedAt: joinedAt,
@@ -252,6 +378,12 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<CustomerAttendance> getAttendance();
+
+  Future<CustomerAttendance> checkAttendance();
+
+  Future<bool> recordQrVisit(String qrToken);
+
   Future<String> uploadProfileImage(String filePath);
 
   Future<bool> updateName(String name);
@@ -318,6 +450,36 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
         Map<String, Object?>.from(value as Map),
         imageBaseUrl: _imageBaseUrl,
       ),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() {
+    return _apiClient.get(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() {
+    return _apiClient.post(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) {
+    return _apiClient.post(
+      '/api/v1/customer/activities/visits',
+      body: {'qrToken': qrToken},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['counted'] as bool;
+      },
     );
   }
 
@@ -573,6 +735,7 @@ class MemoryCustomerEngagementRepository
   CustomerProfile _profile;
   final List<InterestedStore> _interests;
   final List<CustomerReview> _reviews;
+  final Set<String> _attendanceDates = <String>{};
   NotificationPreference _notificationPreference = const NotificationPreference(
     pushNotificationEnabled: true,
     marketingOptIn: false,
@@ -585,6 +748,55 @@ class MemoryCustomerEngagementRepository
       reviewCount: _reviews.where((review) => review.isActive).length,
     );
     return _profile;
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() async {
+    return _attendance(newlyChecked: false);
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() async {
+    final today = DateTime.now();
+    final newlyChecked = _attendanceDates.add(_dateKey(today));
+    if (newlyChecked) {
+      _profile = _profile.copyWith(
+        activitySummary: CustomerActivitySummary.fromTotalCount(
+          _profile.activitySummary.totalCount + 1,
+        ),
+      );
+    }
+    return _attendance(newlyChecked: newlyChecked);
+  }
+
+  CustomerAttendance _attendance({required bool newlyChecked}) {
+    final today = DateTime.now();
+    final checkedDates =
+        _attendanceDates
+            .map(DateTime.parse)
+            .where(
+              (date) => date.year == today.year && date.month == today.month,
+            )
+            .toList()
+          ..sort();
+    return CustomerAttendance(
+      today: DateTime(today.year, today.month, today.day),
+      checkedDates: checkedDates,
+      checkedToday: _attendanceDates.contains(_dateKey(today)),
+      newlyChecked: newlyChecked,
+      activitySummary: _profile.activitySummary,
+    );
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) async {
+    return false;
   }
 
   @override
