@@ -54,4 +54,6 @@ public interface StoreRepository extends JpaRepository<Store, Long> {
             com.example.project_popq.store.domain.StoreStatus status,
             Collection<com.example.project_popq.store.domain.BusinessStatus> businessStatuses
     );
+
+    long countByStatus(StoreStatus status);
 }
