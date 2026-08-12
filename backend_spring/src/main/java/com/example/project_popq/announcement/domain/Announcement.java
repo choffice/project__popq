@@ -46,31 +46,66 @@ public class Announcement extends BaseTimeEntity {
     @Column(name = "published_at")
     private Instant publishedAt;
 
-    private Announcement(Store store, String title, String content) {
+    @Column(name = "pinned", nullable = false)
+    private boolean pinned;
+
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
+    private Announcement(
+        Store store,
+        String title,
+        String content,
+        String imageUrl
+    ) {
         this.store = store;
         this.title = title;
         this.content = content;
+        this.imageUrl = imageUrl;
         this.status = AnnouncementStatus.DRAFT;
     }
 
     public static Announcement create(
-            Store store,
-            String title,
-            String content
+        Store store,
+        String title,
+        String content,
+        String imageUrl
     ) {
-        return new Announcement(store, title, content);
+        return new Announcement(
+            store,
+            title,
+            content,
+            imageUrl
+        );
     }
 
-    public void update(String title, String content) {
+    public void update(
+        String title,
+        String content,
+        String imageUrl
+    ) {
         this.title = title;
         this.content = content;
+        this.imageUrl = imageUrl;
     }
 
     public void changeStatus(AnnouncementStatus status, Instant now) {
         this.status = status;
         if (status == AnnouncementStatus.PUBLISHED) {
             this.publishedAt = now;
+        } else {
+            this.pinned = false;
         }
     }
-}
 
+    public void pin() {
+        if (status != AnnouncementStatus.PUBLISHED) {
+            throw new IllegalStateException("only published announcements can be pinned");
+        }
+        this.pinned = true;
+    }
+
+    public void unpin() {
+        this.pinned = false;
+    }
+}
