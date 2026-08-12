@@ -1,24 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import './App.css'
-import { freshDemoOrders } from './data/demo'
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import "./App.css";
+import { freshDemoOrders } from "./data/demo";
+import { AdminManagement } from "./features/admin/AdminManagement";
+import { SalesAnalytics } from "./features/analytics/SalesAnalytics";
+import { AnnouncementManagement } from "./features/announcements/AnnouncementManagement";
+import { SellerAuth } from "./features/auth/SellerAuth";
+import { ProductManagement } from "./features/catalog/ProductManagement";
+import { MessageManagement } from "./features/messages/MessageManagement";
+import { QrManagement } from "./features/qr/QrManagement";
+import { StoreSettings } from "./features/store/StoreSettings";
+import { SupportManagement } from "./features/support/SupportManagement";
 import {
-  getSellerPaymentSummary,
   getSellerOrders,
+  getSellerPaymentSummary,
   getSellerStores,
   getSellerUnreadConversationCount,
   refundSellerOrder,
   transitionSellerOrder,
-} from './services/api'
-import { connectSellerRealtime } from './services/realtime'
-import { useThemePreference } from './theme'
-import { ProductManagement } from './features/catalog/ProductManagement'
-import { QrManagement } from './features/qr/QrManagement'
-import { SalesAnalytics } from './features/analytics/SalesAnalytics'
-import { StoreSettings } from './features/store/StoreSettings'
-import { AdminManagement } from './features/admin/AdminManagement'
-import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
-import { SellerAuth } from './features/auth/SellerAuth'
-import { MessageManagement } from './features/messages/MessageManagement'
+} from "./services/api";
+import { connectSellerRealtime } from "./services/realtime";
+import { useThemePreference } from "./theme";
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -27,159 +28,150 @@ import type {
   SellerOrder,
   SellerPaymentSummary,
   StoreSummary,
-} from './types'
+} from "./types";
 
-type OrderFilter = 'ACTIVE' | OrderStatus
+type OrderFilter = "ACTIVE" | OrderStatus;
 type SellerView =
-  | 'orders'
-  | 'products'
-  | 'qr'
-  | 'analytics'
-  | 'announcements'
-  | 'messages'
-  | 'settings'
-  | 'admin'
-type TransitionAction =
-  | 'accept'
-  | 'reject'
-  | 'prepare'
-  | 'ready'
-  | 'complete'
+  | "orders"
+  | "products"
+  | "qr"
+  | "analytics"
+  | "announcements"
+  | "messages"
+  | "settings"
+  | "admin"
+  | "support";
+type TransitionAction = "accept" | "reject" | "prepare" | "ready" | "complete";
 
-const CONNECTION_KEY = 'popq:seller:connection'
-const DEMO_KEY = 'popq:seller:demo'
+const CONNECTION_KEY = "popq:seller:connection";
+const DEMO_KEY = "popq:seller:demo";
 
-const STATUS_COPY: Record<
-  OrderStatus,
-  { label: string; short: string }
-> = {
-  CREATED: { label: '결제 대기', short: '대기' },
-  PLACED: { label: '신규 주문', short: '신규' },
-  ACCEPTED: { label: '접수 완료', short: '접수' },
-  PREPARING: { label: '준비 중', short: '준비' },
-  READY: { label: '픽업 대기', short: '픽업' },
-  COMPLETED: { label: '완료', short: '완료' },
-  CANCELED: { label: '고객 취소', short: '취소' },
-  REJECTED: { label: '주문 거절', short: '거절' },
-  EXPIRED: { label: '시간 만료', short: '만료' },
-}
+const STATUS_COPY: Record<OrderStatus, { label: string; short: string }> = {
+  CREATED: { label: "결제 대기", short: "대기" },
+  PLACED: { label: "신규 주문", short: "신규" },
+  ACCEPTED: { label: "접수 완료", short: "접수" },
+  PREPARING: { label: "준비 중", short: "준비" },
+  READY: { label: "픽업 대기", short: "픽업" },
+  COMPLETED: { label: "완료", short: "완료" },
+  CANCELED: { label: "고객 취소", short: "취소" },
+  REJECTED: { label: "주문 거절", short: "거절" },
+  EXPIRED: { label: "시간 만료", short: "만료" },
+};
 
 const LANES: {
-  title: string
-  description: string
-  statuses: OrderStatus[]
-  tone: string
+  title: string;
+  description: string;
+  statuses: OrderStatus[];
+  tone: string;
 }[] = [
   {
-    title: '새 주문',
-    description: '결제 완료 · 접수 필요',
-    statuses: ['PLACED'],
-    tone: 'new',
+    title: "새 주문",
+    description: "결제 완료 · 접수 필요",
+    statuses: ["PLACED"],
+    tone: "new",
   },
   {
-    title: '준비 중',
-    description: '접수부터 제조까지',
-    statuses: ['ACCEPTED', 'PREPARING'],
-    tone: 'making',
+    title: "준비 중",
+    description: "접수부터 제조까지",
+    statuses: ["ACCEPTED", "PREPARING"],
+    tone: "making",
   },
   {
-    title: '전달 대기',
-    description: '픽업 또는 테이블 전달',
-    statuses: ['READY'],
-    tone: 'ready',
+    title: "전달 대기",
+    description: "픽업 또는 테이블 전달",
+    statuses: ["READY"],
+    tone: "ready",
   },
-]
+];
 
 const ACTIONS: Partial<
   Record<
     OrderStatus,
     {
-      primary: { action: TransitionAction; label: string }
-      secondary?: { action: TransitionAction; label: string }
+      primary: { action: TransitionAction; label: string };
+      secondary?: { action: TransitionAction; label: string };
     }
   >
 > = {
   PLACED: {
-    primary: { action: 'accept', label: '주문 접수' },
-    secondary: { action: 'reject', label: '주문 거절' },
+    primary: { action: "accept", label: "주문 접수" },
+    secondary: { action: "reject", label: "주문 거절" },
   },
   ACCEPTED: {
-    primary: { action: 'prepare', label: '준비 시작' },
+    primary: { action: "prepare", label: "준비 시작" },
   },
   PREPARING: {
-    primary: { action: 'ready', label: '준비 완료' },
+    primary: { action: "ready", label: "준비 완료" },
   },
   READY: {
-    primary: { action: 'complete', label: '전달 완료' },
+    primary: { action: "complete", label: "전달 완료" },
   },
-}
+};
 
 const TARGET_STATUS: Record<TransitionAction, OrderStatus> = {
-  accept: 'ACCEPTED',
-  reject: 'REJECTED',
-  prepare: 'PREPARING',
-  ready: 'READY',
-  complete: 'COMPLETED',
-}
+  accept: "ACCEPTED",
+  reject: "REJECTED",
+  prepare: "PREPARING",
+  ready: "READY",
+  complete: "COMPLETED",
+};
 
-const VIEW_COPY: Record<
-  SellerView,
-  { eyebrow: string; title: string }
-> = {
-  orders: { eyebrow: 'LIVE ORDER DESK', title: '오늘의 주문 운영' },
-  products: { eyebrow: 'CATALOG CONTROL', title: '상품 관리' },
-  qr: { eyebrow: 'TABLE ACCESS', title: 'QR 관리' },
-  analytics: { eyebrow: 'SALES PULSE', title: '매출 분석' },
-  announcements: { eyebrow: 'STORE ANNOUNCEMENTS', title: '공지사항' },
-  messages: { eyebrow: 'CUSTOMER CONVERSATIONS', title: '고객 문의' },
-  settings: { eyebrow: 'STORE OPERATIONS', title: '스토어 설정' },
-  admin: { eyebrow: 'PLATFORM CONTROL', title: '관리자 운영' },
-}
+const VIEW_COPY: Record<SellerView, { eyebrow: string; title: string }> = {
+  orders: { eyebrow: "LIVE ORDER DESK", title: "오늘의 주문 운영" },
+  products: { eyebrow: "CATALOG CONTROL", title: "상품 관리" },
+  qr: { eyebrow: "TABLE ACCESS", title: "QR 관리" },
+  analytics: { eyebrow: "SALES PULSE", title: "매출 분석" },
+  announcements: { eyebrow: "STORE ANNOUNCEMENTS", title: "공지사항" },
+  messages: { eyebrow: "CUSTOMER CONVERSATIONS", title: "고객 문의" },
+  settings: { eyebrow: "STORE OPERATIONS", title: "스토어 설정" },
+  admin: { eyebrow: "PLATFORM CONTROL", title: "관리자 운영" },
+  support: { eyebrow: "CUSTOMER SUPPORT", title: "고객센터 문의" },
+};
 
 function money(value: number) {
-  return `${value.toLocaleString('ko-KR')}원`
+  return `${value.toLocaleString("ko-KR")}원`;
 }
 
 function shortOrderId(orderPublicId: string) {
-  return orderPublicId.slice(-4).toUpperCase()
+  return orderPublicId.slice(-4).toUpperCase();
 }
 
 function readConnection(): SellerConnection | null {
   try {
-    const value = window.sessionStorage.getItem(CONNECTION_KEY)
-    return value ? (JSON.parse(value) as SellerConnection) : null
+    const value = window.sessionStorage.getItem(CONNECTION_KEY);
+    return value ? (JSON.parse(value) as SellerConnection) : null;
   } catch {
-    return null
+    return null;
   }
 }
 
 function readDemoMode() {
-  return window.sessionStorage.getItem(DEMO_KEY) === 'true'
+  return window.sessionStorage.getItem(DEMO_KEY) === "true";
 }
 
 function connectionScope(connection: SellerConnection | null) {
-  if (!connection) return null
-  return `${connection.user?.userId ?? 'anonymous'}:${connection.storeId ?? 'admin'}:${connection.accessToken}`
+  if (!connection) return null;
+  return `${connection.user?.userId ?? "anonymous"}:${connection.storeId ?? "admin"}:${connection.accessToken}`;
 }
 
 function lastChangedAt(order: SellerOrder) {
-  const last = order.statusHistory.at(-1)?.changedAt
-  return last ? new Date(last) : new Date()
+  const last = order.statusHistory.at(-1)?.changedAt;
+  return last ? new Date(last) : new Date();
 }
 
 function elapsedMinutes(order: SellerOrder, now: Date) {
   return Math.max(
     0,
     Math.floor((now.getTime() - lastChangedAt(order).getTime()) / 60_000),
-  )
+  );
 }
 
 function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
-  const refunded = ['CANCELED', 'REJECTED'].includes(order.status)
+  const refunded = ["CANCELED", "REJECTED"].includes(order.status);
   return {
     orderPublicId: order.orderPublicId,
-    paymentStatus: refunded ? 'CANCELED' : 'PAID',
-    paymentMethod: 'CARD',
+    paymentStatus: refunded ? "CANCELED" : "PAID",
+    paymentMethod: "CARD",
     approvedAmount: order.totalAmount,
     refundedAmount: refunded ? order.totalAmount : 0,
     refundableAmount: refunded ? 0 : order.totalAmount,
@@ -189,12 +181,11 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
             refundId: order.version,
             amount: order.totalAmount,
             reason:
-              order.status === 'REJECTED'
-                ? '판매자 주문 거절'
-                : '고객 주문 취소',
-            requesterType:
-              order.status === 'REJECTED' ? 'SELLER' : 'GUEST',
-            status: 'SUCCEEDED',
+              order.status === "REJECTED"
+                ? "판매자 주문 거절"
+                : "고객 주문 취소",
+            requesterType: order.status === "REJECTED" ? "SELLER" : "GUEST",
+            status: "SUCCEEDED",
             requestedAt:
               order.statusHistory.at(-1)?.changedAt ?? new Date().toISOString(),
             completedAt:
@@ -204,128 +195,131 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
           },
         ]
       : [],
-  }
+  };
 }
 
 function App() {
-  const { theme, toggleTheme } = useThemePreference()
+  const { theme, toggleTheme } = useThemePreference();
   const [activeView, setActiveView] = useState<SellerView>(() =>
-    readConnection()?.user?.role === 'ADMIN' ? 'admin' : 'orders',
-  )
+    readConnection()?.user?.role === "ADMIN" ? "admin" : "orders",
+  );
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
-  )
+  );
   const [authenticated, setAuthenticated] = useState(
     () => Boolean(readConnection()) || readDemoMode(),
-  )
+  );
   const [orders, setOrders] = useState<SellerOrder[]>(() =>
     readConnection() ? [] : freshDemoOrders(),
-  )
+  );
   const [selectedId, setSelectedId] = useState<string | null>(
     () => freshDemoOrders()[0]?.orderPublicId ?? null,
-  )
-  const [filter, setFilter] = useState<OrderFilter>('ACTIVE')
-  const [now, setNow] = useState(new Date())
-  const [businessStatus, setBusinessStatus] =
-    useState<BusinessStatus>('OPEN')
-  const [connected, setConnected] = useState(false)
-  const [loading, setLoading] = useState(Boolean(readConnection()))
-  const [processing, setProcessing] = useState(false)
-  const [paymentLoading, setPaymentLoading] = useState(false)
+  );
+  const [filter, setFilter] = useState<OrderFilter>("ACTIVE");
+  const [now, setNow] = useState(new Date());
+  const [businessStatus, setBusinessStatus] = useState<BusinessStatus>("OPEN");
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(Boolean(readConnection()));
+  const [processing, setProcessing] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentSummary, setPaymentSummary] =
-    useState<SellerPaymentSummary | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [showConnection, setShowConnection] = useState(false)
-  const [accountStores, setAccountStores] = useState<StoreSummary[]>([])
-  const [accountStoresLoading, setAccountStoresLoading] = useState(false)
-  const [accountStoresError, setAccountStoresError] = useState<string | null>(null)
-  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
-  const seenEvents = useRef(new Set<string>())
-  const accountRequestId = useRef(0)
-  const activeConnectionScope = useRef(connectionScope(connection))
-  const isDemo = authenticated && !connection
-  const isAdmin = connection?.user?.role === 'ADMIN'
+    useState<SellerPaymentSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showConnection, setShowConnection] = useState(false);
+  const [accountStores, setAccountStores] = useState<StoreSummary[]>([]);
+  const [accountStoresLoading, setAccountStoresLoading] = useState(false);
+  const [accountStoresError, setAccountStoresError] = useState<string | null>(
+    null,
+  );
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+  const seenEvents = useRef(new Set<string>());
+  const accountRequestId = useRef(0);
+  const activeConnectionScope = useRef(connectionScope(connection));
+  const isDemo = authenticated && !connection;
+  const isAdmin = connection?.user?.role === "ADMIN";
   const resolvedStoreRole =
     connection?.storeRole ??
-    accountStores.find((store) => store.storeId === connection?.storeId)?.myRole
+    accountStores.find((store) => store.storeId === connection?.storeId)
+      ?.myRole;
   const canManageStore =
-    isDemo ||
-    resolvedStoreRole === 'OWNER' ||
-    resolvedStoreRole === 'MANAGER'
-  const storeScopeKey = isDemo ? 'demo' : `store-${connection?.storeId ?? 'none'}`
+    isDemo || resolvedStoreRole === "OWNER" || resolvedStoreRole === "MANAGER";
+  const storeScopeKey = isDemo
+    ? "demo"
+    : `store-${connection?.storeId ?? "none"}`;
 
   const loadOrders = useCallback(async () => {
-    if (!connection || connection.user?.role === 'ADMIN') return
-    const requestScope = connectionScope(connection)
-    setLoading(true)
+    if (!connection || connection.user?.role === "ADMIN") return;
+    const requestScope = connectionScope(connection);
+    setLoading(true);
     try {
-      const nextOrders = await getSellerOrders(connection)
-      if (activeConnectionScope.current !== requestScope) return
-      setOrders(nextOrders)
+      const nextOrders = await getSellerOrders(connection);
+      if (activeConnectionScope.current !== requestScope) return;
+      setOrders(nextOrders);
       setSelectedId((current) =>
         current && nextOrders.some((order) => order.orderPublicId === current)
           ? current
           : (nextOrders[0]?.orderPublicId ?? null),
-      )
-      setError(null)
+      );
+      setError(null);
     } catch (caught) {
-      if (activeConnectionScope.current !== requestScope) return
+      if (activeConnectionScope.current !== requestScope) return;
       setError(
         caught instanceof Error
           ? caught.message
-          : '주문 목록을 불러오지 못했습니다.',
-      )
+          : "주문 목록을 불러오지 못했습니다.",
+      );
     } finally {
       if (activeConnectionScope.current === requestScope) {
-        setLoading(false)
+        setLoading(false);
       }
     }
-  }, [connection])
+  }, [connection]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 30_000)
-    return () => window.clearInterval(timer)
-  }, [])
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
-    if (!connection || connection.user?.role === 'ADMIN') return
-    const initialLoad = window.setTimeout(() => void loadOrders(), 0)
+    if (!connection || connection.user?.role === "ADMIN") return;
+    const initialLoad = window.setTimeout(() => void loadOrders(), 0);
     const disconnect = connectSellerRealtime(
       connection,
       (event: OrderRealtimeEvent) => {
-        if (seenEvents.current.has(event.eventId)) return
-        seenEvents.current.add(event.eventId)
-        void loadOrders()
+        if (seenEvents.current.has(event.eventId)) return;
+        seenEvents.current.add(event.eventId);
+        void loadOrders();
       },
       () => {
-        setConnected(true)
-        void loadOrders()
+        setConnected(true);
+        void loadOrders();
       },
       () => setConnected(false),
-    )
+    );
     return () => {
-      window.clearTimeout(initialLoad)
-      disconnect()
-    }
-  }, [connection, loadOrders])
+      window.clearTimeout(initialLoad);
+      disconnect();
+    };
+  }, [connection, loadOrders]);
 
   useEffect(() => {
     if (!connection || isAdmin) {
-      return
+      return;
     }
-    let active = true
+    let active = true;
     const refreshAccount = async () => {
       try {
         const [stores, unread] = await Promise.all([
           getSellerStores(connection),
           getSellerUnreadConversationCount(connection),
-        ])
-        if (!active) return
-        setUnreadMessageCount(unread)
-        setAccountStores(stores)
+        ]);
+        if (!active) return;
+        setUnreadMessageCount(unread);
+        setAccountStores(stores);
         const currentStore = stores.find(
           (store) => store.storeId === connection.storeId,
-        )
+        );
         if (
           currentStore &&
           (connection.storeRole !== currentStore.myRole ||
@@ -335,128 +329,125 @@ function App() {
             ...connection,
             storeName: currentStore.name,
             storeRole: currentStore.myRole,
-          }
-          window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
+          };
+          window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next));
         }
       } catch {
         // Feature screens surface request failures when the user opens them.
       }
-    }
-    void refreshAccount()
+    };
+    void refreshAccount();
     const timer = window.setInterval(() => {
       void getSellerUnreadConversationCount(connection)
         .then((count) => {
-          if (active) setUnreadMessageCount(count)
+          if (active) setUnreadMessageCount(count);
         })
-        .catch(() => undefined)
-    }, 30_000)
+        .catch(() => undefined);
+    }, 30_000);
     return () => {
-      active = false
-      window.clearInterval(timer)
-    }
-  }, [connection, isAdmin])
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [connection, isAdmin]);
 
   function openAccount() {
-    setShowConnection(true)
-    if (!connection || isAdmin) return
-    const requestId = accountRequestId.current + 1
-    accountRequestId.current = requestId
-    setAccountStoresLoading(true)
-    setAccountStoresError(null)
+    setShowConnection(true);
+    if (!connection || isAdmin) return;
+    const requestId = accountRequestId.current + 1;
+    accountRequestId.current = requestId;
+    setAccountStoresLoading(true);
+    setAccountStoresError(null);
     void getSellerStores(connection)
       .then((stores) => {
-        if (accountRequestId.current === requestId) setAccountStores(stores)
+        if (accountRequestId.current === requestId) setAccountStores(stores);
       })
       .catch((caught: unknown) => {
-        if (accountRequestId.current !== requestId) return
+        if (accountRequestId.current !== requestId) return;
         setAccountStoresError(
           caught instanceof Error
             ? caught.message
-            : '스토어 목록을 불러오지 못했습니다.',
-        )
+            : "스토어 목록을 불러오지 못했습니다.",
+        );
       })
       .finally(() => {
         if (accountRequestId.current === requestId) {
-          setAccountStoresLoading(false)
+          setAccountStoresLoading(false);
         }
-      })
+      });
   }
 
   const visibleOrders = useMemo(() => {
-    if (filter === 'ACTIVE') {
+    if (filter === "ACTIVE") {
       return orders.filter((order) =>
-        ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'].includes(order.status),
-      )
+        ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(order.status),
+      );
     }
-    return orders.filter((order) => order.status === filter)
-  }, [filter, orders])
+    return orders.filter((order) => order.status === filter);
+  }, [filter, orders]);
 
   const selectedOrder =
-    orders.find((order) => order.orderPublicId === selectedId) ?? null
+    orders.find((order) => order.orderPublicId === selectedId) ?? null;
 
   useEffect(() => {
-    let active = true
+    let active = true;
     const timer = window.setTimeout(() => {
       if (!selectedOrder) {
-        setPaymentSummary(null)
-        setPaymentLoading(false)
-        return
+        setPaymentSummary(null);
+        setPaymentLoading(false);
+        return;
       }
       if (!connection) {
         setPaymentSummary((current) =>
           current?.orderPublicId === selectedOrder.orderPublicId
             ? current
             : demoPaymentSummary(selectedOrder),
-        )
-        setPaymentLoading(false)
-        return
+        );
+        setPaymentLoading(false);
+        return;
       }
-      setPaymentLoading(true)
+      setPaymentLoading(true);
       void getSellerPaymentSummary(connection, selectedOrder.orderPublicId)
         .then((summary) => {
-          if (!active) return
-          setPaymentSummary(summary)
-          setError(null)
+          if (!active) return;
+          setPaymentSummary(summary);
+          setError(null);
         })
         .catch((caught: unknown) => {
-          if (!active) return
-          setPaymentSummary(null)
+          if (!active) return;
+          setPaymentSummary(null);
           setError(
             caught instanceof Error
               ? caught.message
-              : '결제 정보를 불러오지 못했습니다.',
-          )
+              : "결제 정보를 불러오지 못했습니다.",
+          );
         })
         .finally(() => {
-          if (active) setPaymentLoading(false)
-        })
-    }, 0)
+          if (active) setPaymentLoading(false);
+        });
+    }, 0);
     return () => {
-      active = false
-      window.clearTimeout(timer)
-    }
-  }, [connection, selectedOrder])
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [connection, selectedOrder]);
 
   const openOrders = orders.filter((order) =>
-    ['PLACED', 'ACCEPTED', 'PREPARING', 'READY'].includes(order.status),
-  )
+    ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(order.status),
+  );
   const newOrderCount = orders.filter(
-    (order) => order.status === 'PLACED',
-  ).length
-  const readyCount = orders.filter((order) => order.status === 'READY').length
+    (order) => order.status === "PLACED",
+  ).length;
+  const readyCount = orders.filter((order) => order.status === "READY").length;
   const completedSales = orders
-    .filter((order) => order.status === 'COMPLETED')
-    .reduce((total, order) => total + order.totalAmount, 0)
+    .filter((order) => order.status === "COMPLETED")
+    .reduce((total, order) => total + order.totalAmount, 0);
 
-  async function changeStatus(
-    order: SellerOrder,
-    action: TransitionAction,
-  ) {
-    setProcessing(true)
+  async function changeStatus(order: SellerOrder, action: TransitionAction) {
+    setProcessing(true);
     try {
-      let updated: SellerOrder
+      let updated: SellerOrder;
       if (isDemo) {
-        const target = TARGET_STATUS[action]
+        const target = TARGET_STATUS[action];
         updated = {
           ...order,
           status: target,
@@ -466,38 +457,38 @@ function App() {
             {
               previousStatus: order.status,
               currentStatus: target,
-              actorType: 'SELLER',
+              actorType: "SELLER",
               actorId: 1,
-              reason: action === 'reject' ? '데모 주문 거절' : '데모 상태 변경',
+              reason: action === "reject" ? "데모 주문 거절" : "데모 상태 변경",
               changedAt: new Date().toISOString(),
             },
           ],
-        }
+        };
       } else {
         updated = await transitionSellerOrder(
           connection!,
           order.orderPublicId,
           action,
-        )
+        );
       }
       setOrders((current) =>
         current.map((item) =>
           item.orderPublicId === updated.orderPublicId ? updated : item,
         ),
-      )
-      if (isDemo && action === 'reject') {
-        setPaymentSummary(demoPaymentSummary(updated))
+      );
+      if (isDemo && action === "reject") {
+        setPaymentSummary(demoPaymentSummary(updated));
       }
-      setSelectedId(updated.orderPublicId)
-      setError(null)
+      setSelectedId(updated.orderPublicId);
+      setError(null);
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
-          : '주문 상태를 변경하지 못했습니다.',
-      )
+          : "주문 상태를 변경하지 못했습니다.",
+      );
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
   }
 
@@ -510,18 +501,19 @@ function App() {
       !paymentSummary ||
       amount <= 0 ||
       amount > paymentSummary.refundableAmount
-    ) return
-    setProcessing(true)
+    )
+      return;
+    setProcessing(true);
     try {
-      let updated: SellerPaymentSummary
+      let updated: SellerPaymentSummary;
       if (isDemo) {
-        const completedAt = new Date().toISOString()
+        const completedAt = new Date().toISOString();
         updated = {
           ...paymentSummary,
           paymentStatus:
             amount === paymentSummary.refundableAmount
-              ? 'REFUNDED'
-              : 'PARTIALLY_REFUNDED',
+              ? "REFUNDED"
+              : "PARTIALLY_REFUNDED",
           refundedAmount: paymentSummary.refundedAmount + amount,
           refundableAmount: paymentSummary.refundableAmount - amount,
           refunds: [
@@ -530,31 +522,31 @@ function App() {
               refundId: paymentSummary.refunds.length + 1,
               amount,
               reason,
-              requesterType: 'SELLER',
-              status: 'SUCCEEDED',
+              requesterType: "SELLER",
+              status: "SUCCEEDED",
               requestedAt: completedAt,
               completedAt,
               failureCode: null,
               failureMessage: null,
             },
           ],
-        }
+        };
       } else {
         updated = await refundSellerOrder(
           connection!,
           order.orderPublicId,
           amount,
           reason,
-        )
+        );
       }
-      setPaymentSummary(updated)
-      setError(null)
+      setPaymentSummary(updated);
+      setError(null);
     } catch (caught) {
       if (connection) {
         try {
           setPaymentSummary(
             await getSellerPaymentSummary(connection, order.orderPublicId),
-          )
+          );
         } catch {
           // Preserve the original refund error if recovery refresh also fails.
         }
@@ -562,10 +554,10 @@ function App() {
       setError(
         caught instanceof Error
           ? caught.message
-          : '환불을 처리하지 못했습니다.',
-      )
+          : "환불을 처리하지 못했습니다.",
+      );
     } finally {
-      setProcessing(false)
+      setProcessing(false);
     }
   }
 
@@ -573,116 +565,117 @@ function App() {
     window.sessionStorage.setItem(
       CONNECTION_KEY,
       JSON.stringify(nextConnection),
-    )
-    window.sessionStorage.removeItem(DEMO_KEY)
-    activeConnectionScope.current = connectionScope(nextConnection)
-    setConnection(nextConnection)
-    setAuthenticated(true)
-    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
-    setOrders([])
-    setSelectedId(null)
-    setConnected(false)
-    setUnreadMessageCount(0)
-    setError(null)
-    setShowConnection(false)
+    );
+    window.sessionStorage.removeItem(DEMO_KEY);
+    activeConnectionScope.current = connectionScope(nextConnection);
+    setConnection(nextConnection);
+    setAuthenticated(true);
+    setActiveView(nextConnection.user?.role === "ADMIN" ? "admin" : "orders");
+    setOrders([]);
+    setSelectedId(null);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setError(null);
+    setShowConnection(false);
   }
 
   function useDemo() {
-    window.sessionStorage.removeItem(CONNECTION_KEY)
-    window.sessionStorage.setItem(DEMO_KEY, 'true')
-    activeConnectionScope.current = null
-    setConnection(null)
-    setAuthenticated(true)
-    setActiveView('orders')
-    const demo = freshDemoOrders()
-    setOrders(demo)
-    setSelectedId(demo[0]?.orderPublicId ?? null)
-    setConnected(false)
-    setUnreadMessageCount(0)
-    setError(null)
-    setShowConnection(false)
+    window.sessionStorage.removeItem(CONNECTION_KEY);
+    window.sessionStorage.setItem(DEMO_KEY, "true");
+    activeConnectionScope.current = null;
+    setConnection(null);
+    setAuthenticated(true);
+    setActiveView("orders");
+    const demo = freshDemoOrders();
+    setOrders(demo);
+    setSelectedId(demo[0]?.orderPublicId ?? null);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setError(null);
+    setShowConnection(false);
   }
 
   function signOut() {
-    window.sessionStorage.removeItem(CONNECTION_KEY)
-    window.sessionStorage.removeItem(DEMO_KEY)
-    activeConnectionScope.current = null
-    setConnection(null)
-    setAuthenticated(false)
-    setActiveView('orders')
-    setOrders([])
-    setSelectedId(null)
-    setConnected(false)
-    setUnreadMessageCount(0)
-    setError(null)
-    setShowConnection(false)
+    window.sessionStorage.removeItem(CONNECTION_KEY);
+    window.sessionStorage.removeItem(DEMO_KEY);
+    activeConnectionScope.current = null;
+    setConnection(null);
+    setAuthenticated(false);
+    setActiveView("orders");
+    setOrders([]);
+    setSelectedId(null);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setError(null);
+    setShowConnection(false);
+    setUnreadSupportCount(0);
   }
 
   function switchStore(store: StoreSummary) {
-    if (!connection || connection.storeId === store.storeId) return
+    if (!connection || connection.storeId === store.storeId) return;
     const nextConnection: SellerConnection = {
       ...connection,
       storeId: store.storeId,
       storeName: store.name,
       storeRole: store.myRole,
-    }
+    };
     window.sessionStorage.setItem(
       CONNECTION_KEY,
       JSON.stringify(nextConnection),
-    )
-    activeConnectionScope.current = connectionScope(nextConnection)
-    seenEvents.current.clear()
-    setConnection(nextConnection)
-    setOrders([])
-    setSelectedId(null)
-    setFilter('ACTIVE')
-    setPaymentSummary(null)
-    setPaymentLoading(false)
-    setProcessing(false)
-    setConnected(false)
-    setUnreadMessageCount(0)
-    setLoading(true)
-    setBusinessStatus(store.businessStatus)
-    setError(null)
-    setShowConnection(false)
+    );
+    activeConnectionScope.current = connectionScope(nextConnection);
+    seenEvents.current.clear();
+    setConnection(nextConnection);
+    setOrders([]);
+    setSelectedId(null);
+    setFilter("ACTIVE");
+    setPaymentSummary(null);
+    setPaymentLoading(false);
+    setProcessing(false);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setLoading(true);
+    setBusinessStatus(store.businessStatus);
+    setError(null);
+    setShowConnection(false);
   }
 
   const updateCurrentStore = useCallback((store: StoreSummary) => {
     setConnection((current) => {
-      if (!current || current.storeId !== store.storeId) return current
+      if (!current || current.storeId !== store.storeId) return current;
       if (
         current.storeName === store.name &&
         current.storeRole === store.myRole
-      ) return current
+      )
+        return current;
       const next = {
         ...current,
         storeName: store.name,
         storeRole: store.myRole,
-      }
-      window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next))
-      return next
-    })
-    setBusinessStatus(store.businessStatus)
-  }, [])
+      };
+      window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next));
+      return next;
+    });
+    setBusinessStatus(store.businessStatus);
+  }, []);
 
   if (!authenticated) {
     return (
       <>
-        <SellerAuth
-          onAuthenticated={authenticate}
-          onUseDemo={useDemo}
-        />
+        <SellerAuth onAuthenticated={authenticate} onUseDemo={useDemo} />
         <button
           className="theme-toggle auth-theme-toggle"
           type="button"
-          aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
-          aria-pressed={theme === 'dark'}
+          aria-label={
+            theme === "dark" ? "기본 모드로 전환" : "다크 모드로 전환"
+          }
+          aria-pressed={theme === "dark"}
           onClick={toggleTheme}
         >
-          <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+          <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
         </button>
       </>
-    )
+    );
   }
 
   return (
@@ -692,64 +685,78 @@ function App() {
           <span className="brand-mark">P</span>
           <div>
             <strong>POPQ</strong>
-            <small>{isAdmin ? 'ADMIN' : 'SELLER'}</small>
+            <small>{isAdmin ? "ADMIN" : "SELLER"}</small>
           </div>
         </div>
-        <nav aria-label={isAdmin ? '관리자 메뉴' : '판매자 메뉴'}>
+        <nav aria-label={isAdmin ? "관리자 메뉴" : "판매자 메뉴"}>
           {isAdmin ? (
-            <button className="active" onClick={() => setActiveView('admin')}>
-              <span>◇</span>
-              관리자 운영
-            </button>
+            <>
+              <button
+                className={activeView === "admin" ? "active" : ""}
+                onClick={() => setActiveView("admin")}
+              >
+                <span aria-hidden="true">⚙️</span>
+                관리자 운영
+              </button>
+
+              <button
+                className={activeView === "support" ? "active" : ""}
+                onClick={() => setActiveView("support")}
+              >
+                <span aria-hidden="true">💬</span>
+                고객센터 문의
+                {unreadSupportCount > 0 && <b>{unreadSupportCount}</b>}
+              </button>
+            </>
           ) : (
             <>
               <button
-                className={activeView === 'orders' ? 'active' : ''}
-                onClick={() => setActiveView('orders')}
+                className={activeView === "orders" ? "active" : ""}
+                onClick={() => setActiveView("orders")}
               >
                 <span>⌁</span>
                 주문 운영
                 {newOrderCount > 0 && <b>{newOrderCount}</b>}
               </button>
               <button
-                className={activeView === 'products' ? 'active' : ''}
-                onClick={() => setActiveView('products')}
+                className={activeView === "products" ? "active" : ""}
+                onClick={() => setActiveView("products")}
               >
                 <span>□</span>
                 상품 관리
               </button>
               <button
-                className={activeView === 'qr' ? 'active' : ''}
-                onClick={() => setActiveView('qr')}
+                className={activeView === "qr" ? "active" : ""}
+                onClick={() => setActiveView("qr")}
               >
                 <span>⌗</span>
                 QR 관리
               </button>
               <button
-                className={activeView === 'analytics' ? 'active' : ''}
-                onClick={() => setActiveView('analytics')}
+                className={activeView === "analytics" ? "active" : ""}
+                onClick={() => setActiveView("analytics")}
               >
                 <span>↗</span>
                 매출 분석
               </button>
               <button
-                className={activeView === 'announcements' ? 'active' : ''}
-                onClick={() => setActiveView('announcements')}
+                className={activeView === "announcements" ? "active" : ""}
+                onClick={() => setActiveView("announcements")}
               >
                 <span>📢</span>
                 공지사항
               </button>
               <button
-                className={activeView === 'messages' ? 'active' : ''}
-                onClick={() => setActiveView('messages')}
+                className={activeView === "messages" ? "active" : ""}
+                onClick={() => setActiveView("messages")}
               >
                 <span>💬</span>
                 고객 문의
                 {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
               </button>
               <button
-                className={activeView === 'settings' ? 'active' : ''}
-                onClick={() => setActiveView('settings')}
+                className={activeView === "settings" ? "active" : ""}
+                onClick={() => setActiveView("settings")}
               >
                 <span>⚙</span>
                 스토어 설정
@@ -759,15 +766,18 @@ function App() {
         </nav>
         <div className="sidebar-bottom">
           <button className="profile-button" onClick={openAccount}>
-            <span>{isAdmin ? 'AD' : 'SL'}</span>
+            <span>{isAdmin ? "AD" : "SL"}</span>
             <div>
-              <strong>{isDemo ? '데모 운영자' : connection?.user?.name ?? '판매자'}</strong>
+              <strong>
+                {isDemo ? "데모 운영자" : (connection?.user?.name ?? "판매자")}
+              </strong>
               <small>
                 {isDemo
-                  ? '데모 스토어'
+                  ? "데모 스토어"
                   : isAdmin
-                    ? '플랫폼 관리자'
-                    : connection?.storeName ?? `스토어 ${connection?.storeId}`}
+                    ? "플랫폼 관리자"
+                    : (connection?.storeName ??
+                      `스토어 ${connection?.storeId}`)}
               </small>
             </div>
             <b>···</b>
@@ -785,31 +795,39 @@ function App() {
             <button
               className="icon-button theme-toggle"
               type="button"
-              aria-label={theme === 'dark' ? '기본 모드로 전환' : '다크 모드로 전환'}
-              aria-pressed={theme === 'dark'}
+              aria-label={
+                theme === "dark" ? "기본 모드로 전환" : "다크 모드로 전환"
+              }
+              aria-pressed={theme === "dark"}
               onClick={toggleTheme}
             >
-              <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>
+              <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
             </button>
             {!isAdmin && (
               <>
-                <span className={`live-state ${connected || isDemo ? 'on' : ''}`}>
+                <span
+                  className={`live-state ${connected || isDemo ? "on" : ""}`}
+                >
                   <i />
-                  {isDemo ? 'Demo live' : connected ? '실시간 연결' : '재연결 중'}
+                  {isDemo
+                    ? "Demo live"
+                    : connected
+                      ? "실시간 연결"
+                      : "재연결 중"}
                 </span>
                 <button
                   className={`store-toggle ${
-                    businessStatus === 'OPEN' ? 'open' : ''
+                    businessStatus === "OPEN" ? "open" : ""
                   }`}
-                  onClick={() => setActiveView('settings')}
-                  aria-pressed={businessStatus === 'OPEN'}
+                  onClick={() => setActiveView("settings")}
+                  aria-pressed={businessStatus === "OPEN"}
                 >
                   <span />
-                  {businessStatus === 'OPEN'
-                    ? '영업 중'
-                    : businessStatus === 'PRE_OPEN'
-                      ? '오픈 준비'
-                      : '영업 종료'}
+                  {businessStatus === "OPEN"
+                    ? "영업 중"
+                    : businessStatus === "PRE_OPEN"
+                      ? "오픈 준비"
+                      : "영업 종료"}
                 </button>
               </>
             )}
@@ -830,148 +848,163 @@ function App() {
           </div>
         )}
 
-        {activeView === 'orders' && <main>
-          <section className="pulse-strip" aria-label="오늘 운영 현황">
-            <div className="pulse-intro">
-              <span>{now.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })}</span>
-              <strong>
-                {now.toLocaleTimeString('ko-KR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </strong>
-              <p>
-                {isDemo
-                  ? '데모 스토어'
-                  : connection?.storeName ?? `스토어 ${connection?.storeId}`}
-                의 주문 흐름이 안정적입니다.
-              </p>
-            </div>
-            <article>
-              <span className="metric-icon coral">↘</span>
-              <div>
-                <small>진행 주문</small>
-                <strong>{openOrders.length}</strong>
-                <p>지금 처리할 주문</p>
+        {activeView === "orders" && (
+          <main>
+            <section className="pulse-strip" aria-label="오늘 운영 현황">
+              <div className="pulse-intro">
+                <span>
+                  {now.toLocaleDateString("ko-KR", {
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+                <strong>
+                  {now.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </strong>
+                <p>
+                  {isDemo
+                    ? "데모 스토어"
+                    : (connection?.storeName ??
+                      `스토어 ${connection?.storeId}`)}
+                  의 주문 흐름이 안정적입니다.
+                </p>
               </div>
-            </article>
-            <article>
-              <span className="metric-icon lime">!</span>
-              <div>
-                <small>신규 접수</small>
-                <strong>{newOrderCount}</strong>
-                <p>평균 대기 5분</p>
-              </div>
-            </article>
-            <article>
-              <span className="metric-icon violet">✓</span>
-              <div>
-                <small>전달 대기</small>
-                <strong>{readyCount}</strong>
-                <p>픽업 확인 필요</p>
-              </div>
-            </article>
-            <article>
-              <span className="metric-icon cream">₩</span>
-              <div>
-                <small>완료 매출</small>
-                <strong>{money(completedSales)}</strong>
-                <p>현재 세션 기준</p>
-              </div>
-            </article>
-          </section>
+              <article>
+                <span className="metric-icon coral">↘</span>
+                <div>
+                  <small>진행 주문</small>
+                  <strong>{openOrders.length}</strong>
+                  <p>지금 처리할 주문</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon lime">!</span>
+                <div>
+                  <small>신규 접수</small>
+                  <strong>{newOrderCount}</strong>
+                  <p>평균 대기 5분</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon violet">✓</span>
+                <div>
+                  <small>전달 대기</small>
+                  <strong>{readyCount}</strong>
+                  <p>픽업 확인 필요</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon cream">₩</span>
+                <div>
+                  <small>완료 매출</small>
+                  <strong>{money(completedSales)}</strong>
+                  <p>현재 세션 기준</p>
+                </div>
+              </article>
+            </section>
 
-          <section className="orders-section">
-            <div className="section-head">
-              <div>
-                <p className="eyebrow">ORDER FLOW</p>
-                <h2>주문 보드</h2>
+            <section className="orders-section">
+              <div className="section-head">
+                <div>
+                  <p className="eyebrow">ORDER FLOW</p>
+                  <h2>주문 보드</h2>
+                </div>
+                <div className="filters" aria-label="주문 필터">
+                  {(
+                    [
+                      ["ACTIVE", "진행 중"],
+                      ["PLACED", "신규"],
+                      ["READY", "전달 대기"],
+                      ["COMPLETED", "완료"],
+                    ] as [OrderFilter, string][]
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      className={filter === value ? "active" : ""}
+                      onClick={() => setFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="refresh-button"
+                  onClick={() =>
+                    isDemo ? setOrders(freshDemoOrders()) : void loadOrders()
+                  }
+                  disabled={loading}
+                >
+                  {loading ? "불러오는 중…" : "↻ 새로고침"}
+                </button>
               </div>
-              <div className="filters" aria-label="주문 필터">
-                {(
-                  [
-                    ['ACTIVE', '진행 중'],
-                    ['PLACED', '신규'],
-                    ['READY', '전달 대기'],
-                    ['COMPLETED', '완료'],
-                  ] as [OrderFilter, string][]
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    className={filter === value ? 'active' : ''}
-                    onClick={() => setFilter(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <button
-                className="refresh-button"
-                onClick={() =>
-                  isDemo ? setOrders(freshDemoOrders()) : void loadOrders()
-                }
-                disabled={loading}
-              >
-                {loading ? '불러오는 중…' : '↻ 새로고침'}
-              </button>
-            </div>
 
-            {filter === 'ACTIVE' ? (
-              <div className="order-board">
-                {LANES.map((lane) => {
-                  const laneOrders = visibleOrders.filter((order) =>
-                    lane.statuses.includes(order.status),
-                  )
-                  return (
-                    <section className={`lane lane-${lane.tone}`} key={lane.title}>
-                      <header>
-                        <div>
-                          <span />
-                          <strong>{lane.title}</strong>
-                          <b>{laneOrders.length}</b>
-                        </div>
-                        <small>{lane.description}</small>
-                      </header>
-                      <div className="lane-list">
-                        {laneOrders.map((order) => (
-                          <OrderCard
-                            key={order.orderPublicId}
-                            order={order}
-                            now={now}
-                            selected={order.orderPublicId === selectedId}
-                            onSelect={() => setSelectedId(order.orderPublicId)}
-                          />
-                        ))}
-                        {laneOrders.length === 0 && (
-                          <div className="lane-empty">
-                            <span>✓</span>
-                            <p>대기 중인 주문이 없습니다.</p>
+              {filter === "ACTIVE" ? (
+                <div className="order-board">
+                  {LANES.map((lane) => {
+                    const laneOrders = visibleOrders.filter((order) =>
+                      lane.statuses.includes(order.status),
+                    );
+                    return (
+                      <section
+                        className={`lane lane-${lane.tone}`}
+                        key={lane.title}
+                      >
+                        <header>
+                          <div>
+                            <span />
+                            <strong>{lane.title}</strong>
+                            <b>{laneOrders.length}</b>
                           </div>
-                        )}
-                      </div>
-                    </section>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="filtered-list">
-                {visibleOrders.map((order) => (
-                  <OrderCard
-                    key={order.orderPublicId}
-                    order={order}
-                    now={now}
-                    selected={order.orderPublicId === selectedId}
-                    onSelect={() => setSelectedId(order.orderPublicId)}
-                  />
-                ))}
-                {visibleOrders.length === 0 && (
-                  <div className="list-empty">해당 상태의 주문이 없습니다.</div>
-                )}
-              </div>
-            )}
-          </section>
-        </main>}
-        {activeView === 'products' && (
+                          <small>{lane.description}</small>
+                        </header>
+                        <div className="lane-list">
+                          {laneOrders.map((order) => (
+                            <OrderCard
+                              key={order.orderPublicId}
+                              order={order}
+                              now={now}
+                              selected={order.orderPublicId === selectedId}
+                              onSelect={() =>
+                                setSelectedId(order.orderPublicId)
+                              }
+                            />
+                          ))}
+                          {laneOrders.length === 0 && (
+                            <div className="lane-empty">
+                              <span>✓</span>
+                              <p>대기 중인 주문이 없습니다.</p>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="filtered-list">
+                  {visibleOrders.map((order) => (
+                    <OrderCard
+                      key={order.orderPublicId}
+                      order={order}
+                      now={now}
+                      selected={order.orderPublicId === selectedId}
+                      onSelect={() => setSelectedId(order.orderPublicId)}
+                    />
+                  ))}
+                  {visibleOrders.length === 0 && (
+                    <div className="list-empty">
+                      해당 상태의 주문이 없습니다.
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          </main>
+        )}
+        {activeView === "products" && (
           <ProductManagement
             key={storeScopeKey}
             connection={connection}
@@ -979,7 +1012,7 @@ function App() {
             onError={setError}
           />
         )}
-        {activeView === 'qr' && (
+        {activeView === "qr" && (
           <QrManagement
             key={storeScopeKey}
             connection={connection}
@@ -987,14 +1020,14 @@ function App() {
             onError={setError}
           />
         )}
-        {activeView === 'analytics' && (
+        {activeView === "analytics" && (
           <SalesAnalytics
             key={storeScopeKey}
             connection={connection}
             onError={setError}
           />
         )}
-        {activeView === 'settings' && (
+        {activeView === "settings" && (
           <StoreSettings
             key={storeScopeKey}
             connection={connection}
@@ -1003,12 +1036,12 @@ function App() {
             onStoreSelected={switchStore}
             onStoreUpdated={updateCurrentStore}
             onStoreDeleted={(remaining) => {
-              if (remaining.length > 0) switchStore(remaining[0])
-              else signOut()
+              if (remaining.length > 0) switchStore(remaining[0]);
+              else signOut();
             }}
           />
         )}
-        {activeView === 'announcements' && (
+        {activeView === "announcements" && (
           <AnnouncementManagement
             key={storeScopeKey}
             connection={connection}
@@ -1016,7 +1049,7 @@ function App() {
             onError={setError}
           />
         )}
-        {activeView === 'messages' && (
+        {activeView === "messages" && (
           <MessageManagement
             key={storeScopeKey}
             connection={connection}
@@ -1024,17 +1057,24 @@ function App() {
             onUnreadChange={setUnreadMessageCount}
           />
         )}
-        {isAdmin && activeView === 'admin' && (
+        {isAdmin && activeView === "admin" && (
           <AdminManagement connection={connection} onError={setError} />
+        )}
+        {isAdmin && activeView === "support" && (
+          <SupportManagement
+            connection={connection}
+            onError={setError}
+            onUnreadChange={setUnreadSupportCount}
+          />
         )}
       </div>
 
       <aside
         className={`detail-panel ${
-          selectedOrder && activeView === 'orders' ? 'open' : ''
+          selectedOrder && activeView === "orders" ? "open" : ""
         }`}
       >
-        {selectedOrder && activeView === 'orders' && (
+        {selectedOrder && activeView === "orders" && (
           <OrderDetail
             key={selectedOrder.orderPublicId}
             order={selectedOrder}
@@ -1067,19 +1107,23 @@ function App() {
               ×
             </button>
             <p className="eyebrow">ACCOUNT</p>
-            <h2 id="connection-title">{isAdmin ? '관리자 계정' : '판매자 계정'}</h2>
+            <h2 id="connection-title">
+              {isAdmin ? "관리자 계정" : "판매자 계정"}
+            </h2>
             <p>
               {isDemo
-                ? '현재 데모 데이터로 판매자 웹을 체험하고 있습니다.'
+                ? "현재 데모 데이터로 판매자 웹을 체험하고 있습니다."
                 : isAdmin
-                  ? `${connection?.user?.email ?? '관리자 계정'} · 플랫폼 관리자`
-                  : `${connection?.user?.email ?? '판매자 계정'} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
+                  ? `${connection?.user?.email ?? "관리자 계정"} · 플랫폼 관리자`
+                  : `${connection?.user?.email ?? "판매자 계정"} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
             </p>
             {!isDemo && !isAdmin && (
               <div className="account-store-switcher">
                 <div className="account-store-heading">
                   <strong>운영 스토어</strong>
-                  <small>전환하면 스토어별 운영 데이터가 새로 연결됩니다.</small>
+                  <small>
+                    전환하면 스토어별 운영 데이터가 새로 연결됩니다.
+                  </small>
                 </div>
                 {accountStoresLoading ? (
                   <p className="account-store-status">스토어를 불러오는 중…</p>
@@ -1090,12 +1134,12 @@ function App() {
                 ) : (
                   <div className="account-store-list">
                     {accountStores.map((store) => {
-                      const current = store.storeId === connection?.storeId
+                      const current = store.storeId === connection?.storeId;
                       return (
                         <button
                           key={store.storeId}
                           type="button"
-                          className={current ? 'current' : ''}
+                          className={current ? "current" : ""}
                           disabled={current}
                           aria-label={
                             current
@@ -1111,9 +1155,9 @@ function App() {
                               {store.myRole} · {store.businessStatus}
                             </small>
                           </div>
-                          <b>{current ? '현재' : '전환'}</b>
+                          <b>{current ? "현재" : "전환"}</b>
                         </button>
-                      )
+                      );
                     })}
                     {accountStores.length === 0 && (
                       <p className="account-store-status">
@@ -1125,13 +1169,13 @@ function App() {
               </div>
             )}
             <button className="primary-action" onClick={signOut}>
-              {isDemo ? '로그인 화면으로 이동' : '로그아웃'}
+              {isDemo ? "로그인 화면으로 이동" : "로그아웃"}
             </button>
           </section>
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function OrderCard({
@@ -1140,25 +1184,25 @@ function OrderCard({
   selected,
   onSelect,
 }: {
-  order: SellerOrder
-  now: Date
-  selected: boolean
-  onSelect: () => void
+  order: SellerOrder;
+  now: Date;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const itemCount = order.items.reduce(
     (total, item) => total + item.quantity,
     0,
-  )
+  );
   return (
     <button
-      className={`order-card ${selected ? 'selected' : ''}`}
+      className={`order-card ${selected ? "selected" : ""}`}
       onClick={onSelect}
       aria-label={`주문 ${shortOrderId(order.orderPublicId)} 상세 보기`}
     >
       <div className="card-top">
         <div>
           <span className={`type-badge ${order.orderType.toLowerCase()}`}>
-            {order.orderType === 'DINE_IN' ? '매장' : '포장'}
+            {order.orderType === "DINE_IN" ? "매장" : "포장"}
           </span>
           <strong>#{shortOrderId(order.orderPublicId)}</strong>
         </div>
@@ -1178,7 +1222,7 @@ function OrderCard({
         <strong>{money(order.totalAmount)}</strong>
       </div>
     </button>
-  )
+  );
 }
 
 function OrderDetail({
@@ -1191,35 +1235,35 @@ function OrderDetail({
   onAction,
   onRefund,
 }: {
-  order: SellerOrder
-  processing: boolean
-  paymentLoading: boolean
-  paymentSummary: SellerPaymentSummary | null
-  canRefund: boolean
-  onClose: () => void
-  onAction: (action: TransitionAction) => void
-  onRefund: (amount: number, reason: string) => void
+  order: SellerOrder;
+  processing: boolean;
+  paymentLoading: boolean;
+  paymentSummary: SellerPaymentSummary | null;
+  canRefund: boolean;
+  onClose: () => void;
+  onAction: (action: TransitionAction) => void;
+  onRefund: (amount: number, reason: string) => void;
 }) {
-  const [showRefundForm, setShowRefundForm] = useState(false)
-  const [refundReason, setRefundReason] = useState('')
-  const [refundAmount, setRefundAmount] = useState('')
-  const actions = ACTIONS[order.status]
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [refundAmount, setRefundAmount] = useState("");
+  const actions = ACTIONS[order.status];
   const canRefund =
     canIssueRefund &&
-    order.status === 'COMPLETED' &&
-    (paymentSummary?.paymentStatus === 'PAID' ||
-      paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED') &&
-    paymentSummary.refundableAmount > 0
+    order.status === "COMPLETED" &&
+    (paymentSummary?.paymentStatus === "PAID" ||
+      paymentSummary?.paymentStatus === "PARTIALLY_REFUNDED") &&
+    paymentSummary.refundableAmount > 0;
   const paymentStatus =
-    paymentSummary?.paymentStatus === 'REFUNDED'
-      ? '환불 완료'
-      : paymentSummary?.paymentStatus === 'PARTIALLY_REFUNDED'
-        ? '부분 환불'
-      : paymentSummary?.paymentStatus === 'CANCELED'
-        ? '결제 취소'
-        : paymentSummary?.paymentStatus === 'PAID'
-          ? '결제 완료'
-          : '확인 중'
+    paymentSummary?.paymentStatus === "REFUNDED"
+      ? "환불 완료"
+      : paymentSummary?.paymentStatus === "PARTIALLY_REFUNDED"
+        ? "부분 환불"
+        : paymentSummary?.paymentStatus === "CANCELED"
+          ? "결제 취소"
+          : paymentSummary?.paymentStatus === "PAID"
+            ? "결제 완료"
+            : "확인 중";
   return (
     <>
       <header className="detail-head">
@@ -1243,15 +1287,15 @@ function OrderDetail({
         <div>
           <small>주문 유형</small>
           <strong>
-            {order.orderType === 'DINE_IN' ? '매장 이용' : '포장 주문'}
+            {order.orderType === "DINE_IN" ? "매장 이용" : "포장 주문"}
           </strong>
         </div>
         <div>
           <small>주문 시각</small>
           <strong>
-            {lastChangedAt(order).toLocaleTimeString('ko-KR', {
-              hour: '2-digit',
-              minute: '2-digit',
+            {lastChangedAt(order).toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
             })}
           </strong>
         </div>
@@ -1264,8 +1308,8 @@ function OrderDetail({
             <div>
               <strong>{item.productName}</strong>
               <p>
-                {item.options.map((option) => option.optionName).join(' · ') ||
-                  '기본 옵션'}
+                {item.options.map((option) => option.optionName).join(" · ") ||
+                  "기본 옵션"}
               </p>
             </div>
             <b>{money(item.itemTotalPrice)}</b>
@@ -1284,10 +1328,10 @@ function OrderDetail({
           </div>
           <span
             className={`payment-status ${
-              paymentSummary?.paymentStatus.toLowerCase() ?? 'loading'
+              paymentSummary?.paymentStatus.toLowerCase() ?? "loading"
             }`}
           >
-            {paymentLoading ? '불러오는 중' : paymentStatus}
+            {paymentLoading ? "불러오는 중" : paymentStatus}
           </span>
         </header>
         {paymentSummary && (
@@ -1309,30 +1353,43 @@ function OrderDetail({
                     <div>
                       <strong>{refund.reason}</strong>
                       <small>
-                        {refund.requesterType === 'SELLER'
-                          ? '판매자 요청'
-                          : '고객 요청'}
+                        {refund.requesterType === "SELLER"
+                          ? "판매자 요청"
+                          : "고객 요청"}
                       </small>
                     </div>
                     <p>
                       <b>{money(refund.amount)}</b>
                       <span>
-                        {refund.status === 'SUCCEEDED'
-                          ? '완료'
-                          : refund.status === 'FAILED'
-                            ? '실패'
-                            : '처리 중'}
+                        {refund.status === "SUCCEEDED"
+                          ? "완료"
+                          : refund.status === "FAILED"
+                            ? "실패"
+                            : "처리 중"}
                       </span>
                     </p>
-                    {refund.status === 'FAILED' && (
+                    {refund.status === "FAILED" && (
                       <div className="refund-failure-recovery">
-                        <small>{refund.failureMessage ?? '환불 처리에 실패했습니다.'}</small>
+                        <small>
+                          {refund.failureMessage ?? "환불 처리에 실패했습니다."}
+                        </small>
                         {canRefund && (
-                          <button onClick={() => {
-                            setRefundAmount(String(Math.min(refund.amount, paymentSummary.refundableAmount)))
-                            setRefundReason(refund.reason)
-                            setShowRefundForm(true)
-                          }}>같은 내용으로 다시 시도</button>
+                          <button
+                            onClick={() => {
+                              setRefundAmount(
+                                String(
+                                  Math.min(
+                                    refund.amount,
+                                    paymentSummary.refundableAmount,
+                                  ),
+                                ),
+                              );
+                              setRefundReason(refund.reason);
+                              setShowRefundForm(true);
+                            }}
+                          >
+                            같은 내용으로 다시 시도
+                          </button>
                         )}
                       </div>
                     )}
@@ -1344,8 +1401,8 @@ function OrderDetail({
               <button
                 className="refund-open"
                 onClick={() => {
-                  setRefundAmount(String(paymentSummary.refundableAmount))
-                  setShowRefundForm(true)
+                  setRefundAmount(String(paymentSummary.refundableAmount));
+                  setShowRefundForm(true);
                 }}
               >
                 전액 환불
@@ -1362,7 +1419,9 @@ function OrderDetail({
                     value={refundAmount}
                     onChange={(event) => setRefundAmount(event.target.value)}
                   />
-                  <small>환불 가능 {money(paymentSummary.refundableAmount)}</small>
+                  <small>
+                    환불 가능 {money(paymentSummary.refundableAmount)}
+                  </small>
                 </label>
                 <label>
                   환불 사유
@@ -1389,12 +1448,14 @@ function OrderDetail({
                       Number(refundAmount) <= 0 ||
                       Number(refundAmount) > paymentSummary.refundableAmount
                     }
-                    onClick={() => onRefund(Number(refundAmount), refundReason.trim())}
+                    onClick={() =>
+                      onRefund(Number(refundAmount), refundReason.trim())
+                    }
                   >
                     {processing
-                      ? '환불 처리 중…'
+                      ? "환불 처리 중…"
                       : Number(refundAmount) === paymentSummary.refundableAmount
-                        ? '전액 환불 확정'
+                        ? "전액 환불 확정"
                         : `${money(Number(refundAmount) || 0)} 부분 환불 확정`}
                   </button>
                 </div>
@@ -1405,21 +1466,24 @@ function OrderDetail({
       </section>
       <section className="history">
         <h3>최근 처리</h3>
-        {order.statusHistory.slice(-2).reverse().map((entry) => (
-          <div key={`${entry.currentStatus}-${entry.changedAt}`}>
-            <span />
-            <p>
-              <strong>{STATUS_COPY[entry.currentStatus].short}</strong>
-              <small>{entry.reason ?? '상태가 변경되었습니다.'}</small>
-            </p>
-            <time>
-              {new Date(entry.changedAt).toLocaleTimeString('ko-KR', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </time>
-          </div>
-        ))}
+        {order.statusHistory
+          .slice(-2)
+          .reverse()
+          .map((entry) => (
+            <div key={`${entry.currentStatus}-${entry.changedAt}`}>
+              <span />
+              <p>
+                <strong>{STATUS_COPY[entry.currentStatus].short}</strong>
+                <small>{entry.reason ?? "상태가 변경되었습니다."}</small>
+              </p>
+              <time>
+                {new Date(entry.changedAt).toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </time>
+            </div>
+          ))}
       </section>
       {actions ? (
         <div className="detail-actions">
@@ -1437,16 +1501,14 @@ function OrderDetail({
             disabled={processing}
             onClick={() => onAction(actions.primary.action)}
           >
-            {processing ? '처리 중…' : actions.primary.label}
+            {processing ? "처리 중…" : actions.primary.label}
           </button>
         </div>
       ) : (
-        <div className="terminal-note">
-          이 주문의 처리가 종료되었습니다.
-        </div>
+        <div className="terminal-note">이 주문의 처리가 종료되었습니다.</div>
       )}
     </>
-  )
+  );
 }
 
-export default App
+export default App;

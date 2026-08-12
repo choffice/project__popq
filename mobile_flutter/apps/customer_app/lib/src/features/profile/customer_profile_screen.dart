@@ -333,7 +333,11 @@ class _CustomerProfileScreenState
                     title: '고객센터',
                     subtitle:
                     '자주 묻는 질문과 1:1 문의를 할 수 있어요',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.support,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon: Icons.storefront_rounded,

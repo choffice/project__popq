@@ -1,463 +1,516 @@
 export type OrderStatus =
-  | 'CREATED'
-  | 'PLACED'
-  | 'ACCEPTED'
-  | 'PREPARING'
-  | 'READY'
-  | 'COMPLETED'
-  | 'CANCELED'
-  | 'REJECTED'
-  | 'EXPIRED'
+  | "CREATED"
+  | "PLACED"
+  | "ACCEPTED"
+  | "PREPARING"
+  | "READY"
+  | "COMPLETED"
+  | "CANCELED"
+  | "REJECTED"
+  | "EXPIRED";
 
-export type OrderType = 'DINE_IN' | 'TAKEOUT'
+export type OrderType = "DINE_IN" | "TAKEOUT";
 
 export type OrderItemOption = {
-  productOptionId: number
-  optionGroupName: string
-  optionName: string
-  optionPrice: number
-}
+  productOptionId: number;
+  optionGroupName: string;
+  optionName: string;
+  optionPrice: number;
+};
 
 export type OrderItem = {
-  orderItemId: number
-  productId: number
-  productName: string
-  productImageUrl: string | null
-  unitPrice: number
-  quantity: number
-  itemTotalPrice: number
-  options: OrderItemOption[]
-}
+  orderItemId: number;
+  productId: number;
+  productName: string;
+  productImageUrl: string | null;
+  unitPrice: number;
+  quantity: number;
+  itemTotalPrice: number;
+  options: OrderItemOption[];
+};
 
 export type OrderStatusHistory = {
-  previousStatus: OrderStatus | null
-  currentStatus: OrderStatus
-  actorType: string
-  actorId: number | null
-  reason: string | null
-  changedAt: string
-}
+  previousStatus: OrderStatus | null;
+  currentStatus: OrderStatus;
+  actorType: string;
+  actorId: number | null;
+  reason: string | null;
+  changedAt: string;
+};
 
 export type SellerOrder = {
-  orderPublicId: string
-  storeId: number
-  storeName: string
-  orderType: OrderType
-  status: OrderStatus
-  subtotalAmount: number
-  discountAmount: number
-  taxAmount: number
-  serviceFeeAmount: number
-  totalAmount: number
-  expiresAt: string
-  version: number
-  items: OrderItem[]
-  statusHistory: OrderStatusHistory[]
-}
+  orderPublicId: string;
+  storeId: number;
+  storeName: string;
+  orderType: OrderType;
+  status: OrderStatus;
+  subtotalAmount: number;
+  discountAmount: number;
+  taxAmount: number;
+  serviceFeeAmount: number;
+  totalAmount: number;
+  expiresAt: string;
+  version: number;
+  items: OrderItem[];
+  statusHistory: OrderStatusHistory[];
+};
 
 export type PaymentStatus =
-  | 'READY'
-  | 'IN_PROGRESS'
-  | 'PAID'
-  | 'FAILED'
-  | 'CANCELED'
-  | 'PARTIALLY_REFUNDED'
-  | 'REFUNDED'
+  | "READY"
+  | "IN_PROGRESS"
+  | "PAID"
+  | "FAILED"
+  | "CANCELED"
+  | "PARTIALLY_REFUNDED"
+  | "REFUNDED";
 
-export type RefundStatus = 'REQUESTED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED'
+export type RefundStatus = "REQUESTED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
 
 export type SellerPaymentSummary = {
-  orderPublicId: string
-  paymentStatus: PaymentStatus
-  paymentMethod: string
-  approvedAmount: number
-  refundedAmount: number
-  refundableAmount: number
+  orderPublicId: string;
+  paymentStatus: PaymentStatus;
+  paymentMethod: string;
+  approvedAmount: number;
+  refundedAmount: number;
+  refundableAmount: number;
   refunds: {
-    refundId: number
-    amount: number
-    reason: string
-    requesterType: 'GUEST' | 'SELLER' | 'ADMIN'
-    status: RefundStatus
-    requestedAt: string
-    completedAt: string | null
-    failureCode: string | null
-    failureMessage: string | null
-  }[]
-}
+    refundId: number;
+    amount: number;
+    reason: string;
+    requesterType: "GUEST" | "SELLER" | "ADMIN";
+    status: RefundStatus;
+    requestedAt: string;
+    completedAt: string | null;
+    failureCode: string | null;
+    failureMessage: string | null;
+  }[];
+};
 
 export type OrderRealtimeEvent = {
-  eventId: string
-  eventType: string
-  orderPublicId: string
-  storeId: number
-  previousStatus: OrderStatus
-  currentStatus: OrderStatus
-  occurredAt: string
-  version: number
-}
+  eventId: string;
+  eventType: string;
+  orderPublicId: string;
+  storeId: number;
+  previousStatus: OrderStatus;
+  currentStatus: OrderStatus;
+  occurredAt: string;
+  version: number;
+};
 
 export type ApiEnvelope<T> = {
-  success: boolean
-  data: T
+  success: boolean;
+  data: T;
   error?: {
-    code: string
-    message: string
-  }
-}
+    code: string;
+    message: string;
+  };
+};
 
 export type SellerAuthUser = {
-  userId: number
-  email: string
-  name: string
-  role: 'CUSTOMER' | 'SELLER' | 'ADMIN'
-  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
-}
+  userId: number;
+  email: string;
+  name: string;
+  role: "CUSTOMER" | "SELLER" | "ADMIN";
+  status: "ACTIVE" | "SUSPENDED" | "WITHDRAWN";
+};
 
 export type SellerAuthResult = {
-  accessToken: string
-  tokenType: string
-  expiresIn: number
-  user: SellerAuthUser
-}
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  user: SellerAuthUser;
+};
 
 export type SellerConnection = {
-  storeId: number | null
-  accessToken: string
-  storeName?: string
-  storeRole?: StoreRole
-  user?: SellerAuthUser
-}
+  storeId: number | null;
+  accessToken: string;
+  storeName?: string;
+  storeRole?: StoreRole;
+  user?: SellerAuthUser;
+};
 
 export type SellerProduct = {
-  productId: number
-  categoryId: number
-  categoryName: string
-  name: string
-  description: string | null
-  imageUrl: string | null
-  basePrice: number
-  status: 'ACTIVE' | 'INACTIVE'
-  soldOut: boolean
-  availableForQr: boolean
-  salesStartAt: string | null
-  salesEndAt: string | null
-  qrWebEnabled: boolean
-  customerAppEnabled: boolean
-}
+  productId: number;
+  categoryId: number;
+  categoryName: string;
+  name: string;
+  description: string | null;
+  imageUrl: string | null;
+  basePrice: number;
+  status: "ACTIVE" | "INACTIVE";
+  soldOut: boolean;
+  availableForQr: boolean;
+  salesStartAt: string | null;
+  salesEndAt: string | null;
+  qrWebEnabled: boolean;
+  customerAppEnabled: boolean;
+};
 
 export type SellerCategory = {
-  categoryId: number
-  name: string
-  displayOrder: number
-  status: 'ACTIVE' | 'INACTIVE'
-}
+  categoryId: number;
+  name: string;
+  displayOrder: number;
+  status: "ACTIVE" | "INACTIVE";
+};
 
 export type ProductOption = {
-  optionId: number
-  name: string
-  additionalPrice: number
-  displayOrder: number
-}
+  optionId: number;
+  name: string;
+  additionalPrice: number;
+  displayOrder: number;
+};
 
 export type ProductOptionGroup = {
-  optionGroupId: number
-  name: string
-  minSelect: number
-  maxSelect: number
-  required: boolean
-  displayOrder: number
-  options: ProductOption[]
-}
+  optionGroupId: number;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  required: boolean;
+  displayOrder: number;
+  options: ProductOption[];
+};
 
 export type ProductOptionGroupInput = {
-  name: string
-  minSelect: number
-  maxSelect: number
-  required: boolean
-  displayOrder: number
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  required: boolean;
+  displayOrder: number;
   options: {
-    name: string
-    additionalPrice: number
-    displayOrder: number
-  }[]
-}
+    name: string;
+    additionalPrice: number;
+    displayOrder: number;
+  }[];
+};
 
 export type ProductDetail = {
-  product: SellerProduct
+  product: SellerProduct;
   availability: {
-    soldOut: boolean
-    salesStartAt: string | null
-    salesEndAt: string | null
-    qrWebEnabled: boolean
-    customerAppEnabled: boolean
-  }
-  optionGroups: ProductOptionGroup[]
-}
+    soldOut: boolean;
+    salesStartAt: string | null;
+    salesEndAt: string | null;
+    qrWebEnabled: boolean;
+    customerAppEnabled: boolean;
+  };
+  optionGroups: ProductOptionGroup[];
+};
 
 export type StoreTable = {
-  storeTableId: number
-  tableCode: string
-  name: string
-  status: 'ACTIVE' | 'INACTIVE'
-}
+  storeTableId: number;
+  tableCode: string;
+  name: string;
+  status: "ACTIVE" | "INACTIVE";
+};
 
-export type QrCodeStatus = 'ACTIVE' | 'INACTIVE' | 'REVOKED' | 'EXPIRED'
+export type QrCodeStatus = "ACTIVE" | "INACTIVE" | "REVOKED" | "EXPIRED";
 
 export type QrCodeSummary = {
-  qrCodeId: number
-  storeTableId: number | null
-  tableName: string | null
-  status: QrCodeStatus
-  expiresAt: string | null
-  createdAt: string
-  recoverable: boolean
-  archived: boolean
-}
+  qrCodeId: number;
+  storeTableId: number | null;
+  tableName: string | null;
+  status: QrCodeStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  recoverable: boolean;
+  archived: boolean;
+};
 
 export type QrIssued = {
-  qrCodeId: number
-  storeId: number
-  storeTableId: number | null
-  token: string
-  publicUrl: string
-  status: QrCodeStatus
-  expiresAt: string | null
-}
+  qrCodeId: number;
+  storeId: number;
+  storeTableId: number | null;
+  token: string;
+  publicUrl: string;
+  status: QrCodeStatus;
+  expiresAt: string | null;
+};
 
 export type QrCodeDetail = {
-  qrCodeId: number
-  storeId: number
-  storeTableId: number | null
-  tableName: string | null
-  status: QrCodeStatus
-  expiresAt: string | null
-  createdAt: string
-  publicUrl: string
-}
+  qrCodeId: number;
+  storeId: number;
+  storeTableId: number | null;
+  tableName: string | null;
+  status: QrCodeStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  publicUrl: string;
+};
 
 export type SalesSummary = {
-  from: string
-  to: string
-  grossSales: number
-  netSales: number
-  refundedAmount: number
-  refundCount: number
-  canceledOrderCount: number
-  canceledAmount: number
-  completedOrderCount: number
-  averageOrderAmount: number
-  dineInSales: number
-  takeoutSales: number
+  from: string;
+  to: string;
+  grossSales: number;
+  netSales: number;
+  refundedAmount: number;
+  refundCount: number;
+  canceledOrderCount: number;
+  canceledAmount: number;
+  completedOrderCount: number;
+  averageOrderAmount: number;
+  dineInSales: number;
+  takeoutSales: number;
   dailySales: {
-    date: string
-    sales: number
-    orderCount: number
-  }[]
+    date: string;
+    sales: number;
+    orderCount: number;
+  }[];
   topProducts: {
-    productName: string
-    quantity: number
-    sales: number
-  }[]
+    productName: string;
+    quantity: number;
+    sales: number;
+  }[];
   orderHistory: {
-    orderPublicId: string
-    orderType: OrderType
-    approvedAmount: number
-    refundedAmount: number
-    netSales: number
-    completedAt: string
-    itemCount: number
-    itemSummary: string
-  }[]
+    orderPublicId: string;
+    orderType: OrderType;
+    approvedAmount: number;
+    refundedAmount: number;
+    netSales: number;
+    completedAt: string;
+    itemCount: number;
+    itemSummary: string;
+  }[];
   refundHistory: {
-    refundId: number
-    orderPublicId: string
-    amount: number
-    reason: string
-    requesterType: 'GUEST' | 'CUSTOMER' | 'SELLER' | 'ADMIN' | 'SYSTEM' | 'UNKNOWN'
-    completedAt: string | null
-  }[]
+    refundId: number;
+    orderPublicId: string;
+    amount: number;
+    reason: string;
+    requesterType:
+      | "GUEST"
+      | "CUSTOMER"
+      | "SELLER"
+      | "ADMIN"
+      | "SYSTEM"
+      | "UNKNOWN";
+    completedAt: string | null;
+  }[];
   cancellationHistory: {
-    orderPublicId: string
-    status: 'CANCELED' | 'REJECTED'
-    amount: number
-    reason: string | null
-    canceledAt: string
-  }[]
-}
+    orderPublicId: string;
+    status: "CANCELED" | "REJECTED";
+    amount: number;
+    reason: string | null;
+    canceledAt: string;
+  }[];
+};
 
-export type BusinessStatus = 'PRE_OPEN' | 'OPEN' | 'CLOSED'
+export type BusinessStatus = "PRE_OPEN" | "OPEN" | "CLOSED";
 
-export type StoreRole = 'OWNER' | 'MANAGER' | 'STAFF'
-export type StoreType = 'LOCAL_STORE' | 'EVENT_COMMERCE'
-export type StoreStatus = 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
+export type StoreRole = "OWNER" | "MANAGER" | "STAFF";
+export type StoreType = "LOCAL_STORE" | "EVENT_COMMERCE";
+export type StoreStatus = "ACTIVE" | "SUSPENDED" | "CLOSED";
 export type StoreClosedDay =
-  | 'MONDAY'
-  | 'TUESDAY'
-  | 'WEDNESDAY'
-  | 'THURSDAY'
-  | 'FRIDAY'
-  | 'SATURDAY'
-  | 'SUNDAY'
+  | "MONDAY"
+  | "TUESDAY"
+  | "WEDNESDAY"
+  | "THURSDAY"
+  | "FRIDAY"
+  | "SATURDAY"
+  | "SUNDAY";
 
 export type StoreSummary = {
-  storeId: number
-  storeType: StoreType
-  name: string
-  description: string | null
-  address: string | null
-  detailAddress: string | null
-  representativeCategory: string | null
-  imageUrl: string | null
-  phone: string | null
-  latitude: number | null
-  longitude: number | null
-  openTime: string | null
-  closeTime: string | null
-  closedDays: StoreClosedDay[]
-  takeoutAvailable: boolean
-  dineInAvailable: boolean
-  orderAcceptingEnabled: boolean
-  status: StoreStatus
-  businessStatus: BusinessStatus
-  myRole: StoreRole
-}
+  storeId: number;
+  storeType: StoreType;
+  name: string;
+  description: string | null;
+  address: string | null;
+  detailAddress: string | null;
+  representativeCategory: string | null;
+  imageUrl: string | null;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  openTime: string | null;
+  closeTime: string | null;
+  closedDays: StoreClosedDay[];
+  takeoutAvailable: boolean;
+  dineInAvailable: boolean;
+  orderAcceptingEnabled: boolean;
+  status: StoreStatus;
+  businessStatus: BusinessStatus;
+  myRole: StoreRole;
+};
 
 export type StoreDetail = StoreSummary & {
-  tags: string[]
-}
+  tags: string[];
+};
 
 export type StoreSavePayload = {
-  storeType: StoreType
-  name: string
-  description: string | null
-  address: string | null
-  detailAddress: string | null
-  representativeCategory: string | null
-  imageUrl: string | null
-  phone: string | null
-  latitude: number | null
-  longitude: number | null
-  openTime: string | null
-  closeTime: string | null
-  closedDays: StoreClosedDay[]
-  takeoutAvailable: boolean
-  dineInAvailable: boolean
-  orderAcceptingEnabled: boolean
-  tags: string[]
-}
+  storeType: StoreType;
+  name: string;
+  description: string | null;
+  address: string | null;
+  detailAddress: string | null;
+  representativeCategory: string | null;
+  imageUrl: string | null;
+  phone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  openTime: string | null;
+  closeTime: string | null;
+  closedDays: StoreClosedDay[];
+  takeoutAvailable: boolean;
+  dineInAvailable: boolean;
+  orderAcceptingEnabled: boolean;
+  tags: string[];
+};
 
-export type AnnouncementStatus = 'DRAFT' | 'PUBLISHED' | 'HIDDEN'
+export type AnnouncementStatus = "DRAFT" | "PUBLISHED" | "HIDDEN";
 
 export type Announcement = {
-  announcementId: number
-  storeId: number
-  title: string
-  content: string
-  status: AnnouncementStatus
-  publishedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
+  announcementId: number;
+  storeId: number;
+  title: string;
+  content: string;
+  status: AnnouncementStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
-export type MessageSenderType = 'CUSTOMER' | 'SELLER'
+export type MessageSenderType = "CUSTOMER" | "SELLER";
 
 export type OrderMessage = {
-  orderMessageId: number
-  senderUserId: number
-  senderName: string
-  senderType: MessageSenderType
-  clientMessageId: string | null
-  content: string
-  read: boolean
-  readAt: string | null
-  createdAt: string
-}
+  orderMessageId: number;
+  senderUserId: number;
+  senderName: string;
+  senderType: MessageSenderType;
+  clientMessageId: string | null;
+  content: string;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
 
 export type SellerConversationSummary = {
-  orderPublicId: string
-  customerUserId: number | null
-  customerName: string
-  orderStatus: OrderStatus
-  lastMessage: string
-  lastMessageSenderType: MessageSenderType
-  lastMessageAt: string
-  unreadCount: number
-}
+  orderPublicId: string;
+  customerUserId: number | null;
+  customerName: string;
+  orderStatus: OrderStatus;
+  lastMessage: string;
+  lastMessageSenderType: MessageSenderType;
+  lastMessageAt: string;
+  unreadCount: number;
+};
 
 export type SellerConversationDetail = {
-  orderPublicId: string
-  storeId: number
-  storeName: string
-  customerUserId: number | null
-  customerName: string
-  orderType: OrderType
-  orderStatus: OrderStatus
-  totalAmount: number
-  orderedAt: string
+  orderPublicId: string;
+  storeId: number;
+  storeName: string;
+  customerUserId: number | null;
+  customerName: string;
+  orderType: OrderType;
+  orderStatus: OrderStatus;
+  totalAmount: number;
+  orderedAt: string;
   orderItems: {
-    orderItemId: number
-    productName: string
-    quantity: number
-    itemTotalPrice: number
-  }[]
-  messages: OrderMessage[]
-}
+    orderItemId: number;
+    productName: string;
+    quantity: number;
+    itemTotalPrice: number;
+  }[];
+  messages: OrderMessage[];
+};
 
 export type OrderMessagePage = {
-  messages: OrderMessage[]
-  hasMore: boolean
-  nextBeforeMessageId: number | null
-}
+  messages: OrderMessage[];
+  hasMore: boolean;
+  nextBeforeMessageId: number | null;
+};
 
 export type OrderChatEvent = {
-  eventId: string
-  eventType: 'MESSAGE_CREATED' | 'MESSAGE_READ'
-  orderPublicId: string
-  storeId: number
-  customerUserId: number | null
-  message: OrderMessage | null
-  readMessageIds: number[]
-  readerType: MessageSenderType | null
-  occurredAt: string
-}
+  eventId: string;
+  eventType: "MESSAGE_CREATED" | "MESSAGE_READ";
+  orderPublicId: string;
+  storeId: number;
+  customerUserId: number | null;
+  message: OrderMessage | null;
+  readMessageIds: number[];
+  readerType: MessageSenderType | null;
+  occurredAt: string;
+};
 
 export type AdminOverview = {
-  totalUsers: number
-  activeUsers: number
-  sellerProfiles: number
-  pendingSellers: number
-  totalStores: number
-  activeStores: number
-  suspendedStores: number
-}
+  totalUsers: number;
+  activeUsers: number;
+  sellerProfiles: number;
+  pendingSellers: number;
+  totalStores: number;
+  activeStores: number;
+  suspendedStores: number;
+};
 
 export type AdminUser = {
-  userId: number
-  email: string
-  name: string
-  role: 'CUSTOMER' | 'SELLER' | 'ADMIN'
-  status: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
-  createdAt: string
-}
+  userId: number;
+  email: string;
+  name: string;
+  role: "CUSTOMER" | "SELLER" | "ADMIN";
+  status: "ACTIVE" | "SUSPENDED" | "WITHDRAWN";
+  createdAt: string;
+};
 
 export type AdminSeller = {
-  sellerProfileId: number
-  userId: number
-  email: string
-  name: string
-  businessName: string | null
-  businessRegistrationNumber: string | null
-  verificationStatus: 'PENDING' | 'VERIFIED' | 'REJECTED'
-  userStatus: 'ACTIVE' | 'SUSPENDED' | 'WITHDRAWN'
-  createdAt: string
-}
+  sellerProfileId: number;
+  userId: number;
+  email: string;
+  name: string;
+  businessName: string | null;
+  businessRegistrationNumber: string | null;
+  verificationStatus: "PENDING" | "VERIFIED" | "REJECTED";
+  userStatus: "ACTIVE" | "SUSPENDED" | "WITHDRAWN";
+  createdAt: string;
+};
 
 export type AdminStore = {
-  storeId: number
-  storeType: 'LOCAL_STORE' | 'EVENT_COMMERCE'
-  name: string
-  status: 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
-  businessStatus: BusinessStatus
-  createdAt: string
-}
+  storeId: number;
+  storeType: "LOCAL_STORE" | "EVENT_COMMERCE";
+  name: string;
+  status: "ACTIVE" | "SUSPENDED" | "CLOSED";
+  businessStatus: BusinessStatus;
+  createdAt: string;
+};
+
+export type SupportInquiryCategory =
+  | "ACCOUNT"
+  | "ORDER"
+  | "PAYMENT"
+  | "COUPON"
+  | "APP"
+  | "OTHER";
+
+export type SupportInquiryStatus =
+  | "RECEIVED"
+  | "IN_PROGRESS"
+  | "ANSWERED"
+  | "CLOSED";
+
+export type SupportMessageSenderType = "CUSTOMER" | "ADMIN";
+
+export type SupportInquirySummary = {
+  supportInquiryId: number;
+  customerUserId: number;
+  customerName: string;
+  customerEmail: string;
+  category: SupportInquiryCategory;
+  title: string;
+  status: SupportInquiryStatus;
+  unreadMessageCount: number;
+  answeredAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SupportInquiryMessage = {
+  supportInquiryMessageId: number;
+  senderUserId: number;
+  senderName: string;
+  senderType: SupportMessageSenderType;
+  content: string;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
+
+export type SupportInquiryDetail = {
+  inquiry: SupportInquirySummary;
+  messages: SupportInquiryMessage[];
+};
