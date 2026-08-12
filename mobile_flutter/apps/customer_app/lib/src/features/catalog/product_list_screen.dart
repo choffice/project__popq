@@ -5,6 +5,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
+import '../discovery/store_hours_dialog.dart';
 import '../discovery/store_section_widgets.dart';
 import 'catalog_repository.dart';
 
@@ -30,12 +31,29 @@ class _ProductListScreenState extends State<ProductListScreen> {
   late Future<List<CatalogProduct>> _products;
   late Future<CustomerStore> _store;
   int? _selectedCategoryId;
+  var _hoursNoticeShown = false;
 
   @override
   void initState() {
     super.initState();
     _products = widget.repository.findProducts(widget.storeId);
     _store = widget.storeDiscoveryRepository.findDetail(widget.storeId);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showHoursNoticeIfNeeded();
+    });
+  }
+
+  Future<void> _showHoursNoticeIfNeeded() async {
+    if (_hoursNoticeShown) return;
+
+    try {
+      final store = await _store;
+      if (!mounted || store.isOrderAcceptingAt()) return;
+      _hoursNoticeShown = true;
+      await showStoreHoursDialog(context, store: store);
+    } catch (_) {
+      // 상품/매장 조회 오류는 각 화면의 오류 UI에서 안내한다.
+    }
   }
 
   @override
@@ -92,7 +110,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           storeId: widget.storeId,
                           selected: StoreSection.products,
                         ),
-                      if (store != null && !store.orderAcceptingEnabled)
+                      if (store != null && !store.isOrderAcceptingAt())
                         const Padding(
                           padding: EdgeInsets.fromLTRB(
                             PopqSpacing.md,
@@ -229,7 +247,8 @@ class _OrderPausedBanner extends StatelessWidget {
           const SizedBox(width: PopqSpacing.sm),
           Expanded(
             child: Text(
-              '현재 신규 주문 접수가 중지되어 있어요. 메뉴는 둘러볼 수 있습니다.',
+              '현재 영업시간이 아니거나 주문 접수가 중지되어 있어요. '
+              '상품은 둘러보고 장바구니에 담을 수 있습니다.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onErrorContainer,
                 fontWeight: FontWeight.w700,

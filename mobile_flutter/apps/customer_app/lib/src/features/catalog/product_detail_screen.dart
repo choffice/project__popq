@@ -78,13 +78,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             future: _store,
             builder: (context, storeSnapshot) {
               final store = storeSnapshot.data;
-              final checkingStore =
-                  storeSnapshot.connectionState != ConnectionState.done;
               final storeLoadFailed =
                   storeSnapshot.hasError ||
                   (storeSnapshot.connectionState == ConnectionState.done &&
                       store == null);
-              final orderPaused = store != null && !store.orderAcceptingEnabled;
+              final orderPaused = store != null && !store.isOrderAcceptingAt();
 
               return Column(
                 children: [
@@ -199,23 +197,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         width: double.infinity,
                         child: FilledButton(
                           onPressed:
-                              !checkingStore &&
-                                  !storeLoadFailed &&
-                                  !orderPaused &&
-                                  !_addingToCart &&
+                              !_addingToCart &&
                                   product.availableForCustomerApp &&
                                   _isSelectionValid(product)
                               ? () => _addToCart(product)
                               : null,
                           child: Text(
-                            checkingStore
-                                ? '주문 가능 여부 확인 중...'
-                                : storeLoadFailed
-                                ? '주문 상태를 확인해주세요'
-                                : orderPaused
-                                ? '현재 주문 접수 중지'
-                                : _addingToCart
-                                ? '주문 상태 확인 중...'
+                            _addingToCart
+                                ? '장바구니에 담는 중...'
                                 : '${_won(_total(product))} · 장바구니 담기',
                           ),
                         ),
@@ -273,25 +262,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     });
 
     try {
-      final store = await widget.storeDiscoveryRepository.findDetail(
-        widget.storeId,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _store = Future<CustomerStore>.value(store);
-      });
-
-      if (!store.orderAcceptingEnabled) {
-        ScaffoldMessenger.of(context).showTopSnackBar(
-          const SnackBar(content: Text('현재 매장이 신규 주문 접수를 잠시 중지했어요.')),
-        );
-        return;
-      }
-
       final options = _selectedOptions(product);
       try {
         widget.cartController.add(
@@ -343,7 +313,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showTopSnackBar(
-        const SnackBar(content: Text('주문 가능 여부를 확인하지 못했어요. 잠시 후 다시 시도해주세요.')),
+        const SnackBar(content: Text('장바구니에 담지 못했어요. 잠시 후 다시 시도해주세요.')),
       );
     } finally {
       if (mounted) {
@@ -382,7 +352,7 @@ class _OrderPausedBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '현재 주문 접수가 잠시 중단되었어요.',
+                  '현재는 결제할 수 없는 시간이에요.',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: colorScheme.onErrorContainer,
                     fontWeight: FontWeight.w800,
@@ -390,7 +360,7 @@ class _OrderPausedBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '접수가 다시 시작되면 장바구니에 담을 수 있어요.',
+                  '상품은 장바구니에 담아두고 영업시간에 결제할 수 있어요.',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onErrorContainer,
                   ),

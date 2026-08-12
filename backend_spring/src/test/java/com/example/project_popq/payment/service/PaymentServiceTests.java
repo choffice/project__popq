@@ -24,6 +24,8 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
+import com.example.project_popq.store.domain.Store;
+import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -45,9 +47,13 @@ class PaymentServiceTests {
         OrderDomainEventPublisher eventPublisher = mock(
             OrderDomainEventPublisher.class
         );
+        StoreOperatingHoursPolicy operatingHoursPolicy = mock(
+            StoreOperatingHoursPolicy.class
+        );
 
         Payment payment = mock(Payment.class);
         Order order = mock(Order.class);
+        Store store = mock(Store.class);
 
         AtomicReference<PaymentStatus> status = new AtomicReference<>(
             PaymentStatus.IN_PROGRESS
@@ -85,6 +91,12 @@ class PaymentServiceTests {
 
         when(order.getTotalAmount())
             .thenReturn(6800L);
+
+        when(order.getStore())
+            .thenReturn(store);
+
+        when(operatingHoursPolicy.isEffectivelyOrderAccepting(eq(store), any()))
+            .thenReturn(true);
 
         when(
             order.transitionTo(
@@ -129,7 +141,8 @@ class PaymentServiceTests {
             eventPublisher,
             new PaymentProperties(
                 PaymentProviderType.TOSS_PAYMENTS
-            )
+            ),
+            operatingHoursPolicy
         );
 
         service.confirm(

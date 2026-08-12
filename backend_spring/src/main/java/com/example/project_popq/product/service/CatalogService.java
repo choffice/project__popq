@@ -19,6 +19,7 @@ import com.example.project_popq.product.dto.UpdateCategoryRequest;
 import com.example.project_popq.product.dto.UpdateProductRequest;
 import com.example.project_popq.product.repository.ProductCategoryRepository;
 import com.example.project_popq.product.repository.ProductRepository;
+import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.repository.StoreRepository;
@@ -450,7 +451,7 @@ public class CatalogService {
     public List<ProductSummaryResponse> findCustomerProducts(
         Long storeId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicStore(storeId);
 
         Instant now = Instant.now();
 
@@ -482,7 +483,7 @@ public class CatalogService {
         Long storeId,
         Long productId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicStore(storeId);
 
         Product product =
             getActiveDetailedProduct(
@@ -637,12 +638,13 @@ public class CatalogService {
             );
     }
 
-    private void requirePublicOpenStore(
+    private void requirePublicStore(
         Long storeId
     ) {
         Store store = getStore(storeId);
 
-        if (!store.isOpen()) {
+        if (!store.isActive()
+            || store.getBusinessStatus() == BusinessStatus.CLOSED) {
             throw new BusinessException(
                 ErrorCode.STORE_NOT_FOUND
             );
