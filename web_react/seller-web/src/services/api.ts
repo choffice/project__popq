@@ -20,6 +20,8 @@ import type {
   SellerOrder,
   SellerPaymentSummary,
   SellerProduct,
+  SellerReview,
+  SellerReviewReplyTemplate,
   SellerConversationDetail,
   SellerConversationSummary,
   OrderMessage,
@@ -179,14 +181,25 @@ export function transitionSellerOrder(
   connection: SellerConnection,
   orderPublicId: string,
   action: TransitionAction,
-  reason?: string,
+  options?: {
+    reason?: string
+    preparationMinutes?: number
+    applyAsStoreDefault?: boolean
+  },
 ) {
+  const body = action === 'accept'
+    ? {
+        preparationMinutes: options?.preparationMinutes ?? 0,
+        applyAsStoreDefault: options?.applyAsStoreDefault ?? false,
+        reason: options?.reason,
+      }
+    : { reason: options?.reason }
   return request<SellerOrder>(
     `${orderPath(connection)}/${orderPublicId}/${action}`,
     connection,
     {
       method: 'POST',
-      body: JSON.stringify(reason ? { reason } : {}),
+      body: JSON.stringify(body),
     },
   )
 }
@@ -502,6 +515,10 @@ export function getSellerStores(connection: SellerConnection) {
   return request<StoreSummary[]>('/api/v1/seller/stores', connection)
 }
 
+export function getInactiveSellerStores(connection: SellerConnection) {
+  return request<StoreSummary[]>('/api/v1/seller/stores/inactive', connection)
+}
+
 export function getSellerStoreDetail(connection: SellerConnection) {
   return request<StoreDetail>(storePath(connection), connection)
 }
@@ -530,6 +547,22 @@ export function deleteSellerStore(connection: SellerConnection) {
   return request<boolean>(storePath(connection), connection, {
     method: 'DELETE',
   })
+}
+
+export function suspendSellerStore(connection: SellerConnection) {
+  return request<StoreSummary>(
+    `${storePath(connection)}/suspend`,
+    connection,
+    { method: 'POST' },
+  )
+}
+
+export function reopenSellerStore(connection: SellerConnection, storeId: number) {
+  return request<StoreSummary>(
+    `/api/v1/seller/stores/${storeId}/reopen`,
+    connection,
+    { method: 'POST' },
+  )
 }
 
 export function changeStoreBusinessStatus(
@@ -572,13 +605,14 @@ export function createSellerAnnouncement(
   connection: SellerConnection,
   title: string,
   content: string,
+  notifyInterestedCustomers: boolean,
 ) {
   return request<Announcement>(
     `${storePath(connection)}/announcements`,
     connection,
     {
       method: 'POST',
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify({ title, content, notifyInterestedCustomers }),
     },
   )
 }
@@ -588,13 +622,14 @@ export function updateSellerAnnouncement(
   announcementId: number,
   title: string,
   content: string,
+  notifyInterestedCustomers: boolean,
 ) {
   return request<Announcement>(
     `${storePath(connection)}/announcements/${announcementId}`,
     connection,
     {
       method: 'PATCH',
-      body: JSON.stringify({ title, content }),
+      body: JSON.stringify({ title, content, notifyInterestedCustomers }),
     },
   )
 }
@@ -667,5 +702,83 @@ export function sendSellerOrderMessage(
       method: 'POST',
       body: JSON.stringify({ content, clientMessageId }),
     },
+  )
+}
+
+export function getSellerReviews(
+  connection: SellerConnection,
+  filters?: { rating?: number; unanswered?: boolean },
+) {
+  const query = new URLSearchParams()
+  if (filters?.rating) query.set('rating', String(filters.rating))
+  if (filters?.unanswered) query.set('unanswered', 'true')
+  const suffix = query.size > 0 ? `?${query.toString()}` : ''
+  return request<SellerReview[]>(
+    `${storePath(connection)}/reviews${suffix}`,
+    connection,
+  )
+}
+
+export function replySellerReview(
+  connection: SellerConnection,
+  reviewId: number,
+  reply: string,
+) {
+  return request<SellerReview>(
+    `${storePath(connection)}/reviews/${reviewId}/reply`,
+    connection,
+    { method: 'PUT', body: JSON.stringify({ reply }) },
+  )
+}
+
+export function deleteSellerReviewReply(
+  connection: SellerConnection,
+  reviewId: number,
+) {
+  return request<SellerReview>(
+    `${storePath(connection)}/reviews/${reviewId}/reply`,
+    connection,
+    { method: 'DELETE' },
+  )
+}
+
+export function getSellerReviewReplyTemplates(connection: SellerConnection) {
+  return request<SellerReviewReplyTemplate[]>(
+    `${storePath(connection)}/reviews/reply-templates`,
+    connection,
+  )
+}
+
+export function createSellerReviewReplyTemplate(
+  connection: SellerConnection,
+  content: string,
+) {
+  return request<SellerReviewReplyTemplate>(
+    `${storePath(connection)}/reviews/reply-templates`,
+    connection,
+    { method: 'POST', body: JSON.stringify({ content }) },
+  )
+}
+
+export function updateSellerReviewReplyTemplate(
+  connection: SellerConnection,
+  templateId: number,
+  content: string,
+) {
+  return request<SellerReviewReplyTemplate>(
+    `${storePath(connection)}/reviews/reply-templates/${templateId}`,
+    connection,
+    { method: 'PATCH', body: JSON.stringify({ content }) },
+  )
+}
+
+export function deleteSellerReviewReplyTemplate(
+  connection: SellerConnection,
+  templateId: number,
+) {
+  return request<null>(
+    `${storePath(connection)}/reviews/reply-templates/${templateId}`,
+    connection,
+    { method: 'DELETE' },
   )
 }

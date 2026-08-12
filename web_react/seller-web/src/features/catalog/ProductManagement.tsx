@@ -42,6 +42,7 @@ type DraftGroup = {
   key: string
   name: string
   required: boolean
+  minSelect: string
   maxSelect: string
   options: DraftOption[]
 }
@@ -75,6 +76,7 @@ function emptyGroup(): DraftGroup {
     key: key(),
     name: '',
     required: false,
+    minSelect: '0',
     maxSelect: '1',
     options: [emptyOption()],
   }
@@ -85,6 +87,7 @@ function toDraftGroups(detail: ProductDetail): DraftGroup[] {
     key: String(group.optionGroupId),
     name: group.name,
     required: group.required,
+    minSelect: String(group.minSelect),
     maxSelect: String(group.maxSelect),
     options: group.options.map((option) => ({
       key: String(option.optionId),
@@ -487,7 +490,7 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
     const groups: ProductOptionGroupInput[] = draftGroups.map(
       (group, groupIndex) => ({
         name: group.name.trim(),
-        minSelect: group.required ? 1 : 0,
+        minSelect: Number(group.minSelect),
         maxSelect: Number(group.maxSelect),
         required: group.required,
         displayOrder: groupIndex,
@@ -501,9 +504,12 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
     const invalid = groups.some(
       (group) =>
         !group.name ||
+        !Number.isInteger(group.minSelect) ||
         !Number.isInteger(group.maxSelect) ||
-        group.maxSelect < 1 ||
+        group.minSelect < 0 ||
+        group.maxSelect < group.minSelect ||
         group.maxSelect > group.options.length ||
+        (group.required && group.minSelect === 0) ||
         group.options.length === 0 ||
         group.options.some(
           (option) =>
@@ -956,6 +962,18 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
                           updateGroup(group.key, { name: event.target.value })
                         }
                         placeholder="예: 온도"
+                      />
+                    </label>
+                    <label>
+                      최소 선택
+                      <input
+                        inputMode="numeric"
+                        value={group.minSelect}
+                        onChange={(event) =>
+                          updateGroup(group.key, {
+                            minSelect: event.target.value,
+                          })
+                        }
                       />
                     </label>
                     <label>

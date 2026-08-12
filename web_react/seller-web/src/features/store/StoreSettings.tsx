@@ -5,9 +5,12 @@ import {
   createSellerStore,
   createStoreTable,
   deleteSellerStore,
+  getInactiveSellerStores,
   getSellerStoreDetail,
   getSellerStores,
   getStoreTables,
+  reopenSellerStore,
+  suspendSellerStore,
   updateSellerStore,
 } from '../../services/api'
 import type {
@@ -43,12 +46,22 @@ type EditorState = {
   longitude: string
   openTime: string
   closeTime: string
+  operationStartDate: string
+  operationEndDate: string
   closedDays: StoreClosedDay[]
   takeoutAvailable: boolean
   dineInAvailable: boolean
   orderAcceptingEnabled: boolean
   tags: string
 }
+
+const STORE_CATEGORIES = [
+  '카페', '디저트', '베이커리', '한식', '중식', '일식', '양식', '분식',
+  '치킨', '피자', '패스트푸드', '주점', '푸드트럭', '팝업·행사',
+  '플리마켓·행사', '기타',
+]
+
+const PHONE_PATTERN = /^[0-9+\-()\s]+$/
 
 const CLOSED_DAYS: { value: StoreClosedDay; label: string }[] = [
   { value: 'MONDAY', label: '월' },
@@ -80,6 +93,8 @@ function blankEditor(): EditorState {
     longitude: '',
     openTime: '09:00',
     closeTime: '21:00',
+    operationStartDate: '',
+    operationEndDate: '',
     closedDays: [],
     takeoutAvailable: true,
     dineInAvailable: true,
@@ -102,6 +117,8 @@ function editorFromStore(store: StoreDetail): EditorState {
     longitude: store.longitude?.toString() ?? '',
     openTime: store.openTime?.slice(0, 5) ?? '',
     closeTime: store.closeTime?.slice(0, 5) ?? '',
+    operationStartDate: store.operationStartDate ?? '',
+    operationEndDate: store.operationEndDate ?? '',
     closedDays: store.closedDays,
     takeoutAvailable: store.takeoutAvailable,
     dineInAvailable: store.dineInAvailable,
@@ -129,6 +146,8 @@ function payloadFromEditor(editor: EditorState): StoreSavePayload {
     longitude: editor.longitude ? Number(editor.longitude) : null,
     openTime: optional(editor.openTime),
     closeTime: optional(editor.closeTime),
+    operationStartDate: optional(editor.operationStartDate),
+    operationEndDate: optional(editor.operationEndDate),
     closedDays: editor.closedDays,
     takeoutAvailable: editor.takeoutAvailable,
     dineInAvailable: editor.dineInAvailable,
@@ -161,11 +180,15 @@ export function StoreSettings({
   const [editorMode, setEditorMode] = useState<'edit' | 'create' | null>(null)
   const [editor, setEditor] = useState<EditorState>(blankEditor)
   const [showTableForm, setShowTableForm] = useState(false)
+  const [showInactiveStores, setShowInactiveStores] = useState(false)
+  const [inactiveStores, setInactiveStores] = useState<StoreSummary[]>([])
+  const [inactiveLoading, setInactiveLoading] = useState(false)
   const [tableCode, setTableCode] = useState('')
   const [tableName, setTableName] = useState('')
 
-  const canManage = store.myRole === 'OWNER' || store.myRole === 'MANAGER'
-  const canDelete = store.myRole === 'OWNER'
+  const isActiveStore = store.status === 'ACTIVE'
+  const canManage = isActiveStore && (store.myRole === 'OWNER' || store.myRole === 'MANAGER')
+  const canDelete = isActiveStore && store.myRole === 'OWNER'
   const orderMethods = useMemo(
     () => [
       store.dineInAvailable && '매장 식사',
@@ -232,8 +255,30 @@ export function StoreSettings({
 
   async function saveStore() {
     const payload = payloadFromEditor(editor)
-    if (!payload.name) {
-      onError('스토어 이름을 입력해 주세요.')
+    if (
+      !payload.name ||
+      !payload.representativeCategory ||
+      !payload.address ||
+      !payload.detailAddress ||
+      !payload.phone
+    ) {
+      onError('사업장명, 대표 카테고리, 주소, 상세 주소와 연락처를 모두 입력해 주세요.')
+      return
+    }
+    if (!PHONE_PATTERN.test(payload.phone)) {
+      onError('연락처 형식을 확인해 주세요.')
+      return
+    }
+    if (!payload.takeoutAvailable && !payload.dineInAvailable) {
+      onError('포장 또는 매장 식사 중 하나는 가능해야 합니다.')
+      return
+    }
+    if (
+      payload.operationStartDate &&
+      payload.operationEndDate &&
+      payload.operationEndDate < payload.operationStartDate
+    ) {
+      onError('운영 종료일은 시작일보다 빠를 수 없습니다.')
       return
     }
     setProcessing(true)
@@ -261,15 +306,76 @@ export function StoreSettings({
 
   async function removeStore() {
     if (!connection || !canDelete) return
-    if (!window.confirm(`'${store.name}' 스토어를 삭제할까요? 이 작업은 되돌릴 수 없습니다.`)) return
+    if (!window.confirm(`'${store.name}' 사업장을 폐업할까요? 기존 주문과 결제 기록은 보존되며 직접 재개할 수 없습니다.`)) return
     setProcessing(true)
     try {
       await deleteSellerStore(connection)
       const remaining = await getSellerStores(connection)
-      onStoreDeleted?.(remaining)
+      if (remaining.length > 0) {
+        onStoreDeleted?.(remaining)
+      } else {
+        const closed = { ...store, status: 'CLOSED' as const, businessStatus: 'CLOSED' as const, orderAcceptingEnabled: false }
+        setStore(closed)
+        setInactiveStores([closed])
+        setShowInactiveStores(true)
+        onBusinessStatusChange('CLOSED')
+      }
       onError(null)
     } catch (caught) {
-      onError(caught instanceof Error ? caught.message : '스토어를 삭제하지 못했습니다.')
+      onError(caught instanceof Error ? caught.message : '사업장을 폐업하지 못했습니다.')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  async function suspendStore() {
+    if (!connection || !canDelete) return
+    if (!window.confirm(`'${store.name}' 사업장을 휴업할까요? 고객 노출과 신규 주문 접수가 중지됩니다.`)) return
+    setProcessing(true)
+    try {
+      const suspended = await suspendSellerStore(connection)
+      const remaining = await getSellerStores(connection)
+      if (remaining.length > 0) {
+        onStoreDeleted?.(remaining)
+      } else {
+        setStore((current) => ({ ...current, ...suspended }))
+        setInactiveStores([suspended])
+        setShowInactiveStores(true)
+        onBusinessStatusChange(suspended.businessStatus)
+      }
+      onError(null)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '사업장을 휴업하지 못했습니다.')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  async function openInactiveStores() {
+    if (!connection) return
+    setShowInactiveStores(true)
+    setInactiveLoading(true)
+    try {
+      setInactiveStores(await getInactiveSellerStores(connection))
+      onError(null)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '휴업·폐업 사업장을 불러오지 못했습니다.')
+    } finally {
+      setInactiveLoading(false)
+    }
+  }
+
+  async function reopenStore(target: StoreSummary) {
+    if (!connection || target.status !== 'SUSPENDED') return
+    setProcessing(true)
+    try {
+      const reopened = await reopenSellerStore(connection, target.storeId)
+      setInactiveStores((current) => current.filter((item) => item.storeId !== target.storeId))
+      setShowInactiveStores(false)
+      onStoreSelected?.(reopened)
+      onError(null)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : '사업장을 재개하지 못했습니다.')
     } finally {
       setProcessing(false)
     }
@@ -312,8 +418,10 @@ export function StoreSettings({
         <div className="store-profile-actions">
           <span className={`store-health status-${store.status.toLowerCase()}`}>{store.status === 'ACTIVE' ? '정상 운영' : store.status}</span>
           <button className="secondary-action" onClick={() => openEditor('create')}>+ 새 스토어</button>
+          {!isDemo && <button className="secondary-action" onClick={() => void openInactiveStores()}>휴업·폐업 사업장</button>}
           {canManage && <button className="secondary-action" onClick={() => openEditor('edit')}>상세 편집</button>}
-          {canDelete && <button className="danger-action" disabled={processing} onClick={() => void removeStore()}>스토어 삭제</button>}
+          {canDelete && <button className="secondary-action" disabled={processing} onClick={() => void suspendStore()}>사업장 휴업</button>}
+          {canDelete && <button className="danger-action" disabled={processing} onClick={() => void removeStore()}>사업장 폐업</button>}
         </div>
       </section>
 
@@ -358,14 +466,16 @@ export function StoreSettings({
           <h2 id="store-editor-title">{editorMode === 'create' ? '스토어 생성' : '스토어 상세 편집'}</h2>
           <div className="store-editor-grid">
             <label>유형<select value={editor.storeType} onChange={(event) => setEditor({ ...editor, storeType: event.target.value as StoreType })}><option value="LOCAL_STORE">상설 매장</option><option value="EVENT_COMMERCE">이벤트 커머스</option></select></label>
-            <label>이름<input maxLength={150} value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} /></label>
+            <label>사업장명 *<input maxLength={150} value={editor.name} onChange={(event) => setEditor({ ...editor, name: event.target.value })} /></label>
             <label className="wide">소개<textarea maxLength={1000} value={editor.description} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label>
-            <label>주소<input value={editor.address} onChange={(event) => setEditor({ ...editor, address: event.target.value })} /></label>
-            <label>상세 주소<input value={editor.detailAddress} onChange={(event) => setEditor({ ...editor, detailAddress: event.target.value })} /></label>
-            <label>대표 카테고리<input value={editor.representativeCategory} onChange={(event) => setEditor({ ...editor, representativeCategory: event.target.value })} /></label>
-            <label>연락처<input value={editor.phone} onChange={(event) => setEditor({ ...editor, phone: event.target.value })} /></label>
+            <label>주소 *<input maxLength={255} value={editor.address} onChange={(event) => setEditor({ ...editor, address: event.target.value })} /></label>
+            <label>상세 주소 *<input maxLength={255} value={editor.detailAddress} onChange={(event) => setEditor({ ...editor, detailAddress: event.target.value })} /></label>
+            <label>대표 카테고리 *<select value={editor.representativeCategory} onChange={(event) => setEditor({ ...editor, representativeCategory: event.target.value })}><option value="">선택</option>{STORE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+            <label>연락처 *<input maxLength={30} value={editor.phone} onChange={(event) => setEditor({ ...editor, phone: event.target.value })} /></label>
             <label>오픈 시간<input type="time" value={editor.openTime} onChange={(event) => setEditor({ ...editor, openTime: event.target.value })} /></label>
             <label>마감 시간<input type="time" value={editor.closeTime} onChange={(event) => setEditor({ ...editor, closeTime: event.target.value })} /></label>
+            <label>운영 시작일<input type="date" value={editor.operationStartDate} onChange={(event) => setEditor({ ...editor, operationStartDate: event.target.value })} /></label>
+            <label>운영 종료일<input type="date" min={editor.operationStartDate || undefined} value={editor.operationEndDate} onChange={(event) => setEditor({ ...editor, operationEndDate: event.target.value })} /></label>
             <label>위도<input type="number" step="any" value={editor.latitude} onChange={(event) => setEditor({ ...editor, latitude: event.target.value })} /></label>
             <label>경도<input type="number" step="any" value={editor.longitude} onChange={(event) => setEditor({ ...editor, longitude: event.target.value })} /></label>
             <label className="wide">이미지 URL<input value={editor.imageUrl} onChange={(event) => setEditor({ ...editor, imageUrl: event.target.value })} /></label>
@@ -378,6 +488,7 @@ export function StoreSettings({
       )}
 
       {showTableForm && <div className="modal-backdrop" role="presentation"><section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="table-title"><button className="modal-close" aria-label="닫기" onClick={() => setShowTableForm(false)}>×</button><p className="eyebrow">NEW TABLE</p><h2 id="table-title">테이블 추가</h2><label>테이블 코드<input placeholder="WINDOW-08" value={tableCode} onChange={(event) => setTableCode(event.target.value)} /></label><label>표시 이름<input placeholder="Window 08" value={tableName} onChange={(event) => setTableName(event.target.value)} /></label><button className="primary-action" disabled={processing} onClick={() => void addTable()}>{processing ? '추가 중…' : '테이블 추가하기'}</button></section></div>}
+      {showInactiveStores && <div className="modal-backdrop" role="presentation"><section className="connection-modal store-editor-modal" role="dialog" aria-modal="true" aria-labelledby="inactive-store-title"><button className="modal-close" aria-label="닫기" onClick={() => setShowInactiveStores(false)}>×</button><p className="eyebrow">INACTIVE STORES</p><h2 id="inactive-store-title">휴업·폐업 사업장</h2>{inactiveLoading ? <p>사업장을 불러오는 중입니다.</p> : <div className="account-store-list">{inactiveStores.map((item) => <article key={item.storeId} className="announcement-card"><div><strong>{item.name}</strong><small>{item.status === 'SUSPENDED' ? '휴업' : '폐업'}</small></div>{item.status === 'SUSPENDED' && item.myRole === 'OWNER' && <button className="primary-action" disabled={processing} onClick={() => void reopenStore(item)}>사업장 재개</button>}</article>)}{inactiveStores.length === 0 && <p>휴업·폐업 사업장이 없습니다.</p>}</div>}</section></div>}
     </main>
   )
 }

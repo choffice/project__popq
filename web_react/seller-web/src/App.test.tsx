@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App'
 
@@ -36,11 +36,29 @@ describe('판매자 주문 운영', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: '주문 접수' }))
+    const dialog = screen.getByRole('dialog', { name: '준비시간 선택' })
+    await user.click(within(dialog).getByRole('radio', { name: '15분' }))
+    await user.click(within(dialog).getByRole('button', { name: '주문 접수' }))
 
     expect(screen.getByText('접수 완료')).toBeVisible()
     expect(
       screen.getByRole('button', { name: '준비 시작' }),
     ).toBeVisible()
+  })
+
+  it('주문 거절 사유를 입력한 뒤 주문을 거절한다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: '주문 거절' }))
+    const dialog = screen.getByRole('dialog', { name: '주문 거절 사유' })
+    const confirm = within(dialog).getByRole('button', { name: '주문 거절 확정' })
+    expect(confirm).toBeDisabled()
+    await user.type(within(dialog).getByLabelText('고객 안내 사유'), '재료가 모두 소진되었습니다.')
+    await user.click(confirm)
+
+    expect(screen.getAllByText('주문 거절').length).toBeGreaterThan(0)
+    expect(screen.getByText('재료가 모두 소진되었습니다.')).toBeVisible()
   })
 
   it('완료 필터에서 종료된 주문만 조회한다', async () => {
@@ -247,21 +265,48 @@ describe('판매자 주문 운영', () => {
     expect(await screen.findByText('요청하신 포크를 함께 드릴게요.')).toBeVisible()
   })
 
-  it('완료 주문의 일부 금액만 환불한다', async () => {
+  it('리뷰에 판매자 답글을 작성한다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /리뷰 관리/ }))
+    expect(await screen.findByRole('heading', { name: '리뷰 관리', level: 1 })).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '답글 작성' }))
+    const dialog = screen.getByRole('dialog', { name: '답글 작성' })
+    await user.type(within(dialog).getByLabelText('답글'), '소중한 리뷰 감사합니다.')
+    await user.click(within(dialog).getByRole('button', { name: '답글 저장' }))
+
+    expect(await screen.findByText('소중한 리뷰 감사합니다.')).toBeVisible()
+  })
+
+  it('공지 저장과 동시에 관심 고객에게 알리도록 설정한다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.click(screen.getByRole('button', { name: /공지사항/ }))
+    await user.click(screen.getByRole('button', { name: '+ 새 공지' }))
+    const dialog = screen.getByRole('dialog')
+    await user.type(within(dialog).getByLabelText('제목'), '신메뉴 안내')
+    await user.type(within(dialog).getByLabelText('내용'), '오늘부터 신메뉴를 판매합니다.')
+    await user.click(within(dialog).getByRole('checkbox', { name: '찜한 고객에게 알림 보내기' }))
+    await user.click(within(dialog).getByRole('button', { name: '게시하고 알림 보내기' }))
+
+    expect(await screen.findByText('신메뉴 안내')).toBeVisible()
+    expect(screen.getAllByText('게시 중').length).toBeGreaterThan(0)
+  })
+
+  it('완료 주문의 환불 가능 금액을 전액 환불한다', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: '완료' }))
     await user.click(screen.getByRole('button', { name: '주문 0037 상세 보기' }))
     await user.click(await screen.findByRole('button', { name: '전액 환불' }))
-    const amount = screen.getByLabelText(/환불 금액/)
-    await user.clear(amount)
-    await user.type(amount, '1000')
-    await user.type(screen.getByLabelText('환불 사유'), '일부 메뉴 누락')
-    await user.click(screen.getByRole('button', { name: '1,000원 부분 환불 확정' }))
+    await user.type(screen.getByLabelText('환불 사유'), '주문 전체 환불')
+    await user.click(screen.getByRole('button', { name: '전액 환불 확정' }))
 
-    expect(await screen.findByText('부분 환불')).toBeVisible()
-    expect(screen.getAllByText('일부 메뉴 누락').length).toBeGreaterThan(0)
+    expect(await screen.findByText('환불 완료')).toBeVisible()
+    expect(screen.getAllByText('주문 전체 환불').length).toBeGreaterThan(0)
   })
 
   it('판매자 세션에는 관리자 메뉴를 노출하지 않는다', () => {

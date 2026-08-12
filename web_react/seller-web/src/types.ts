@@ -50,6 +50,10 @@ export type SellerOrder = {
   serviceFeeAmount: number
   totalAmount: number
   expiresAt: string
+  createdAt?: string
+  acceptedAt?: string | null
+  preparationMinutes?: number | null
+  estimatedReadyAt?: string | null
   version: number
   items: OrderItem[]
   statusHistory: OrderStatusHistory[]
@@ -314,10 +318,13 @@ export type StoreSummary = {
   longitude: number | null
   openTime: string | null
   closeTime: string | null
+  operationStartDate?: string | null
+  operationEndDate?: string | null
   closedDays: StoreClosedDay[]
   takeoutAvailable: boolean
   dineInAvailable: boolean
   orderAcceptingEnabled: boolean
+  defaultPreparationMinutes?: number | null
   status: StoreStatus
   businessStatus: BusinessStatus
   myRole: StoreRole
@@ -340,6 +347,8 @@ export type StoreSavePayload = {
   longitude: number | null
   openTime: string | null
   closeTime: string | null
+  operationStartDate: string | null
+  operationEndDate: string | null
   closedDays: StoreClosedDay[]
   takeoutAvailable: boolean
   dineInAvailable: boolean
@@ -358,6 +367,28 @@ export type Announcement = {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export type SellerReview = {
+  reviewId: number
+  orderPublicId: string
+  storeId: number
+  storeName: string
+  storeCategory: string | null
+  authorName: string
+  rating: number
+  content: string | null
+  status: string
+  createdAt: string
+  updatedAt: string
+  sellerReply: string | null
+  sellerRepliedAt: string | null
+  sellerRepliedByUserId: number | null
+}
+
+export type SellerReviewReplyTemplate = {
+  templateId: number
+  content: string
 }
 
 export type MessageSenderType = 'CUSTOMER' | 'SELLER'

@@ -293,7 +293,7 @@ class _SellerProductListScreenState
                   ),
                   _filterChip(
                     _ProductFilter.channelOff,
-                    '채널 꺼짐',
+                    '판매 중지',
                   ),
                 ],
               ),
@@ -798,30 +798,41 @@ class _SellerProductListScreenState
     }
 
     try {
+      String? imageUrl = draft.removeImage
+          ? null
+          : draft.imageUrl;
+
+      final String? imageFilePath =
+          draft.imageFilePath;
+
+      // 새 사진을 선택하거나 촬영했다면
+      // 상품을 저장하기 전에 이미지를 먼저 업로드한다.
+      if (imageFilePath != null &&
+          imageFilePath.trim().isNotEmpty) {
+        imageUrl =
+        await widget.repository.uploadProductImage(
+          imageFilePath,
+        );
+      }
+
       final SellerProduct saved =
       product == null
           ? await widget.repository.create(
         _storeId,
-        categoryId:
-        draft.categoryId,
+        categoryId: draft.categoryId,
         name: draft.name,
-        description:
-        draft.description,
-        imageUrl: draft.imageUrl,
-        basePrice:
-        draft.basePrice,
+        description: draft.description,
+        imageUrl: imageUrl,
+        basePrice: draft.basePrice,
       )
           : await widget.repository.update(
         _storeId,
         product,
-        categoryId:
-        draft.categoryId,
+        categoryId: draft.categoryId,
         name: draft.name,
-        description:
-        draft.description,
-        imageUrl: draft.imageUrl,
-        basePrice:
-        draft.basePrice,
+        description: draft.description,
+        imageUrl: imageUrl,
+        basePrice: draft.basePrice,
       );
 
       if (!mounted) {

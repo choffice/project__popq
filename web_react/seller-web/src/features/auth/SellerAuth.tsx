@@ -1,9 +1,18 @@
 import { useState, type FormEvent } from 'react'
-import { getSellerStores, loginAccount, signUpSeller } from '../../services/api'
+import {
+  createSellerStore,
+  getInactiveSellerStores,
+  getSellerStores,
+  loginAccount,
+  reopenSellerStore,
+  signUpSeller,
+} from '../../services/api'
 import type {
   SellerAuthResult,
   SellerConnection,
   StoreSummary,
+  StoreSavePayload,
+  StoreType,
 } from '../../types'
 
 type AuthMode = 'seller-login' | 'admin-login' | 'signup'
@@ -17,6 +26,34 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).+$/
 const PHONE_PATTERN = /^01[0-9]-?\d{3,4}-?\d{4}$/
 const NICKNAME_PATTERN = /^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$/u
+const STORE_PHONE_PATTERN = /^[0-9+\-()\s]+$/
+const STORE_CATEGORIES = [
+  '카페', '디저트', '베이커리', '한식', '중식', '일식', '양식', '분식',
+  '치킨', '피자', '패스트푸드', '주점', '푸드트럭', '팝업·행사',
+  '플리마켓·행사', '기타',
+]
+
+type FirstStoreDraft = {
+  storeType: StoreType
+  name: string
+  representativeCategory: string
+  address: string
+  detailAddress: string
+  phone: string
+  dineInAvailable: boolean
+  takeoutAvailable: boolean
+}
+
+const EMPTY_FIRST_STORE: FirstStoreDraft = {
+  storeType: 'LOCAL_STORE',
+  name: '',
+  representativeCategory: '',
+  address: '',
+  detailAddress: '',
+  phone: '',
+  dineInAvailable: true,
+  takeoutAvailable: true,
+}
 
 export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [mode, setMode] = useState<AuthMode>('seller-login')
@@ -31,6 +68,9 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [notice, setNotice] = useState<string | null>(null)
   const [pendingAuth, setPendingAuth] = useState<SellerAuthResult | null>(null)
   const [stores, setStores] = useState<StoreSummary[]>([])
+  const [needsFirstStore, setNeedsFirstStore] = useState(false)
+  const [needsStoreRecovery, setNeedsStoreRecovery] = useState(false)
+  const [firstStore, setFirstStore] = useState<FirstStoreDraft>(EMPTY_FIRST_STORE)
 
   function switchMode(nextMode: AuthMode) {
     setMode(nextMode)
@@ -88,9 +128,12 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       const connection = { storeId: 0, accessToken: auth.accessToken }
       const ownedStores = await getSellerStores(connection)
       if (ownedStores.length === 0) {
-        throw new Error(
-          '운영할 수 있는 스토어가 없습니다. 판매자 앱에서 스토어를 먼저 등록해 주세요.',
-        )
+        const inactiveStores = await getInactiveSellerStores(connection)
+        setPendingAuth(auth)
+        setStores(inactiveStores)
+        setNeedsStoreRecovery(inactiveStores.some((store) => store.status === 'SUSPENDED'))
+        setNeedsFirstStore(!inactiveStores.some((store) => store.status === 'SUSPENDED'))
+        return
       }
       if (ownedStores.length === 1) {
         completeAuthentication(auth, ownedStores[0])
@@ -99,12 +142,90 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
 
       setPendingAuth(auth)
       setStores(ownedStores)
+      setNeedsFirstStore(false)
+      setNeedsStoreRecovery(false)
     } catch (caught) {
       setError(
         caught instanceof Error
           ? caught.message
           : '로그인에 실패했습니다. 다시 시도해 주세요.',
       )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function reopenStoreFromAuth(store: StoreSummary) {
+    if (!pendingAuth || store.status !== 'SUSPENDED') return
+    setBusy(true)
+    setError(null)
+    try {
+      const reopened = await reopenSellerStore(
+        { storeId: store.storeId, accessToken: pendingAuth.accessToken, user: pendingAuth.user },
+        store.storeId,
+      )
+      completeAuthentication(pendingAuth, reopened)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '사업장을 재개하지 못했습니다.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function createFirstStore(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!pendingAuth) return
+    const draft = {
+      ...firstStore,
+      name: firstStore.name.trim(),
+      representativeCategory: firstStore.representativeCategory.trim(),
+      address: firstStore.address.trim(),
+      detailAddress: firstStore.detailAddress.trim(),
+      phone: firstStore.phone.trim(),
+    }
+    if (!draft.name || !draft.representativeCategory || !draft.address || !draft.detailAddress || !draft.phone) {
+      setError('사업장명, 대표 카테고리, 주소, 상세 주소와 연락처를 모두 입력해 주세요.')
+      return
+    }
+    if (!STORE_PHONE_PATTERN.test(draft.phone)) {
+      setError('연락처 형식을 확인해 주세요.')
+      return
+    }
+    if (!draft.dineInAvailable && !draft.takeoutAvailable) {
+      setError('포장 또는 매장 식사 중 하나는 가능해야 합니다.')
+      return
+    }
+    const payload: StoreSavePayload = {
+      storeType: draft.storeType,
+      name: draft.name,
+      description: null,
+      address: draft.address,
+      detailAddress: draft.detailAddress,
+      representativeCategory: draft.representativeCategory,
+      imageUrl: null,
+      phone: draft.phone,
+      latitude: null,
+      longitude: null,
+      openTime: '09:00',
+      closeTime: '21:00',
+      operationStartDate: null,
+      operationEndDate: null,
+      closedDays: [],
+      takeoutAvailable: draft.takeoutAvailable,
+      dineInAvailable: draft.dineInAvailable,
+      orderAcceptingEnabled: true,
+      tags: [],
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const created = await createSellerStore(
+        { storeId: 0, accessToken: pendingAuth.accessToken, user: pendingAuth.user },
+        payload,
+      )
+      completeAuthentication(pendingAuth, created)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : '첫 사업장을 등록하지 못했습니다.')
     } finally {
       setBusy(false)
     }
@@ -175,6 +296,48 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   }
 
   if (pendingAuth) {
+    if (needsFirstStore) {
+      return (
+        <main className="auth-page">
+          <section className="auth-card store-choice-card">
+            <AuthBrand />
+            <p className="eyebrow">FIRST STORE</p>
+            <h1>첫 사업장을 등록하세요</h1>
+            <p className="auth-description">판매자 App과 동일한 필수 항목으로 첫 운영 공간을 만듭니다.</p>
+            <form className="auth-form" onSubmit={createFirstStore}>
+              <label>사업장 유형<select value={firstStore.storeType} onChange={(event) => setFirstStore({ ...firstStore, storeType: event.target.value as StoreType })}><option value="LOCAL_STORE">상설 매장</option><option value="EVENT_COMMERCE">이벤트 커머스</option></select></label>
+              <label>사업장명 *<input maxLength={150} value={firstStore.name} onChange={(event) => setFirstStore({ ...firstStore, name: event.target.value })} /></label>
+              <label>대표 카테고리 *<select value={firstStore.representativeCategory} onChange={(event) => setFirstStore({ ...firstStore, representativeCategory: event.target.value })}><option value="">선택</option>{STORE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select></label>
+              <label>주소 *<input maxLength={255} value={firstStore.address} onChange={(event) => setFirstStore({ ...firstStore, address: event.target.value })} /></label>
+              <label>상세 주소 *<input maxLength={255} value={firstStore.detailAddress} onChange={(event) => setFirstStore({ ...firstStore, detailAddress: event.target.value })} /></label>
+              <label>연락처 *<input maxLength={30} value={firstStore.phone} onChange={(event) => setFirstStore({ ...firstStore, phone: event.target.value })} /></label>
+              <fieldset className="choice-fieldset"><legend>주문 방식 *</legend><label><input type="checkbox" checked={firstStore.dineInAvailable} onChange={(event) => setFirstStore({ ...firstStore, dineInAvailable: event.target.checked })} />매장 식사</label><label><input type="checkbox" checked={firstStore.takeoutAvailable} onChange={(event) => setFirstStore({ ...firstStore, takeoutAvailable: event.target.checked })} />포장</label></fieldset>
+              {error && <p className="auth-error" role="alert">{error}</p>}
+              <button className="auth-submit" type="submit" disabled={busy}>{busy ? '등록 중…' : '사업장 등록하고 시작하기'}</button>
+            </form>
+            <button type="button" className="auth-text-button" onClick={() => { setPendingAuth(null); setNeedsFirstStore(false); setFirstStore(EMPTY_FIRST_STORE); setError(null) }}>다른 계정으로 로그인</button>
+          </section>
+        </main>
+      )
+    }
+    if (needsStoreRecovery) {
+      return (
+        <main className="auth-page">
+          <section className="auth-card store-choice-card">
+            <AuthBrand />
+            <p className="eyebrow">INACTIVE STORES</p>
+            <h1>휴업 사업장을 재개하세요</h1>
+            <p className="auth-description">App과 동일하게 휴업 사업장은 기존 데이터와 함께 다시 운영할 수 있습니다.</p>
+            <div className="auth-store-list">
+              {stores.map((store) => <article key={store.storeId} className="announcement-card"><div><strong>{store.name}</strong><small>{store.status === 'SUSPENDED' ? '휴업' : '폐업'}</small></div>{store.status === 'SUSPENDED' && <button type="button" disabled={busy} onClick={() => void reopenStoreFromAuth(store)}>재개</button>}</article>)}
+            </div>
+            {error && <p className="auth-error" role="alert">{error}</p>}
+            <button type="button" className="auth-text-button" onClick={() => { setNeedsStoreRecovery(false); setNeedsFirstStore(true); setError(null) }}>새 사업장 등록</button>
+            <button type="button" className="auth-text-button" onClick={() => { setPendingAuth(null); setStores([]); setNeedsStoreRecovery(false); setError(null) }}>다른 계정으로 로그인</button>
+          </section>
+        </main>
+      )
+    }
     return (
       <main className="auth-page">
         <section className="auth-card store-choice-card">
@@ -208,6 +371,8 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
             onClick={() => {
               setPendingAuth(null)
               setStores([])
+              setNeedsFirstStore(false)
+              setNeedsStoreRecovery(false)
             }}
           >
             다른 계정으로 로그인

@@ -451,7 +451,7 @@ public class CatalogService {
     public List<ProductSummaryResponse> findCustomerProducts(
         Long storeId
     ) {
-        requirePublicStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Instant now = Instant.now();
 
@@ -483,7 +483,7 @@ public class CatalogService {
         Long storeId,
         Long productId
     ) {
-        requirePublicStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Product product =
             getActiveDetailedProduct(
@@ -638,13 +638,14 @@ public class CatalogService {
             );
     }
 
-    private void requirePublicStore(
+    private void requirePublicVisibleStore(
         Long storeId
     ) {
         Store store = getStore(storeId);
 
         if (!store.isActive()
-            || store.getBusinessStatus() == BusinessStatus.CLOSED) {
+            || (store.getBusinessStatus() != BusinessStatus.OPEN
+            && store.getBusinessStatus() != BusinessStatus.PRE_OPEN)) {
             throw new BusinessException(
                 ErrorCode.STORE_NOT_FOUND
             );

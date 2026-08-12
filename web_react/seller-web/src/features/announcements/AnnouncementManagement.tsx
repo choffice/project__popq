@@ -46,6 +46,7 @@ export function AnnouncementManagement({ connection, storeRole, onError }: Props
   const [editing, setEditing] = useState<Announcement | null | 'new'>(null)
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
+  const [notifyInterestedCustomers, setNotifyInterestedCustomers] = useState(false)
 
   const load = useCallback(async () => {
     if (!connection) {
@@ -73,6 +74,7 @@ export function AnnouncementManagement({ connection, storeRole, onError }: Props
     setEditing(item ?? 'new')
     setTitle(item?.title ?? '')
     setContent(item?.content ?? '')
+    setNotifyInterestedCustomers(false)
   }
 
   async function save() {
@@ -83,15 +85,16 @@ export function AnnouncementManagement({ connection, storeRole, onError }: Props
     setProcessing(true)
     try {
       if (isDemo) {
+        const now = new Date().toISOString()
         const saved: Announcement = typeof editing === 'object' && editing
-          ? { ...editing, title: title.trim(), content: content.trim(), updatedAt: new Date().toISOString() }
-          : { announcementId: Date.now(), storeId: 1, title: title.trim(), content: content.trim(), status: 'DRAFT', publishedAt: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+          ? { ...editing, title: title.trim(), content: content.trim(), status: notifyInterestedCustomers ? 'PUBLISHED' : editing.status, publishedAt: notifyInterestedCustomers ? now : editing.publishedAt, updatedAt: now }
+          : { announcementId: Date.now(), storeId: 1, title: title.trim(), content: content.trim(), status: notifyInterestedCustomers ? 'PUBLISHED' : 'DRAFT', publishedAt: notifyInterestedCustomers ? now : null, createdAt: now, updatedAt: now }
         setItems((current) => typeof editing === 'object' && editing ? current.map((item) => item.announcementId === saved.announcementId ? saved : item) : [saved, ...current])
       } else if (typeof editing === 'object' && editing) {
-        const saved = await updateSellerAnnouncement(connection, editing.announcementId, title.trim(), content.trim())
+        const saved = await updateSellerAnnouncement(connection, editing.announcementId, title.trim(), content.trim(), notifyInterestedCustomers)
         setItems((current) => current.map((item) => item.announcementId === saved.announcementId ? saved : item))
       } else {
-        const saved = await createSellerAnnouncement(connection, title.trim(), content.trim())
+        const saved = await createSellerAnnouncement(connection, title.trim(), content.trim(), notifyInterestedCustomers)
         setItems((current) => [saved, ...current])
       }
       setEditing(null)
@@ -136,7 +139,7 @@ export function AnnouncementManagement({ connection, storeRole, onError }: Props
           </article>)}
         </section>
       )}
-      {editing && <div className="modal-backdrop" role="presentation"><section className="connection-modal announcement-editor" role="dialog" aria-modal="true"><button className="modal-close" aria-label="닫기" onClick={() => setEditing(null)}>×</button><p className="eyebrow">ANNOUNCEMENT DRAFT</p><h2>{editing === 'new' ? '공지 초안 작성' : '공지 수정'}</h2><label>제목<input maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>내용<textarea maxLength={2000} rows={8} value={content} onChange={(event) => setContent(event.target.value)} /></label><button className="primary-action" disabled={processing} onClick={() => void save()}>{processing ? '저장 중…' : '초안 저장'}</button></section></div>}
+      {editing && <div className="modal-backdrop" role="presentation"><section className="connection-modal announcement-editor" role="dialog" aria-modal="true"><button className="modal-close" aria-label="닫기" onClick={() => setEditing(null)}>×</button><p className="eyebrow">ANNOUNCEMENT DRAFT</p><h2>{editing === 'new' ? '공지 작성' : '공지 수정'}</h2><label>제목<input maxLength={200} value={title} onChange={(event) => setTitle(event.target.value)} /></label><label>내용<textarea maxLength={2000} rows={8} value={content} onChange={(event) => setContent(event.target.value)} /></label><label className="required-check"><input type="checkbox" checked={notifyInterestedCustomers} onChange={(event) => setNotifyInterestedCustomers(event.target.checked)} />찜한 고객에게 알림 보내기</label><small>선택하면 저장과 동시에 공지를 게시하고 관심 고객에게 알립니다.</small><button className="primary-action" disabled={processing} onClick={() => void save()}>{processing ? '저장 중…' : notifyInterestedCustomers ? '게시하고 알림 보내기' : '초안 저장'}</button></section></div>}
     </main>
   )
 }
