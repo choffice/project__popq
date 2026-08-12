@@ -41,6 +41,7 @@ import '../features/profile/customer_engagement_repository.dart';
 import '../features/profile/customer_my_info_screen.dart';
 import '../features/profile/customer_my_reviews_screen.dart';
 import '../features/profile/customer_notification_settings_screen.dart';
+import '../features/profile/customer_point_history_screen.dart';
 import '../features/profile/customer_profile_screen.dart';
 import '../features/profile/customer_visit_history_screen.dart';
 import '../features/profile/review_editor_screen.dart';
@@ -66,6 +67,7 @@ abstract final class CustomerRoutes {
   static const orders = '/orders';
   static const profile = '/profile';
   static const myReviews = '/my-reviews';
+  static const pointHistory = '/point-history';
   static const myInfo = '/my-info';
   static const visitHistory = '/visit-history';
   static const notifications = '/notifications';
@@ -237,6 +239,8 @@ GoRouter createCustomerRouter({
               location == CustomerRoutes.profile ||
               location ==
                   CustomerRoutes.myReviews ||
+              location ==
+                  CustomerRoutes.pointHistory ||
               location ==
                   CustomerRoutes.myInfo ||
               location ==
@@ -699,6 +703,14 @@ GoRouter createCustomerRouter({
               return CustomerMyReviewsScreen(
                 repository:
                 engagementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.pointHistory,
+            builder: (context, state) {
+              return CustomerPointHistoryScreen(
+                repository: engagementRepository,
               );
             },
           ),

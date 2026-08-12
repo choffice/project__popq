@@ -21,6 +21,7 @@ import com.example.project_popq.payment.provider.PaymentProvider;
 import com.example.project_popq.payment.provider.PaymentProviderRegistry;
 import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.payment.service.RefundProcessingException;
+import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
@@ -44,6 +45,7 @@ public class OrderCommandService {
     private final PaymentRepository paymentRepository;
     private final PaymentProviderRegistry paymentProviderRegistry;
     private final OrderDomainEventPublisher orderEventPublisher;
+    private final CustomerPointService customerPointService;
 
     @Transactional(noRollbackFor = RefundProcessingException.class)
     public OrderResponse cancelByGuest(
@@ -374,6 +376,7 @@ public class OrderCommandService {
         );
 
         payment.markCanceled(processedAt);
+        customerPointService.reclaimRefund(payment, refund, processedAt);
 
         payment.addTransaction(
                 PaymentTransaction.succeeded(

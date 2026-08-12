@@ -531,6 +531,7 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   static const List<String> _profileSubRoutes = <String>[
     CustomerRoutes.myInfo,
     CustomerRoutes.myReviews,
+    CustomerRoutes.pointHistory,
     CustomerRoutes.visitHistory,
     CustomerRoutes.notificationSettings,
   ];

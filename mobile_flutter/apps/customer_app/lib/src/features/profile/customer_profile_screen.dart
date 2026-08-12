@@ -313,6 +313,14 @@ class _CustomerProfileScreenState
                     },
                   ),
                   _MenuRowData(
+                    icon: Icons.savings_outlined,
+                    title: '포인트 내역',
+                    subtitle: '결제로 적립하거나 환불로 회수된 내역을 확인해요',
+                    onTap: () {
+                      context.push(CustomerRoutes.pointHistory);
+                    },
+                  ),
+                  _MenuRowData(
                     icon: Icons.star_border_rounded,
                     title: '공지사항',
                     subtitle:

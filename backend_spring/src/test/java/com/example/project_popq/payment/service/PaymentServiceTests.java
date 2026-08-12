@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.project_popq.order.domain.Order;
+import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.domain.OrderTransition;
 import com.example.project_popq.order.repository.OrderRepository;
 import com.example.project_popq.order.service.GuestOrderService;
@@ -24,6 +25,7 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
+import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import java.util.Optional;
@@ -49,6 +51,9 @@ class PaymentServiceTests {
         );
         StoreOperatingHoursPolicy operatingHoursPolicy = mock(
             StoreOperatingHoursPolicy.class
+        );
+        CustomerPointService customerPointService = mock(
+            CustomerPointService.class
         );
 
         Payment payment = mock(Payment.class);
@@ -92,6 +97,9 @@ class PaymentServiceTests {
         when(order.getTotalAmount())
             .thenReturn(6800L);
 
+        when(order.getStatus())
+            .thenReturn(OrderStatus.CREATED);
+
         when(order.getStore())
             .thenReturn(store);
 
@@ -118,7 +126,7 @@ class PaymentServiceTests {
             paymentProvider.approve(any())
         ).thenReturn(
             PaymentApprovalResult.success(
-                "toss-provider-payment-key",
+                "toss-client-payment-key",
                 6800
             )
         );
@@ -142,7 +150,8 @@ class PaymentServiceTests {
             new PaymentProperties(
                 PaymentProviderType.TOSS_PAYMENTS
             ),
-            operatingHoursPolicy
+            operatingHoursPolicy,
+            customerPointService
         );
 
         service.confirm(
@@ -163,6 +172,8 @@ class PaymentServiceTests {
         verify(paymentProvider)
             .approve(command.capture());
 
+        verify(customerPointService).rewardPayment(eq(payment), any());
+
         assertThat(
             command.getValue().idempotencyKey()
         ).isEqualTo("payment-key");
@@ -173,7 +184,7 @@ class PaymentServiceTests {
 
         verify(payment).markPaid(
             eq(6800L),
-            eq("toss-provider-payment-key"),
+            eq("toss-client-payment-key"),
             any()
         );
 

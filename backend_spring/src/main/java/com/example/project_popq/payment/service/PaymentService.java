@@ -26,6 +26,7 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
+import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
@@ -46,6 +47,7 @@ public class PaymentService {
     private final OrderDomainEventPublisher orderEventPublisher;
     private final PaymentProperties paymentProperties;
     private final StoreOperatingHoursPolicy operatingHoursPolicy;
+    private final CustomerPointService customerPointService;
 
     @Transactional(noRollbackFor = PaymentProcessingException.class)
     public PaymentResponse confirm(
@@ -454,6 +456,7 @@ public class PaymentService {
             result.providerPaymentKey(),
             processedAt
         );
+        customerPointService.rewardPayment(payment, processedAt);
 
         payment.addTransaction(
             PaymentTransaction.succeeded(
@@ -532,6 +535,12 @@ public class PaymentService {
                     lookupResult.approvedAt() == null
                         ? now
                         : lookupResult.approvedAt()
+                );
+                customerPointService.rewardPayment(
+                        payment,
+                        lookupResult.approvedAt() == null
+                                ? now
+                                : lookupResult.approvedAt()
                 );
 
                 ensureOrderPlacedAfterPayment(

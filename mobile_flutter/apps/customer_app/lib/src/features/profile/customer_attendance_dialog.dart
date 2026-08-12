@@ -33,6 +33,7 @@ class _CustomerAttendanceDialog extends StatefulWidget {
 
 class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
   CustomerAttendance? _attendance;
+  MonthlyRaffleStatus? _raffle;
   Object? _loadError;
   bool _loading = true;
   bool _checking = false;
@@ -51,10 +52,16 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
     });
 
     try {
-      final attendance = await widget.repository.getAttendance();
+      final results = await Future.wait<Object>([
+        widget.repository.getAttendance(),
+        widget.repository.getMonthlyRaffleStatus(),
+      ]);
+      final attendance = results[0] as CustomerAttendance;
+      final raffle = results[1] as MonthlyRaffleStatus;
       if (!mounted) return;
       setState(() {
         _attendance = attendance;
+        _raffle = raffle;
         _loading = false;
       });
     } catch (error) {
@@ -90,6 +97,25 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
       setState(() {
         _checking = false;
         _resultMessage = '출석을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.';
+      });
+    }
+  }
+
+  Future<void> _purchaseRaffleTicket() async {
+    if (_checking || _raffle?.canPurchase != true) return;
+    setState(() => _checking = true);
+    try {
+      final raffle = await widget.repository.purchaseMonthlyRaffleTicket();
+      if (!mounted) return;
+      setState(() {
+        _raffle = raffle;
+        _checking = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _checking = false;
+        _resultMessage = '응모권을 구매하지 못했어요. 잠시 후 다시 시도해 주세요.';
       });
     }
   }
@@ -147,6 +173,14 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
                 else if (_loadError != null)
                   _AttendanceLoadError(onRetry: _load)
                 else ...[
+                  if (_raffle != null) ...[
+                    _MonthlyRaffleCard(
+                      raffle: _raffle!,
+                      purchasing: _checking,
+                      onPurchase: _purchaseRaffleTicket,
+                    ),
+                    const SizedBox(height: PopqSpacing.md),
+                  ],
                   _AttendanceCalendar(attendance: _attendance!),
                   const SizedBox(height: PopqSpacing.md),
                   _CheckpointSummary(
@@ -194,6 +228,77 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
       ),
     );
   }
+}
+
+class _MonthlyRaffleCard extends StatelessWidget {
+  const _MonthlyRaffleCard({
+    required this.raffle,
+    required this.purchasing,
+    required this.onPurchase,
+  });
+
+  final MonthlyRaffleStatus raffle;
+  final bool purchasing;
+  final VoidCallback onPurchase;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final drawDate = raffle.nextDrawDate;
+    return Container(
+      padding: const EdgeInsets.all(PopqSpacing.md),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '매월 10일 POPQ 추첨',
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: PopqSpacing.xs),
+          if (raffle.hasResult) ...[
+            Text(
+              raffle.won ? '당첨되셨습니다.' : '다음기회에',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: PopqSpacing.xs),
+          ],
+          Text(
+            '보유 ${_formatPoint(raffle.pointBalance)}P · '
+            '${raffle.purchaseRound} 응모권 ${raffle.purchasedTicketCount}장',
+            style: theme.textTheme.bodySmall,
+          ),
+          Text(
+            '다음 추첨 ${drawDate.year}.${drawDate.month}.${drawDate.day}',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          OutlinedButton.icon(
+            onPressed: raffle.canPurchase && !purchasing ? onPurchase : null,
+            icon: const Icon(Icons.confirmation_number_outlined),
+            label: Text('${_formatPoint(raffle.ticketPrice)}P로 1장 구매'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatPoint(int value) {
+  final digits = value.toString();
+  final buffer = StringBuffer();
+  for (var index = 0; index < digits.length; index++) {
+    if (index > 0 && (digits.length - index) % 3 == 0) buffer.write(',');
+    buffer.write(digits[index]);
+  }
+  return buffer.toString();
 }
 
 class _AttendanceCalendar extends StatelessWidget {

@@ -121,6 +121,44 @@ class CustomerAttendance {
   final CustomerActivitySummary activitySummary;
 }
 
+class MonthlyRaffleStatus {
+  const MonthlyRaffleStatus({
+    required this.pointBalance,
+    required this.ticketPrice,
+    required this.purchaseRound,
+    required this.nextDrawDate,
+    required this.purchasedTicketCount,
+    required this.canPurchase,
+    this.resultRound,
+    this.result,
+  });
+
+  factory MonthlyRaffleStatus.fromJson(Map<String, Object?> json) {
+    return MonthlyRaffleStatus(
+      pointBalance: (json['pointBalance'] as num).toInt(),
+      ticketPrice: (json['ticketPrice'] as num).toInt(),
+      purchaseRound: json['purchaseRound'] as String,
+      nextDrawDate: DateTime.parse(json['nextDrawDate'] as String),
+      purchasedTicketCount: (json['purchasedTicketCount'] as num).toInt(),
+      canPurchase: json['canPurchase'] as bool,
+      resultRound: json['resultRound'] as String?,
+      result: json['result'] as String?,
+    );
+  }
+
+  final int pointBalance;
+  final int ticketPrice;
+  final String purchaseRound;
+  final DateTime nextDrawDate;
+  final int purchasedTicketCount;
+  final bool canPurchase;
+  final String? resultRound;
+  final String? result;
+
+  bool get hasResult => result != null;
+  bool get won => result == 'WON';
+}
+
 class CustomerProfile {
   const CustomerProfile({
     required this.userId,
@@ -244,6 +282,66 @@ class NotificationPreference {
 
   final bool pushNotificationEnabled;
   final bool marketingOptIn;
+}
+
+class CustomerPointHistory {
+  const CustomerPointHistory({
+    required this.transactionId,
+    required this.type,
+    required this.points,
+    required this.orderPublicId,
+    required this.storeName,
+    required this.paymentAmount,
+    required this.occurredAt,
+  });
+
+  factory CustomerPointHistory.fromJson(Map<String, Object?> json) {
+    return CustomerPointHistory(
+      transactionId: (json['transactionId'] as num).toInt(),
+      type: json['type'] as String,
+      points: (json['points'] as num).toInt(),
+      orderPublicId: json['orderPublicId'] as String,
+      storeName: json['storeName'] as String,
+      paymentAmount: (json['paymentAmount'] as num).toInt(),
+      occurredAt: DateTime.parse(json['occurredAt'] as String),
+    );
+  }
+
+  final int transactionId;
+  final String type;
+  final int points;
+  final String orderPublicId;
+  final String storeName;
+  final int paymentAmount;
+  final DateTime occurredAt;
+
+  bool get isReward => type == 'PAYMENT_REWARD';
+}
+
+class CustomerPointSummary {
+  const CustomerPointSummary({
+    required this.balance,
+    required this.rewardRatePercent,
+    required this.histories,
+  });
+
+  factory CustomerPointSummary.fromJson(Map<String, Object?> json) {
+    return CustomerPointSummary(
+      balance: (json['balance'] as num).toInt(),
+      rewardRatePercent: (json['rewardRatePercent'] as num).toDouble(),
+      histories: (json['histories'] as List<Object?>)
+          .map(
+            (item) => CustomerPointHistory.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  final int balance;
+  final double rewardRatePercent;
+  final List<CustomerPointHistory> histories;
 }
 
 class VisitedStore {
@@ -408,9 +506,15 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<CustomerPointSummary> getPointSummary();
+
   Future<CustomerAttendance> getAttendance();
 
   Future<CustomerAttendance> checkAttendance();
+
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus();
+
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket();
 
   Future<bool> recordQrVisit(String qrToken);
 
@@ -486,6 +590,16 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }
 
   @override
+  Future<CustomerPointSummary> getPointSummary() {
+    return _apiClient.get(
+      '/api/v1/customer/points',
+      decode: (value) => CustomerPointSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
   Future<CustomerAttendance> getAttendance() {
     return _apiClient.get(
       '/api/v1/customer/activities/attendance',
@@ -500,6 +614,26 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
       '/api/v1/customer/activities/attendance',
       decode: (value) =>
           CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus() {
+    return _apiClient.get(
+      '/api/v1/customer/monthly-raffle',
+      decode: (value) => MonthlyRaffleStatus.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket() {
+    return _apiClient.post(
+      '/api/v1/customer/monthly-raffle/tickets',
+      decode: (value) => MonthlyRaffleStatus.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
     );
   }
 
@@ -784,6 +918,8 @@ class MemoryCustomerEngagementRepository
     pushNotificationEnabled: true,
     marketingOptIn: false,
   );
+  int _pointBalance = 3000;
+  int _raffleTicketCount = 0;
 
   @override
   Future<CustomerProfile> getProfile() async {
@@ -792,6 +928,15 @@ class MemoryCustomerEngagementRepository
       reviewCount: _reviews.where((review) => review.isActive).length,
     );
     return _profile;
+  }
+
+  @override
+  Future<CustomerPointSummary> getPointSummary() async {
+    return const CustomerPointSummary(
+      balance: 0,
+      rewardRatePercent: 2.5,
+      histories: [],
+    );
   }
 
   @override
@@ -811,6 +956,36 @@ class MemoryCustomerEngagementRepository
       );
     }
     return _attendance(newlyChecked: newlyChecked);
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus() async {
+    return _memoryRaffleStatus();
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket() async {
+    if (_pointBalance >= 1000) {
+      _pointBalance -= 1000;
+      _raffleTicketCount++;
+    }
+    return _memoryRaffleStatus();
+  }
+
+  MonthlyRaffleStatus _memoryRaffleStatus() {
+    final now = DateTime.now();
+    final drawDate = now.day < 10
+        ? DateTime(now.year, now.month, 10)
+        : DateTime(now.year, now.month + 1, 10);
+    return MonthlyRaffleStatus(
+      pointBalance: _pointBalance,
+      ticketPrice: 1000,
+      purchaseRound:
+          '${drawDate.year}-${drawDate.month.toString().padLeft(2, '0')}',
+      nextDrawDate: drawDate,
+      purchasedTicketCount: _raffleTicketCount,
+      canPurchase: _pointBalance >= 1000,
+    );
   }
 
   CustomerAttendance _attendance({required bool newlyChecked}) {
