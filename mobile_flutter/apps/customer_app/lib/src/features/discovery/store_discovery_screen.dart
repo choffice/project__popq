@@ -10,11 +10,16 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
+
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
 import '../permissions/customer_permission_gateway.dart';
 import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
+import 'kakao_store_map_web_stub.dart'
+if (dart.library.js_interop) 'kakao_store_map_web.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
 
@@ -88,6 +93,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   int _walkingRouteRequestSerial = 0;
 
   _StoreFilterType _selectedFilter = _StoreFilterType.all;
+
+  bool _openOnly = false;
 
   bool _showSuggestions = false;
 
@@ -345,6 +352,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     };
   }
 
+  List<CustomerStore> get _mapStores {
+    final stores = _filteredStores;
+
+    if (!_openOnly) {
+      return stores;
+    }
+
+    return stores
+        .where((store) => store.businessStatus == 'OPEN')
+        .toList(growable: false);
+  }
+
   /*
  * 카카오맵 마커에 표시할 현재 찜 업체 ID입니다.
  *
@@ -368,59 +387,124 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return const [];
     }
 
-    return _filteredStores
+    /*
+   * 현재 지도 영역의 업체 중 검색어와 일치하는 업체를 찾습니다.
+   *
+   * _filteredStores는 서버에서 받은 거리순을 그대로 유지하므로,
+   * 여기서는 별도의 거리 계산이나 API 호출을 하지 않습니다.
+   */
+    final matchedStores = _filteredStores
         .where((store) {
-          final nameMatches = store.name.toLowerCase().contains(query);
+      final nameMatches =
+      store.name.toLowerCase().contains(query);
 
-          final addressMatches =
-              store.address?.toLowerCase().contains(query) ?? false;
+      final addressMatches =
+          store.address?.toLowerCase().contains(query) ?? false;
 
-          final categoryMatches = store.representativeCategory
-                  ?.toLowerCase()
-                  .contains(query) ??
+      final categoryMatches =
+          store.representativeCategory
+              ?.toLowerCase()
+              .contains(query) ??
               false;
 
-          final tagMatches = store.tags.any(
+      final tagMatches = store.tags.any(
             (tag) => tag.toLowerCase().contains(query),
-          );
+      );
 
-          return nameMatches ||
-              categoryMatches ||
-              addressMatches ||
-              tagMatches;
-        })
-        .take(5)
-        .toList();
+      return nameMatches ||
+          categoryMatches ||
+          addressMatches ||
+          tagMatches;
+    })
+        .toList(growable: false);
+
+    /*
+   * 검색 드롭다운에서는 영업 상태를 거리보다 우선합니다.
+   *
+   * 1. OPEN
+   * 2. PRE_OPEN
+   *
+   * 각 그룹 내부에서는 matchedStores의 기존 순서를 그대로
+   * 유지하므로 결과적으로 거리 가까운 순이 유지됩니다.
+   */
+    final openStores = matchedStores.where(
+          (store) => store.businessStatus == 'OPEN',
+    );
+
+    final preparingStores = matchedStores.where(
+          (store) => store.businessStatus == 'PRE_OPEN',
+    );
+
+    /*
+   * 현재 공개 탐색 API는 OPEN / PRE_OPEN만 내려주지만,
+   * 예상하지 못한 상태가 들어오더라도 검색 결과 자체가
+   * 사라지지는 않도록 마지막에 보존합니다.
+   */
+    final otherStores = matchedStores.where(
+          (store) =>
+      store.businessStatus != 'OPEN' &&
+          store.businessStatus != 'PRE_OPEN',
+    );
+
+    return <CustomerStore>[
+      ...openStores,
+      ...preparingStores,
+      ...otherStores,
+    ].take(5).toList(growable: false);
   }
 
   @override
   Widget build(BuildContext context) {
-    final stores = _filteredStores;
+    final stores = _mapStores;
+    // final stores = _filteredStores;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        KakaoStoreMap(
-          controller: _mapController,
-          stores: stores,
-          favoriteStoreIds: _favoriteStoreIds,
-          currentLocation: _controller.location,
-          searchCenter: _controller.searchCenter,
-          selectedStoreId: _selectedStore?.storeId,
-          onStoreSelected: _selectStore,
-          onViewportIdle: _onMapViewportIdle,
-        ),
+        if (!kIsWeb)
+          KakaoStoreMap(
+            controller: _mapController,
+            stores: stores,
+            favoriteStoreIds: _favoriteStoreIds,
+            currentLocation: _controller.location,
+            searchCenter: _controller.searchCenter,
+            selectedStoreId: _selectedStore?.storeId,
+            onStoreSelected: _selectStore,
+            onViewportIdle: _onMapViewportIdle,
+          )
+        else
+          KakaoStoreMapWeb(
+            controller: _mapController,
+            stores: stores,
+            favoriteStoreIds: _favoriteStoreIds,
+            currentLocation: _controller.location,
+            searchCenter: _controller.searchCenter,
+            onStoreSelected: _selectStore,
+            selectedStoreId: _selectedStore?.storeId,
+            onViewportIdle: _onMapViewportIdle,
+          ),
 
         _buildStatusOverlay(stores),
 
-        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _buildTopControls(),
+          ),
+        ),
 
         Positioned(
           right: 16,
           bottom: _selectedStore == null ? 20 : 158,
-          child: _CurrentLocationButton(
-            active: _controller.location != null,
-            onPressed: _useCurrentLocation,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _CurrentLocationButton(
+              active: _controller.location != null,
+              onPressed: _useCurrentLocation,
+            ),
           ),
         ),
 
@@ -429,7 +513,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: _SelectedStoreCard(
+              child: PointerInterceptor(
+                intercepting: kIsWeb,
+                child: _SelectedStoreCard(
               store: _selectedStore!,
               favorite: _isFavorite(_selectedStore!.storeId),
               favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
@@ -448,13 +534,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
               },
             ),
           ),
-
+          ),
         if (_showInitialLocationChoice)
           Positioned.fill(
-            child: _InitialLocationChoice(
-              requestingLocation: _requestingInitialLocation,
-              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
-              onContinueWithBusan: _continueWithBusan,
+            child: PointerInterceptor(
+              intercepting: kIsWeb,
+              child: _InitialLocationChoice(
+                requestingLocation: _requestingInitialLocation,
+                onUseCurrentLocation:
+                _useCurrentLocationFromInitialChoice,
+                onContinueWithBusan: _continueWithBusan,
+              ),
             ),
           ),
       ],
@@ -508,30 +598,50 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             onSelected: _selectFilter,
           ),
 
-        if (_controller.location != null && !_showSuggestions) ...[
+        if (!_showSuggestions) ...[
           const SizedBox(height: PopqSpacing.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Material(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
-              borderRadius: BorderRadius.circular(999),
-              elevation: 1,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                child: Text(
-                  '현재 위치 기준 10km 이내 · 가까운 순',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              if (_controller.location != null)
+                Material(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
+                  borderRadius: BorderRadius.circular(999),
+                  elevation: 1,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    child: Text(
+                      '현재 위치 기준 10km 이내 · 가까운 순',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
+              const Spacer(),
+
+              FilterChip(
+                label: const Text('영업중만'),
+                selected: _openOnly,
+                onSelected: _toggleOpenOnly,
+                avatar: Icon(
+                  _openOnly
+                      ? Icons.check_circle_rounded
+                      : Icons.schedule_rounded,
+                  size: 16,
+                ),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                labelStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ),
-        ],
-
-        if (_controller.isRefreshing && !_showSuggestions) ...[
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.center,
-            child: _MapRefreshIndicator(),
+            ],
           ),
         ],
       ],
@@ -593,10 +703,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
       DiscoveryStatus.data when filteredStores.isEmpty => Center(
         child: _MapStatusCard(
-          icon: _selectedFilter == _StoreFilterType.favorites
+          icon: _openOnly
+              ? Icons.schedule_rounded
+              : _selectedFilter == _StoreFilterType.favorites
               ? Icons.favorite_border_rounded
               : Icons.filter_alt_off_rounded,
-          message: _selectedFilter == _StoreFilterType.favorites
+          message: _openOnly
+              ? '현재 영업 중인 업체가 없습니다.'
+              : _selectedFilter == _StoreFilterType.favorites
               ? '이 지도 영역에 찜한 업체가 없습니다.'
               : '선택한 분류의 업체가 없습니다.',
         ),
@@ -604,6 +718,24 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
       DiscoveryStatus.data => const SizedBox.shrink(),
     };
+  }
+
+  void _toggleOpenOnly(bool value) {
+    setState(() {
+      _openOnly = value;
+
+      /*
+     * 영업중만을 켠 순간 현재 선택된 업체가 영업 중이 아니라면
+     * 지도에서 사라지는 업체의 선택 카드만 함께 정리합니다.
+     *
+     * OPEN 업체를 선택한 상태라면 카드는 그대로 유지합니다.
+     */
+      if (_openOnly &&
+          _selectedStore != null &&
+          _selectedStore!.businessStatus != 'OPEN') {
+        _clearSelectedStoreState();
+      }
+    });
   }
 
   void _selectFilter(_StoreFilterType filter) {
@@ -1364,10 +1496,20 @@ class _SearchSuggestionPanel extends StatelessWidget {
                       imageUrl: store.imageUrl,
                       fallbackIcon: _storeTypeIcon(store.storeType),
                     ),
-                    title: Text(
-                      store.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            store.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StoreBusinessStatusBadge(
+                          businessStatus: store.businessStatus,
+                        ),
+                      ],
                     ),
                     subtitle: Text(
                       [
@@ -1385,6 +1527,47 @@ class _SearchSuggestionPanel extends StatelessWidget {
                   );
                 },
               ),
+      ),
+    );
+  }
+}
+
+class _StoreBusinessStatusBadge extends StatelessWidget {
+  const _StoreBusinessStatusBadge({
+    required this.businessStatus,
+  });
+
+  final String businessStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isOpen = businessStatus == 'OPEN';
+    final bool isPreparing = businessStatus == 'PRE_OPEN';
+
+    if (!isOpen && !isPreparing) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: isOpen
+            ? const Color(0xFFB7FF00)
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        isOpen ? '영업중' : '영업준비중',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: isOpen
+              ? const Color(0xFF08110E)
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }

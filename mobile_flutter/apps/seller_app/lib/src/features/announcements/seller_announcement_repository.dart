@@ -71,6 +71,10 @@ abstract interface class SellerAnnouncementRepository {
   Future<List<SellerAnnouncement>> findAll(int storeId);
 
   Future<String> uploadAnnouncementImage(
+    String filePath,
+  );
+
+  Future<String> uploadAnnouncementImageBytes(
     Uint8List bytes, {
     required String fileName,
   });
@@ -203,6 +207,25 @@ class ApiSellerAnnouncementRepository implements SellerAnnouncementRepository {
 
   @override
   Future<String> uploadAnnouncementImage(
+    String filePath,
+  ) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (Object? value) {
+        final json = Map<String, Object?>.from(value as Map);
+        final imageUrl = json['imageUrl'];
+        if (imageUrl is! String || imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return imageUrl;
+      },
+    );
+  }
+
+  @override
+  Future<String> uploadAnnouncementImageBytes(
     Uint8List bytes, {
     required String fileName,
   }) {
@@ -250,6 +273,13 @@ class MemorySellerAnnouncementRepository
 
   @override
   Future<String> uploadAnnouncementImage(
+    String filePath,
+  ) async {
+    return filePath;
+  }
+
+  @override
+  Future<String> uploadAnnouncementImageBytes(
     Uint8List bytes, {
     required String fileName,
   }) async {

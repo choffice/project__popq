@@ -1,6 +1,7 @@
-import 'dart:io';
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,6 +10,8 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'business_registration_ocr_service.dart';
 import 'seller_business_schedule.dart';
 import 'seller_store_location_picker_screen.dart';
+import 'seller_local_file_image_io.dart'
+    if (dart.library.html) 'seller_local_file_image_web.dart';
 import 'seller_phone_input.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
@@ -125,6 +128,7 @@ class _SellerStoreRegistrationScreenState
   final ImagePicker _imagePicker = ImagePicker();
 
   XFile? _selectedRepresentativeImage;
+  Uint8List? _selectedRepresentativeImageBytes;
 
   bool _pickingRepresentativeImage = false;
 
@@ -721,8 +725,14 @@ class _SellerStoreRegistrationScreenState
                 ),
               ),
             )
-                : Image.file(
-              File(selectedImage.path),
+                : kIsWeb
+                ? Image.memory(
+              _selectedRepresentativeImageBytes!,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            )
+                : buildSellerLocalFileImage(
+              selectedImage.path,
               width: double.infinity,
               fit: BoxFit.cover,
               errorBuilder: (
@@ -2581,9 +2591,14 @@ class _SellerStoreRegistrationScreenState
         return;
       }
 
+      final Uint8List? selectedImageBytes =
+      kIsWeb ? await selectedImage.readAsBytes() : null;
+
       setState(() {
         _selectedRepresentativeImage =
             selectedImage;
+        _selectedRepresentativeImageBytes =
+            selectedImageBytes;
 
         _pickingRepresentativeImage = false;
       });
@@ -2617,6 +2632,7 @@ class _SellerStoreRegistrationScreenState
 
     setState(() {
       _selectedRepresentativeImage = null;
+      _selectedRepresentativeImageBytes = null;
     });
 
     _showMessage(
@@ -3475,11 +3491,15 @@ class _SellerStoreRegistrationScreenState
           '대표 사진을 업로드하고 있습니다.',
         );
 
-        representativeImageUrl =
-        await widget.repository
-            .uploadRepresentativeImage(
-          selectedImage.path,
-        );
+        representativeImageUrl = kIsWeb
+            ? await widget.repository.uploadRepresentativeImageBytes(
+                _selectedRepresentativeImageBytes ??
+                    await selectedImage.readAsBytes(),
+                fileName: selectedImage.name,
+              )
+            : await widget.repository.uploadRepresentativeImage(
+                selectedImage.path,
+              );
 
         if (!mounted) {
           return;
@@ -3616,8 +3636,12 @@ class _SellerStoreRegistrationScreenState
       final List<XFile>? files = response.files;
 
       if (files != null && files.isNotEmpty) {
+        final XFile recoveredImage = files.first;
+        final Uint8List? recoveredImageBytes =
+        kIsWeb ? await recoveredImage.readAsBytes() : null;
         setState(() {
-          _selectedRepresentativeImage = files.first;
+          _selectedRepresentativeImage = recoveredImage;
+          _selectedRepresentativeImageBytes = recoveredImageBytes;
         });
 
         _showMessage(

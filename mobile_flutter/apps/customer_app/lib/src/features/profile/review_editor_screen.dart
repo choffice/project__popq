@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -97,10 +98,12 @@ class _ReviewEditorScreenState extends State<ReviewEditorScreen> {
       final bytes = _pickedImageBytes;
       final file = _pickedImage;
       if (bytes != null && bytes.isNotEmpty && file != null) {
-        imageUrl = await widget.repository.uploadReviewImage(
-          bytes,
-          fileName: file.name,
-        );
+        imageUrl = kIsWeb
+            ? await widget.repository.uploadReviewImage(
+                bytes,
+                fileName: file.name,
+              )
+            : await widget.repository.uploadReviewImageFile(file.path);
       }
       await widget.repository.createReview(
         orderPublicId: widget.orderPublicId,

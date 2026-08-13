@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -354,6 +355,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 
       final Uint8List? imageBytes = draft.imageBytes;
       final String? imageFileName = draft.imageFileName;
+      final String? imageFilePath = draft.imageFilePath;
       final bool hasNewImageSelection =
           imageBytes != null || imageFileName != null;
 
@@ -365,13 +367,19 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
         throw StateError('선택한 공지 이미지 데이터를 읽지 못했습니다.');
       }
 
-      if (imageBytes != null &&
-          imageBytes.isNotEmpty &&
-          imageFileName != null &&
-          imageFileName.trim().isNotEmpty) {
+      if (kIsWeb) {
+        if (imageBytes != null &&
+            imageBytes.isNotEmpty &&
+            imageFileName != null &&
+            imageFileName.trim().isNotEmpty) {
+          imageUrl = await widget.repository.uploadAnnouncementImageBytes(
+            imageBytes,
+            fileName: imageFileName,
+          );
+        }
+      } else if (imageFilePath != null && imageFilePath.trim().isNotEmpty) {
         imageUrl = await widget.repository.uploadAnnouncementImage(
-          imageBytes,
-          fileName: imageFileName,
+          imageFilePath,
         );
       }
 
@@ -547,6 +555,7 @@ class _AnnouncementDraft {
     this.imageUrl,
     this.imageBytes,
     this.imageFileName,
+    this.imageFilePath,
     this.removeImage = false,
   });
 
@@ -556,6 +565,7 @@ class _AnnouncementDraft {
   final String? imageUrl;
   final Uint8List? imageBytes;
   final String? imageFileName;
+  final String? imageFilePath;
   final bool removeImage;
 
   final bool notifyInterestedCustomers;
@@ -691,6 +701,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 imageUrl: _removeImage ? null : widget.announcement?.imageUrl,
                 imageBytes: _pickedImageBytes,
                 imageFileName: _pickedImage?.name,
+                imageFilePath: _pickedImage?.path,
                 removeImage: _removeImage,
                 notifyInterestedCustomers: _notifyInterestedCustomers,
               ),

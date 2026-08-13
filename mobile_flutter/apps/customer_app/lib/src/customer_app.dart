@@ -124,6 +124,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
 
+  bool get _isWebDevelopment =>
+      kIsWeb &&
+          widget.environment.flavor ==
+              AppFlavor.development;
+
   @override
   void initState() {
     super.initState();
@@ -181,10 +186,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    _googleAuthService = GoogleAuthService(
-      webClientId:
-          '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-    );
+
+    if (!_isWebDevelopment) {
+      _googleAuthService = GoogleAuthService(
+        webClientId:
+        '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+      );
+    }
 
     _authRepository =
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
@@ -281,12 +289,18 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
-      onGoogleSignIn: _googleSignIn,
-      onKakaoSignIn: _kakaoSignIn,
-      onNaverSignIn: _naverSignIn,
-      onGoogleLink: _googleLink,
-      onKakaoLink: _kakaoLink,
-      onNaverLink: _naverLink,
+      onGoogleSignIn:
+      _isWebDevelopment ? null : _googleSignIn,
+      onKakaoSignIn:
+      _isWebDevelopment ? null : _kakaoSignIn,
+      onNaverSignIn:
+      _isWebDevelopment ? null : _naverSignIn,
+      onGoogleLink:
+      _isWebDevelopment ? null : _googleLink,
+      onKakaoLink:
+      _isWebDevelopment ? null : _kakaoLink,
+      onNaverLink:
+      _isWebDevelopment ? null : _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -727,6 +741,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   Future<void> _registerPushDevice() async {
+    if (kIsWeb &&
+        widget.environment.flavor == AppFlavor.development) {
+      debugPrint(
+        'Customer Web development: FCM 기기 등록을 건너뜁니다.',
+      );
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 
