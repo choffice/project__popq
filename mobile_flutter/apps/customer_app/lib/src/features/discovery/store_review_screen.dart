@@ -126,9 +126,7 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                                             semanticLabel:
                                                 review.authorEmblemLabel,
                                           ),
-                                          const SizedBox(
-                                            width: PopqSpacing.xs,
-                                          ),
+                                          const SizedBox(width: PopqSpacing.xs),
                                         ],
                                         Expanded(
                                           child: Text(
@@ -147,6 +145,14 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                                         if (review.content?.trim().isNotEmpty ==
                                             true)
                                           Text(review.content!),
+                                        if (review.imageUrl != null) ...[
+                                          const SizedBox(
+                                            height: PopqSpacing.sm,
+                                          ),
+                                          _ReviewImage(
+                                            imageUrl: review.imageUrl!,
+                                          ),
+                                        ],
                                         if (review.sellerReply
                                                 ?.trim()
                                                 .isNotEmpty ==
@@ -172,6 +178,31 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                 },
           );
         },
+      ),
+    );
+  }
+}
+
+class _ReviewImage extends StatelessWidget {
+  const _ReviewImage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
       ),
     );
   }

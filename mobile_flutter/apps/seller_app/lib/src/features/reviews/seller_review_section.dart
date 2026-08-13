@@ -41,9 +41,9 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
 
     debugPrint(
       '[SELLER REVIEW] didUpdateWidget '
-          'oldStore=${oldWidget.storeId} '
-          'newStore=${widget.storeId} '
-          'sameRepository=${identical(oldWidget.repository, widget.repository)}',
+      'oldStore=${oldWidget.storeId} '
+      'newStore=${widget.storeId} '
+      'sameRepository=${identical(oldWidget.repository, widget.repository)}',
     );
 
     if (oldWidget.storeId != widget.storeId) {
@@ -127,7 +127,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
   String _reviewSummary() {
     final reviews = _allReviews ?? const <SellerReview>[];
     if (reviews.isEmpty) return '전체 평점 - · 리뷰 0개';
-    final average = reviews.map((item) => item.rating).reduce((a, b) => a + b) /
+    final average =
+        reviews.map((item) => item.rating).reduce((a, b) => a + b) /
         reviews.length;
     return '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${reviews.length}개';
   }
@@ -137,10 +138,7 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       return const PopqLoadingView(message: '리뷰를 불러오고 있어요.');
     }
     if (_error != null || _allReviews == null) {
-      return PopqErrorView(
-        message: '리뷰를 불러오지 못했습니다.',
-        onRetry: _reload,
-      );
+      return PopqErrorView(message: '리뷰를 불러오지 못했습니다.', onRetry: _reload);
     }
     if (_allReviews!.isEmpty) {
       return const PopqEmptyView(
@@ -208,6 +206,26 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
               const SizedBox(height: PopqSpacing.sm),
               Text(review.content!),
             ],
+            if (review.imageUrl != null) ...[
+              const SizedBox(height: PopqSpacing.sm),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    review.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    ),
+                  ),
+                ),
+              ),
+            ],
             if (review.sellerReply?.isNotEmpty ?? false) ...[
               const Divider(),
               Text('사장님 답글\n${review.sellerReply!}'),
@@ -245,9 +263,9 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
 
     debugPrint(
       '[SELLER REVIEW] LOAD START '
-          'store=$storeId '
-          'serial=$requestSerial '
-          'repository=${identityHashCode(widget.repository)}',
+      'store=$storeId '
+      'serial=$requestSerial '
+      'repository=${identityHashCode(widget.repository)}',
     );
 
     setState(() {
@@ -262,25 +280,23 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
 
       debugPrint(
         '[SELLER REVIEW] LOAD SUCCESS '
-            'store=$storeId '
-            'serial=$requestSerial '
-            'count=${reviews.length} '
-            'currentSerial=$_requestSerial '
-            'currentStore=${widget.storeId}',
+        'store=$storeId '
+        'serial=$requestSerial '
+        'count=${reviews.length} '
+        'currentSerial=$_requestSerial '
+        'currentStore=${widget.storeId}',
       );
 
       if (!mounted) {
-        debugPrint(
-          '[SELLER REVIEW] RESULT IGNORED: unmounted',
-        );
+        debugPrint('[SELLER REVIEW] RESULT IGNORED: unmounted');
         return;
       }
 
       if (requestSerial != _requestSerial) {
         debugPrint(
           '[SELLER REVIEW] RESULT IGNORED: '
-              'serial mismatch '
-              '$requestSerial != $_requestSerial',
+          'serial mismatch '
+          '$requestSerial != $_requestSerial',
         );
         return;
       }
@@ -288,8 +304,8 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
       if (widget.storeId != storeId) {
         debugPrint(
           '[SELLER REVIEW] RESULT IGNORED: '
-              'store changed '
-              '$storeId -> ${widget.storeId}',
+          'store changed '
+          '$storeId -> ${widget.storeId}',
         );
         return;
       }
@@ -299,15 +315,13 @@ class _SellerReviewSectionState extends State<SellerReviewSection> {
         _loading = false;
       });
 
-      debugPrint(
-        '[SELLER REVIEW] UI READY count=${reviews.length}',
-      );
+      debugPrint('[SELLER REVIEW] UI READY count=${reviews.length}');
     } catch (error, stackTrace) {
       debugPrint(
         '[SELLER REVIEW] LOAD ERROR '
-            'store=$storeId '
-            'serial=$requestSerial '
-            'error=$error',
+        'store=$storeId '
+        'serial=$requestSerial '
+        'error=$error',
       );
       debugPrintStack(stackTrace: stackTrace);
 

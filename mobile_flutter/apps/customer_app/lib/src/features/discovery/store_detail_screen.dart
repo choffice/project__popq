@@ -546,34 +546,33 @@ class _LatestAnnouncementPreview extends StatelessWidget {
                   child: ListTile(
                     leading: latest.imageUrl?.trim().isNotEmpty == true
                         ? SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          latest.imageUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (
-                              BuildContext context,
-                              Object error,
-                              StackTrace? stackTrace,
-                              ) {
-                            return Container(
-                              alignment: Alignment.center,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
-                              child: const Icon(
-                                Icons.campaign_outlined,
+                            width: 56,
+                            height: 56,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                latest.imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (
+                                      BuildContext context,
+                                      Object error,
+                                      StackTrace? stackTrace,
+                                    ) {
+                                      return Container(
+                                        alignment: Alignment.center,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerHighest,
+                                        child: const Icon(
+                                          Icons.campaign_outlined,
+                                        ),
+                                      );
+                                    },
                               ),
-                            );
-                          },
-                        ),
-                      ),
-                    )
-                        : const Icon(
-                      Icons.campaign_outlined,
-                    ),
+                            ),
+                          )
+                        : const Icon(Icons.campaign_outlined),
                     title: Row(
                       children: <Widget>[
                         if (latest.pinned) ...<Widget>[
@@ -818,6 +817,10 @@ class _StoreReviewSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (review.content != null) Text(review.content!),
+                      if (review.imageUrl != null) ...[
+                        const SizedBox(height: PopqSpacing.sm),
+                        _ReviewImage(imageUrl: review.imageUrl!),
+                      ],
                       if (review.sellerReply?.isNotEmpty ?? false) ...[
                         const SizedBox(height: PopqSpacing.sm),
                         Container(
@@ -839,6 +842,31 @@ class _StoreReviewSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _ReviewImage extends StatelessWidget {
+  const _ReviewImage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
+      ),
     );
   }
 }

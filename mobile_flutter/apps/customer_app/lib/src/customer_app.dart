@@ -27,6 +27,7 @@ import 'features/orders/pending_payment_recovery_service.dart';
 import 'features/permissions/customer_permission_gateway.dart';
 import 'features/profile/customer_attendance_dialog.dart';
 import 'features/profile/customer_engagement_repository.dart';
+import 'features/support/customer_support_repository.dart';
 import 'notifications/customer_push_notification_service.dart';
 import 'notifications/customer_app_badge_service.dart';
 import 'realtime/customer_realtime_scope.dart';
@@ -43,6 +44,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.orderRepository,
     this.orderMessageRepository,
     this.engagementRepository,
+    this.supportRepository,
     this.notificationRepository,
     this.locationRepository,
     this.cartController,
@@ -63,6 +65,7 @@ class PopqCustomerApp extends StatefulWidget {
   final CustomerOrderRepository? orderRepository;
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
+  final CustomerSupportRepository? supportRepository;
   final CustomerNotificationRepository? notificationRepository;
   final CustomerLocationRepository? locationRepository;
   final CartController? cartController;
@@ -98,6 +101,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final CustomerNotificationRepository _notificationRepository;
   late final CustomerOrderRepository _orderRepository;
   late final CustomerEngagementRepository _engagementRepository;
+  late final CustomerSupportRepository _supportRepository;
   late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
@@ -119,6 +123,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   bool _attendanceDialogScheduled = false;
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
+
+  bool get _isWebDevelopment =>
+      kIsWeb &&
+          widget.environment.flavor ==
+              AppFlavor.development;
 
   @override
   void initState() {
@@ -177,10 +186,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
     _sessionController.addListener(_handleSessionChanged);
 
-    _googleAuthService = GoogleAuthService(
-      webClientId:
-          '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-    );
+
+    if (!_isWebDevelopment) {
+      _googleAuthService = GoogleAuthService(
+        webClientId:
+        '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+      );
+    }
 
     _authRepository =
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
@@ -225,6 +237,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
           imageBaseUrl: widget.environment.apiBaseUrl,
         );
 
+    _supportRepository =
+        widget.supportRepository ??
+            ApiCustomerSupportRepository(_apiClient);
+
     _notificationRepository =
         widget.notificationRepository ??
         ApiCustomerNotificationRepository(_apiClient);
@@ -258,6 +274,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
       engagementRepository: _engagementRepository,
+      supportRepository: _supportRepository,
       activitySummaryListenable: _activitySummaryNotifier,
       notificationRepository: _notificationRepository,
       locationRepository: locationRepository,
@@ -272,12 +289,18 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
-      onGoogleSignIn: _googleSignIn,
-      onKakaoSignIn: _kakaoSignIn,
-      onNaverSignIn: _naverSignIn,
-      onGoogleLink: _googleLink,
-      onKakaoLink: _kakaoLink,
-      onNaverLink: _naverLink,
+      onGoogleSignIn:
+      _isWebDevelopment ? null : _googleSignIn,
+      onKakaoSignIn:
+      _isWebDevelopment ? null : _kakaoSignIn,
+      onNaverSignIn:
+      _isWebDevelopment ? null : _naverSignIn,
+      onGoogleLink:
+      _isWebDevelopment ? null : _googleLink,
+      onKakaoLink:
+      _isWebDevelopment ? null : _kakaoLink,
+      onNaverLink:
+      _isWebDevelopment ? null : _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -718,6 +741,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   Future<void> _registerPushDevice() async {
+    if (kIsWeb &&
+        widget.environment.flavor == AppFlavor.development) {
+      debugPrint(
+        'Customer Web development: FCM 기기 등록을 건너뜁니다.',
+      );
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 

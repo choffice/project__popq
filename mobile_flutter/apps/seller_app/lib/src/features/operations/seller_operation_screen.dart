@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -848,8 +849,12 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       if (image == null || !mounted) {
         return;
       }
-      final String uploadedUrl = await widget.storeRepository
-          .uploadRepresentativeImage(image.path);
+      final String uploadedUrl = kIsWeb
+          ? await widget.storeRepository.uploadRepresentativeImageBytes(
+              await image.readAsBytes(),
+              fileName: image.name,
+            )
+          : await widget.storeRepository.uploadRepresentativeImage(image.path);
       if (!mounted) {
         return;
       }

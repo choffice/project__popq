@@ -8,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'src/notifications/customer_push_notification_service.dart';
 import 'dart:ui';
 import 'src/notifications/customer_app_badge_service.dart';
+import 'package:flutter/foundation.dart';
 
 const naverClientId = String.fromEnvironment('NAVER_CLIENT_ID');
 const naverClientSecret = String.fromEnvironment('NAVER_CLIENT_SECRET');
@@ -31,12 +32,14 @@ Future<void> firebaseMessagingBackgroundHandler(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await NaverLoginSDK.initialize(
     clientId: naverClientId,
     clientSecret: naverClientSecret,
     clientName: 'POPQ',
   );
   await KakaoSdk.init(nativeAppKey: 'c4ae67811eeef68ede602afc04a8efbd',);
+
   await Firebase.initializeApp();
 
   FirebaseMessaging.onBackgroundMessage(

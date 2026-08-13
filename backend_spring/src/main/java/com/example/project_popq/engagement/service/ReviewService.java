@@ -57,7 +57,8 @@ public class ReviewService {
                         order,
                         user,
                         request.rating(),
-                        normalize(request.content())
+                        normalize(request.content()),
+                        normalize(request.imageUrl())
                 )
         );
         reviewRepository.flush();
@@ -71,7 +72,11 @@ public class ReviewService {
             UpsertReviewRequest request
     ) {
         Review review = requireOwnedActive(user, reviewId);
-        review.update(request.rating(), normalize(request.content()));
+        review.update(
+                request.rating(),
+                normalize(request.content()),
+                normalize(request.imageUrl())
+        );
         reviewRepository.flush();
         return toResponse(review);
     }
