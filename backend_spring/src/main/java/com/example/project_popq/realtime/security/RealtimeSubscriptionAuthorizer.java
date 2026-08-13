@@ -73,7 +73,15 @@ public class RealtimeSubscriptionAuthorizer {
         Pattern.compile(
             "^/user/queue/orders$"
         );
+    private static final Pattern ADMIN_SUPPORT_DESTINATION =
+        Pattern.compile(
+            "^/topic/admin/support/tickets$"
+        );
 
+    private static final Pattern REQUESTER_SUPPORT_DESTINATION =
+        Pattern.compile(
+            "^/user/queue/support/tickets$"
+        );
     /**
      * 기존 QR 게스트 주문 실시간 구독 경로입니다.
      *
@@ -169,6 +177,24 @@ public class RealtimeSubscriptionAuthorizer {
                 .matches()
         ) {
             authorizeCustomer(authentication);
+            return;
+        }
+
+        if (
+            ADMIN_SUPPORT_DESTINATION
+                .matcher(destination)
+                .matches()
+        ) {
+            authorizeSupportAdmin(authentication);
+            return;
+        }
+
+        if (
+            REQUESTER_SUPPORT_DESTINATION
+                .matcher(destination)
+                .matches()
+        ) {
+            authorizeSupportRequester(authentication);
             return;
         }
 
@@ -346,6 +372,41 @@ public class RealtimeSubscriptionAuthorizer {
         throw new AccessDeniedException(
             "주문 채팅 권한이 없습니다."
         );
+    }
+
+    private void authorizeSupportAdmin(
+        Authentication authentication
+    ) {
+        Jwt jwt = requireJwt(
+            authentication,
+            "관리자 인증이 필요합니다."
+        );
+
+        if (resolveRole(jwt) != PlatformRole.ADMIN) {
+            throw new AccessDeniedException(
+                "관리자 문의 구독 권한이 없습니다."
+            );
+        }
+    }
+
+    private void authorizeSupportRequester(
+        Authentication authentication
+    ) {
+        Jwt jwt = requireJwt(
+            authentication,
+            "문의 작성자 인증이 필요합니다."
+        );
+
+        PlatformRole role = resolveRole(jwt);
+
+        if (
+            role != PlatformRole.SELLER
+                && role != PlatformRole.CUSTOMER
+        ) {
+            throw new AccessDeniedException(
+                "개인 문의 구독 권한이 없습니다."
+            );
+        }
     }
 
     /**

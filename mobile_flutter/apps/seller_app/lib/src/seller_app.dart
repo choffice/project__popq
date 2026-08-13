@@ -24,6 +24,7 @@ import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
 import 'features/support/seller_support_memory_repository.dart';
+import 'features/support/seller_support_api_repository.dart';
 import 'features/support/seller_support_repository.dart';
 import 'notifications/seller_push_device_repository.dart';
 import 'notifications/seller_push_notification_service.dart';
@@ -225,7 +226,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         ApiSellerOperationalAlertRepository(_apiClient);
 
     _supportRepository =
-        widget.supportRepository ?? MemorySellerSupportRepository();
+        widget.supportRepository ??
+        ApiSellerSupportRepository(
+          _apiClient,
+          faqRepository: MemorySellerSupportRepository(),
+        );
 
     final identityRepository =
         widget.identityRepository ??
