@@ -718,6 +718,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   Future<void> _registerPushDevice() async {
+    if (kIsWeb &&
+        widget.environment.flavor == AppFlavor.development) {
+      debugPrint(
+        'Customer Web development: FCM 기기 등록을 건너뜁니다.',
+      );
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 

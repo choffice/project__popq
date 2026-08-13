@@ -33,12 +33,6 @@ Future<void> firebaseMessagingBackgroundHandler(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  final environment = AppEnvironment.fromEnvironment();
-
-  final bool skipFirebase =
-      kIsWeb &&
-          environment.flavor == AppFlavor.development;
-
   await NaverLoginSDK.initialize(
     clientId: naverClientId,
     clientSecret: naverClientSecret,
@@ -46,20 +40,13 @@ Future<void> main() async {
   );
   await KakaoSdk.init(nativeAppKey: 'c4ae67811eeef68ede602afc04a8efbd',);
 
-  if (!skipFirebase) {
-    await Firebase.initializeApp();
+  await Firebase.initializeApp();
 
-    FirebaseMessaging.onBackgroundMessage(
-      firebaseMessagingBackgroundHandler,
-    );
+  FirebaseMessaging.onBackgroundMessage(
+    firebaseMessagingBackgroundHandler,
+  );
 
-    await PushNotificationService.initialize();
-  } else {
-    debugPrint(
-      'Customer Web development: '
-          'Firebase/FCM 초기화를 건너뜁니다.',
-    );
-  }
+  await PushNotificationService.initialize();
 
-  runApp(PopqCustomerApp(environment: environment));
+  runApp(PopqCustomerApp(environment: AppEnvironment.fromEnvironment()));
 }
