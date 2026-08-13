@@ -6,6 +6,7 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../features/announcements/seller_announcement_repository.dart';
+import '../features/announcements/seller_platform_announcement_screens.dart';
 import '../features/auth/seller_bootstrap_controller.dart';
 import '../features/auth/seller_find_id_screen.dart';
 import '../features/auth/seller_find_password_screen.dart';
@@ -51,6 +52,7 @@ abstract final class SellerRoutes {
   static const orders = '/orders';
   static const customers = '/customers';
   static const notifications = '/notifications';
+  static const platformAnnouncements = '/announcements';
   static const my = '/my';
   static const myProfile = '/my/profile';
   static const support = '/support';
@@ -59,6 +61,10 @@ abstract final class SellerRoutes {
 
   static String supportTicketDetail(int supportTicketId) {
     return '$supportTickets/$supportTicketId';
+  }
+
+  static String platformAnnouncementDetail(int platformAnnouncementId) {
+    return '$platformAnnouncements/$platformAnnouncementId';
   }
 
   @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
@@ -73,6 +79,7 @@ GoRouter createSellerRouter({
   required SellerStoreSelectionController storeSelectionController,
   required SellerStoreRepository storeRepository,
   required SellerAnnouncementRepository announcementRepository,
+  required PlatformAnnouncementRepository platformAnnouncementRepository,
   required SellerOrderRepository orderRepository,
   required SellerProductRepository productRepository,
   required SellerAnalyticsRepository analyticsRepository,
@@ -270,6 +277,29 @@ GoRouter createSellerRouter({
             repository: operationalAlertRepository,
             storeRepository: storeRepository,
             selectionController: storeSelectionController,
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.platformAnnouncements,
+        builder: (context, state) {
+          return SellerPlatformAnnouncementListScreen(
+            repository: platformAnnouncementRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: '${SellerRoutes.platformAnnouncements}/:platformAnnouncementId',
+        builder: (context, state) {
+          final id = int.tryParse(
+            state.pathParameters['platformAnnouncementId'] ?? '',
+          );
+          if (id == null || id <= 0) {
+            return const PopqErrorView(message: '공지사항 번호가 올바르지 않습니다.');
+          }
+          return SellerPlatformAnnouncementDetailScreen(
+            platformAnnouncementId: id,
+            repository: platformAnnouncementRepository,
           );
         },
       ),

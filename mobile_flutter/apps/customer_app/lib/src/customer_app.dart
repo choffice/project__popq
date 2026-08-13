@@ -41,6 +41,7 @@ class PopqCustomerApp extends StatefulWidget {
     this.storeDiscoveryRepository,
     this.catalogRepository,
     this.announcementRepository,
+    this.platformAnnouncementRepository,
     this.orderRepository,
     this.orderMessageRepository,
     this.engagementRepository,
@@ -62,6 +63,7 @@ class PopqCustomerApp extends StatefulWidget {
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
   final PublicAnnouncementRepository? announcementRepository;
+  final PlatformAnnouncementRepository? platformAnnouncementRepository;
   final CustomerOrderRepository? orderRepository;
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
@@ -219,6 +221,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final announcementRepository = widget.announcementRepository ??
         ApiPublicAnnouncementRepository(_apiClient);
 
+    final platformAnnouncementRepository =
+        widget.platformAnnouncementRepository ??
+        ApiPlatformAnnouncementRepository(
+          _apiClient,
+          audience: PlatformAnnouncementAudience.customerApp,
+        );
+
     _orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
 
@@ -271,6 +280,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       storeDiscoveryRepository: storeDiscoveryRepository,
       catalogRepository: catalogRepository,
       announcementRepository: announcementRepository,
+      platformAnnouncementRepository: platformAnnouncementRepository,
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
       engagementRepository: _engagementRepository,

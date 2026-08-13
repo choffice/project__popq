@@ -27,7 +27,6 @@ import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.point.service.CustomerPointService;
-import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
 import java.util.Objects;
@@ -46,7 +45,6 @@ public class PaymentService {
     private final PaymentProviderRegistry paymentProviderRegistry;
     private final OrderDomainEventPublisher orderEventPublisher;
     private final PaymentProperties paymentProperties;
-    private final StoreOperatingHoursPolicy operatingHoursPolicy;
     private final CustomerPointService customerPointService;
 
     @Transactional(noRollbackFor = PaymentProcessingException.class)
@@ -694,10 +692,7 @@ public class PaymentService {
             );
         }
 
-        if (!operatingHoursPolicy.isEffectivelyOrderAccepting(
-            order.getStore(),
-            now
-        )) {
+        if (!order.getStore().isOrderAccepting()) {
             throw new BusinessException(
                 ErrorCode.STORE_NOT_OPEN
             );

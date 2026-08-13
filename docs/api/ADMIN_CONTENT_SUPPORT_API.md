@@ -67,9 +67,10 @@ PATCH /api/v1/admin/content/announcements/{id}/status
 ```text
 GET /api/v1/public/content/announcements?audience=CUSTOMER_APP
 GET /api/v1/public/content/announcements?audience=SELLER_APP
+GET /api/v1/public/content/announcements/{id}?audience=CUSTOMER_APP
 ```
 
-공개 조회는 게시 상태이고 현재 시각이 게시 시작·종료 범위에 포함되는 공지만 반환한다.
+공개 목록·상세 조회는 게시 상태이고 현재 시각이 게시 시작·종료 범위에 포함되며 요청한 앱 대상 또는 `ALL`인 공지만 반환한다.
 
 ## FAQ
 
@@ -140,4 +141,4 @@ PATCH /api/v1/admin/support/tickets/{ticketId}/status
 
 ## 앱 연결 상태
 
-현재 저장소의 `mobile_flutter`는 Flutter 기본 카운터 예제이므로 실제 구매자·판매자 앱 화면에는 연결하지 않았다. 위 공개/인증 API는 앱 코드가 저장소에 추가되면 바로 연동할 수 있는 계약이다.
+구매자 앱과 판매자 앱의 마이 메뉴 `공지사항`에서 대상 앱에 맞는 플랫폼 공지 목록과 상세를 조회한다. seller_web 관리자가 `ALL`, `CUSTOMER_APP`, `SELLER_APP` 대상으로 게시한 공지는 게시 기간과 대상 조건에 따라 각 앱에 노출된다.

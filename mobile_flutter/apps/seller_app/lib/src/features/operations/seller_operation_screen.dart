@@ -247,8 +247,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     final theme = Theme.of(context);
     final bool canManage = _canManage(store);
     final bool canChangeType = store.isOwner;
-    final bool operationEnded =
-        store.businessStatus == 'CLOSED' || store.status != 'ACTIVE';
+    final bool operationUnavailable = store.status != 'ACTIVE';
 
     return ListView(
       padding: const EdgeInsets.all(PopqSpacing.lg),
@@ -274,14 +273,14 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    operationEnded ? '운영 종료' : '영업 준비',
+                    operationUnavailable ? '운영 중지' : '영업 상태',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 Switch(
-                  value: store.businessStatus == 'OPEN' && !operationEnded,
+                  value: store.businessStatus == 'OPEN' && !operationUnavailable,
                   onChanged: !canManage ||
-                          operationEnded ||
+                          operationUnavailable ||
                           _changingStatus ||
                           _savingQuickEdit
                       ? null
@@ -291,11 +290,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 ),
                 const SizedBox(width: PopqSpacing.xs),
                 Text(
-                  operationEnded
-                      ? '종료됨'
+                  operationUnavailable
+                      ? '중지됨'
                       : store.businessStatus == 'OPEN'
                           ? '영업 중'
-                          : '준비 중',
+                          : '준비중',
                   style: theme.textTheme.titleMedium,
                 ),
               ],

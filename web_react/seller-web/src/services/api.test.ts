@@ -457,7 +457,7 @@ describe('판매자 주문 API 계약', () => {
         ),
     )
 
-    await changeStoreBusinessStatus(connection, 'CLOSED')
+    await changeStoreBusinessStatus(connection, 'PRE_OPEN')
     await createStoreTable(connection, 'WINDOW-08', 'Window 08')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -465,7 +465,7 @@ describe('판매자 주문 API 계약', () => {
       '/api/v1/seller/stores/7/business-status',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ businessStatus: 'CLOSED' }),
+        body: JSON.stringify({ businessStatus: 'PRE_OPEN' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(

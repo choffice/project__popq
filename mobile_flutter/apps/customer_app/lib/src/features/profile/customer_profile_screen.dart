@@ -325,7 +325,9 @@ class _CustomerProfileScreenState
                     title: '공지사항',
                     subtitle:
                     '버그 수정 / 업데이트 내역',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(CustomerRoutes.platformAnnouncements);
+                    },
                   ),
                   _MenuRowData(
                     icon:
@@ -669,16 +671,6 @@ class _CustomerProfileScreenState
         setState(() => _uploadingProfileImage = false);
       }
     }
-  }
-
-  void _showComingSoon() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentTopSnackBar()
-      ..showTopSnackBar(
-        const SnackBar(
-          content: Text('준비 중인 기능이에요.'),
-        ),
-      );
   }
 
   Future<void> _signOut() async {

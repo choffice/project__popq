@@ -16,6 +16,7 @@ import '../features/cart/cart_screen.dart';
 import '../features/catalog/catalog_repository.dart';
 import '../features/announcements/public_announcement_repository.dart';
 import '../features/announcements/public_announcement_screens.dart';
+import '../features/announcements/customer_platform_announcement_screens.dart';
 import '../features/catalog/product_detail_screen.dart';
 import '../features/catalog/product_list_screen.dart';
 import '../features/discovery/store_detail_screen.dart';
@@ -77,12 +78,17 @@ abstract final class CustomerRoutes {
   static const visitHistory = '/visit-history';
   static const notifications = '/notifications';
   static const notificationSettings = '/notification-settings';
+  static const platformAnnouncements = '/announcements';
   static const support = '/support';
   static const supportInquiryForm = '/support/inquiries/new';
   static const supportInquiries = '/support/inquiries';
 
   static String supportInquiryDetail(int supportInquiryId) {
     return '$supportInquiries/$supportInquiryId';
+  }
+
+  static String platformAnnouncementDetail(int platformAnnouncementId) {
+    return '$platformAnnouncements/$platformAnnouncementId';
   }
 
   static String orderMessages(String orderPublicId) {
@@ -97,6 +103,7 @@ GoRouter createCustomerRouter({
   required StoreDiscoveryRepository storeDiscoveryRepository,
   required CatalogRepository catalogRepository,
   required PublicAnnouncementRepository announcementRepository,
+  required PlatformAnnouncementRepository platformAnnouncementRepository,
   required CustomerOrderRepository orderRepository,
   required CustomerOrderMessageRepository orderMessageRepository,
   required CustomerEngagementRepository engagementRepository,
@@ -457,6 +464,29 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.notifications,
         builder: (context, state) {
           return NotificationListScreen(repository: notificationRepository);
+        },
+      ),
+      GoRoute(
+        path: CustomerRoutes.platformAnnouncements,
+        builder: (context, state) {
+          return CustomerPlatformAnnouncementListScreen(
+            repository: platformAnnouncementRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: '${CustomerRoutes.platformAnnouncements}/:platformAnnouncementId',
+        builder: (context, state) {
+          final id = int.tryParse(
+            state.pathParameters['platformAnnouncementId'] ?? '',
+          );
+          if (id == null || id <= 0) {
+            return const PopqErrorView(message: '공지사항 번호가 올바르지 않습니다.');
+          }
+          return CustomerPlatformAnnouncementDetailScreen(
+            platformAnnouncementId: id,
+            repository: platformAnnouncementRepository,
+          );
         },
       ),
       GoRoute(

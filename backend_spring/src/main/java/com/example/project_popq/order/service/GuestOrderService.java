@@ -22,7 +22,6 @@ import com.example.project_popq.qr.repository.GuestSessionRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.store.domain.Store;
-import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -45,7 +44,6 @@ public class GuestOrderService {
     private final OrderRepository orderRepository;
     private final OrderRequestHasher orderRequestHasher;
     private final OrderProperties properties;
-    private final StoreOperatingHoursPolicy operatingHoursPolicy;
 
     @Transactional
     public OrderResponse create(
@@ -70,7 +68,7 @@ public class GuestOrderService {
                 ));
         Instant now = Instant.now();
         Store store = guestSession.getQrCode().getStore();
-        if (!operatingHoursPolicy.isEffectivelyOrderAccepting(store, now)) {
+        if (!store.isOrderAccepting()) {
             throw new BusinessException(ErrorCode.STORE_NOT_OPEN);
         }
         Order order = Order.createGuestOrder(

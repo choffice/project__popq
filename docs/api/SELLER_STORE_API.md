@@ -58,5 +58,10 @@
 
 `PATCH /api/v1/seller/stores/{storeId}/business-status`
 
-`PREPARING`, `OPEN`, `CLOSED` 중 하나로 변경한다.
+`PRE_OPEN`, `OPEN` 중 하나로 변경한다.
 
+- `PRE_OPEN`: 준비중. 신규 주문을 받지 않는다.
+- `OPEN`: 영업중. `orderAcceptingEnabled=true`이면 신규 주문을 받는다.
+
+등록 영업시간과 휴무 일정은 구매자 안내용 정보이며 영업 상태를 자동으로
+변경하지 않는다. 영업 시작과 준비중 전환은 판매자가 직접 수행한다.

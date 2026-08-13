@@ -420,7 +420,7 @@ public class StoreApplicationService {
         }
 
         store.changeBusinessStatus(
-            BusinessStatus.CLOSED
+            BusinessStatus.PRE_OPEN
         );
 
         store.updateOperatingPolicy(

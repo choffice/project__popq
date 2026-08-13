@@ -1,6 +1,6 @@
 # 공개 스토어 탐색 API
 
-소비자 앱이 인증 없이 영업 중인 스토어를 탐색하는 읽기 전용 계약이다. `status=ACTIVE`, `businessStatus=OPEN`인 스토어만 노출한다.
+소비자 앱이 인증 없이 활성 스토어를 탐색하는 읽기 전용 계약이다. `status=ACTIVE`이고 `businessStatus`가 `PRE_OPEN` 또는 `OPEN`인 스토어를 노출한다. 등록 영업시간과 휴무 일정은 방문 안내용 정보이며 주문 가능 여부를 자동으로 결정하지 않는다.
 
 ## 검색
 
@@ -70,6 +70,6 @@ GET /api/v1/public/stores/{storeId}
 - `GET /api/v1/public/stores/{storeId}/products`
 - `GET /api/v1/public/stores/{storeId}/products/{productId}`
 
-인증 없이 조회할 수 있지만 `ACTIVE + OPEN` 스토어의 `ACTIVE` 상품 중 `customerAppEnabled=true`이고 판매 기간 안에 있는 상품만 노출한다. 목록은 품절 상품을 포함해 품절 상태를 표시할 수 있으며, 회원 주문 생성 시 서버가 판매 가능 상태를 다시 검증한다.
+인증 없이 조회할 수 있지만 활성 스토어의 `ACTIVE` 상품 중 `customerAppEnabled=true`이고 판매 기간 안에 있는 상품만 노출한다. 목록은 품절 상품을 포함해 품절 상태를 표시할 수 있으며, 회원 주문 생성 시 서버가 `ACTIVE + OPEN + orderAcceptingEnabled=true`인지 다시 검증한다. 등록 영업시간은 주문 가능 검증 조건에 포함하지 않는다.
 
 상세 응답의 `optionGroups`는 각 그룹의 `minSelect`, `maxSelect`, `required`와 옵션별 `additionalPrice`를 제공한다. 클라이언트는 선택 UI를 구성할 때 사용하고 최종 검증과 가격 계산은 서버가 수행한다.
