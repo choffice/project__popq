@@ -175,6 +175,7 @@ class _ProductEditorState extends State<_ProductEditor> {
   late final TextEditingController _name;
   late final TextEditingController _description;
   late final TextEditingController _price;
+  String? _priceError;
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -240,7 +241,18 @@ class _ProductEditorState extends State<_ProductEditor> {
                 key: const Key('product-price'),
                 controller: _price,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: '기본 가격'),
+                onChanged: (_) {
+                  if (_priceError != null) {
+                    setState(() {
+                      _priceError = null;
+                    });
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: '기본 가격',
+                  suffixText: '원',
+                  errorText: _priceError,
+                ),
               ),
               TextField(
                 key: const Key('product-description'),
@@ -471,8 +483,37 @@ class _ProductEditorState extends State<_ProductEditor> {
 
   void _submit() {
     final name = _name.text.trim();
-    final price = int.tryParse(_price.text.trim());
-    if (name.isEmpty || price == null || price < 0) return;
+    final priceText = _price.text.trim();
+    final price = int.tryParse(priceText);
+
+    if (name.isEmpty) {
+      return;
+    }
+
+    if (priceText.isEmpty) {
+      setState(() {
+        _priceError = '기본 가격을 입력해주세요.';
+      });
+      return;
+    }
+
+    if (price == null) {
+      setState(() {
+        _priceError = '가격은 숫자로 입력해주세요.';
+      });
+      return;
+    }
+
+    if (price < 0) {
+      setState(() {
+        _priceError = '가격은 0원 이상이어야 합니다.';
+      });
+      return;
+    }
+
+    setState(() {
+      _priceError = null;
+    });
     Navigator.pop(
       context,
       SellerProductDraft(

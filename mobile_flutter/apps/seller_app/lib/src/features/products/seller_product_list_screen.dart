@@ -60,12 +60,20 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
           product.name.toLowerCase().contains(normalizedQuery) ||
           product.categoryName.toLowerCase().contains(normalizedQuery);
 
+      final bool hasAnySalesChannel =
+          product.qrWebEnabled || product.customerAppEnabled;
+
       final bool matchesFilter = switch (_filter) {
         _ProductFilter.all => true,
-        _ProductFilter.selling => !product.soldOut,
-        _ProductFilter.soldOut => product.soldOut,
+
+        _ProductFilter.selling =>
+        !product.soldOut && hasAnySalesChannel,
+
+        _ProductFilter.soldOut =>
+        product.soldOut,
+
         _ProductFilter.channelOff =>
-          !product.qrWebEnabled || !product.customerAppEnabled,
+        !product.qrWebEnabled || !product.customerAppEnabled,
       };
 
       return matchesQuery && matchesFilter;
@@ -570,13 +578,17 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
     }
 
     List<SellerStoreOptionTemplate> optionTemplates = const [];
+
     if (product == null) {
       try {
-        optionTemplates = await widget.repository.findOptionTemplates(_storeId);
+        optionTemplates =
+        await widget.repository.findOptionTemplates(_storeId);
       } catch (_) {
         if (!mounted) return;
-        _showMessage('매장 공용 옵션을 불러오지 못했습니다.');
-        return;
+        _showMessage(
+          '매장 공용 옵션을 불러오지 못했습니다. '
+              '옵션 없이 메뉴 등록은 계속할 수 있습니다.',
+        );
       }
     }
 
@@ -760,13 +772,13 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
 
       if (templateDeleteFailed) {
         _showMessage(
-          '현재 메뉴에서는 옵션을 제거했습니다. '
-          '다른 메뉴에서 사용 중이라 공용 옵션은 유지했습니다.',
+          '현재 메뉴의 옵션 변경은 저장됐지만, '
+              '일부 공용 옵션은 삭제하지 못해 그대로 유지했습니다.',
         );
       } else {
         _showMessage(
           '${saved.product.name} 옵션 그룹 '
-          '${saved.optionGroups.length}개를 저장했습니다.',
+              '${saved.optionGroups.length}개를 저장했습니다.',
         );
       }
     } catch (_) {
