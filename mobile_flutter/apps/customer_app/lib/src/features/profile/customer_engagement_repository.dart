@@ -531,7 +531,14 @@ abstract interface class CustomerEngagementRepository {
 
   Future<String> uploadProfileImage(String filePath);
 
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  });
+
   Future<String> uploadReviewImage(Uint8List bytes, {required String fileName});
+
+  Future<String> uploadReviewImageFile(String filePath);
 
   Future<bool> updateName(String name);
 
@@ -668,6 +675,23 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
       '/api/v1/users/me/profile-image',
       fieldName: 'file',
       filePath: filePath,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['imageUrl'] as String;
+      },
+    );
+  }
+
+  @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/users/me/profile-image',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
       decode: (value) {
         final json = Map<String, Object?>.from(value as Map);
         return json['imageUrl'] as String;
@@ -908,6 +932,23 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
       },
     );
   }
+
+  @override
+  Future<String> uploadReviewImageFile(String filePath) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/customer/review-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        final rawImageUrl = json['imageUrl'];
+        if (rawImageUrl is! String || rawImageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return _resolveImageUrl(rawImageUrl, _imageBaseUrl)!;
+      },
+    );
+  }
 }
 
 String? _resolveImageUrl(String? value, String? baseUrl) {
@@ -1064,11 +1105,26 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    final imageUrl = 'memory://profile-images/$fileName';
+    _profile = _profile.copyWith(profileImageUrl: imageUrl);
+    return imageUrl;
+  }
+
+  @override
   Future<String> uploadReviewImage(
     Uint8List bytes, {
     required String fileName,
   }) async {
     return 'memory://review-images/$fileName';
+  }
+
+  @override
+  Future<String> uploadReviewImageFile(String filePath) async {
+    return Uri.file(filePath).toString();
   }
 
   @override

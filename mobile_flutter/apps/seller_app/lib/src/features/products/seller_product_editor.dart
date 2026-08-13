@@ -17,6 +17,8 @@ class SellerProductDraft {
     required this.imageUrl,
     required this.basePrice,
     this.imageFilePath,
+    this.imageBytes,
+    this.imageFileName,
     this.removeImage = false,
   });
 
@@ -27,6 +29,8 @@ class SellerProductDraft {
   final int basePrice;
 
   final String? imageFilePath;
+  final Uint8List? imageBytes;
+  final String? imageFileName;
   final bool removeImage;
 }
 
@@ -399,6 +403,8 @@ class _ProductEditorState extends State<_ProductEditor> {
             ? null
             : widget.product?.imageUrl,
         imageFilePath: _pickedImage?.path,
+        imageBytes: _pickedImageBytes,
+        imageFileName: _pickedImage?.name,
         removeImage: _removeImage,
         basePrice: price,
       ),

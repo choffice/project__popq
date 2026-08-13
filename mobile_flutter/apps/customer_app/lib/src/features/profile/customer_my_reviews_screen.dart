@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -325,10 +326,12 @@ class _EditReviewDialogState extends State<_EditReviewDialog> {
       final bytes = _pickedImageBytes;
       final picked = _pickedImage;
       if (bytes != null && bytes.isNotEmpty && picked != null) {
-        imageUrl = await widget.repository.uploadReviewImage(
-          bytes,
-          fileName: picked.name,
-        );
+        imageUrl = kIsWeb
+            ? await widget.repository.uploadReviewImage(
+                bytes,
+                fileName: picked.name,
+              )
+            : await widget.repository.uploadReviewImageFile(picked.path);
       }
       final result = await widget.repository.updateReview(
         reviewId: widget.review.reviewId,

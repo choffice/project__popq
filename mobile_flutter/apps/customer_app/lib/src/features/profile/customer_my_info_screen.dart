@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -101,7 +102,14 @@ class _CustomerMyInfoScreenState extends State<CustomerMyInfoScreen> {
 
     setState(() => _uploadingProfileImage = true);
     try {
-      await widget.repository.uploadProfileImage(image.path);
+      if (kIsWeb) {
+        await widget.repository.uploadProfileImageBytes(
+          await image.readAsBytes(),
+          fileName: image.name,
+        );
+      } else {
+        await widget.repository.uploadProfileImage(image.path);
+      }
 
       if (!mounted) return;
       await _reloadProfile();

@@ -628,7 +628,14 @@ class _CustomerProfileScreenState
 
     setState(() => _uploadingProfileImage = true);
     try {
-      await widget.repository.uploadProfileImage(image.path);
+      if (kIsWeb) {
+        await widget.repository.uploadProfileImageBytes(
+          await image.readAsBytes(),
+          fileName: image.name,
+        );
+      } else {
+        await widget.repository.uploadProfileImage(image.path);
+      }
 
       if (!mounted) return;
       await _reload();
