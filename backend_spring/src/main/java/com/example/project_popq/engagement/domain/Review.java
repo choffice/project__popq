@@ -50,6 +50,9 @@ public class Review extends BaseTimeEntity {
     @Column(name = "content", length = 1000)
     private String content;
 
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Column(name = "seller_reply", length = 1000)
     private String sellerReply;
 
@@ -63,13 +66,30 @@ public class Review extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 30)
     private ReviewStatus status;
 
-    private Review(Order order, User user, int rating, String content) {
+    private Review(
+            Order order,
+            User user,
+            int rating,
+            String content,
+            String imageUrl
+    ) {
         this.order = order;
         this.user = user;
         this.store = order.getStore();
         this.rating = rating;
         this.content = content;
+        this.imageUrl = imageUrl;
         this.status = ReviewStatus.ACTIVE;
+    }
+
+    public static Review create(
+            Order order,
+            User user,
+            int rating,
+            String content,
+            String imageUrl
+    ) {
+        return new Review(order, user, rating, content, imageUrl);
     }
 
     public static Review create(
@@ -78,17 +98,23 @@ public class Review extends BaseTimeEntity {
             int rating,
             String content
     ) {
-        return new Review(order, user, rating, content);
+        return create(order, user, rating, content, null);
+    }
+
+    public void update(int rating, String content, String imageUrl) {
+        this.rating = rating;
+        this.content = content;
+        this.imageUrl = imageUrl;
     }
 
     public void update(int rating, String content) {
-        this.rating = rating;
-        this.content = content;
+        update(rating, content, this.imageUrl);
     }
 
     public void delete() {
         this.status = ReviewStatus.DELETED;
         this.content = null;
+        this.imageUrl = null;
     }
 
     public boolean belongsTo(Long userId) {

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
 
 import 'seller_business_schedule.dart';
@@ -509,6 +511,11 @@ abstract interface class SellerStoreRepository {
       String filePath,
       );
 
+  Future<String> uploadRepresentativeImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  });
+
   Future<SellerStore> create({
     required String storeType,
     required String name,
@@ -793,6 +800,28 @@ class ApiSellerStoreRepository
           );
         }
 
+        return imageUrl;
+      },
+    );
+  }
+
+  @override
+  Future<String> uploadRepresentativeImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (Object? value) {
+        final Map<String, Object?> json =
+            Map<String, Object?>.from(value as Map);
+        final Object? imageUrl = json['imageUrl'];
+        if (imageUrl is! String || imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
         return imageUrl;
       },
     );
@@ -1141,6 +1170,14 @@ class MemorySellerStoreRepository
       String filePath,
       ) async {
     return filePath;
+  }
+
+  @override
+  Future<String> uploadRepresentativeImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    return 'memory://store-images/$fileName';
   }
 
   @override

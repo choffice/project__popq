@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:popq_app_core/popq_app_core.dart';
@@ -74,7 +75,14 @@ class _SellerProfileScreenState extends State<SellerProfileScreen> {
 
     setState(() => _uploadingProfileImage = true);
     try {
-      await widget.identityRepository.uploadProfileImage(image.path);
+      if (kIsWeb) {
+        await widget.identityRepository.uploadProfileImageBytes(
+          await image.readAsBytes(),
+          fileName: image.name,
+        );
+      } else {
+        await widget.identityRepository.uploadProfileImage(image.path);
+      }
 
       if (!mounted) return;
       await _reload();

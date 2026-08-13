@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
@@ -836,12 +837,29 @@ class _SellerProductListScreenState
 
       // 새 사진을 선택하거나 촬영했다면
       // 상품을 저장하기 전에 이미지를 먼저 업로드한다.
-      if (imageFilePath != null &&
+      if (kIsWeb) {
+        final imageBytes = draft.imageBytes;
+        final imageFileName = draft.imageFileName;
+        final hasNewImage = imageFilePath != null && imageFilePath.isNotEmpty;
+        if (hasNewImage &&
+            (imageBytes == null ||
+                imageBytes.isEmpty ||
+                imageFileName == null ||
+                imageFileName.trim().isEmpty)) {
+          throw StateError('선택한 상품 이미지 데이터를 읽지 못했습니다.');
+        }
+        if (imageBytes != null &&
+            imageBytes.isNotEmpty &&
+            imageFileName != null &&
+            imageFileName.trim().isNotEmpty) {
+          imageUrl = await widget.repository.uploadProductImageBytes(
+            imageBytes,
+            fileName: imageFileName,
+          );
+        }
+      } else if (imageFilePath != null &&
           imageFilePath.trim().isNotEmpty) {
-        imageUrl =
-        await widget.repository.uploadProductImage(
-          imageFilePath,
-        );
+        imageUrl = await widget.repository.uploadProductImage(imageFilePath);
       }
 
       final SellerProduct saved =

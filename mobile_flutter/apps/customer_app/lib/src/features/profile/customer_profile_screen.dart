@@ -344,7 +344,11 @@ class _CustomerProfileScreenState
                     title: '고객센터',
                     subtitle:
                     '자주 묻는 질문과 1:1 문의를 할 수 있어요',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.support,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon: Icons.storefront_rounded,
@@ -628,7 +632,14 @@ class _CustomerProfileScreenState
 
     setState(() => _uploadingProfileImage = true);
     try {
-      await widget.repository.uploadProfileImage(image.path);
+      if (kIsWeb) {
+        await widget.repository.uploadProfileImageBytes(
+          await image.readAsBytes(),
+          fileName: image.name,
+        );
+      } else {
+        await widget.repository.uploadProfileImage(image.path);
+      }
 
       if (!mounted) return;
       await _reload();

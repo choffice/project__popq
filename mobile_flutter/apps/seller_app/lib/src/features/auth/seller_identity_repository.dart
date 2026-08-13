@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
 
 class SellerIdentity {
@@ -52,6 +54,11 @@ abstract interface class SellerIdentityRepository {
   Future<SellerIdentity> getCurrent();
 
   Future<String> uploadProfileImage(String filePath);
+
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  });
 }
 
 class ApiSellerIdentityRepository implements SellerIdentityRepository {
@@ -83,6 +90,23 @@ class ApiSellerIdentityRepository implements SellerIdentityRepository {
       },
     );
   }
+
+  @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/users/me/profile-image',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['imageUrl'] as String;
+      },
+    );
+  }
 }
 
 class MemorySellerIdentityRepository implements SellerIdentityRepository {
@@ -103,6 +127,16 @@ class MemorySellerIdentityRepository implements SellerIdentityRepository {
   @override
   Future<String> uploadProfileImage(String filePath) async {
     final imageUrl = Uri.file(filePath).toString();
+    _identity = _identity.copyWith(profileImageUrl: imageUrl);
+    return imageUrl;
+  }
+
+  @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    final imageUrl = 'memory://profile-images/$fileName';
     _identity = _identity.copyWith(profileImageUrl: imageUrl);
     return imageUrl;
   }

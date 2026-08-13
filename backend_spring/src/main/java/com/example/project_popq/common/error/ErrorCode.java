@@ -69,6 +69,8 @@ public enum ErrorCode {
   FAQ_NOT_FOUND(HttpStatus.NOT_FOUND,"FAQ를 찾을 수 없습니다."),
   SUPPORT_TICKET_NOT_FOUND(HttpStatus.NOT_FOUND,"문의를 찾을 수 없습니다."),
   SUPPORT_TICKET_CLOSED(HttpStatus.CONFLICT,"종료된 문의에는 메시지를 보낼 수 없습니다."),
+  SUPPORT_INQUIRY_NOT_FOUND(HttpStatus.NOT_FOUND, "고객센터 문의를 찾을 수 없습니다."),
+  SUPPORT_INQUIRY_CLOSED(HttpStatus.CONFLICT, "종료된 고객센터 문의에는 메시지를 작성할 수 없습니다."),
   PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 정보를 찾을 수 없습니다."),
   PAYMENT_FAILED(HttpStatus.PAYMENT_REQUIRED, "결제 승인에 실패했습니다."),
   PAYMENT_AMOUNT_MISMATCH(HttpStatus.CONFLICT, "결제 승인 금액이 주문 금액과 일치하지 않습니다."),
