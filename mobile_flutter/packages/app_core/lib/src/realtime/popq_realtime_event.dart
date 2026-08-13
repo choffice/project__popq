@@ -166,6 +166,58 @@ class PopqRealtimeEvent {
   }
 }
 
+enum PopqSupportTicketRealtimeEventType {
+  ticketCreated,
+  messageAdded,
+  statusChanged;
+
+  factory PopqSupportTicketRealtimeEventType.fromJson(String value) {
+    return switch (value) {
+      'TICKET_CREATED' => PopqSupportTicketRealtimeEventType.ticketCreated,
+      'MESSAGE_ADDED' => PopqSupportTicketRealtimeEventType.messageAdded,
+      'STATUS_CHANGED' => PopqSupportTicketRealtimeEventType.statusChanged,
+      _ => throw FormatException('지원하지 않는 문의 실시간 이벤트 유형입니다: $value'),
+    };
+  }
+}
+
+class PopqSupportTicketRealtimeEvent {
+  const PopqSupportTicketRealtimeEvent({
+    required this.eventId,
+    required this.eventType,
+    required this.ticketId,
+    required this.requesterUserId,
+    required this.requesterType,
+    required this.senderType,
+    required this.status,
+    required this.occurredAt,
+  });
+
+  factory PopqSupportTicketRealtimeEvent.fromJson(Map<String, Object?> json) {
+    return PopqSupportTicketRealtimeEvent(
+      eventId: _requiredString(json, 'eventId'),
+      eventType: PopqSupportTicketRealtimeEventType.fromJson(
+        _requiredString(json, 'eventType'),
+      ),
+      ticketId: _requiredInt(json, 'ticketId'),
+      requesterUserId: _requiredInt(json, 'requesterUserId'),
+      requesterType: _requiredString(json, 'requesterType'),
+      senderType: _requiredString(json, 'senderType'),
+      status: _requiredString(json, 'status'),
+      occurredAt: _requiredDateTime(json, 'occurredAt'),
+    );
+  }
+
+  final String eventId;
+  final PopqSupportTicketRealtimeEventType eventType;
+  final int ticketId;
+  final int requesterUserId;
+  final String requesterType;
+  final String senderType;
+  final String status;
+  final DateTime occurredAt;
+}
+
 enum PopqOrderRealtimeEventType {
   placed,
   accepted,
