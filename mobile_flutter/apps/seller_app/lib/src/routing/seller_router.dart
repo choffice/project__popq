@@ -30,7 +30,13 @@ import '../features/stores/seller_store_registration_screen.dart';
 import '../features/stores/seller_store_repository.dart';
 import '../features/stores/seller_store_selection_controller.dart';
 import '../features/stores/store_selection_screen.dart';
+import '../features/support/seller_support_repository.dart';
 import '../seller_root_screen.dart';
+import '../features/auth/seller_identity_repository.dart';
+import '../features/support/seller_support_screen.dart';
+import '../features/support/seller_support_ticket_detail_screen.dart';
+import '../features/support/seller_support_ticket_form_screen.dart';
+import '../features/support/seller_support_ticket_list_screen.dart';
 
 abstract final class SellerRoutes {
   static const bootstrap = '/bootstrap';
@@ -47,6 +53,13 @@ abstract final class SellerRoutes {
   static const notifications = '/notifications';
   static const my = '/my';
   static const myProfile = '/my/profile';
+  static const support = '/support';
+  static const supportTicketForm = '/support/tickets/new';
+  static const supportTickets = '/support/tickets';
+
+  static String supportTicketDetail(int supportTicketId) {
+    return '$supportTickets/$supportTicketId';
+  }
 
   @Deprecated('마이 탭 경로는 SellerRoutes.my를 사용하세요.')
   static const sales = my;
@@ -66,36 +79,22 @@ GoRouter createSellerRouter({
   required SellerCustomerRepository customerRepository,
   required SellerReviewRepository reviewRepository,
   required SellerOperationalAlertRepository operationalAlertRepository,
+  required SellerSupportRepository supportRepository,
   required Future<void> Function() onSignOut,
   required Future<void> Function(String? confirmationPhrase) onWithdraw,
   required Future<void> Function() onConnectCustomerAccess,
-  required Future<void> Function(
-      String email,
-      String password,
-      )
-  onSignIn,
+  required Future<void> Function(String email, String password) onSignIn,
   required Future<void> Function({
-  required String email,
-  required String password,
-  required String name,
-  required String phone,
+    required String email,
+    required String password,
+    required String name,
+    required String phone,
   })
   onSignUp,
-  required Future<String> Function(
-      String name,
-      String phone,
-      )
-  onFindId,
-  required Future<void> Function(
-      String email,
-      String phone,
-      )
+  required Future<String> Function(String name, String phone) onFindId,
+  required Future<void> Function(String email, String phone)
   onVerifyForPasswordReset,
-  required Future<void> Function(
-      String email,
-      String phone,
-      String newPassword,
-      )
+  required Future<void> Function(String email, String phone, String newPassword)
   onResetPassword,
   PopqThemeController? themeController,
   Future<void> Function()? onDevelopmentSignIn,
@@ -117,50 +116,37 @@ GoRouter createSellerRouter({
     redirect: (context, state) {
       final location = state.matchedLocation;
 
-      final isBootstrap =
-          location == SellerRoutes.bootstrap;
+      final isBootstrap = location == SellerRoutes.bootstrap;
 
-      final isBootstrapError =
-          location == SellerRoutes.bootstrapError;
+      final isBootstrapError = location == SellerRoutes.bootstrapError;
 
-      final isSignIn =
-          location == SellerRoutes.signIn;
+      final isSignIn = location == SellerRoutes.signIn;
 
-      final isSignUp =
-          location == SellerRoutes.signUp;
+      final isSignUp = location == SellerRoutes.signUp;
 
-      final isFindId =
-          location == SellerRoutes.findId;
+      final isFindId = location == SellerRoutes.findId;
 
-      final isFindPassword =
-          location == SellerRoutes.findPassword;
+      final isFindPassword = location == SellerRoutes.findPassword;
 
       final isPreLoginAuthScreen =
-          isSignIn ||
-              isSignUp ||
-              isFindId ||
-              isFindPassword;
+          isSignIn || isSignUp || isFindId || isFindPassword;
 
-      final isStoreRegistration =
-          location == SellerRoutes.storeRegistration;
+      final isStoreRegistration = location == SellerRoutes.storeRegistration;
+
+      final isSupport =
+          location == SellerRoutes.support ||
+          location.startsWith('${SellerRoutes.support}/');
 
       final hasMinSplashElapsed =
-          DateTime.now().difference(splashStartedAt) >=
-              minSplashDuration;
+          DateTime.now().difference(splashStartedAt) >= minSplashDuration;
 
-      if (bootstrapController.status ==
-          SellerBootstrapStatus.restoring ||
+      if (bootstrapController.status == SellerBootstrapStatus.restoring ||
           !hasMinSplashElapsed) {
-        return isBootstrap
-            ? null
-            : SellerRoutes.bootstrap;
+        return isBootstrap ? null : SellerRoutes.bootstrap;
       }
 
-      if (bootstrapController.status ==
-          SellerBootstrapStatus.failure) {
-        return isBootstrapError
-            ? null
-            : SellerRoutes.bootstrapError;
+      if (bootstrapController.status == SellerBootstrapStatus.failure) {
+        return isBootstrapError ? null : SellerRoutes.bootstrapError;
       }
 
       if (isBootstrap || isBootstrapError) {
@@ -172,14 +158,11 @@ GoRouter createSellerRouter({
       }
 
       if (!sessionController.isSignedIn) {
-        return isPreLoginAuthScreen
-            ? null
-            : SellerRoutes.signIn;
+        return isPreLoginAuthScreen ? null : SellerRoutes.signIn;
       }
 
       if (isPreLoginAuthScreen) {
-        return state.uri.queryParameters['from'] ??
-            SellerRoutes.dashboard;
+        return state.uri.queryParameters['from'] ?? SellerRoutes.dashboard;
       }
 
       if (!storeSelectionController.hasSelection &&
@@ -188,7 +171,8 @@ GoRouter createSellerRouter({
           location != SellerRoutes.my &&
           location != SellerRoutes.settings &&
           location != SellerRoutes.notifications &&
-          !isStoreRegistration) {
+          !isStoreRegistration &&
+          !isSupport) {
         return SellerRoutes.dashboard;
       }
 
@@ -198,9 +182,7 @@ GoRouter createSellerRouter({
       return PopqErrorView(
         message: '요청한 판매자 화면을 찾을 수 없어요.',
         onRetry: () {
-          context.go(
-            SellerRoutes.dashboard,
-          );
+          context.go(SellerRoutes.dashboard);
         },
       );
     },
@@ -226,31 +208,25 @@ GoRouter createSellerRouter({
         path: SellerRoutes.signIn,
         builder: (context, state) {
           return SellerSignInScreen(
-            roleMismatch:
-            bootstrapController.roleMismatch,
+            roleMismatch: bootstrapController.roleMismatch,
             onSignIn: onSignIn,
-            onDevelopmentSignIn:
-            onDevelopmentSignIn,
+            onDevelopmentSignIn: onDevelopmentSignIn,
             onGoogleSignIn: onGoogleSignIn,
-            onKakaoSignIn : onKakaoSignIn,
-            onNaverSignIn : onNaverSignIn,
+            onKakaoSignIn: onKakaoSignIn,
+            onNaverSignIn: onNaverSignIn,
           );
         },
       ),
       GoRoute(
         path: SellerRoutes.signUp,
         builder: (context, state) {
-          return SellerSignUpScreen(
-            onSignUp: onSignUp,
-          );
+          return SellerSignUpScreen(onSignUp: onSignUp);
         },
       ),
       GoRoute(
         path: SellerRoutes.findId,
         builder: (context, state) {
-          return SellerFindIdScreen(
-            onFindId: onFindId,
-          );
+          return SellerFindIdScreen(onFindId: onFindId);
         },
       ),
       GoRoute(
@@ -279,16 +255,12 @@ GoRouter createSellerRouter({
             return PopqErrorView(
               message: '화면 설정을 준비하지 못했어요.',
               onRetry: () {
-                context.go(
-                  SellerRoutes.dashboard,
-                );
+                context.go(SellerRoutes.dashboard);
               },
             );
           }
 
-          return SellerSettingsScreen(
-            themeController: controller,
-          );
+          return SellerSettingsScreen(themeController: controller);
         },
       ),
       GoRoute(
@@ -306,44 +278,157 @@ GoRouter createSellerRouter({
         builder: (context, state) {
           return SellerStoreRegistrationScreen(
             repository: storeRepository,
-            selectionController:
-            storeSelectionController,
+            selectionController: storeSelectionController,
             identityRepository: bootstrapController.identityRepository,
           );
         },
       ),
       GoRoute(
-        path:
-        '${SellerRoutes.orders}/:orderPublicId',
+        path: '${SellerRoutes.orders}/:orderPublicId',
         builder: (context, state) {
           return SellerOrderDetailScreen(
-            orderPublicId:
-            state.pathParameters[
-            'orderPublicId'
-            ]!,
+            orderPublicId: state.pathParameters['orderPublicId']!,
             repository: orderRepository,
             storeRepository: storeRepository,
-            selectionController:
-            storeSelectionController,
+            selectionController: storeSelectionController,
             reviewRepository: reviewRepository,
-            storeId: int.tryParse(
-              state.uri.queryParameters['storeId'] ?? '',
-            ),
+            storeId: int.tryParse(state.uri.queryParameters['storeId'] ?? ''),
           );
         },
       ),
       GoRoute(
-        path:
-        '${SellerRoutes.customers}/:orderPublicId',
+        path: '${SellerRoutes.customers}/:orderPublicId',
         builder: (context, state) {
           return SellerCustomerChatScreen(
-            orderPublicId:
-            state.pathParameters[
-            'orderPublicId'
-            ]!,
+            orderPublicId: state.pathParameters['orderPublicId']!,
             repository: customerRepository,
-            selectionController:
-            storeSelectionController,
+            selectionController: storeSelectionController,
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.support,
+        builder: (context, state) {
+          return SellerSupportScreen(
+            repository: supportRepository,
+            onCreateTicket: () {
+              context.push(SellerRoutes.supportTicketForm);
+            },
+            onMyTickets: () {
+              context.push(SellerRoutes.supportTickets);
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.supportTicketForm,
+        builder: (context, state) {
+          return FutureBuilder<SellerIdentity>(
+            future: bootstrapController.identityRepository.getCurrent(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (snapshot.hasError || snapshot.data == null) {
+                return Scaffold(
+                  appBar: AppBar(
+                    title: const Text('1:1 문의하기'),
+                    centerTitle: true,
+                  ),
+                  body: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 48),
+                          const SizedBox(height: 14),
+                          const Text(
+                            '판매자 정보를 불러오지 못했어요.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 16),
+                          OutlinedButton(
+                            onPressed: () {
+                              context.go(SellerRoutes.support);
+                            },
+                            child: const Text('고객센터로 돌아가기'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              return SellerSupportTicketFormScreen(
+                repository: supportRepository,
+                sellerEmail: snapshot.data!.email,
+                onCreated: (created) {
+                  context.pushReplacement(
+                    SellerRoutes.supportTicketDetail(
+                      created.ticket.supportTicketId,
+                    ),
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.supportTickets,
+        builder: (context, state) {
+          return SellerSupportTicketListScreen(
+            repository: supportRepository,
+            onTicketTap: (supportTicketId) {
+              context.push(SellerRoutes.supportTicketDetail(supportTicketId));
+            },
+          );
+        },
+      ),
+      GoRoute(
+        path: '${SellerRoutes.supportTickets}/:supportTicketId',
+        builder: (context, state) {
+          final supportTicketId = int.tryParse(
+            state.pathParameters['supportTicketId'] ?? '',
+          );
+
+          if (supportTicketId == null || supportTicketId <= 0) {
+            return Scaffold(
+              appBar: AppBar(title: const Text('문의 상세'), centerTitle: true),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded, size: 48),
+                      const SizedBox(height: 14),
+                      const Text(
+                        '올바르지 않은 문의 번호예요.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(
+                        onPressed: () {
+                          context.go(SellerRoutes.supportTickets);
+                        },
+                        child: const Text('문의 목록으로 이동'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return SellerSupportTicketDetailScreen(
+            repository: supportRepository,
+            supportTicketId: supportTicketId,
           );
         },
       ),
@@ -352,11 +437,9 @@ GoRouter createSellerRouter({
           return SellerRootScreen(
             location: state.uri.path,
             onSignOut: onSignOut,
-            customerRepository:
-            customerRepository,
+            customerRepository: customerRepository,
             storeRepository: storeRepository,
-            storeSelectionController:
-            storeSelectionController,
+            storeSelectionController: storeSelectionController,
             themeController: themeController,
             child: child,
           );
@@ -367,8 +450,7 @@ GoRouter createSellerRouter({
             builder: (context, state) {
               return StoreSelectionScreen(
                 repository: storeRepository,
-                controller:
-                storeSelectionController,
+                controller: storeSelectionController,
               );
             },
           ),
@@ -376,18 +458,13 @@ GoRouter createSellerRouter({
             path: SellerRoutes.operations,
             builder: (context, state) {
               return SellerOperationScreen(
-                storeRepository:
-                storeRepository,
-                announcementRepository:
-                announcementRepository,
-                productRepository:
-                productRepository,
-                analyticsRepository:
-                analyticsRepository,
+                storeRepository: storeRepository,
+                announcementRepository: announcementRepository,
+                productRepository: productRepository,
+                analyticsRepository: analyticsRepository,
                 reviewRepository: reviewRepository,
                 orderRepository: orderRepository,
-                selectionController:
-                storeSelectionController,
+                selectionController: storeSelectionController,
                 identityRepository: bootstrapController.identityRepository,
                 initialSection:
                     state.uri.queryParameters['section'] == 'reviews' ? 4 : 0,
@@ -400,12 +477,11 @@ GoRouter createSellerRouter({
               return SellerOrderListScreen(
                 repository: orderRepository,
                 storeRepository: storeRepository,
-                selectionController:
-                storeSelectionController,
+                selectionController: storeSelectionController,
                 initialCurrentFilter:
                     state.uri.queryParameters['filter'] == 'placed'
-                        ? 'PLACED'
-                        : null,
+                    ? 'PLACED'
+                    : null,
               );
             },
           ),
@@ -413,10 +489,8 @@ GoRouter createSellerRouter({
             path: SellerRoutes.customers,
             builder: (context, state) {
               return SellerCustomerScreen(
-                repository:
-                customerRepository,
-                selectionController:
-                storeSelectionController,
+                repository: customerRepository,
+                selectionController: storeSelectionController,
               );
             },
           ),
@@ -424,12 +498,9 @@ GoRouter createSellerRouter({
             path: SellerRoutes.my,
             builder: (context, state) {
               return SellerMyScreen(
-                storeRepository:
-                storeRepository,
-                selectionController:
-                storeSelectionController,
-                identityRepository:
-                bootstrapController.identityRepository,
+                storeRepository: storeRepository,
+                selectionController: storeSelectionController,
+                identityRepository: bootstrapController.identityRepository,
                 onSignOut: onSignOut,
                 onWithdraw: onWithdraw,
                 onConnectCustomerAccess: onConnectCustomerAccess,
