@@ -3,6 +3,7 @@ package com.example.project_popq.product.service;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.product.domain.ProductOptionGroup;
+import com.example.project_popq.product.domain.CatalogStatus;
 import com.example.project_popq.product.domain.StoreOptionGroupTemplate;
 import com.example.project_popq.product.domain.StoreOptionTemplateOption;
 import com.example.project_popq.product.dto.BulkApplyStoreOptionTemplateRequest;
@@ -106,7 +107,9 @@ public class StoreOptionTemplateService {
         getTemplate(storeId, templateId);
         Map<Long, ProductUsage> productsById = new LinkedHashMap<>();
         optionGroupRepository
-                .findAllByStoreOptionGroupTemplateIdOrderByProductIdAsc(templateId)
+                .findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+                        templateId, CatalogStatus.ACTIVE
+                )
                 .forEach(group -> productsById.putIfAbsent(
                         group.getProduct().getId(),
                         new ProductUsage(
@@ -146,16 +149,24 @@ public class StoreOptionTemplateService {
                         ErrorCode.RESOURCE_NOT_FOUND
                 ));
         ProductOptionGroup source = optionGroupRepository
-                .findByIdAndProductIdAndStoreOptionGroupTemplateId(
+                .findByIdAndProductIdAndStoreOptionGroupTemplateIdAndProductStatus(
                         request.sourceOptionGroupId(),
                         request.sourceProductId(),
-                        templateId
+                        templateId,
+                        CatalogStatus.ACTIVE
                 )
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.INVALID_PRODUCT_OPTION
                 ));
         if (!source.getProduct().getStore().getId().equals(storeId)) {
             throw new BusinessException(ErrorCode.STORE_ACCESS_DENIED);
+        }
+
+        String normalizedName = request.name().trim();
+        if (templateRepository.existsByStoreIdAndNameIgnoreCaseAndIdNot(
+                storeId, normalizedName, templateId
+        )) {
+            throw new BusinessException(ErrorCode.INVALID_PRODUCT_OPTION);
         }
 
         List<StoreOptionTemplateOption.Value> values = options.stream()
@@ -165,8 +176,12 @@ public class StoreOptionTemplateService {
                         option.displayOrder()
                 ))
                 .toList();
+        if (hasSameContent(template, normalizedName, request, values)) {
+            return StoreOptionTemplateResponse.from(template);
+        }
+
         template.updateFrom(
-                request.name().trim(),
+                normalizedName,
                 request.minSelect(),
                 request.maxSelect(),
                 request.required(),
@@ -174,9 +189,11 @@ public class StoreOptionTemplateService {
         );
         long newVersion = template.getVersion();
         List<ProductOptionGroup> groups = optionGroupRepository
-                .findAllByStoreOptionGroupTemplateIdOrderByProductIdAsc(templateId);
+                .findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+                        templateId, CatalogStatus.ACTIVE
+                );
         groups.forEach(group -> group.applyTemplateValues(
-                request.name().trim(),
+                normalizedName,
                 request.minSelect(),
                 request.maxSelect(),
                 request.required(),
@@ -195,7 +212,9 @@ public class StoreOptionTemplateService {
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND
                 ));
-        if (optionGroupRepository.countByStoreOptionGroupTemplateId(templateId) > 0) {
+        if (optionGroupRepository.countByStoreOptionGroupTemplateIdAndProductStatus(
+                templateId, CatalogStatus.ACTIVE
+        ) > 0) {
             throw new BusinessException(ErrorCode.INVALID_PRODUCT_OPTION);
         }
         templateRepository.delete(template);
@@ -206,6 +225,31 @@ public class StoreOptionTemplateService {
                 .orElseThrow(() -> new BusinessException(
                         ErrorCode.RESOURCE_NOT_FOUND
                 ));
+    }
+
+    private boolean hasSameContent(
+            StoreOptionGroupTemplate template,
+            String name,
+            BulkApplyStoreOptionTemplateRequest request,
+            List<StoreOptionTemplateOption.Value> values
+    ) {
+        if (!template.getName().equals(name)
+                || template.getMinSelect() != request.minSelect()
+                || template.getMaxSelect() != request.maxSelect()
+                || template.isRequired() != request.required()
+                || template.getOptions().size() != values.size()) {
+            return false;
+        }
+        for (int index = 0; index < values.size(); index++) {
+            StoreOptionTemplateOption current = template.getOptions().get(index);
+            StoreOptionTemplateOption.Value requested = values.get(index);
+            if (!current.getName().equals(requested.name())
+                    || current.getAdditionalPrice() != requested.additionalPrice()
+                    || current.getDisplayOrder() != requested.displayOrder()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void validate(

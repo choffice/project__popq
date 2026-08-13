@@ -16,6 +16,8 @@ class SellerProductDraft {
     required this.description,
     required this.imageUrl,
     required this.basePrice,
+    this.optionGroups = const <SellerProductOptionGroup>[],
+    this.openOptionEditorAfterCreate = false,
     this.imageFilePath,
     this.imageBytes,
     this.imageFileName,
@@ -27,6 +29,8 @@ class SellerProductDraft {
   final String? description;
   final String? imageUrl;
   final int basePrice;
+  final List<SellerProductOptionGroup> optionGroups;
+  final bool openOptionEditorAfterCreate;
 
   final String? imageFilePath;
   final Uint8List? imageBytes;
@@ -47,11 +51,16 @@ Future<SellerCategoryDraft?> showSellerCategoryEditor(
 Future<SellerProductDraft?> showSellerProductEditor(
   BuildContext context, {
   required List<SellerCategory> categories,
+  List<SellerStoreOptionTemplate> optionTemplates = const [],
   SellerProduct? product,
 }) {
   return showDialog<SellerProductDraft>(
     context: context,
-    builder: (_) => _ProductEditor(categories: categories, product: product),
+    builder: (_) => _ProductEditor(
+      categories: categories,
+      product: product,
+      optionTemplates: optionTemplates,
+    ),
   );
 }
 
@@ -147,10 +156,15 @@ class _CategoryEditorState extends State<_CategoryEditor> {
 }
 
 class _ProductEditor extends StatefulWidget {
-  const _ProductEditor({required this.categories, required this.product});
+  const _ProductEditor({
+    required this.categories,
+    required this.product,
+    required this.optionTemplates,
+  });
 
   final List<SellerCategory> categories;
   final SellerProduct? product;
+  final List<SellerStoreOptionTemplate> optionTemplates;
 
   @override
   State<_ProductEditor> createState() => _ProductEditorState();
@@ -167,6 +181,8 @@ class _ProductEditorState extends State<_ProductEditor> {
   XFile? _pickedImage;
   Uint8List? _pickedImageBytes;
   bool _removeImage = false;
+  final Set<int> _selectedTemplateIds = <int>{};
+  bool _openOptionEditorAfterCreate = false;
 
   @override
   void initState() {
@@ -233,6 +249,82 @@ class _ProductEditorState extends State<_ProductEditor> {
                 maxLines: 3,
                 decoration: const InputDecoration(labelText: '설명 (선택)'),
               ),
+              if (widget.product == null) ...[
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '상품 옵션 (선택)',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.optionTemplates.isEmpty
+                        ? '저장된 매장 공용 옵션이 없습니다.'
+                        : '등록하면서 적용할 매장 공용 옵션을 선택하세요.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                if (widget.optionTemplates.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: widget.optionTemplates
+                          .map(
+                            (template) => CheckboxListTile(
+                              dense: true,
+                              title: Text(template.name),
+                              subtitle: Text(
+                                template.options
+                                    .map((option) => option.name)
+                                    .join(', '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              value: _selectedTemplateIds.contains(
+                                template.templateId,
+                              ),
+                              onChanged: (selected) {
+                                setState(() {
+                                  if (selected == true) {
+                                    _selectedTemplateIds.add(
+                                      template.templateId,
+                                    );
+                                  } else {
+                                    _selectedTemplateIds.remove(
+                                      template.templateId,
+                                    );
+                                  }
+                                });
+                              },
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                ],
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('옵션을 직접 구성하거나 세부 수정하기'),
+                  subtitle: const Text('기본정보 저장 다음 단계에서 옵션 편집 화면을 엽니다.'),
+                  value: _openOptionEditorAfterCreate,
+                  onChanged: (value) {
+                    setState(() {
+                      _openOptionEditorAfterCreate = value ?? false;
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: 16),
 
               Align(
@@ -393,6 +485,27 @@ class _ProductEditorState extends State<_ProductEditor> {
         imageFileName: _pickedImage?.name,
         removeImage: _removeImage,
         basePrice: price,
+        optionGroups: widget.optionTemplates
+            .where(
+              (template) => _selectedTemplateIds.contains(template.templateId),
+            )
+            .toList()
+            .asMap()
+            .entries
+            .map(
+              (entry) => SellerProductOptionGroup(
+                name: entry.value.name,
+                minSelect: entry.value.required ? 1 : 0,
+                maxSelect: entry.value.maxSelect,
+                required: entry.value.required,
+                displayOrder: entry.key,
+                templateId: entry.value.templateId,
+                appliedTemplateVersion: entry.value.version,
+                options: List.of(entry.value.options),
+              ),
+            )
+            .toList(),
+        openOptionEditorAfterCreate: _openOptionEditorAfterCreate,
       ),
     );
   }
@@ -589,7 +702,9 @@ class _OptionEditorState extends State<_OptionEditor> {
 
             _templateNameField(groupIndex, group),
 
-            if (group.templateId != null && group.optionGroupId != null) ...[
+            if (group.templateId != null &&
+                group.optionGroupId != null &&
+                _hasTemplateChanges(group)) ...[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerRight,
@@ -649,6 +764,7 @@ class _OptionEditorState extends State<_OptionEditor> {
             TextField(
               controller: group.max,
               keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 labelText: '최대 선택 수',
                 helperText: '이 그룹에서 고객이 선택할 수 있는 최대 개수',
@@ -737,6 +853,7 @@ class _OptionEditorState extends State<_OptionEditor> {
           key: Key('option-group-name-$groupIndex'),
           controller: controller,
           focusNode: focusNode,
+          onChanged: (_) => setState(() {}),
           onSubmitted: (_) => onSubmitted(),
           decoration: InputDecoration(
             hintText: '예: 사이즈, 맵기, 토핑',
@@ -803,6 +920,33 @@ class _OptionEditorState extends State<_OptionEditor> {
     });
   }
 
+  bool _hasTemplateChanges(_GroupFields group) {
+    final templateIndex = _templates.indexWhere(
+      (template) => template.templateId == group.templateId,
+    );
+    if (templateIndex < 0) return false;
+    final template = _templates[templateIndex];
+    final currentMax = int.tryParse(group.max.text.trim());
+    final currentMin = group.required ? 1 : 0;
+    if (group.name.text.trim() != template.name ||
+        group.required != template.required ||
+        currentMin != template.minSelect ||
+        currentMax != template.maxSelect ||
+        group.options.length != template.options.length) {
+      return true;
+    }
+    for (var index = 0; index < group.options.length; index++) {
+      final current = group.options[index];
+      final saved = template.options[index];
+      if (current.name.text.trim() != saved.name ||
+          int.tryParse(current.price.text.trim()) != saved.additionalPrice ||
+          index != saved.displayOrder) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _applyToAll(int groupIndex) async {
     final group = _groups[groupIndex];
     final model = _validatedGroup(groupIndex);
@@ -837,7 +981,9 @@ class _OptionEditorState extends State<_OptionEditor> {
             '동일 옵션이 적용된 메뉴들이 ${usage.totalCount}개 있습니다.\n\n'
             '${preview.isEmpty ? '연결된 메뉴 없음' : '$preview$extra'}\n\n'
             "현재 '${model.name}' 설정으로 모두 변경할까요?\n\n"
-            '각 메뉴에서 개별 수정한 옵션도 현재 설정으로 변경됩니다.',
+            '각 메뉴에서 개별 수정한 옵션도 현재 설정으로 변경됩니다.\n\n'
+            '일괄 적용하면 즉시 저장되며, 이후 옵션 편집 화면에서 '
+            '취소해도 되돌릴 수 없습니다.',
           ),
           actions: [
             TextButton(
@@ -869,7 +1015,12 @@ class _OptionEditorState extends State<_OptionEditor> {
         _formError = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('연결된 메뉴 ${usage.totalCount}개의 옵션을 변경했습니다.')),
+        SnackBar(
+          content: Text(
+            '연결된 메뉴 ${usage.totalCount}개의 옵션과 '
+            '매장 기본 옵션을 바로 변경했습니다.',
+          ),
+        ),
       );
     } catch (_) {
       if (mounted) {
@@ -889,6 +1040,7 @@ class _OptionEditorState extends State<_OptionEditor> {
           child: TextField(
             key: Key('option-name-$groupIndex-$optionIndex'),
             controller: option.name,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               labelText: '옵션 이름',
               errorText: option.nameError,
@@ -900,6 +1052,7 @@ class _OptionEditorState extends State<_OptionEditor> {
           child: TextField(
             key: Key('option-price-$groupIndex-$optionIndex'),
             controller: option.price,
+            onChanged: (_) => setState(() {}),
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
               labelText: '추가 금액',

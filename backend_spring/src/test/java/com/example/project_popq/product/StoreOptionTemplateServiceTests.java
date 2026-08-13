@@ -8,10 +8,12 @@ import static org.mockito.Mockito.when;
 
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.product.domain.Product;
+import com.example.project_popq.product.domain.CatalogStatus;
 import com.example.project_popq.product.domain.ProductOptionGroup;
 import com.example.project_popq.product.domain.StoreOptionGroupTemplate;
 import com.example.project_popq.product.dto.BulkApplyStoreOptionTemplateRequest;
 import com.example.project_popq.product.dto.BulkApplyStoreOptionTemplateRequest.OptionRequest;
+import com.example.project_popq.product.dto.StoreOptionTemplateUsageResponse;
 import com.example.project_popq.product.repository.ProductOptionGroupRepository;
 import com.example.project_popq.product.repository.StoreOptionGroupTemplateRepository;
 import com.example.project_popq.product.service.StoreOptionTemplateService;
@@ -86,12 +88,14 @@ class StoreOptionTemplateServiceTests {
         when(templateRepository.findLockedByIdAndStoreId(templateId, storeId))
                 .thenReturn(Optional.of(template));
         when(optionGroupRepository
-                .findByIdAndProductIdAndStoreOptionGroupTemplateId(
-                        30L, 40L, templateId
+                .findByIdAndProductIdAndStoreOptionGroupTemplateIdAndProductStatus(
+                        30L, 40L, templateId, CatalogStatus.ACTIVE
                 ))
                 .thenReturn(Optional.of(sourceGroup));
         when(optionGroupRepository
-                .findAllByStoreOptionGroupTemplateIdOrderByProductIdAsc(templateId))
+                .findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+                        templateId, CatalogStatus.ACTIVE
+                ))
                 .thenReturn(List.of(sourceGroup, otherGroup));
 
         service.applyToAll(
@@ -120,6 +124,34 @@ class StoreOptionTemplateServiceTests {
     }
 
     @Test
+    void usageContainsOnlyGroupsFromActiveProducts() {
+        long storeId = 10L;
+        long templateId = 20L;
+        StoreOptionGroupTemplate template = StoreOptionGroupTemplate.create(
+                store, "온도", 1, 1, true
+        );
+        ProductOptionGroup activeGroup = ProductOptionGroup.create(
+                sourceProduct, "온도", 1, 1, true, 0
+        );
+        when(templateRepository.findByIdAndStoreId(templateId, storeId))
+                .thenReturn(Optional.of(template));
+        when(sourceProduct.getId()).thenReturn(40L);
+        when(sourceProduct.getName()).thenReturn("아메리카노");
+        when(optionGroupRepository
+                .findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+                        templateId, CatalogStatus.ACTIVE
+                ))
+                .thenReturn(List.of(activeGroup));
+
+        StoreOptionTemplateUsageResponse usage = service.findUsage(
+                user, storeId, templateId
+        );
+
+        assertEquals(1, usage.totalCount());
+        assertEquals("아메리카노", usage.products().get(0).productName());
+    }
+
+    @Test
     void deletingATemplateStillInUseIsRejectedInsideTheServiceTransaction() {
         long storeId = 10L;
         long templateId = 20L;
@@ -128,7 +160,9 @@ class StoreOptionTemplateServiceTests {
         );
         when(templateRepository.findLockedByIdAndStoreId(templateId, storeId))
                 .thenReturn(Optional.of(template));
-        when(optionGroupRepository.countByStoreOptionGroupTemplateId(templateId))
+        when(optionGroupRepository.countByStoreOptionGroupTemplateIdAndProductStatus(
+                templateId, CatalogStatus.ACTIVE
+        ))
                 .thenReturn(1L);
 
         assertThrows(
@@ -137,5 +171,107 @@ class StoreOptionTemplateServiceTests {
         );
 
         verify(templateRepository, never()).delete(template);
+    }
+
+    @Test
+    void deletingWhenOnlyDeletedProductsReferenceTemplateIsAllowed() {
+        long storeId = 10L;
+        long templateId = 20L;
+        StoreOptionGroupTemplate template = StoreOptionGroupTemplate.create(
+                store, "온도", 1, 1, true
+        );
+        when(templateRepository.findLockedByIdAndStoreId(templateId, storeId))
+                .thenReturn(Optional.of(template));
+        when(optionGroupRepository.countByStoreOptionGroupTemplateIdAndProductStatus(
+                templateId, CatalogStatus.ACTIVE
+        )).thenReturn(0L);
+
+        service.deleteIfUnused(user, storeId, templateId);
+
+        verify(templateRepository).delete(template);
+    }
+
+    @Test
+    void applyingIdenticalContentDoesNotIncreaseVersionOrRewriteGroups() {
+        long storeId = 10L;
+        long templateId = 20L;
+        StoreOptionGroupTemplate template = StoreOptionGroupTemplate.create(
+                store, "온도", 1, 1, true
+        );
+        template.addOption("HOT", 0L, 0);
+        template.addOption("ICE", 0L, 1);
+        when(store.getId()).thenReturn(storeId);
+        when(sourceProduct.getStore()).thenReturn(store);
+        ProductOptionGroup sourceGroup = ProductOptionGroup.createFromTemplate(
+                sourceProduct, "온도", 1, 1, true, 0, template, 1L
+        );
+        when(templateRepository.findLockedByIdAndStoreId(templateId, storeId))
+                .thenReturn(Optional.of(template));
+        when(optionGroupRepository
+                .findByIdAndProductIdAndStoreOptionGroupTemplateIdAndProductStatus(
+                        30L, 40L, templateId, CatalogStatus.ACTIVE
+                ))
+                .thenReturn(Optional.of(sourceGroup));
+
+        service.applyToAll(
+                user,
+                storeId,
+                templateId,
+                new BulkApplyStoreOptionTemplateRequest(
+                        40L, 30L, "온도", 1, 1, true,
+                        List.of(
+                                new OptionRequest("HOT", 0L, 0),
+                                new OptionRequest("ICE", 0L, 1)
+                        )
+                )
+        );
+
+        assertEquals(1L, template.getVersion());
+        verify(optionGroupRepository, never()).flush();
+        verify(optionGroupRepository, never())
+                .findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+                        templateId, CatalogStatus.ACTIVE
+                );
+    }
+
+    @Test
+    void renamingToAnotherTemplateNameIsRejectedBeforeDatabaseConstraint() {
+        long storeId = 10L;
+        long templateId = 20L;
+        StoreOptionGroupTemplate template = StoreOptionGroupTemplate.create(
+                store, "온도", 1, 1, true
+        );
+        template.addOption("HOT", 0L, 0);
+        when(store.getId()).thenReturn(storeId);
+        when(sourceProduct.getStore()).thenReturn(store);
+        ProductOptionGroup sourceGroup = ProductOptionGroup.createFromTemplate(
+                sourceProduct, "온도", 1, 1, true, 0, template, 1L
+        );
+        when(templateRepository.findLockedByIdAndStoreId(templateId, storeId))
+                .thenReturn(Optional.of(template));
+        when(optionGroupRepository
+                .findByIdAndProductIdAndStoreOptionGroupTemplateIdAndProductStatus(
+                        30L, 40L, templateId, CatalogStatus.ACTIVE
+                ))
+                .thenReturn(Optional.of(sourceGroup));
+        when(templateRepository.existsByStoreIdAndNameIgnoreCaseAndIdNot(
+                storeId, "사이즈", templateId
+        )).thenReturn(true);
+
+        assertThrows(
+                BusinessException.class,
+                () -> service.applyToAll(
+                        user,
+                        storeId,
+                        templateId,
+                        new BulkApplyStoreOptionTemplateRequest(
+                                40L, 30L, "사이즈", 1, 1, true,
+                                List.of(new OptionRequest("HOT", 0L, 0))
+                        )
+                )
+        );
+
+        assertEquals(1L, template.getVersion());
+        verify(optionGroupRepository, never()).flush();
     }
 }

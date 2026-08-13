@@ -569,9 +569,22 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
       return;
     }
 
+    List<SellerStoreOptionTemplate> optionTemplates = const [];
+    if (product == null) {
+      try {
+        optionTemplates = await widget.repository.findOptionTemplates(_storeId);
+      } catch (_) {
+        if (!mounted) return;
+        _showMessage('매장 공용 옵션을 불러오지 못했습니다.');
+        return;
+      }
+    }
+
+    if (!mounted) return;
     final draft = await showSellerProductEditor(
       context,
       categories: categories,
+      optionTemplates: optionTemplates,
       product: product,
     );
 
@@ -629,6 +642,32 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
               basePrice: draft.basePrice,
             );
 
+      bool optionSaveFailed = false;
+      List<SellerProductOptionGroup> optionGroups = draft.optionGroups;
+      if (product == null && draft.openOptionEditorAfterCreate && mounted) {
+        final optionResult = await showSellerOptionEditor(
+          context,
+          product: saved,
+          groups: optionGroups,
+          templates: optionTemplates,
+          repository: widget.repository,
+        );
+        if (optionResult != null) {
+          optionGroups = optionResult.groups;
+        }
+      }
+      if (product == null && optionGroups.isNotEmpty) {
+        try {
+          await widget.repository.replaceOptions(
+            _storeId,
+            saved,
+            optionGroups,
+          );
+        } catch (_) {
+          optionSaveFailed = true;
+        }
+      }
+
       if (!mounted) {
         return;
       }
@@ -645,7 +684,11 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
         }
       });
 
-      _showMessage('${saved.name} 메뉴를 저장했습니다.');
+      _showMessage(
+        optionSaveFailed
+            ? '${saved.name} 메뉴는 등록했지만 옵션은 저장하지 못했습니다.'
+            : '${saved.name} 메뉴를 저장했습니다.',
+      );
     } catch (_) {
       if (!mounted) {
         return;
@@ -698,8 +741,13 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
         result.groups,
       );
 
+      bool templateDeleteFailed = false;
       for (final templateId in result.templateIdsToDelete) {
-        await widget.repository.deleteOptionTemplate(_storeId, templateId);
+        try {
+          await widget.repository.deleteOptionTemplate(_storeId, templateId);
+        } catch (_) {
+          templateDeleteFailed = true;
+        }
       }
 
       if (!mounted) {
@@ -710,10 +758,17 @@ class _SellerProductListScreenState extends State<SellerProductListScreen> {
         _updatingIds.remove(product.productId);
       });
 
-      _showMessage(
-        '${saved.product.name} 옵션 그룹 '
-        '${saved.optionGroups.length}개를 저장했습니다.',
-      );
+      if (templateDeleteFailed) {
+        _showMessage(
+          '현재 메뉴에서는 옵션을 제거했습니다. '
+          '다른 메뉴에서 사용 중이라 공용 옵션은 유지했습니다.',
+        );
+      } else {
+        _showMessage(
+          '${saved.product.name} 옵션 그룹 '
+          '${saved.optionGroups.length}개를 저장했습니다.',
+        );
+      }
     } catch (_) {
       if (!mounted) {
         return;

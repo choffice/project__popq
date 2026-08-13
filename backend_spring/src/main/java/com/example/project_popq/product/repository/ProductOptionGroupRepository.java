@@ -1,6 +1,7 @@
 package com.example.project_popq.product.repository;
 
 import com.example.project_popq.product.domain.ProductOptionGroup;
+import com.example.project_popq.product.domain.CatalogStatus;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -10,15 +11,20 @@ public interface ProductOptionGroupRepository
         extends JpaRepository<ProductOptionGroup, Long> {
 
     @EntityGraph(attributePaths = {"product", "options"})
-    List<ProductOptionGroup> findAllByStoreOptionGroupTemplateIdOrderByProductIdAsc(
-            Long templateId
+    List<ProductOptionGroup> findAllByStoreOptionGroupTemplateIdAndProductStatusOrderByProductIdAsc(
+            Long templateId,
+            CatalogStatus productStatus
     );
 
-    long countByStoreOptionGroupTemplateId(Long templateId);
+    long countByStoreOptionGroupTemplateIdAndProductStatus(
+            Long templateId,
+            CatalogStatus productStatus
+    );
 
-    Optional<ProductOptionGroup> findByIdAndProductIdAndStoreOptionGroupTemplateId(
+    Optional<ProductOptionGroup> findByIdAndProductIdAndStoreOptionGroupTemplateIdAndProductStatus(
             Long id,
             Long productId,
-            Long templateId
+            Long templateId,
+            CatalogStatus productStatus
     );
 }

@@ -24,6 +24,12 @@ public interface StoreOptionGroupTemplateRepository
             String name
     );
 
+    boolean existsByStoreIdAndNameIgnoreCaseAndIdNot(
+            Long storeId,
+            String name,
+            Long id
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = "options")
     @Query("""
