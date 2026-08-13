@@ -1,8 +1,10 @@
 package com.example.project_popq.platformcontent;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.project_popq.platformcontent.domain.AppAudience;
+import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.platformcontent.domain.ContentStatus;
 import com.example.project_popq.platformcontent.dto.FaqRequest;
 import com.example.project_popq.platformcontent.dto.PlatformAnnouncementRequest;
@@ -60,6 +62,14 @@ class PlatformContentIntegrationTests {
         assertThat(service.publishedAnnouncements(AppAudience.SELLER_APP))
                 .extracting("title")
                 .doesNotContain("구매자 공지");
+        assertThat(service.publishedAnnouncement(
+                AppAudience.CUSTOMER_APP,
+                announcement.platformAnnouncementId()
+        ).title()).isEqualTo("구매자 공지");
+        assertThatThrownBy(() -> service.publishedAnnouncement(
+                AppAudience.SELLER_APP,
+                announcement.platformAnnouncementId()
+        )).isInstanceOf(BusinessException.class);
         assertThat(service.publishedFaqs(AppAudience.SELLER_APP))
                 .extracting("question")
                 .contains("비밀번호는 어떻게 바꾸나요?");

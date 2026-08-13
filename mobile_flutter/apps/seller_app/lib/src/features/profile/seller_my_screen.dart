@@ -163,6 +163,16 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                   ),
                   const Divider(height: 1),
                   ListTile(
+                    leading: const Icon(Icons.campaign_outlined),
+                    title: const Text('공지사항'),
+                    subtitle: const Text('POPQ 서비스 소식과 업데이트를 확인합니다.'),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () {
+                      context.push(SellerRoutes.platformAnnouncements);
+                    },
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
                     leading: const Icon(Icons.settings_outlined),
                     title: const Text('설정'),
                     subtitle: const Text('테마와 앱 사용 환경을 관리합니다.'),

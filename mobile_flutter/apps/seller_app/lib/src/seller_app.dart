@@ -38,6 +38,7 @@ class PopqSellerApp extends StatefulWidget {
     this.storeSelectionStore,
     this.storeRepository,
     this.announcementRepository,
+    this.platformAnnouncementRepository,
     this.identityRepository,
     this.orderRepository,
     this.productRepository,
@@ -57,6 +58,7 @@ class PopqSellerApp extends StatefulWidget {
   final SellerStoreSelectionStore? storeSelectionStore;
   final SellerStoreRepository? storeRepository;
   final SellerAnnouncementRepository? announcementRepository;
+  final PlatformAnnouncementRepository? platformAnnouncementRepository;
   final SellerIdentityRepository? identityRepository;
   final SellerOrderRepository? orderRepository;
   final SellerProductRepository? productRepository;
@@ -90,6 +92,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
   late final SellerBootstrapController _bootstrapController;
   late final SellerStoreRepository _storeRepository;
   late final SellerAnnouncementRepository _announcementRepository;
+  late final PlatformAnnouncementRepository _platformAnnouncementRepository;
   late final SellerOrderRepository _orderRepository;
   late final SellerProductRepository _productRepository;
   late final SellerAnalyticsRepository _analyticsRepository;
@@ -205,6 +208,13 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         widget.announcementRepository ??
         ApiSellerAnnouncementRepository(_apiClient);
 
+    _platformAnnouncementRepository =
+        widget.platformAnnouncementRepository ??
+        ApiPlatformAnnouncementRepository(
+          _apiClient,
+          audience: PlatformAnnouncementAudience.sellerApp,
+        );
+
     _orderRepository =
         widget.orderRepository ?? ApiSellerOrderRepository(_apiClient);
 
@@ -251,6 +261,7 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       storeSelectionController: _storeSelectionController,
       storeRepository: _storeRepository,
       announcementRepository: _announcementRepository,
+      platformAnnouncementRepository: _platformAnnouncementRepository,
       orderRepository: _orderRepository,
       productRepository: _productRepository,
       analyticsRepository: _analyticsRepository,

@@ -8,6 +8,7 @@ import com.example.project_popq.platformcontent.service.PlatformContentService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,6 +25,14 @@ public class PublicPlatformContentController {
             @RequestParam AppAudience audience
     ) {
         return ApiResponse.success(service.publishedAnnouncements(audience));
+    }
+
+    @GetMapping("/announcements/{id}")
+    public ApiResponse<PlatformAnnouncementResponse> announcement(
+            @PathVariable Long id,
+            @RequestParam AppAudience audience
+    ) {
+        return ApiResponse.success(service.publishedAnnouncement(audience, id));
     }
 
     @GetMapping("/faqs")

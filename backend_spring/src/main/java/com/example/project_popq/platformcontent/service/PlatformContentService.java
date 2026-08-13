@@ -131,12 +131,23 @@ public class PlatformContentService {
 
     @Transactional(readOnly = true)
     public List<PlatformAnnouncementResponse> publishedAnnouncements(AppAudience audience) {
-        if (audience == AppAudience.ALL) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST, "조회할 앱을 선택해 주세요.");
-        }
+        requireSpecificAudience(audience);
         return announcementRepository.findPublished(audience, Instant.now()).stream()
                 .map(PlatformAnnouncementResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PlatformAnnouncementResponse publishedAnnouncement(
+            AppAudience audience,
+            Long id
+    ) {
+        requireSpecificAudience(audience);
+        return announcementRepository.findPublishedById(id, audience, Instant.now())
+                .map(PlatformAnnouncementResponse::from)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.PLATFORM_ANNOUNCEMENT_NOT_FOUND
+                ));
     }
 
     @Transactional(readOnly = true)
@@ -276,6 +287,12 @@ public class PlatformContentService {
     private void requireAdmin(User user) {
         if (!user.hasRole(PlatformRole.ADMIN)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+    }
+
+    private void requireSpecificAudience(AppAudience audience) {
+        if (audience == AppAudience.ALL) {
+            throw new BusinessException(ErrorCode.INVALID_REQUEST, "조회할 앱을 선택해 주세요.");
         }
     }
 }

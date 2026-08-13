@@ -110,8 +110,8 @@ class AnnouncementServiceTests {
     @Test
     void rejectsDraftAndHiddenAnnouncements() {
         Store store = store(STORE_ID);
-        Announcement draft = Announcement.create(store, "draft", "content");
-        Announcement hidden = Announcement.create(store, "hidden", "content");
+        Announcement draft = Announcement.create(store, "draft", "content", null);
+        Announcement hidden = Announcement.create(store, "hidden", "content", null);
         hidden.changeStatus(AnnouncementStatus.HIDDEN, Instant.now());
         when(storeRepository.findForUpdateById(STORE_ID))
                 .thenReturn(Optional.of(store));
@@ -155,7 +155,7 @@ class AnnouncementServiceTests {
     }
 
     private Announcement published(Store store) {
-        Announcement announcement = Announcement.create(store, "title", "content");
+        Announcement announcement = Announcement.create(store, "title", "content", null);
         announcement.changeStatus(AnnouncementStatus.PUBLISHED, Instant.now());
         return announcement;
     }
