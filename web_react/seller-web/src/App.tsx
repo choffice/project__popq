@@ -17,7 +17,7 @@ import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
 import { AdminContentManagement } from './features/admin/AdminContentManagement'
-import { AdminSupportManagement } from './features/admin/AdminSupportManagement'
+import { AdminSupportHub } from './features/admin/AdminSupportHub'
 import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
 import { SellerAuth } from './features/auth/SellerAuth'
 import { MessageManagement } from './features/messages/MessageManagement'
@@ -1077,7 +1077,7 @@ function App() {
         {isAdmin && activeView === 'admin-sellers' && <AdminManagement connection={connection} section="sellers" onError={setError} />}
         {isAdmin && activeView === 'admin-stores' && <AdminManagement connection={connection} section="stores" onError={setError} />}
         {isAdmin && activeView === 'admin-announcements' && <AdminContentManagement connection={connection} kind="announcements" onError={setError} />}
-        {isAdmin && activeView === 'admin-support' && <AdminSupportManagement connection={connection} onError={setError} />}
+        {isAdmin && activeView === 'admin-support' && <AdminSupportHub connection={connection} onError={setError} />}
         {isAdmin && activeView === 'admin-faqs' && <AdminContentManagement connection={connection} kind="faqs" onError={setError} />}
       </div>
 

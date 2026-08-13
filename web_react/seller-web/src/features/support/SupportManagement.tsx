@@ -102,77 +102,81 @@ export function SupportManagement({
 
   useEffect(() => {
     let active = true;
+    const timer = window.setTimeout(() => {
+      setLoading(true);
 
-    setLoading(true);
+      void refreshList()
+        .then(() => {
+          if (active) {
+            onError(null);
+          }
+        })
+        .catch((caught: unknown) => {
+          if (!active) {
+            return;
+          }
 
-    void refreshList()
-      .then(() => {
-        if (active) {
-          onError(null);
-        }
-      })
-      .catch((caught: unknown) => {
-        if (!active) {
-          return;
-        }
-
-        onError(
-          caught instanceof Error
-            ? caught.message
-            : "문의 목록을 불러오지 못했습니다.",
-        );
-      })
-      .finally(() => {
-        if (active) {
-          setLoading(false);
-        }
-      });
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : "문의 목록을 불러오지 못했습니다.",
+          );
+        })
+        .finally(() => {
+          if (active) {
+            setLoading(false);
+          }
+        });
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [onError, refreshList]);
 
   useEffect(() => {
     let active = true;
+    const timer = window.setTimeout(() => {
+      if (!connection || selectedId === null) {
+        setDetail(null);
+        return;
+      }
 
-    if (!connection || selectedId === null) {
-      setDetail(null);
-      return;
-    }
+      setDetailLoading(true);
 
-    setDetailLoading(true);
+      void getAdminSupportInquiry(connection, selectedId)
+        .then((result) => {
+          if (!active) {
+            return;
+          }
 
-    void getAdminSupportInquiry(connection, selectedId)
-      .then((result) => {
-        if (!active) {
-          return;
-        }
+          setDetail(result);
+          onError(null);
 
-        setDetail(result);
-        onError(null);
+          void refreshList().catch(() => undefined);
+        })
+        .catch((caught: unknown) => {
+          if (!active) {
+            return;
+          }
 
-        void refreshList().catch(() => undefined);
-      })
-      .catch((caught: unknown) => {
-        if (!active) {
-          return;
-        }
-
-        onError(
-          caught instanceof Error
-            ? caught.message
-            : "문의 내용을 불러오지 못했습니다.",
-        );
-      })
-      .finally(() => {
-        if (active) {
-          setDetailLoading(false);
-        }
-      });
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : "문의 내용을 불러오지 못했습니다.",
+          );
+        })
+        .finally(() => {
+          if (active) {
+            setDetailLoading(false);
+          }
+        });
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
   }, [connection, onError, refreshList, selectedId]);
 
