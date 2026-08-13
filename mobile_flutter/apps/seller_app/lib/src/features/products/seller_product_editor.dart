@@ -429,6 +429,7 @@ class _OptionEditor extends StatefulWidget {
 
 class _OptionEditorState extends State<_OptionEditor> {
   late final List<_GroupFields> _groups;
+  String? _formError;
 
   @override
   void initState() {
@@ -451,15 +452,56 @@ class _OptionEditorState extends State<_OptionEditor> {
       content: SizedBox(
         width: 560,
         height: 520,
-        child: _groups.isEmpty
-            ? const Center(
-                child: Text('옵션 그룹이 없습니다. 아래 버튼으로 추가하세요.'),
+        child: Column(
+          children: [
+            if (_formError != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _formError!,
+                        style: TextStyle(
+                          color:
+                          Theme.of(context).colorScheme.onErrorContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            Expanded(
+              child: _groups.isEmpty
+                  ? const Center(
+                child: Text(
+                  '옵션 그룹이 없습니다. 아래 버튼으로 추가하세요.',
+                ),
               )
-            : ListView.separated(
+                  : ListView.separated(
                 itemCount: _groups.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 12),
+                separatorBuilder: (_, _) =>
+                const SizedBox(height: 12),
                 itemBuilder: (_, index) => _groupCard(index),
               ),
+            ),
+          ],
+        ),
       ),
       actions: [
         TextButton.icon(
@@ -483,68 +525,206 @@ class _OptionEditorState extends State<_OptionEditor> {
 
   Widget _groupCard(int groupIndex) {
     final group = _groups[groupIndex];
+
     return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            /*
+           * 그룹 헤더
+           */
             Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    key: Key('option-group-name-$groupIndex'),
-                    controller: group.name,
-                    decoration: const InputDecoration(labelText: '그룹 이름'),
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${groupIndex + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    '옵션 그룹',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 IconButton(
-                  tooltip: '그룹 삭제',
-                  onPressed: () => _removeGroup(groupIndex),
-                  icon: const Icon(Icons.delete_outline),
+                  tooltip: '옵션 그룹 삭제',
+                  onPressed: () async {
+                    await _removeGroup(groupIndex);
+                  },
+                  icon: Icon(
+                    Icons.delete_outline_rounded,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ),
               ],
             ),
+
+            const SizedBox(height: 16),
+
+            /*
+           * 옵션 그룹 이름
+           */
+            Text(
+              '옵션 그룹 이름',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '고객에게 어떤 선택을 요청할지 적어주세요.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            TextField(
+              key: Key('option-group-name-$groupIndex'),
+              controller: group.name,
+              decoration: InputDecoration(
+                hintText: '예: 사이즈, 맵기, 토핑',
+                border: OutlineInputBorder(),
+                errorText: group.nameError,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            /*
+           * 선택 방법
+           */
+            Text(
+              '선택 방법',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
+                title: const Text(
+                  '필수 선택',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  group.required
+                      ? '고객이 반드시 1개 이상 선택해야 합니다.'
+                      : '고객이 선택하지 않아도 주문할 수 있습니다.',
+                ),
+                value: group.required,
+                onChanged: (value) {
+                  setState(() {
+                    group.required = value;
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            TextField(
+              controller: group.max,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: '최대 선택 수',
+                helperText: '이 그룹에서 고객이 선택할 수 있는 최대 개수',
+                suffixText: '개',
+                border: OutlineInputBorder(),
+                errorText: group.maxError,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            /*
+           * 옵션 항목
+           */
             Row(
               children: [
                 Expanded(
-                  child: TextField(
-                    controller: group.min,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: '최소 선택'),
+                  child: Text(
+                    '옵션 항목',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: group.max,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: '최대 선택'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('필수'),
-                    value: group.required,
-                    onChanged: (value) =>
-                        setState(() => group.required = value),
+                Text(
+                  '${group.options.length}개',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color:
+                    Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
             ),
-            const Divider(),
+
+            const SizedBox(height: 4),
+
+            Text(
+              '고객이 실제로 선택할 항목과 추가금액을 등록합니다.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
             ...List.generate(
               group.options.length,
-              (optionIndex) => _optionRow(groupIndex, optionIndex),
+                  (optionIndex) =>
+                  _optionRow(groupIndex, optionIndex),
             ),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
+
+            const SizedBox(height: 8),
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
                 key: Key('add-option-$groupIndex'),
-                onPressed: () => setState(
-                  () => group.options.add(_OptionFields.empty()),
-                ),
+                onPressed: () {
+                  setState(() {
+                    group.options.add(_OptionFields.empty());
+                  });
+                },
                 icon: const Icon(Icons.add_rounded),
                 label: const Text('옵션 항목 추가'),
               ),
@@ -564,7 +744,7 @@ class _OptionEditorState extends State<_OptionEditor> {
           child: TextField(
             key: Key('option-name-$groupIndex-$optionIndex'),
             controller: option.name,
-            decoration: const InputDecoration(labelText: '옵션 이름'),
+            decoration: InputDecoration(labelText: '옵션 이름', errorText: option.nameError,),
           ),
         ),
         const SizedBox(width: 8),
@@ -573,7 +753,7 @@ class _OptionEditorState extends State<_OptionEditor> {
             key: Key('option-price-$groupIndex-$optionIndex'),
             controller: option.price,
             keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: '추가 금액'),
+            decoration: InputDecoration(labelText: '추가 금액', errorText: option.priceError,),
           ),
         ),
         IconButton(
@@ -594,47 +774,169 @@ class _OptionEditorState extends State<_OptionEditor> {
     setState(() => _groups.add(_GroupFields.empty()));
   }
 
-  void _removeGroup(int index) {
-    _groups[index].dispose();
-    setState(() => _groups.removeAt(index));
+  Future<void> _removeGroup(int index) async {
+    final group = _groups[index];
+    final groupName = group.name.text.trim();
+    final optionCount = group.options.length;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('옵션 그룹을 삭제할까요?'),
+          content: Text(
+            groupName.isEmpty
+                ? '이 옵션 그룹과 등록된 옵션 $optionCount개가 함께 삭제됩니다.'
+                : '"$groupName" 그룹과 등록된 옵션 $optionCount개가 함께 삭제됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, false);
+              },
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext, true);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor:
+                Theme.of(dialogContext).colorScheme.error,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    group.dispose();
+
+    setState(() {
+      _groups.removeAt(index);
+    });
   }
 
   void _submit() {
-    final result = <SellerProductOptionGroup>[];
-    for (var groupIndex = 0; groupIndex < _groups.length; groupIndex++) {
-      final group = _groups[groupIndex];
-      final name = group.name.text.trim();
-      final min = int.tryParse(group.min.text.trim());
-      final max = int.tryParse(group.max.text.trim());
-      if (name.isEmpty ||
-          min == null ||
-          max == null ||
-          min < 0 ||
-          max < min ||
-          group.options.isEmpty ||
-          max > group.options.length ||
-          (group.required && min == 0)) {
-        return;
+    bool hasError = false;
+
+    /*
+   * 이전 저장 시도에서 표시했던 오류를 초기화합니다.
+   */
+    _formError = null;
+
+    for (final group in _groups) {
+      group.nameError = null;
+      group.maxError = null;
+
+      for (final option in group.options) {
+        option.nameError = null;
+        option.priceError = null;
       }
+    }
+
+    /*
+   * 모든 입력값을 먼저 검증합니다.
+   */
+    for (var groupIndex = 0;
+    groupIndex < _groups.length;
+    groupIndex++) {
+      final group = _groups[groupIndex];
+
+      final name = group.name.text.trim();
+      final min = group.required ? 1 : 0;
+      final max = int.tryParse(group.max.text.trim());
+
+      if (name.isEmpty) {
+        group.nameError = '옵션 그룹 이름을 입력해주세요.';
+        hasError = true;
+      }
+
+      if (max == null) {
+        group.maxError = '최대 선택 수를 숫자로 입력해주세요.';
+        hasError = true;
+      } else if (max < min) {
+        group.maxError = group.required
+            ? '필수 선택은 최대 선택 수가 1개 이상이어야 합니다.'
+            : '최대 선택 수를 확인해주세요.';
+        hasError = true;
+      } else if (max > group.options.length) {
+        group.maxError =
+        '등록된 옵션 ${group.options.length}개를 넘을 수 없습니다.';
+        hasError = true;
+      }
+
+      if (group.options.isEmpty) {
+        hasError = true;
+      }
+
+      for (final option in group.options) {
+        final optionName = option.name.text.trim();
+        final price = int.tryParse(option.price.text.trim());
+
+        if (optionName.isEmpty) {
+          option.nameError = '옵션 이름을 입력해주세요.';
+          hasError = true;
+        }
+
+        if (price == null) {
+          option.priceError = '금액을 숫자로 입력해주세요.';
+          hasError = true;
+        } else if (price < 0) {
+          option.priceError = '추가 금액은 0원 이상이어야 합니다.';
+          hasError = true;
+        }
+      }
+    }
+
+    /*
+   * 문제가 있으면 모달을 닫지 않고
+   * 오류가 난 입력칸과 상단 안내를 표시합니다.
+   */
+    if (hasError) {
+      setState(() {
+        _formError = '저장되지 않았습니다. 표시된 입력 항목을 확인해주세요.';
+      });
+      return;
+    }
+
+    /*
+   * 검증이 끝난 뒤 기존 데이터 구조 그대로 변환합니다.
+   */
+    final result = <SellerProductOptionGroup>[];
+
+    for (var groupIndex = 0;
+    groupIndex < _groups.length;
+    groupIndex++) {
+      final group = _groups[groupIndex];
+
+      final min = group.required ? 1 : 0;
+      final max = int.parse(group.max.text.trim());
+
       final options = <SellerProductOption>[];
+
       for (var optionIndex = 0;
-          optionIndex < group.options.length;
-          optionIndex++) {
+      optionIndex < group.options.length;
+      optionIndex++) {
         final fields = group.options[optionIndex];
-        final optionName = fields.name.text.trim();
-        final price = int.tryParse(fields.price.text.trim());
-        if (optionName.isEmpty || price == null || price < 0) return;
+
         options.add(
           SellerProductOption(
-            name: optionName,
-            additionalPrice: price,
+            name: fields.name.text.trim(),
+            additionalPrice: int.parse(fields.price.text.trim()),
             displayOrder: optionIndex,
           ),
         );
       }
+
       result.add(
         SellerProductOptionGroup(
-          name: name,
+          name: group.name.text.trim(),
           minSelect: min,
           maxSelect: max,
           required: group.required,
@@ -643,6 +945,7 @@ class _OptionEditorState extends State<_OptionEditor> {
         ),
       );
     }
+
     Navigator.pop(context, result);
   }
 }
@@ -682,6 +985,9 @@ class _GroupFields {
   bool required;
   final List<_OptionFields> options;
 
+  String? nameError;
+  String? maxError;
+
   void dispose() {
     name.dispose();
     min.dispose();
@@ -711,6 +1017,9 @@ class _OptionFields {
 
   final TextEditingController name;
   final TextEditingController price;
+
+  String? nameError;
+  String? priceError;
 
   void dispose() {
     name.dispose();
