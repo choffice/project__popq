@@ -94,6 +94,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   _StoreFilterType _selectedFilter = _StoreFilterType.all;
 
+  bool _openOnly = false;
+
   bool _showSuggestions = false;
 
   bool _showInitialLocationChoice = false;
@@ -350,6 +352,18 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     };
   }
 
+  List<CustomerStore> get _mapStores {
+    final stores = _filteredStores;
+
+    if (!_openOnly) {
+      return stores;
+    }
+
+    return stores
+        .where((store) => store.businessStatus == 'OPEN')
+        .toList(growable: false);
+  }
+
   /*
  * 카카오맵 마커에 표시할 현재 찜 업체 ID입니다.
  *
@@ -400,7 +414,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stores = _filteredStores;
+    final stores = _mapStores;
+    // final stores = _filteredStores;
 
     return Stack(
       fit: StackFit.expand,
@@ -542,30 +557,50 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             onSelected: _selectFilter,
           ),
 
-        if (_controller.location != null && !_showSuggestions) ...[
+        if (!_showSuggestions) ...[
           const SizedBox(height: PopqSpacing.sm),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Material(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
-              borderRadius: BorderRadius.circular(999),
-              elevation: 1,
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                child: Text(
-                  '현재 위치 기준 10km 이내 · 가까운 순',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              if (_controller.location != null)
+                Material(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.94),
+                  borderRadius: BorderRadius.circular(999),
+                  elevation: 1,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    child: Text(
+                      '현재 위치 기준 10km 이내 · 가까운 순',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+
+              const Spacer(),
+
+              FilterChip(
+                label: const Text('영업중만'),
+                selected: _openOnly,
+                onSelected: _toggleOpenOnly,
+                avatar: Icon(
+                  _openOnly
+                      ? Icons.check_circle_rounded
+                      : Icons.schedule_rounded,
+                  size: 16,
+                ),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                labelStyle: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ),
-        ],
-
-        if (_controller.isRefreshing && !_showSuggestions) ...[
-          const SizedBox(height: 6),
-          const Align(
-            alignment: Alignment.center,
-            child: _MapRefreshIndicator(),
+            ],
           ),
         ],
       ],
@@ -627,10 +662,14 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
       DiscoveryStatus.data when filteredStores.isEmpty => Center(
         child: _MapStatusCard(
-          icon: _selectedFilter == _StoreFilterType.favorites
+          icon: _openOnly
+              ? Icons.schedule_rounded
+              : _selectedFilter == _StoreFilterType.favorites
               ? Icons.favorite_border_rounded
               : Icons.filter_alt_off_rounded,
-          message: _selectedFilter == _StoreFilterType.favorites
+          message: _openOnly
+              ? '현재 영업 중인 업체가 없습니다.'
+              : _selectedFilter == _StoreFilterType.favorites
               ? '이 지도 영역에 찜한 업체가 없습니다.'
               : '선택한 분류의 업체가 없습니다.',
         ),
@@ -638,6 +677,24 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
 
       DiscoveryStatus.data => const SizedBox.shrink(),
     };
+  }
+
+  void _toggleOpenOnly(bool value) {
+    setState(() {
+      _openOnly = value;
+
+      /*
+     * 영업중만을 켠 순간 현재 선택된 업체가 영업 중이 아니라면
+     * 지도에서 사라지는 업체의 선택 카드만 함께 정리합니다.
+     *
+     * OPEN 업체를 선택한 상태라면 카드는 그대로 유지합니다.
+     */
+      if (_openOnly &&
+          _selectedStore != null &&
+          _selectedStore!.businessStatus != 'OPEN') {
+        _clearSelectedStoreState();
+      }
+    });
   }
 
   void _selectFilter(_StoreFilterType filter) {
