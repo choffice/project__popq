@@ -387,29 +387,70 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
       return const [];
     }
 
-    return _filteredStores
+    /*
+   * 현재 지도 영역의 업체 중 검색어와 일치하는 업체를 찾습니다.
+   *
+   * _filteredStores는 서버에서 받은 거리순을 그대로 유지하므로,
+   * 여기서는 별도의 거리 계산이나 API 호출을 하지 않습니다.
+   */
+    final matchedStores = _filteredStores
         .where((store) {
-          final nameMatches = store.name.toLowerCase().contains(query);
+      final nameMatches =
+      store.name.toLowerCase().contains(query);
 
-          final addressMatches =
-              store.address?.toLowerCase().contains(query) ?? false;
+      final addressMatches =
+          store.address?.toLowerCase().contains(query) ?? false;
 
-          final categoryMatches = store.representativeCategory
-                  ?.toLowerCase()
-                  .contains(query) ??
+      final categoryMatches =
+          store.representativeCategory
+              ?.toLowerCase()
+              .contains(query) ??
               false;
 
-          final tagMatches = store.tags.any(
+      final tagMatches = store.tags.any(
             (tag) => tag.toLowerCase().contains(query),
-          );
+      );
 
-          return nameMatches ||
-              categoryMatches ||
-              addressMatches ||
-              tagMatches;
-        })
-        .take(5)
-        .toList();
+      return nameMatches ||
+          categoryMatches ||
+          addressMatches ||
+          tagMatches;
+    })
+        .toList(growable: false);
+
+    /*
+   * 검색 드롭다운에서는 영업 상태를 거리보다 우선합니다.
+   *
+   * 1. OPEN
+   * 2. PRE_OPEN
+   *
+   * 각 그룹 내부에서는 matchedStores의 기존 순서를 그대로
+   * 유지하므로 결과적으로 거리 가까운 순이 유지됩니다.
+   */
+    final openStores = matchedStores.where(
+          (store) => store.businessStatus == 'OPEN',
+    );
+
+    final preparingStores = matchedStores.where(
+          (store) => store.businessStatus == 'PRE_OPEN',
+    );
+
+    /*
+   * 현재 공개 탐색 API는 OPEN / PRE_OPEN만 내려주지만,
+   * 예상하지 못한 상태가 들어오더라도 검색 결과 자체가
+   * 사라지지는 않도록 마지막에 보존합니다.
+   */
+    final otherStores = matchedStores.where(
+          (store) =>
+      store.businessStatus != 'OPEN' &&
+          store.businessStatus != 'PRE_OPEN',
+    );
+
+    return <CustomerStore>[
+      ...openStores,
+      ...preparingStores,
+      ...otherStores,
+    ].take(5).toList(growable: false);
   }
 
   @override
@@ -1455,10 +1496,20 @@ class _SearchSuggestionPanel extends StatelessWidget {
                       imageUrl: store.imageUrl,
                       fallbackIcon: _storeTypeIcon(store.storeType),
                     ),
-                    title: Text(
-                      store.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            store.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        _StoreBusinessStatusBadge(
+                          businessStatus: store.businessStatus,
+                        ),
+                      ],
                     ),
                     subtitle: Text(
                       [
@@ -1476,6 +1527,47 @@ class _SearchSuggestionPanel extends StatelessWidget {
                   );
                 },
               ),
+      ),
+    );
+  }
+}
+
+class _StoreBusinessStatusBadge extends StatelessWidget {
+  const _StoreBusinessStatusBadge({
+    required this.businessStatus,
+  });
+
+  final String businessStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isOpen = businessStatus == 'OPEN';
+    final bool isPreparing = businessStatus == 'PRE_OPEN';
+
+    if (!isOpen && !isPreparing) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 7,
+        vertical: 3,
+      ),
+      decoration: BoxDecoration(
+        color: isOpen
+            ? const Color(0xFFB7FF00)
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        isOpen ? '영업중' : '영업준비중',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w800,
+          color: isOpen
+              ? const Color(0xFF08110E)
+              : Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
     );
   }
