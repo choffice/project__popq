@@ -51,19 +51,37 @@ Future<SellerProductDraft?> showSellerProductEditor(
 }) {
   return showDialog<SellerProductDraft>(
     context: context,
-    builder: (_) =>
-        _ProductEditor(categories: categories, product: product),
+    builder: (_) => _ProductEditor(categories: categories, product: product),
   );
 }
 
-Future<List<SellerProductOptionGroup>?> showSellerOptionEditor(
+class SellerOptionEditorResult {
+  const SellerOptionEditorResult({
+    required this.groups,
+    required this.templateIdsToDelete,
+  });
+
+  final List<SellerProductOptionGroup> groups;
+  final Set<int> templateIdsToDelete;
+}
+
+enum _TemplateRemovalChoice { cancel, currentOnly, deleteTemplate }
+
+Future<SellerOptionEditorResult?> showSellerOptionEditor(
   BuildContext context, {
   required SellerProduct product,
   required List<SellerProductOptionGroup> groups,
+  required List<SellerStoreOptionTemplate> templates,
+  required SellerProductRepository repository,
 }) {
-  return showDialog<List<SellerProductOptionGroup>>(
+  return showDialog<SellerOptionEditorResult>(
     context: context,
-    builder: (_) => _OptionEditor(product: product, groups: groups),
+    builder: (_) => _OptionEditor(
+      product: product,
+      groups: groups,
+      templates: templates,
+      repository: repository,
+    ),
   );
 }
 
@@ -124,10 +142,7 @@ class _CategoryEditorState extends State<_CategoryEditor> {
   void _submit() {
     final name = _name.text.trim();
     if (name.isEmpty) return;
-    Navigator.pop(
-      context,
-      SellerCategoryDraft(name: name),
-    );
+    Navigator.pop(context, SellerCategoryDraft(name: name));
   }
 }
 
@@ -252,9 +267,7 @@ class _ProductEditorState extends State<_ProductEditor> {
                       onPressed: () {
                         _pickImage(ImageSource.camera);
                       },
-                      icon: const Icon(
-                        Icons.camera_alt_outlined,
-                      ),
+                      icon: const Icon(Icons.camera_alt_outlined),
                       label: const Text('사진 촬영'),
                     ),
                   ),
@@ -264,9 +277,7 @@ class _ProductEditorState extends State<_ProductEditor> {
                       onPressed: () {
                         _pickImage(ImageSource.gallery);
                       },
-                      icon: const Icon(
-                        Icons.photo_library_outlined,
-                      ),
+                      icon: const Icon(Icons.photo_library_outlined),
                       label: const Text('앨범 선택'),
                     ),
                   ),
@@ -280,9 +291,7 @@ class _ProductEditorState extends State<_ProductEditor> {
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: _clearImage,
-                    icon: const Icon(
-                      Icons.delete_outline,
-                    ),
+                    icon: const Icon(Icons.delete_outline),
                     label: const Text('사진 삭제'),
                   ),
                 ),
@@ -304,11 +313,8 @@ class _ProductEditorState extends State<_ProductEditor> {
     );
   }
 
-  Future<void> _pickImage(
-      ImageSource source,
-      ) async {
-    final XFile? picked =
-    await _imagePicker.pickImage(
+  Future<void> _pickImage(ImageSource source) async {
+    final XFile? picked = await _imagePicker.pickImage(
       source: source,
       imageQuality: 85,
       maxWidth: 1600,
@@ -318,8 +324,7 @@ class _ProductEditorState extends State<_ProductEditor> {
       return;
     }
 
-    final Uint8List bytes =
-    await picked.readAsBytes();
+    final Uint8List bytes = await picked.readAsBytes();
 
     if (!mounted) {
       return;
@@ -342,33 +347,21 @@ class _ProductEditorState extends State<_ProductEditor> {
 
   Widget _buildImagePreview() {
     if (_pickedImageBytes != null) {
-      return Image.memory(
-        _pickedImageBytes!,
-        fit: BoxFit.cover,
-      );
+      return Image.memory(_pickedImageBytes!, fit: BoxFit.cover);
     }
 
-    final String? existingUrl =
-        widget.product?.imageUrl;
+    final String? existingUrl = widget.product?.imageUrl;
 
-    if (!_removeImage &&
-        existingUrl != null &&
-        existingUrl.trim().isNotEmpty) {
+    if (!_removeImage && existingUrl != null && existingUrl.trim().isNotEmpty) {
       return Image.network(
         existingUrl,
         fit: BoxFit.cover,
-        errorBuilder: (
-            BuildContext context,
-            Object error,
-            StackTrace? stackTrace,
-            ) {
-          return const Center(
-            child: Icon(
-              Icons.broken_image_outlined,
-              size: 48,
-            ),
-          );
-        },
+        errorBuilder:
+            (BuildContext context, Object error, StackTrace? stackTrace) {
+              return const Center(
+                child: Icon(Icons.broken_image_outlined, size: 48),
+              );
+            },
       );
     }
 
@@ -376,10 +369,7 @@ class _ProductEditorState extends State<_ProductEditor> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Icons.add_photo_alternate_outlined,
-            size: 48,
-          ),
+          Icon(Icons.add_photo_alternate_outlined, size: 48),
           SizedBox(height: 8),
           Text('등록된 메뉴 사진이 없습니다.'),
         ],
@@ -396,12 +386,8 @@ class _ProductEditorState extends State<_ProductEditor> {
       SellerProductDraft(
         categoryId: _categoryId,
         name: name,
-        description: _nullable(
-          _description.text,
-        ),
-        imageUrl: _removeImage
-            ? null
-            : widget.product?.imageUrl,
+        description: _nullable(_description.text),
+        imageUrl: _removeImage ? null : widget.product?.imageUrl,
         imageFilePath: _pickedImage?.path,
         imageBytes: _pickedImageBytes,
         imageFileName: _pickedImage?.name,
@@ -418,10 +404,17 @@ class _ProductEditorState extends State<_ProductEditor> {
 }
 
 class _OptionEditor extends StatefulWidget {
-  const _OptionEditor({required this.product, required this.groups});
+  const _OptionEditor({
+    required this.product,
+    required this.groups,
+    required this.templates,
+    required this.repository,
+  });
 
   final SellerProduct product;
   final List<SellerProductOptionGroup> groups;
+  final List<SellerStoreOptionTemplate> templates;
+  final SellerProductRepository repository;
 
   @override
   State<_OptionEditor> createState() => _OptionEditorState();
@@ -429,12 +422,16 @@ class _OptionEditor extends StatefulWidget {
 
 class _OptionEditorState extends State<_OptionEditor> {
   late final List<_GroupFields> _groups;
+  late final List<SellerStoreOptionTemplate> _templates;
+  final Set<int> _templateIdsToDelete = <int>{};
   String? _formError;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
     _groups = widget.groups.map(_GroupFields.fromModel).toList();
+    _templates = List.of(widget.templates);
   }
 
   @override
@@ -475,8 +472,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                       child: Text(
                         _formError!,
                         style: TextStyle(
-                          color:
-                          Theme.of(context).colorScheme.onErrorContainer,
+                          color: Theme.of(context).colorScheme.onErrorContainer,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -488,17 +484,12 @@ class _OptionEditorState extends State<_OptionEditor> {
 
             Expanded(
               child: _groups.isEmpty
-                  ? const Center(
-                child: Text(
-                  '옵션 그룹이 없습니다. 아래 버튼으로 추가하세요.',
-                ),
-              )
+                  ? const Center(child: Text('옵션 그룹이 없습니다. 아래 버튼으로 추가하세요.'))
                   : ListView.separated(
-                itemCount: _groups.length,
-                separatorBuilder: (_, _) =>
-                const SizedBox(height: 12),
-                itemBuilder: (_, index) => _groupCard(index),
-              ),
+                      itemCount: _groups.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      itemBuilder: (_, index) => _groupCard(index),
+                    ),
             ),
           ],
         ),
@@ -516,8 +507,8 @@ class _OptionEditorState extends State<_OptionEditor> {
         ),
         FilledButton(
           key: const Key('save-options'),
-          onPressed: _submit,
-          child: const Text('저장'),
+          onPressed: _saving ? null : _submit,
+          child: Text(_saving ? '저장 중...' : '저장'),
         ),
       ],
     );
@@ -544,9 +535,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                   height: 28,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .colorScheme
-                        .primaryContainer,
+                    color: Theme.of(context).colorScheme.primaryContainer,
                     shape: BoxShape.circle,
                   ),
                   child: Text(
@@ -554,9 +543,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onPrimaryContainer,
+                      color: Theme.of(context).colorScheme.onPrimaryContainer,
                     ),
                   ),
                 ),
@@ -564,10 +551,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                 const Expanded(
                   child: Text(
                     '옵션 그룹',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                   ),
                 ),
                 IconButton(
@@ -590,9 +574,9 @@ class _OptionEditorState extends State<_OptionEditor> {
            */
             Text(
               '옵션 그룹 이름',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
@@ -603,15 +587,19 @@ class _OptionEditorState extends State<_OptionEditor> {
             ),
             const SizedBox(height: 8),
 
-            TextField(
-              key: Key('option-group-name-$groupIndex'),
-              controller: group.name,
-              decoration: InputDecoration(
-                hintText: '예: 사이즈, 맵기, 토핑',
-                border: OutlineInputBorder(),
-                errorText: group.nameError,
+            _templateNameField(groupIndex, group),
+
+            if (group.templateId != null && group.optionGroupId != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton.icon(
+                  onPressed: _saving ? null : () => _applyToAll(groupIndex),
+                  icon: const Icon(Icons.sync_rounded),
+                  label: const Text('동일 그룹에 변경사항 일괄 적용'),
+                ),
               ),
-            ),
+            ],
 
             const SizedBox(height: 20),
 
@@ -620,9 +608,9 @@ class _OptionEditorState extends State<_OptionEditor> {
            */
             Text(
               '선택 방법',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
 
@@ -640,9 +628,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                 ),
                 title: const Text(
                   '필수 선택',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 subtitle: Text(
                   group.required
@@ -690,8 +676,7 @@ class _OptionEditorState extends State<_OptionEditor> {
                 Text(
                   '${group.options.length}개',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color:
-                    Theme.of(context).colorScheme.onSurfaceVariant,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -710,8 +695,7 @@ class _OptionEditorState extends State<_OptionEditor> {
 
             ...List.generate(
               group.options.length,
-                  (optionIndex) =>
-                  _optionRow(groupIndex, optionIndex),
+              (optionIndex) => _optionRow(groupIndex, optionIndex),
             ),
 
             const SizedBox(height: 8),
@@ -735,6 +719,167 @@ class _OptionEditorState extends State<_OptionEditor> {
     );
   }
 
+  Widget _templateNameField(int groupIndex, _GroupFields group) {
+    return RawAutocomplete<SellerStoreOptionTemplate>(
+      textEditingController: group.name,
+      focusNode: group.nameFocus,
+      displayStringForOption: (template) => template.name,
+      optionsBuilder: (value) {
+        final query = value.text.trim().toLowerCase();
+        if (query.isEmpty) return _templates;
+        return _templates.where(
+          (template) => template.name.toLowerCase().contains(query),
+        );
+      },
+      onSelected: (template) => _useTemplate(groupIndex, template),
+      fieldViewBuilder: (context, controller, focusNode, onSubmitted) {
+        return TextField(
+          key: Key('option-group-name-$groupIndex'),
+          controller: controller,
+          focusNode: focusNode,
+          onSubmitted: (_) => onSubmitted(),
+          decoration: InputDecoration(
+            hintText: '예: 사이즈, 맵기, 토핑',
+            helperText: _templates.isEmpty
+                ? '새 이름으로 저장하면 매장 공용 옵션으로 등록됩니다.'
+                : '기존 공용 옵션을 선택하거나 새 이름을 입력하세요.',
+            border: const OutlineInputBorder(),
+            errorText: group.nameError,
+          ),
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        final items = options.toList();
+        if (items.isEmpty) return const SizedBox.shrink();
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520, maxHeight: 240),
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final template = items[index];
+                  return ListTile(
+                    dense: true,
+                    title: Text(template.name),
+                    subtitle: Text(
+                      '${template.options.length}개 옵션 · 버전 ${template.version}',
+                    ),
+                    onTap: () => onSelected(template),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _useTemplate(int groupIndex, SellerStoreOptionTemplate template) {
+    final group = _groups[groupIndex];
+    for (final option in group.options) {
+      option.dispose();
+    }
+    setState(() {
+      if (group.templateId != template.templateId) {
+        group.optionGroupId = null;
+      }
+      group.templateId = template.templateId;
+      group.appliedTemplateVersion = template.version;
+      group.name.text = template.name;
+      group.required = template.required;
+      group.min.text = template.minSelect.toString();
+      group.max.text = template.maxSelect.toString();
+      group.options
+        ..clear()
+        ..addAll(template.options.map(_OptionFields.fromModel));
+    });
+  }
+
+  Future<void> _applyToAll(int groupIndex) async {
+    final group = _groups[groupIndex];
+    final model = _validatedGroup(groupIndex);
+    if (model == null ||
+        group.templateId == null ||
+        group.optionGroupId == null) {
+      setState(() {
+        _formError = '일괄 적용 전에 표시된 입력 항목을 확인해주세요.';
+      });
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final usage = await widget.repository.findOptionTemplateUsage(
+        widget.product.storeId,
+        group.templateId!,
+      );
+      if (!mounted) return;
+      final preview = usage.products
+          .take(3)
+          .map((item) => '- ${item.productName}')
+          .join('\n');
+      final extra = usage.totalCount > 3
+          ? '\n... 외 ${usage.totalCount - 3}개'
+          : '';
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('동일 옵션 그룹을 일괄 변경할까요?'),
+          content: Text(
+            '동일 옵션이 적용된 메뉴들이 ${usage.totalCount}개 있습니다.\n\n'
+            '${preview.isEmpty ? '연결된 메뉴 없음' : '$preview$extra'}\n\n'
+            "현재 '${model.name}' 설정으로 모두 변경할까요?\n\n"
+            '각 메뉴에서 개별 수정한 옵션도 현재 설정으로 변경됩니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('일괄 적용'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+      final updated = await widget.repository.applyOptionTemplateToAll(
+        widget.product.storeId,
+        widget.product,
+        model,
+      );
+      if (!mounted) return;
+      final templateIndex = _templates.indexWhere(
+        (item) => item.templateId == updated.templateId,
+      );
+      setState(() {
+        group.appliedTemplateVersion = updated.version;
+        if (templateIndex >= 0) {
+          _templates[templateIndex] = updated;
+        }
+        _formError = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('연결된 메뉴 ${usage.totalCount}개의 옵션을 변경했습니다.')),
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() => _formError = '공용 옵션 일괄 적용에 실패했습니다. 다시 시도해주세요.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   Widget _optionRow(int groupIndex, int optionIndex) {
     final option = _groups[groupIndex].options[optionIndex];
     return Row(
@@ -744,7 +889,10 @@ class _OptionEditorState extends State<_OptionEditor> {
           child: TextField(
             key: Key('option-name-$groupIndex-$optionIndex'),
             controller: option.name,
-            decoration: InputDecoration(labelText: '옵션 이름', errorText: option.nameError,),
+            decoration: InputDecoration(
+              labelText: '옵션 이름',
+              errorText: option.nameError,
+            ),
           ),
         ),
         const SizedBox(width: 8),
@@ -753,16 +901,17 @@ class _OptionEditorState extends State<_OptionEditor> {
             key: Key('option-price-$groupIndex-$optionIndex'),
             controller: option.price,
             keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: '추가 금액', errorText: option.priceError,),
+            decoration: InputDecoration(
+              labelText: '추가 금액',
+              errorText: option.priceError,
+            ),
           ),
         ),
         IconButton(
           tooltip: '옵션 삭제',
           onPressed: () {
             option.dispose();
-            setState(
-              () => _groups[groupIndex].options.removeAt(optionIndex),
-            );
+            setState(() => _groups[groupIndex].options.removeAt(optionIndex));
           },
           icon: const Icon(Icons.remove_circle_outline),
         ),
@@ -779,10 +928,74 @@ class _OptionEditorState extends State<_OptionEditor> {
     final groupName = group.name.text.trim();
     final optionCount = group.options.length;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
+    _TemplateRemovalChoice choice = _TemplateRemovalChoice.currentOnly;
+    if (group.templateId != null && group.optionGroupId != null) {
+      setState(() => _saving = true);
+      try {
+        final usage = await widget.repository.findOptionTemplateUsage(
+          widget.product.storeId,
+          group.templateId!,
+        );
+        if (!mounted) return;
+        final otherCount = usage.products
+            .where((item) => item.productId != widget.product.productId)
+            .length;
+        choice =
+            await showDialog<_TemplateRemovalChoice>(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                title: const Text('옵션 그룹을 삭제할까요?'),
+                content: Text(
+                  otherCount > 0
+                      ? '이 공용 옵션은 다른 메뉴 $otherCount개에서도 사용 중입니다. '
+                            '현재 메뉴에서만 삭제할 수 있습니다.'
+                      : '다른 메뉴에서 사용하지 않는 공용 옵션입니다. '
+                            '현재 메뉴에서만 제거하거나 공용 옵션까지 삭제할 수 있습니다.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(
+                      dialogContext,
+                      _TemplateRemovalChoice.cancel,
+                    ),
+                    child: const Text('취소'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(
+                      dialogContext,
+                      _TemplateRemovalChoice.currentOnly,
+                    ),
+                    child: const Text('현재 메뉴에서만 삭제'),
+                  ),
+                  if (otherCount == 0)
+                    TextButton(
+                      onPressed: () => Navigator.pop(
+                        dialogContext,
+                        _TemplateRemovalChoice.deleteTemplate,
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(
+                          dialogContext,
+                        ).colorScheme.error,
+                      ),
+                      child: const Text('공용 옵션도 삭제'),
+                    ),
+                ],
+              ),
+            ) ??
+            _TemplateRemovalChoice.cancel;
+      } catch (_) {
+        if (mounted) {
+          setState(() => _formError = '공용 옵션 사용 메뉴를 확인하지 못했습니다.');
+        }
+        return;
+      } finally {
+        if (mounted) setState(() => _saving = false);
+      }
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
           title: const Text('옵션 그룹을 삭제할까요?'),
           content: Text(
             groupName.isEmpty
@@ -791,28 +1004,26 @@ class _OptionEditorState extends State<_OptionEditor> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, false);
-              },
+              onPressed: () => Navigator.pop(dialogContext, false),
               child: const Text('취소'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.pop(dialogContext, true);
-              },
+              onPressed: () => Navigator.pop(dialogContext, true),
               style: TextButton.styleFrom(
-                foregroundColor:
-                Theme.of(dialogContext).colorScheme.error,
+                foregroundColor: Theme.of(dialogContext).colorScheme.error,
               ),
               child: const Text('삭제'),
             ),
           ],
-        );
-      },
-    );
+        ),
+      );
+      if (confirmed != true) choice = _TemplateRemovalChoice.cancel;
+    }
 
-    if (confirmed != true || !mounted) {
-      return;
+    if (choice == _TemplateRemovalChoice.cancel || !mounted) return;
+    if (choice == _TemplateRemovalChoice.deleteTemplate &&
+        group.templateId != null) {
+      _templateIdsToDelete.add(group.templateId!);
     }
 
     group.dispose();
@@ -822,7 +1033,7 @@ class _OptionEditorState extends State<_OptionEditor> {
     });
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     bool hasError = false;
 
     /*
@@ -843,9 +1054,7 @@ class _OptionEditorState extends State<_OptionEditor> {
     /*
    * 모든 입력값을 먼저 검증합니다.
    */
-    for (var groupIndex = 0;
-    groupIndex < _groups.length;
-    groupIndex++) {
+    for (var groupIndex = 0; groupIndex < _groups.length; groupIndex++) {
       final group = _groups[groupIndex];
 
       final name = group.name.text.trim();
@@ -866,8 +1075,7 @@ class _OptionEditorState extends State<_OptionEditor> {
             : '최대 선택 수를 확인해주세요.';
         hasError = true;
       } else if (max > group.options.length) {
-        group.maxError =
-        '등록된 옵션 ${group.options.length}개를 넘을 수 없습니다.';
+        group.maxError = '등록된 옵션 ${group.options.length}개를 넘을 수 없습니다.';
         hasError = true;
       }
 
@@ -910,9 +1118,7 @@ class _OptionEditorState extends State<_OptionEditor> {
    */
     final result = <SellerProductOptionGroup>[];
 
-    for (var groupIndex = 0;
-    groupIndex < _groups.length;
-    groupIndex++) {
+    for (var groupIndex = 0; groupIndex < _groups.length; groupIndex++) {
       final group = _groups[groupIndex];
 
       final min = group.required ? 1 : 0;
@@ -920,9 +1126,11 @@ class _OptionEditorState extends State<_OptionEditor> {
 
       final options = <SellerProductOption>[];
 
-      for (var optionIndex = 0;
-      optionIndex < group.options.length;
-      optionIndex++) {
+      for (
+        var optionIndex = 0;
+        optionIndex < group.options.length;
+        optionIndex++
+      ) {
         final fields = group.options[optionIndex];
 
         options.add(
@@ -936,23 +1144,142 @@ class _OptionEditorState extends State<_OptionEditor> {
 
       result.add(
         SellerProductOptionGroup(
+          optionGroupId: group.optionGroupId,
           name: group.name.text.trim(),
           minSelect: min,
           maxSelect: max,
           required: group.required,
           displayOrder: groupIndex,
+          templateId: group.templateId,
+          appliedTemplateVersion: group.appliedTemplateVersion,
           options: options,
         ),
       );
     }
 
-    Navigator.pop(context, result);
+    setState(() => _saving = true);
+    try {
+      final linked = <SellerProductOptionGroup>[];
+      for (final group in result) {
+        final matchingTemplate = group.templateId == null
+            ? _templates.cast<SellerStoreOptionTemplate?>().firstWhere(
+                (template) =>
+                    template!.name.toLowerCase() == group.name.toLowerCase(),
+                orElse: () => null,
+              )
+            : _templates.cast<SellerStoreOptionTemplate?>().firstWhere(
+                (template) => template!.templateId == group.templateId,
+                orElse: () => null,
+              );
+        final template =
+            matchingTemplate ??
+            await widget.repository.createOptionTemplate(
+              widget.product.storeId,
+              group,
+            );
+        if (matchingTemplate == null) _templates.add(template);
+        linked.add(
+          SellerProductOptionGroup(
+            optionGroupId: group.optionGroupId,
+            name: group.name,
+            minSelect: group.minSelect,
+            maxSelect: group.maxSelect,
+            required: group.required,
+            displayOrder: group.displayOrder,
+            templateId: template.templateId,
+            appliedTemplateVersion:
+                group.appliedTemplateVersion ?? template.version,
+            options: group.options,
+          ),
+        );
+      }
+      if (!mounted) return;
+      Navigator.pop(
+        context,
+        SellerOptionEditorResult(
+          groups: linked,
+          templateIdsToDelete: Set.unmodifiable(_templateIdsToDelete),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+          _formError = '공용 옵션을 저장하지 못했습니다. 이름 중복 여부를 확인해주세요.';
+        });
+      }
+    }
+  }
+
+  SellerProductOptionGroup? _validatedGroup(int groupIndex) {
+    final group = _groups[groupIndex];
+    group.nameError = null;
+    group.maxError = null;
+    for (final option in group.options) {
+      option.nameError = null;
+      option.priceError = null;
+    }
+    final name = group.name.text.trim();
+    final min = group.required ? 1 : 0;
+    final max = int.tryParse(group.max.text.trim());
+    var invalid = false;
+    if (name.isEmpty) {
+      group.nameError = '옵션 그룹 이름을 입력해주세요.';
+      invalid = true;
+    }
+    if (max == null || max < min || max > group.options.length) {
+      group.maxError = '최대 선택 수를 확인해주세요.';
+      invalid = true;
+    }
+    final options = <SellerProductOption>[];
+    for (var index = 0; index < group.options.length; index++) {
+      final fields = group.options[index];
+      final optionName = fields.name.text.trim();
+      final price = int.tryParse(fields.price.text.trim());
+      if (optionName.isEmpty) {
+        fields.nameError = '옵션 이름을 입력해주세요.';
+        invalid = true;
+      }
+      if (price == null || price < 0) {
+        fields.priceError = '0원 이상의 숫자를 입력해주세요.';
+        invalid = true;
+      }
+      if (optionName.isNotEmpty && price != null && price >= 0) {
+        options.add(
+          SellerProductOption(
+            name: optionName,
+            additionalPrice: price,
+            displayOrder: index,
+          ),
+        );
+      }
+    }
+    if (group.options.isEmpty) invalid = true;
+    if (invalid || max == null) {
+      setState(() {});
+      return null;
+    }
+    return SellerProductOptionGroup(
+      optionGroupId: group.optionGroupId,
+      name: name,
+      minSelect: min,
+      maxSelect: max,
+      required: group.required,
+      displayOrder: groupIndex,
+      templateId: group.templateId,
+      appliedTemplateVersion: group.appliedTemplateVersion,
+      options: options,
+    );
   }
 }
 
 class _GroupFields {
   _GroupFields({
+    required this.optionGroupId,
+    required this.templateId,
+    required this.appliedTemplateVersion,
     required this.name,
+    required this.nameFocus,
     required this.min,
     required this.max,
     required this.required,
@@ -961,7 +1288,11 @@ class _GroupFields {
 
   factory _GroupFields.empty() {
     return _GroupFields(
+      optionGroupId: null,
+      templateId: null,
+      appliedTemplateVersion: null,
       name: TextEditingController(),
+      nameFocus: FocusNode(),
       min: TextEditingController(text: '0'),
       max: TextEditingController(text: '1'),
       required: false,
@@ -971,7 +1302,11 @@ class _GroupFields {
 
   factory _GroupFields.fromModel(SellerProductOptionGroup group) {
     return _GroupFields(
+      optionGroupId: group.optionGroupId,
+      templateId: group.templateId,
+      appliedTemplateVersion: group.appliedTemplateVersion,
       name: TextEditingController(text: group.name),
+      nameFocus: FocusNode(),
       min: TextEditingController(text: group.minSelect.toString()),
       max: TextEditingController(text: group.maxSelect.toString()),
       required: group.required,
@@ -979,7 +1314,11 @@ class _GroupFields {
     );
   }
 
+  int? optionGroupId;
+  int? templateId;
+  int? appliedTemplateVersion;
   final TextEditingController name;
+  final FocusNode nameFocus;
   final TextEditingController min;
   final TextEditingController max;
   bool required;
@@ -990,6 +1329,7 @@ class _GroupFields {
 
   void dispose() {
     name.dispose();
+    nameFocus.dispose();
     min.dispose();
     max.dispose();
     for (final option in options) {

@@ -46,6 +46,8 @@ public record ProductDetailResponse(
             int maxSelect,
             boolean required,
             int displayOrder,
+            Long templateId,
+            Long appliedTemplateVersion,
             List<OptionResponse> options
     ) {
         private static OptionGroupResponse from(ProductOptionGroup group) {
@@ -56,6 +58,10 @@ public record ProductDetailResponse(
                     group.getMaxSelect(),
                     group.isRequired(),
                     group.getDisplayOrder(),
+                    group.getStoreOptionGroupTemplate() == null
+                            ? null
+                            : group.getStoreOptionGroupTemplate().getId(),
+                    group.getAppliedTemplateVersion(),
                     group.getOptions().stream()
                             .map(OptionResponse::from)
                             .toList()
@@ -79,4 +85,3 @@ public record ProductDetailResponse(
         }
     }
 }
-
