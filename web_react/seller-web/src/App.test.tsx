@@ -222,9 +222,9 @@ describe('판매자 주문 운영', () => {
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: /스토어 설정/ }))
-    await user.click(screen.getByRole('radio', { name: /영업 종료/ }))
+    await user.click(screen.getByRole('radio', { name: /준비중/ }))
     expect(
-      screen.getByRole('button', { name: '영업 종료' }),
+      screen.getByRole('button', { name: '준비중' }),
     ).toBeVisible()
 
     await user.click(screen.getByRole('button', { name: /테이블 추가/ }))

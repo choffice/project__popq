@@ -2049,9 +2049,7 @@ IconData _storeTypeIcon(String storeType) {
 String _businessStatusLabel(String businessStatus) {
   return switch (businessStatus) {
     'OPEN' => '영업 중',
-    'PRE_OPEN' => '영업 준비',
-    'CLOSED' => '영업 종료',
-    'TEMPORARILY_CLOSED' => '임시 휴무',
+    'PRE_OPEN' => '준비중',
     _ => businessStatus,
   };
 }

@@ -246,7 +246,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           );
         }
 
-        if (store.isOrderAcceptingAt()) {
+        if (store.isOrderAccepting()) {
           return const SizedBox.shrink();
         }
 
@@ -587,7 +587,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 (snapshot.connectionState == ConnectionState.done &&
                     store == null);
             final orderPaused =
-                store != null && !store.isOrderAcceptingAt();
+                store != null && !store.isOrderAccepting();
             final paymentEnabled = canPay &&
                 (!checkingStore || _createdOrder != null) &&
                 (!storeLoadFailed || _createdOrder != null);
@@ -648,7 +648,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         _storeFuture = Future<CustomerStore>.value(store);
       });
 
-      if (!store.isOrderAcceptingAt()) {
+      if (!store.isOrderAccepting()) {
         setState(() {
           _busy = false;
         });

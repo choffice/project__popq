@@ -290,7 +290,7 @@ export type SalesSummary = {
   }[]
 }
 
-export type BusinessStatus = 'PRE_OPEN' | 'OPEN' | 'CLOSED'
+export type BusinessStatus = 'PRE_OPEN' | 'OPEN'
 
 export type StoreRole = 'OWNER' | 'MANAGER' | 'STAFF'
 export type StoreType = 'LOCAL_STORE' | 'EVENT_COMMERCE'

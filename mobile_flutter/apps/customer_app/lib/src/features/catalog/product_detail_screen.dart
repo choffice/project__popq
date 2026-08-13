@@ -82,7 +82,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   storeSnapshot.hasError ||
                   (storeSnapshot.connectionState == ConnectionState.done &&
                       store == null);
-              final orderPaused = store != null && !store.isOrderAcceptingAt();
+              final orderPaused = store != null && !store.isOrderAccepting();
 
               return Column(
                 children: [

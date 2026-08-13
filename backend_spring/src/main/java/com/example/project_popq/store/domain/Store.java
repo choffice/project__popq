@@ -204,4 +204,8 @@ public class Store extends BaseTimeEntity {
     public boolean isOpen() {
         return isActive() && businessStatus == BusinessStatus.OPEN;
     }
+
+    public boolean isOrderAccepting() {
+        return isOpen() && orderAcceptingEnabled;
+    }
 }

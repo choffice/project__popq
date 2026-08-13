@@ -20,11 +20,6 @@ public interface StoreRepository extends JpaRepository<Store, Long>,
     @Query("select store from Store store where store.id = :storeId")
     Optional<Store> findForUpdateById(@Param("storeId") Long storeId);
 
-    List<Store> findAllByStatusAndBusinessStatus(
-            StoreStatus status,
-            BusinessStatus businessStatus
-    );
-
     @Query("""
             select distinct store
             from Store store

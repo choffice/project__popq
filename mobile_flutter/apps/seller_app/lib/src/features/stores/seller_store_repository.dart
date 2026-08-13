@@ -1406,7 +1406,7 @@ class MemorySellerStoreRepository
 
     _stores[index] = store.copyWith(
       status: 'CLOSED',
-      businessStatus: 'CLOSED',
+      businessStatus: 'PRE_OPEN',
       orderAcceptingEnabled: false,
     );
   }

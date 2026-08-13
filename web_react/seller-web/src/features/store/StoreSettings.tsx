@@ -74,9 +74,8 @@ const CLOSED_DAYS: { value: StoreClosedDay; label: string }[] = [
 ]
 
 const STATUS_LABEL: Record<BusinessStatus, string> = {
-  PRE_OPEN: '오픈 준비',
+  PRE_OPEN: '준비중',
   OPEN: '영업 중',
-  CLOSED: '영업 종료',
 }
 
 function blankEditor(): EditorState {
@@ -314,11 +313,11 @@ export function StoreSettings({
       if (remaining.length > 0) {
         onStoreDeleted?.(remaining)
       } else {
-        const closed = { ...store, status: 'CLOSED' as const, businessStatus: 'CLOSED' as const, orderAcceptingEnabled: false }
+        const closed = { ...store, status: 'CLOSED' as const, businessStatus: 'PRE_OPEN' as const, orderAcceptingEnabled: false }
         setStore(closed)
         setInactiveStores([closed])
         setShowInactiveStores(true)
-        onBusinessStatusChange('CLOSED')
+        onBusinessStatusChange('PRE_OPEN')
       }
       onError(null)
     } catch (caught) {
@@ -432,7 +431,7 @@ export function StoreSettings({
           <header><div><p className="eyebrow">BUSINESS STATUS</p><h3>영업 상태</h3></div><span>{STATUS_LABEL[store.businessStatus]}</span></header>
           <p>고객 주문 가능 여부에 맞춰 현재 영업 상태를 관리합니다.</p>
           <div className="status-options" role="radiogroup" aria-label="영업 상태">
-            {(['PRE_OPEN', 'OPEN', 'CLOSED'] as BusinessStatus[]).map((value) => (
+            {(['PRE_OPEN', 'OPEN'] as BusinessStatus[]).map((value) => (
               <button key={value} role="radio" aria-checked={store.businessStatus === value} className={store.businessStatus === value ? 'active' : ''} disabled={processing || !canManage} onClick={() => void changeStatus(value)}>
                 <span /><div><strong>{STATUS_LABEL[value]}</strong><small>{value === 'OPEN' ? '고객 주문 허용' : '신규 주문 제한'}</small></div>
               </button>

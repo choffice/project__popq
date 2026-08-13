@@ -27,7 +27,6 @@ import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.store.domain.Store;
-import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -48,9 +47,6 @@ class PaymentServiceTests {
 
         OrderDomainEventPublisher eventPublisher = mock(
             OrderDomainEventPublisher.class
-        );
-        StoreOperatingHoursPolicy operatingHoursPolicy = mock(
-            StoreOperatingHoursPolicy.class
         );
         CustomerPointService customerPointService = mock(
             CustomerPointService.class
@@ -103,8 +99,7 @@ class PaymentServiceTests {
         when(order.getStore())
             .thenReturn(store);
 
-        when(operatingHoursPolicy.isEffectivelyOrderAccepting(eq(store), any()))
-            .thenReturn(true);
+        when(store.isOrderAccepting()).thenReturn(true);
 
         when(
             order.transitionTo(
@@ -150,7 +145,6 @@ class PaymentServiceTests {
             new PaymentProperties(
                 PaymentProviderType.TOSS_PAYMENTS
             ),
-            operatingHoursPolicy,
             customerPointService
         );
 

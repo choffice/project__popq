@@ -850,9 +850,7 @@ function App() {
                   <span />
                   {businessStatus === 'OPEN'
                     ? '영업 중'
-                    : businessStatus === 'PRE_OPEN'
-                      ? '오픈 준비'
-                      : '영업 종료'}
+                    : '준비중'}
                 </button>
               </>
             )}

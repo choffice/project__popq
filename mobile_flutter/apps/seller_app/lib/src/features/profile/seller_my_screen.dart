@@ -929,8 +929,7 @@ String _roleLabel(String role) {
 String _businessStatusLabel(String status) {
   return switch (status) {
     'OPEN' => '영업 중',
-    'PRE_OPEN' => '영업 준비',
-    'CLOSED' => '영업 종료',
+    'PRE_OPEN' => '준비중',
     _ => status,
   };
 }

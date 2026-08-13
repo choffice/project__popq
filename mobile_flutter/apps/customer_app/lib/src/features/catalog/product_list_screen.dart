@@ -48,7 +48,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
     try {
       final store = await _store;
-      if (!mounted || store.isOrderAcceptingAt()) return;
+      if (!mounted || store.isOrderAccepting()) return;
       _hoursNoticeShown = true;
       await showStoreHoursDialog(context, store: store);
     } catch (_) {
@@ -125,7 +125,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                           storeId: widget.storeId,
                           selected: StoreSection.products,
                         ),
-                      if (store != null && !store.isOrderAcceptingAt())
+                      if (store != null && !store.isOrderAccepting())
                         const Padding(
                           padding: EdgeInsets.fromLTRB(
                             PopqSpacing.md,
