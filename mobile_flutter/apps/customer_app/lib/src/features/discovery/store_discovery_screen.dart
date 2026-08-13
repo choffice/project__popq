@@ -10,11 +10,16 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:pointer_interceptor/pointer_interceptor.dart';
+
 import '../../routing/customer_router.dart';
 import '../favorites/customer_store_interest_controller.dart';
 import '../permissions/customer_permission_gateway.dart';
 import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
+import 'kakao_store_map_web_stub.dart'
+if (dart.library.js_interop) 'kakao_store_map_web.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
 
@@ -400,27 +405,50 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        KakaoStoreMap(
-          controller: _mapController,
-          stores: stores,
-          favoriteStoreIds: _favoriteStoreIds,
-          currentLocation: _controller.location,
-          searchCenter: _controller.searchCenter,
-          selectedStoreId: _selectedStore?.storeId,
-          onStoreSelected: _selectStore,
-          onViewportIdle: _onMapViewportIdle,
-        ),
+        if (!kIsWeb)
+          KakaoStoreMap(
+            controller: _mapController,
+            stores: stores,
+            favoriteStoreIds: _favoriteStoreIds,
+            currentLocation: _controller.location,
+            searchCenter: _controller.searchCenter,
+            selectedStoreId: _selectedStore?.storeId,
+            onStoreSelected: _selectStore,
+            onViewportIdle: _onMapViewportIdle,
+          )
+        else
+          KakaoStoreMapWeb(
+            controller: _mapController,
+            stores: stores,
+            favoriteStoreIds: _favoriteStoreIds,
+            currentLocation: _controller.location,
+            searchCenter: _controller.searchCenter,
+            onStoreSelected: _selectStore,
+            selectedStoreId: _selectedStore?.storeId,
+            onViewportIdle: _onMapViewportIdle,
+          ),
 
         _buildStatusOverlay(stores),
 
-        Positioned(top: 12, left: 12, right: 12, child: _buildTopControls()),
+        Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _buildTopControls(),
+          ),
+        ),
 
         Positioned(
           right: 16,
           bottom: _selectedStore == null ? 20 : 158,
-          child: _CurrentLocationButton(
-            active: _controller.location != null,
-            onPressed: _useCurrentLocation,
+          child: PointerInterceptor(
+            intercepting: kIsWeb,
+            child: _CurrentLocationButton(
+              active: _controller.location != null,
+              onPressed: _useCurrentLocation,
+            ),
           ),
         ),
 
@@ -429,7 +457,9 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
             left: 12,
             right: 12,
             bottom: 12,
-            child: _SelectedStoreCard(
+              child: PointerInterceptor(
+                intercepting: kIsWeb,
+                child: _SelectedStoreCard(
               store: _selectedStore!,
               favorite: _isFavorite(_selectedStore!.storeId),
               favoriteUpdating: _isFavoriteUpdating(_selectedStore!.storeId),
@@ -448,13 +478,17 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
               },
             ),
           ),
-
+          ),
         if (_showInitialLocationChoice)
           Positioned.fill(
-            child: _InitialLocationChoice(
-              requestingLocation: _requestingInitialLocation,
-              onUseCurrentLocation: _useCurrentLocationFromInitialChoice,
-              onContinueWithBusan: _continueWithBusan,
+            child: PointerInterceptor(
+              intercepting: kIsWeb,
+              child: _InitialLocationChoice(
+                requestingLocation: _requestingInitialLocation,
+                onUseCurrentLocation:
+                _useCurrentLocationFromInitialChoice,
+                onContinueWithBusan: _continueWithBusan,
+              ),
             ),
           ),
       ],
