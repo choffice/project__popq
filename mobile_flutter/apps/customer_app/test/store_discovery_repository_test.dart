@@ -2,6 +2,30 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:popq_customer_app/src/features/discovery/store_discovery_repository.dart';
 
 void main() {
+  test('LOCAL public 응답의 null eventName을 안전하게 파싱한다', () {
+    final CustomerStore store = CustomerStore.fromJson(<String, Object?>{
+      'storeId': 10,
+      'storeType': 'LOCAL_STORE',
+      'eventName': null,
+      'name': '일반 매장',
+      'businessStatus': 'PRE_OPEN',
+    });
+
+    expect(store.eventName, isNull);
+  });
+
+  test('EVENT public 응답의 eventName을 파싱한다', () {
+    final CustomerStore store = CustomerStore.fromJson(<String, Object?>{
+      'storeId': 11,
+      'storeType': 'EVENT_COMMERCE',
+      'eventName': '부산 바다 푸드 페스타',
+      'name': '달빛 푸드트럭',
+      'businessStatus': 'PRE_OPEN',
+    });
+
+    expect(store.eventName, '부산 바다 푸드 페스타');
+  });
+
   test('manual OPEN accepts orders regardless of guide hours', () {
     const store = CustomerStore(
       storeId: 1,

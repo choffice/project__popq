@@ -59,6 +59,7 @@ class SellerStore {
     this.closeTime,
     this.operationStartDate,
     this.operationEndDate,
+    this.eventName,
     this.closedDays = const [],
     this.takeoutAvailable = true,
     this.dineInAvailable = true,
@@ -76,8 +77,7 @@ class SellerStore {
       description: json['description'] as String?,
       address: json['address'] as String?,
       detailAddress: json['detailAddress'] as String?,
-      representativeCategory:
-      json['representativeCategory'] as String?,
+      representativeCategory: json['representativeCategory'] as String?,
       imageUrl: json['imageUrl'] as String?,
       phone: json['phone'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
@@ -86,20 +86,14 @@ class SellerStore {
       closeTime: json['closeTime'] as String?,
       operationStartDate: _readDate(json['operationStartDate']),
       operationEndDate: _readDate(json['operationEndDate']),
-      closedDays: _readStringList(
-        json['closedDays'],
-      ),
-      takeoutAvailable:
-      json['takeoutAvailable'] as bool? ?? true,
-      dineInAvailable:
-      json['dineInAvailable'] as bool? ?? true,
-      orderAcceptingEnabled:
-      json['orderAcceptingEnabled'] as bool? ?? true,
-      defaultPreparationMinutes:
-      (json['defaultPreparationMinutes'] as num?)?.toInt(),
-      tags: _readStringList(
-        json['tags'],
-      ),
+      eventName: json['eventName'] as String?,
+      closedDays: _readStringList(json['closedDays']),
+      takeoutAvailable: json['takeoutAvailable'] as bool? ?? true,
+      dineInAvailable: json['dineInAvailable'] as bool? ?? true,
+      orderAcceptingEnabled: json['orderAcceptingEnabled'] as bool? ?? true,
+      defaultPreparationMinutes: (json['defaultPreparationMinutes'] as num?)
+          ?.toInt(),
+      tags: _readStringList(json['tags']),
       schedule: SellerBusinessSchedule.fromJson(
         json['schedule'],
         legacyOpenTime: json['openTime'] as String?,
@@ -127,6 +121,7 @@ class SellerStore {
   final String? closeTime;
   final DateTime? operationStartDate;
   final DateTime? operationEndDate;
+  final String? eventName;
   final List<String> closedDays;
   final bool takeoutAvailable;
   final bool dineInAvailable;
@@ -157,6 +152,7 @@ class SellerStore {
     String? closeTime,
     DateTime? operationStartDate,
     DateTime? operationEndDate,
+    String? eventName,
     List<String>? closedDays,
     bool? takeoutAvailable,
     bool? dineInAvailable,
@@ -173,11 +169,9 @@ class SellerStore {
       name: name ?? this.name,
       description: description ?? this.description,
       address: address ?? this.address,
-      detailAddress:
-      detailAddress ?? this.detailAddress,
+      detailAddress: detailAddress ?? this.detailAddress,
       representativeCategory:
-      representativeCategory ??
-          this.representativeCategory,
+          representativeCategory ?? this.representativeCategory,
       imageUrl: imageUrl ?? this.imageUrl,
       phone: phone ?? this.phone,
       latitude: latitude ?? this.latitude,
@@ -186,24 +180,38 @@ class SellerStore {
       closeTime: closeTime ?? this.closeTime,
       operationStartDate: operationStartDate ?? this.operationStartDate,
       operationEndDate: operationEndDate ?? this.operationEndDate,
+      eventName: eventName ?? this.eventName,
       closedDays: closedDays ?? this.closedDays,
-      takeoutAvailable:
-      takeoutAvailable ?? this.takeoutAvailable,
-      dineInAvailable:
-      dineInAvailable ?? this.dineInAvailable,
+      takeoutAvailable: takeoutAvailable ?? this.takeoutAvailable,
+      dineInAvailable: dineInAvailable ?? this.dineInAvailable,
       orderAcceptingEnabled:
-      orderAcceptingEnabled ??
-          this.orderAcceptingEnabled,
+          orderAcceptingEnabled ?? this.orderAcceptingEnabled,
       defaultPreparationMinutes:
-      defaultPreparationMinutes ?? this.defaultPreparationMinutes,
+          defaultPreparationMinutes ?? this.defaultPreparationMinutes,
       tags: tags ?? this.tags,
       status: status ?? this.status,
-      businessStatus:
-      businessStatus ?? this.businessStatus,
+      businessStatus: businessStatus ?? this.businessStatus,
       myRole: myRole,
       schedule: schedule ?? this.schedule,
     );
   }
+}
+
+class SellerNearbyEventSuggestion {
+  const SellerNearbyEventSuggestion({
+    required this.eventName,
+    required this.activeStoreCount,
+  });
+
+  factory SellerNearbyEventSuggestion.fromJson(Map<String, Object?> json) {
+    return SellerNearbyEventSuggestion(
+      eventName: json['eventName'] as String,
+      activeStoreCount: (json['activeStoreCount'] as num).toInt(),
+    );
+  }
+
+  final String eventName;
+  final int activeStoreCount;
 }
 
 class SellerAddressSearchResult {
@@ -216,49 +224,28 @@ class SellerAddressSearchResult {
     this.zoneNo,
   });
 
-  factory SellerAddressSearchResult.fromJson(
-      Map<String, Object?> json,
-      ) {
-    final Object? latitudeValue =
-    json['latitude'];
+  factory SellerAddressSearchResult.fromJson(Map<String, Object?> json) {
+    final Object? latitudeValue = json['latitude'];
 
-    final Object? longitudeValue =
-    json['longitude'];
+    final Object? longitudeValue = json['longitude'];
 
-    if (latitudeValue is! num ||
-        longitudeValue is! num) {
-      throw const InvalidResponseFailure(
-        '주소 검색 결과의 좌표가 올바르지 않습니다.',
-      );
+    if (latitudeValue is! num || longitudeValue is! num) {
+      throw const InvalidResponseFailure('주소 검색 결과의 좌표가 올바르지 않습니다.');
     }
 
-    final String addressName =
-        json['addressName']?.toString().trim() ??
-            '';
+    final String addressName = json['addressName']?.toString().trim() ?? '';
 
     if (addressName.isEmpty) {
-      throw const InvalidResponseFailure(
-        '주소 검색 결과에 주소가 없습니다.',
-      );
+      throw const InvalidResponseFailure('주소 검색 결과에 주소가 없습니다.');
     }
 
     return SellerAddressSearchResult(
       addressName: addressName,
-      roadAddressName:
-      _readNullableString(
-        json['roadAddressName'],
-      ),
-      jibunAddressName:
-      _readNullableString(
-        json['jibunAddressName'],
-      ),
-      zoneNo: _readNullableString(
-        json['zoneNo'],
-      ),
-      latitude:
-      latitudeValue.toDouble(),
-      longitude:
-      longitudeValue.toDouble(),
+      roadAddressName: _readNullableString(json['roadAddressName']),
+      jibunAddressName: _readNullableString(json['jibunAddressName']),
+      zoneNo: _readNullableString(json['zoneNo']),
+      latitude: latitudeValue.toDouble(),
+      longitude: longitudeValue.toDouble(),
     );
   }
 
@@ -284,62 +271,37 @@ class SellerKakaoPlaceSearchResult {
     this.placeUrl,
   });
 
-  factory SellerKakaoPlaceSearchResult.fromJson(
-      Map<String, Object?> json,
-      ) {
-    final String placeId =
-        json['placeId']?.toString().trim() ?? '';
+  factory SellerKakaoPlaceSearchResult.fromJson(Map<String, Object?> json) {
+    final String placeId = json['placeId']?.toString().trim() ?? '';
 
-    final String placeName =
-        json['placeName']?.toString().trim() ?? '';
+    final String placeName = json['placeName']?.toString().trim() ?? '';
 
-    final Object? latitudeValue =
-    json['latitude'];
+    final Object? latitudeValue = json['latitude'];
 
-    final Object? longitudeValue =
-    json['longitude'];
+    final Object? longitudeValue = json['longitude'];
 
-    if (placeId.isEmpty ||
-        placeName.isEmpty) {
-      throw const InvalidResponseFailure(
-        '카카오 업체 검색 결과에 업체 정보가 없습니다.',
-      );
+    if (placeId.isEmpty || placeName.isEmpty) {
+      throw const InvalidResponseFailure('카카오 업체 검색 결과에 업체 정보가 없습니다.');
     }
 
-    if (latitudeValue is! num ||
-        longitudeValue is! num) {
-      throw const InvalidResponseFailure(
-        '카카오 업체 검색 결과의 좌표가 올바르지 않습니다.',
-      );
+    if (latitudeValue is! num || longitudeValue is! num) {
+      throw const InvalidResponseFailure('카카오 업체 검색 결과의 좌표가 올바르지 않습니다.');
     }
 
-    final SellerKakaoPlaceSearchResult result =
-    SellerKakaoPlaceSearchResult(
+    final SellerKakaoPlaceSearchResult result = SellerKakaoPlaceSearchResult(
       placeId: placeId,
       placeName: placeName,
-      categoryName: _readNullableString(
-        json['categoryName'],
-      ),
-      phone: _readNullableString(
-        json['phone'],
-      ),
-      addressName: _readNullableString(
-        json['addressName'],
-      ),
-      roadAddressName: _readNullableString(
-        json['roadAddressName'],
-      ),
-      placeUrl: _readNullableString(
-        json['placeUrl'],
-      ),
+      categoryName: _readNullableString(json['categoryName']),
+      phone: _readNullableString(json['phone']),
+      addressName: _readNullableString(json['addressName']),
+      roadAddressName: _readNullableString(json['roadAddressName']),
+      placeUrl: _readNullableString(json['placeUrl']),
       latitude: latitudeValue.toDouble(),
       longitude: longitudeValue.toDouble(),
     );
 
     if (result.displayAddress.isEmpty) {
-      throw const InvalidResponseFailure(
-        '카카오 업체 검색 결과에 주소가 없습니다.',
-      );
+      throw const InvalidResponseFailure('카카오 업체 검색 결과에 주소가 없습니다.');
     }
 
     return result;
@@ -363,8 +325,7 @@ class SellerKakaoPlaceSearchResult {
   final double longitude;
 
   String get displayAddress {
-    final String roadAddress =
-        roadAddressName?.trim() ?? '';
+    final String roadAddress = roadAddressName?.trim() ?? '';
 
     if (roadAddress.isNotEmpty) {
       return roadAddress;
@@ -385,55 +346,29 @@ class SellerReverseGeocodeResult {
     this.zoneNo,
   });
 
-  factory SellerReverseGeocodeResult.fromJson(
-      Map<String, Object?> json,
-      ) {
-    final String addressName =
-        json['addressName']
-            ?.toString()
-            .trim() ??
-            '';
+  factory SellerReverseGeocodeResult.fromJson(Map<String, Object?> json) {
+    final String addressName = json['addressName']?.toString().trim() ?? '';
 
-    final Object? latitudeValue =
-    json['latitude'];
+    final Object? latitudeValue = json['latitude'];
 
-    final Object? longitudeValue =
-    json['longitude'];
+    final Object? longitudeValue = json['longitude'];
 
     if (addressName.isEmpty) {
-      throw const InvalidResponseFailure(
-        '선택한 좌표의 주소가 없습니다.',
-      );
+      throw const InvalidResponseFailure('선택한 좌표의 주소가 없습니다.');
     }
 
-    if (latitudeValue is! num ||
-        longitudeValue is! num) {
-      throw const InvalidResponseFailure(
-        '좌표 주소 변환 결과가 올바르지 않습니다.',
-      );
+    if (latitudeValue is! num || longitudeValue is! num) {
+      throw const InvalidResponseFailure('좌표 주소 변환 결과가 올바르지 않습니다.');
     }
 
     return SellerReverseGeocodeResult(
       addressName: addressName,
-      roadAddressName:
-      _readNullableString(
-        json['roadAddressName'],
-      ),
-      jibunAddressName:
-      _readNullableString(
-        json['jibunAddressName'],
-      ),
-      buildingName:
-      _readNullableString(
-        json['buildingName'],
-      ),
-      zoneNo: _readNullableString(
-        json['zoneNo'],
-      ),
-      latitude:
-      latitudeValue.toDouble(),
-      longitude:
-      longitudeValue.toDouble(),
+      roadAddressName: _readNullableString(json['roadAddressName']),
+      jibunAddressName: _readNullableString(json['jibunAddressName']),
+      buildingName: _readNullableString(json['buildingName']),
+      zoneNo: _readNullableString(json['zoneNo']),
+      latitude: latitudeValue.toDouble(),
+      longitude: longitudeValue.toDouble(),
     );
   }
 
@@ -447,15 +382,13 @@ class SellerReverseGeocodeResult {
   final double longitude;
 
   String get displayAddress {
-    final String roadAddress =
-        roadAddressName?.trim() ?? '';
+    final String roadAddress = roadAddressName?.trim() ?? '';
 
     if (roadAddress.isNotEmpty) {
       return roadAddress;
     }
 
-    final String jibunAddress =
-        jibunAddressName?.trim() ?? '';
+    final String jibunAddress = jibunAddressName?.trim() ?? '';
 
     if (jibunAddress.isNotEmpty) {
       return jibunAddress;
@@ -467,14 +400,9 @@ class SellerReverseGeocodeResult {
   Set<String> get addressCandidates {
     return <String>{
       addressName,
-      if (roadAddressName != null)
-        roadAddressName!,
-      if (jibunAddressName != null)
-        jibunAddressName!,
-    }.where(
-          (String value) =>
-      value.trim().isNotEmpty,
-    ).toSet();
+      if (roadAddressName != null) roadAddressName!,
+      if (jibunAddressName != null) jibunAddressName!,
+    }.where((String value) => value.trim().isNotEmpty).toSet();
   }
 }
 
@@ -487,31 +415,26 @@ abstract interface class SellerStoreRepository {
 
   Future<List<SellerDashboardSummary>> findDashboardSummaries();
 
-  Future<List<SellerAddressSearchResult>>
-  searchAddresses(
-      String query,
-      );
+  Future<List<SellerAddressSearchResult>> searchAddresses(String query);
 
-  Future<List<SellerKakaoPlaceSearchResult>>
-  searchPlaces(
-      String query,
-      );
+  Future<List<SellerKakaoPlaceSearchResult>> searchPlaces(String query);
 
-  Future<SellerReverseGeocodeResult>
-  reverseGeocode({
+  Future<SellerReverseGeocodeResult> reverseGeocode({
     required double latitude,
     required double longitude,
   });
 
-  Future<SellerStore> findOne(
-      int storeId,
-      );
+  Future<List<SellerNearbyEventSuggestion>> findNearbyEventNames({
+    required double latitude,
+    required double longitude,
+    required double radiusKm,
+  });
+
+  Future<SellerStore> findOne(int storeId);
 
   Future<SellerStore> createDevelopmentStore();
 
-  Future<String> uploadRepresentativeImage(
-      String filePath,
-      );
+  Future<String> uploadRepresentativeImage(String filePath);
 
   Future<String> uploadRepresentativeImageBytes(
     Uint8List bytes, {
@@ -521,6 +444,7 @@ abstract interface class SellerStoreRepository {
   Future<SellerStore> create({
     required String storeType,
     required String name,
+    String? eventName,
     String? description,
     String? address,
     String? detailAddress,
@@ -541,49 +465,43 @@ abstract interface class SellerStoreRepository {
     SellerBusinessSchedule? schedule,
   });
 
-  Future<SellerStore> changeBusinessStatus(
-      int storeId,
-      String status,
-      );
+  Future<SellerStore> changeBusinessStatus(int storeId, String status);
 
   Future<SellerStore> suspend(int storeId);
 
   Future<SellerStore> reopen(int storeId);
 
   Future<SellerStore> update(
-      int storeId, {
-        String? storeType,
-        required String name,
-        String? description,
-        String? address,
-        String? detailAddress,
-        String? representativeCategory,
-        String? imageUrl,
-        String? phone,
-        double? latitude,
-        double? longitude,
-        String? openTime,
-        String? closeTime,
-        required DateTime? operationStartDate,
-        required DateTime? operationEndDate,
-        List<String>? closedDays,
-        bool? takeoutAvailable,
-        bool? dineInAvailable,
-        bool? orderAcceptingEnabled,
-        List<String> tags = const [],
-        SellerBusinessSchedule? schedule,
-      });
+    int storeId, {
+    String? storeType,
+    required String name,
+    String? eventName,
+    String? description,
+    String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
+    double? latitude,
+    double? longitude,
+    String? openTime,
+    String? closeTime,
+    required DateTime? operationStartDate,
+    required DateTime? operationEndDate,
+    bool? clearOperationEndDate,
+    List<String>? closedDays,
+    bool? takeoutAvailable,
+    bool? dineInAvailable,
+    bool? orderAcceptingEnabled,
+    List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
+  });
 
-  Future<void> delete(
-      int storeId,
-      );
+  Future<void> delete(int storeId);
 }
 
-class ApiSellerStoreRepository
-    implements SellerStoreRepository {
-  ApiSellerStoreRepository(
-      this._apiClient,
-      );
+class ApiSellerStoreRepository implements SellerStoreRepository {
+  ApiSellerStoreRepository(this._apiClient);
 
   final PopqApiClient _apiClient;
 
@@ -595,13 +513,37 @@ class ApiSellerStoreRepository
         return (value as List<Object?>)
             .map(
               (Object? item) =>
-              SellerStore.fromJson(
-                Map<String, Object?>.from(
-                  item as Map,
-                ),
-              ),
-        )
+                  SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
+            )
             .toList();
+      },
+    );
+  }
+
+  @override
+  Future<List<SellerNearbyEventSuggestion>> findNearbyEventNames({
+    required double latitude,
+    required double longitude,
+    required double radiusKm,
+  }) {
+    return _apiClient.get<List<SellerNearbyEventSuggestion>>(
+      '/api/v1/seller/event-name-suggestions',
+      query: <String, Object?>{
+        'latitude': latitude,
+        'longitude': longitude,
+        'radiusKm': radiusKm,
+      },
+      decode: (Object? value) {
+        if (value is! List) {
+          throw const InvalidResponseFailure('인근 행사 정보 응답 형식이 올바르지 않습니다.');
+        }
+        return value
+            .map(
+              (Object? item) => SellerNearbyEventSuggestion.fromJson(
+                Map<String, Object?>.from(item as Map),
+              ),
+            )
+            .toList(growable: false);
       },
     );
   }
@@ -612,9 +554,8 @@ class ApiSellerStoreRepository
       '/api/v1/seller/stores/inactive',
       decode: (Object? value) => (value as List<Object?>)
           .map(
-            (item) => SellerStore.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
+            (item) =>
+                SellerStore.fromJson(Map<String, Object?>.from(item as Map)),
           )
           .toList(),
     );
@@ -624,18 +565,14 @@ class ApiSellerStoreRepository
   Future<void> reorderStores(List<int> storeIds) async {
     final bool reordered = await _apiClient.patch<bool>(
       '/api/v1/seller/stores/reorder',
-      body: <String, Object?>{
-        'storeIds': storeIds,
-      },
+      body: <String, Object?>{'storeIds': storeIds},
       decode: (Object? value) {
         return value as bool;
       },
     );
 
     if (!reordered) {
-      throw StateError(
-        'store reorder failed',
-      );
+      throw StateError('store reorder failed');
     }
   }
 
@@ -654,131 +591,83 @@ class ApiSellerStoreRepository
   }
 
   @override
-  Future<List<SellerAddressSearchResult>>
-  searchAddresses(
-      String query,
-      ) {
-    return _apiClient.get<
-        List<SellerAddressSearchResult>>(
+  Future<List<SellerAddressSearchResult>> searchAddresses(String query) {
+    return _apiClient.get<List<SellerAddressSearchResult>>(
       '/api/v1/seller/location/addresses',
-      query: <String, Object?>{
-        'query': query,
-      },
+      query: <String, Object?>{'query': query},
       decode: (Object? value) {
         if (value is! List) {
-          throw const InvalidResponseFailure(
-            '주소 검색 응답 형식이 올바르지 않습니다.',
-          );
+          throw const InvalidResponseFailure('주소 검색 응답 형식이 올바르지 않습니다.');
         }
 
         return value
-            .map(
-              (Object? item) {
-            if (item is! Map) {
-              throw const InvalidResponseFailure(
-                '주소 검색 결과 형식이 올바르지 않습니다.',
-              );
-            }
+            .map((Object? item) {
+              if (item is! Map) {
+                throw const InvalidResponseFailure('주소 검색 결과 형식이 올바르지 않습니다.');
+              }
 
-            return SellerAddressSearchResult
-                .fromJson(
-              Map<String, Object?>.from(
-                item,
-              ),
-            );
-          },
-        )
-            .toList(
-          growable: false,
-        );
+              return SellerAddressSearchResult.fromJson(
+                Map<String, Object?>.from(item),
+              );
+            })
+            .toList(growable: false);
       },
     );
   }
 
   @override
-  Future<List<SellerKakaoPlaceSearchResult>>
-  searchPlaces(
-      String query,
-      ) {
-    return _apiClient.get<
-        List<SellerKakaoPlaceSearchResult>>(
+  Future<List<SellerKakaoPlaceSearchResult>> searchPlaces(String query) {
+    return _apiClient.get<List<SellerKakaoPlaceSearchResult>>(
       '/api/v1/seller/location/places',
-      query: <String, Object?>{
-        'query': query,
-      },
+      query: <String, Object?>{'query': query},
       decode: (Object? value) {
         if (value is! List) {
-          throw const InvalidResponseFailure(
-            '카카오 업체 검색 응답 형식이 올바르지 않습니다.',
-          );
+          throw const InvalidResponseFailure('카카오 업체 검색 응답 형식이 올바르지 않습니다.');
         }
 
         return value
-            .map(
-              (Object? item) {
-            if (item is! Map) {
-              throw const InvalidResponseFailure(
-                '카카오 업체 검색 결과 형식이 올바르지 않습니다.',
-              );
-            }
+            .map((Object? item) {
+              if (item is! Map) {
+                throw const InvalidResponseFailure(
+                  '카카오 업체 검색 결과 형식이 올바르지 않습니다.',
+                );
+              }
 
-            return SellerKakaoPlaceSearchResult
-                .fromJson(
-              Map<String, Object?>.from(
-                item,
-              ),
-            );
-          },
-        )
-            .toList(
-          growable: false,
-        );
+              return SellerKakaoPlaceSearchResult.fromJson(
+                Map<String, Object?>.from(item),
+              );
+            })
+            .toList(growable: false);
       },
     );
   }
 
   @override
-  Future<SellerReverseGeocodeResult>
-  reverseGeocode({
+  Future<SellerReverseGeocodeResult> reverseGeocode({
     required double latitude,
     required double longitude,
   }) {
-    return _apiClient.get<
-        SellerReverseGeocodeResult>(
+    return _apiClient.get<SellerReverseGeocodeResult>(
       '/api/v1/seller/location/reverse',
-      query: <String, Object?>{
-        'latitude': latitude,
-        'longitude': longitude,
-      },
+      query: <String, Object?>{'latitude': latitude, 'longitude': longitude},
       decode: (Object? value) {
         if (value is! Map) {
-          throw const InvalidResponseFailure(
-            '좌표 주소 변환 응답 형식이 올바르지 않습니다.',
-          );
+          throw const InvalidResponseFailure('좌표 주소 변환 응답 형식이 올바르지 않습니다.');
         }
 
-        return SellerReverseGeocodeResult
-            .fromJson(
-          Map<String, Object?>.from(
-            value,
-          ),
+        return SellerReverseGeocodeResult.fromJson(
+          Map<String, Object?>.from(value),
         );
       },
     );
   }
 
   @override
-  Future<SellerStore> findOne(
-      int storeId,
-      ) {
+  Future<SellerStore> findOne(int storeId) {
     return _apiClient.get(
       '/api/v1/seller/stores/$storeId',
       decode: (Object? value) {
-        return SellerStore.fromJson(
-          Map<String, Object?>.from(
-            value as Map,
-          ),
-        );
+        return SellerStore.fromJson(Map<String, Object?>.from(value as Map));
       },
     );
   }
@@ -798,27 +687,20 @@ class ApiSellerStoreRepository
   }
 
   @override
-  Future<String> uploadRepresentativeImage(
-      String filePath,
-      ) {
+  Future<String> uploadRepresentativeImage(String filePath) {
     return _apiClient.postMultipartFile<String>(
       '/api/v1/seller/store-images',
       fieldName: 'file',
       filePath: filePath,
       decode: (Object? value) {
-        final Map<String, Object?> json =
-        Map<String, Object?>.from(
+        final Map<String, Object?> json = Map<String, Object?>.from(
           value as Map,
         );
 
-        final Object? imageUrl =
-        json['imageUrl'];
+        final Object? imageUrl = json['imageUrl'];
 
-        if (imageUrl is! String ||
-            imageUrl.trim().isEmpty) {
-          throw const InvalidResponseFailure(
-            '업로드된 이미지 URL이 없습니다.',
-          );
+        if (imageUrl is! String || imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
         }
 
         return imageUrl;
@@ -837,8 +719,9 @@ class ApiSellerStoreRepository
       bytes: bytes,
       fileName: fileName,
       decode: (Object? value) {
-        final Map<String, Object?> json =
-            Map<String, Object?>.from(value as Map);
+        final Map<String, Object?> json = Map<String, Object?>.from(
+          value as Map,
+        );
         final Object? imageUrl = json['imageUrl'];
         if (imageUrl is! String || imageUrl.trim().isEmpty) {
           throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
@@ -852,6 +735,7 @@ class ApiSellerStoreRepository
   Future<SellerStore> create({
     required String storeType,
     required String name,
+    String? eventName,
     String? description,
     String? address,
     String? detailAddress,
@@ -876,11 +760,11 @@ class ApiSellerStoreRepository
       body: {
         'storeType': storeType,
         'name': name,
+        'eventName': eventName,
         'description': description,
         'address': address,
         'detailAddress': detailAddress,
-        'representativeCategory':
-        representativeCategory,
+        'representativeCategory': representativeCategory,
         'imageUrl': imageUrl,
         'phone': phone,
         'latitude': latitude,
@@ -892,38 +776,24 @@ class ApiSellerStoreRepository
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
-        'orderAcceptingEnabled':
-        orderAcceptingEnabled,
+        'orderAcceptingEnabled': orderAcceptingEnabled,
         'tags': tags,
         'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
-        return SellerStore.fromJson(
-          Map<String, Object?>.from(
-            value as Map,
-          ),
-        );
+        return SellerStore.fromJson(Map<String, Object?>.from(value as Map));
       },
     );
   }
 
   @override
-  Future<SellerStore> changeBusinessStatus(
-      int storeId,
-      String status,
-      ) {
+  Future<SellerStore> changeBusinessStatus(int storeId, String status) {
     return _apiClient.patch(
       '/api/v1/seller/stores/'
-          '$storeId/business-status',
-      body: {
-        'businessStatus': status,
-      },
+      '$storeId/business-status',
+      body: {'businessStatus': status},
       decode: (Object? value) {
-        return SellerStore.fromJson(
-          Map<String, Object?>.from(
-            value as Map,
-          ),
-        );
+        return SellerStore.fromJson(Map<String, Object?>.from(value as Map));
       },
     );
   }
@@ -932,9 +802,8 @@ class ApiSellerStoreRepository
   Future<SellerStore> suspend(int storeId) {
     return _apiClient.post(
       '/api/v1/seller/stores/$storeId/suspend',
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -942,46 +811,47 @@ class ApiSellerStoreRepository
   Future<SellerStore> reopen(int storeId) {
     return _apiClient.post(
       '/api/v1/seller/stores/$storeId/reopen',
-      decode: (value) => SellerStore.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerStore.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
   @override
   Future<SellerStore> update(
-      int storeId, {
-        String? storeType,
-        required String name,
-        String? description,
-        String? address,
-        String? detailAddress,
-        String? representativeCategory,
-        String? imageUrl,
-        String? phone,
-        double? latitude,
-        double? longitude,
-        String? openTime,
-        String? closeTime,
-        required DateTime? operationStartDate,
-        required DateTime? operationEndDate,
-        List<String>? closedDays,
-        bool? takeoutAvailable,
-        bool? dineInAvailable,
-        bool? orderAcceptingEnabled,
-        List<String> tags = const [],
-        SellerBusinessSchedule? schedule,
-      }) {
+    int storeId, {
+    String? storeType,
+    required String name,
+    String? eventName,
+    String? description,
+    String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
+    double? latitude,
+    double? longitude,
+    String? openTime,
+    String? closeTime,
+    required DateTime? operationStartDate,
+    required DateTime? operationEndDate,
+    bool? clearOperationEndDate,
+    List<String>? closedDays,
+    bool? takeoutAvailable,
+    bool? dineInAvailable,
+    bool? orderAcceptingEnabled,
+    List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
+  }) {
     return _apiClient.patch(
       '/api/v1/seller/stores/$storeId',
-      body: {
+      body: <String, Object?>{
         'storeType': storeType,
         'name': name,
+        'eventName': eventName,
         'description': description,
         'address': address,
         'detailAddress': detailAddress,
-        'representativeCategory':
-        representativeCategory,
+        'representativeCategory': representativeCategory,
         'imageUrl': imageUrl,
         'phone': phone,
         'latitude': latitude,
@@ -990,30 +860,24 @@ class ApiSellerStoreRepository
         'closeTime': closeTime,
         'operationStartDate': _dateToApi(operationStartDate),
         'operationEndDate': _dateToApi(operationEndDate),
+        if (clearOperationEndDate != null)
+          'clearOperationEndDate': clearOperationEndDate,
         'closedDays': closedDays,
         'takeoutAvailable': takeoutAvailable,
         'dineInAvailable': dineInAvailable,
-        'orderAcceptingEnabled':
-        orderAcceptingEnabled,
+        'orderAcceptingEnabled': orderAcceptingEnabled,
         'tags': tags,
         'schedule': schedule?.toJson(),
       },
       decode: (Object? value) {
-        return SellerStore.fromJson(
-          Map<String, Object?>.from(
-            value as Map,
-          ),
-        );
+        return SellerStore.fromJson(Map<String, Object?>.from(value as Map));
       },
     );
   }
 
   @override
-  Future<void> delete(
-      int storeId,
-      ) async {
-    final bool deleted =
-    await _apiClient.delete<bool>(
+  Future<void> delete(int storeId) async {
+    final bool deleted = await _apiClient.delete<bool>(
       '/api/v1/seller/stores/$storeId',
       decode: (Object? value) {
         return value as bool;
@@ -1021,19 +885,15 @@ class ApiSellerStoreRepository
     );
 
     if (!deleted) {
-      throw StateError(
-        'store deletion failed',
-      );
+      throw StateError('store deletion failed');
     }
   }
 }
 
-class MemorySellerStoreRepository
-    implements SellerStoreRepository {
-  MemorySellerStoreRepository({
-    List<SellerStore>? stores,
-  }) : _stores =
-      stores ??
+class MemorySellerStoreRepository implements SellerStoreRepository {
+  MemorySellerStoreRepository({List<SellerStore>? stores})
+    : _stores =
+          stores ??
           [
             const SellerStore(
               storeId: 1,
@@ -1079,14 +939,11 @@ class MemorySellerStoreRepository
     if (storeIds.length != requestedStoreIds.length ||
         activeStoreIds.length != requestedStoreIds.length ||
         !activeStoreIds.containsAll(requestedStoreIds)) {
-      throw StateError(
-        'invalid store reorder request',
-      );
+      throw StateError('invalid store reorder request');
     }
 
     final Map<int, SellerStore> activeStoreById = <int, SellerStore>{
-      for (final SellerStore store in activeStores)
-        store.storeId: store,
+      for (final SellerStore store in activeStores) store.storeId: store,
     };
 
     final List<SellerStore> reorderedActiveStores = storeIds
@@ -1122,24 +979,18 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<List<SellerAddressSearchResult>>
-  searchAddresses(
-      String query,
-      ) async {
-    final String normalizedQuery =
-    query.trim();
+  Future<List<SellerAddressSearchResult>> searchAddresses(String query) async {
+    final String normalizedQuery = query.trim();
 
     if (normalizedQuery.isEmpty) {
-      return const <
-          SellerAddressSearchResult>[];
+      return const <SellerAddressSearchResult>[];
     }
 
     return <SellerAddressSearchResult>[
       SellerAddressSearchResult(
         addressName: normalizedQuery,
         roadAddressName: normalizedQuery,
-        jibunAddressName:
-        '부산 부산진구 부전동',
+        jibunAddressName: '부산 부산진구 부전동',
         zoneNo: '47291',
         latitude: 35.157746,
         longitude: 129.059319,
@@ -1148,16 +999,11 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<List<SellerKakaoPlaceSearchResult>>
-  searchPlaces(
-      String query,
-      ) async {
-    final String normalizedQuery =
-    query.trim();
+  Future<List<SellerKakaoPlaceSearchResult>> searchPlaces(String query) async {
+    final String normalizedQuery = query.trim();
 
     if (normalizedQuery.isEmpty) {
-      return const <
-          SellerKakaoPlaceSearchResult>[];
+      return const <SellerKakaoPlaceSearchResult>[];
     }
 
     return const <SellerKakaoPlaceSearchResult>[
@@ -1166,12 +1012,9 @@ class MemorySellerStoreRepository
         placeName: '포포컴퍼니 서면점',
         categoryName: '음식점 > 카페',
         phone: '051-123-4567',
-        addressName:
-        '부산 부산진구 부전동 573-1',
-        roadAddressName:
-        '부산 부산진구 중앙대로 730',
-        placeUrl:
-        'https://place.map.kakao.com/1',
+        addressName: '부산 부산진구 부전동 573-1',
+        roadAddressName: '부산 부산진구 중앙대로 730',
+        placeUrl: 'https://place.map.kakao.com/1',
         latitude: 35.157746,
         longitude: 129.059319,
       ),
@@ -1179,18 +1022,14 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<SellerReverseGeocodeResult>
-  reverseGeocode({
+  Future<SellerReverseGeocodeResult> reverseGeocode({
     required double latitude,
     required double longitude,
   }) async {
     return SellerReverseGeocodeResult(
-      addressName:
-      '부산 부산진구 중앙대로 730',
-      roadAddressName:
-      '부산 부산진구 중앙대로 730',
-      jibunAddressName:
-      '부산 부산진구 부전동 573-1',
+      addressName: '부산 부산진구 중앙대로 730',
+      roadAddressName: '부산 부산진구 중앙대로 730',
+      jibunAddressName: '부산 부산진구 부전동 573-1',
       buildingName: '서면역',
       zoneNo: '47291',
       latitude: latitude,
@@ -1199,14 +1038,19 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<SellerStore> findOne(
-      int storeId,
-      ) async {
-    return _stores.firstWhere(
-          (SellerStore store) {
-        return store.storeId == storeId;
-      },
-    );
+  Future<List<SellerNearbyEventSuggestion>> findNearbyEventNames({
+    required double latitude,
+    required double longitude,
+    required double radiusKm,
+  }) async {
+    return const <SellerNearbyEventSuggestion>[];
+  }
+
+  @override
+  Future<SellerStore> findOne(int storeId) async {
+    return _stores.firstWhere((SellerStore store) {
+      return store.storeId == storeId;
+    });
   }
 
   @override
@@ -1224,9 +1068,7 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<String> uploadRepresentativeImage(
-      String filePath,
-      ) async {
+  Future<String> uploadRepresentativeImage(String filePath) async {
     return filePath;
   }
 
@@ -1242,6 +1084,7 @@ class MemorySellerStoreRepository
   Future<SellerStore> create({
     required String storeType,
     required String name,
+    String? eventName,
     String? description,
     String? address,
     String? detailAddress,
@@ -1264,25 +1107,21 @@ class MemorySellerStoreRepository
     final int nextStoreId = _stores.isEmpty
         ? 1
         : _stores
-        .map(
-          (SellerStore store) =>
-      store.storeId,
-    )
-        .reduce(
-          (int left, int right) =>
-      left > right ? left : right,
-    ) +
-        1;
+                  .map((SellerStore store) => store.storeId)
+                  .reduce(
+                    (int left, int right) => left > right ? left : right,
+                  ) +
+              1;
 
     final SellerStore store = SellerStore(
       storeId: nextStoreId,
       storeType: storeType,
       name: name,
+      eventName: storeType == 'EVENT_COMMERCE' ? eventName : null,
       description: description,
       address: address,
       detailAddress: detailAddress,
-      representativeCategory:
-      representativeCategory,
+      representativeCategory: representativeCategory,
       imageUrl: imageUrl,
       phone: phone,
       latitude: latitude,
@@ -1291,17 +1130,11 @@ class MemorySellerStoreRepository
       closeTime: closeTime,
       operationStartDate: operationStartDate,
       operationEndDate: operationEndDate,
-      closedDays:
-      List<String>.unmodifiable(
-        closedDays,
-      ),
+      closedDays: List<String>.unmodifiable(closedDays),
       takeoutAvailable: takeoutAvailable,
       dineInAvailable: dineInAvailable,
-      orderAcceptingEnabled:
-      orderAcceptingEnabled,
-      tags: List<String>.unmodifiable(
-        tags,
-      ),
+      orderAcceptingEnabled: orderAcceptingEnabled,
+      tags: List<String>.unmodifiable(tags),
       status: 'ACTIVE',
       businessStatus: 'PRE_OPEN',
       myRole: 'OWNER',
@@ -1314,35 +1147,22 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<SellerStore> changeBusinessStatus(
-      int storeId,
-      String status,
-      ) async {
-    final int index = _stores.indexWhere(
-          (SellerStore store) {
-        return store.storeId == storeId;
-      },
-    );
+  Future<SellerStore> changeBusinessStatus(int storeId, String status) async {
+    final int index = _stores.indexWhere((SellerStore store) {
+      return store.storeId == storeId;
+    });
 
     if (index < 0) {
-      throw StateError(
-        'store not found',
-      );
+      throw StateError('store not found');
     }
 
     final SellerStore store = _stores[index];
 
-    if (store.myRole != 'OWNER' &&
-        store.myRole != 'MANAGER') {
-      throw StateError(
-        'store manager role is required',
-      );
+    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
+      throw StateError('store manager role is required');
     }
 
-    final SellerStore updated =
-    store.copyWith(
-      businessStatus: status,
-    );
+    final SellerStore updated = store.copyWith(businessStatus: status);
 
     _stores[index] = updated;
 
@@ -1379,60 +1199,57 @@ class MemorySellerStoreRepository
 
   @override
   Future<SellerStore> update(
-      int storeId, {
-        String? storeType,
-        required String name,
-        String? description,
-        String? address,
-        String? detailAddress,
-        String? representativeCategory,
-        String? imageUrl,
-        String? phone,
-        double? latitude,
-        double? longitude,
-        String? openTime,
-        String? closeTime,
-        required DateTime? operationStartDate,
-        required DateTime? operationEndDate,
-        List<String>? closedDays,
-        bool? takeoutAvailable,
-        bool? dineInAvailable,
-        bool? orderAcceptingEnabled,
-        List<String> tags = const [],
-        SellerBusinessSchedule? schedule,
-      }) async {
-    final int index = _stores.indexWhere(
-          (SellerStore store) {
-        return store.storeId == storeId;
-      },
-    );
+    int storeId, {
+    String? storeType,
+    required String name,
+    String? eventName,
+    String? description,
+    String? address,
+    String? detailAddress,
+    String? representativeCategory,
+    String? imageUrl,
+    String? phone,
+    double? latitude,
+    double? longitude,
+    String? openTime,
+    String? closeTime,
+    required DateTime? operationStartDate,
+    required DateTime? operationEndDate,
+    bool? clearOperationEndDate,
+    List<String>? closedDays,
+    bool? takeoutAvailable,
+    bool? dineInAvailable,
+    bool? orderAcceptingEnabled,
+    List<String> tags = const [],
+    SellerBusinessSchedule? schedule,
+  }) async {
+    final int index = _stores.indexWhere((SellerStore store) {
+      return store.storeId == storeId;
+    });
 
     if (index < 0) {
-      throw StateError(
-        'store not found',
-      );
+      throw StateError('store not found');
     }
 
     final SellerStore store = _stores[index];
 
-    if (store.myRole != 'OWNER' &&
-        store.myRole != 'MANAGER') {
-      throw StateError(
-        'store manager role is required',
-      );
+    if (store.myRole != 'OWNER' && store.myRole != 'MANAGER') {
+      throw StateError('store manager role is required');
     }
 
+    final String resolvedStoreType = storeType ?? store.storeType;
     final SellerStore updated = SellerStore(
       storeId: store.storeId,
-      storeType: storeType ?? store.storeType,
+      storeType: resolvedStoreType,
       name: name,
+      eventName: resolvedStoreType == 'EVENT_COMMERCE'
+          ? eventName ?? store.eventName
+          : null,
       description: description,
       address: address,
-      detailAddress:
-      detailAddress ?? store.detailAddress,
+      detailAddress: detailAddress ?? store.detailAddress,
       representativeCategory:
-      representativeCategory ??
-          store.representativeCategory,
+          representativeCategory ?? store.representativeCategory,
       imageUrl: imageUrl == null
           ? store.imageUrl
           : imageUrl.trim().isEmpty
@@ -1441,31 +1258,20 @@ class MemorySellerStoreRepository
       phone: phone ?? store.phone,
       latitude: latitude,
       longitude: longitude,
-      openTime:
-      openTime ?? store.openTime,
-      closeTime:
-      closeTime ?? store.closeTime,
-      operationStartDate: operationStartDate,
-      operationEndDate: operationEndDate,
-      closedDays:
-      List<String>.unmodifiable(
-        closedDays ?? store.closedDays,
-      ),
-      takeoutAvailable:
-      takeoutAvailable ??
-          store.takeoutAvailable,
-      dineInAvailable:
-      dineInAvailable ??
-          store.dineInAvailable,
+      openTime: openTime ?? store.openTime,
+      closeTime: closeTime ?? store.closeTime,
+      operationStartDate: operationStartDate ?? store.operationStartDate,
+      operationEndDate: clearOperationEndDate == true
+          ? null
+          : operationEndDate ?? store.operationEndDate,
+      closedDays: List<String>.unmodifiable(closedDays ?? store.closedDays),
+      takeoutAvailable: takeoutAvailable ?? store.takeoutAvailable,
+      dineInAvailable: dineInAvailable ?? store.dineInAvailable,
       orderAcceptingEnabled:
-      orderAcceptingEnabled ??
-          store.orderAcceptingEnabled,
-      tags: List<String>.unmodifiable(
-        tags,
-      ),
+          orderAcceptingEnabled ?? store.orderAcceptingEnabled,
+      tags: List<String>.unmodifiable(tags),
       status: store.status,
-      businessStatus:
-      store.businessStatus,
+      businessStatus: store.businessStatus,
       myRole: store.myRole,
       schedule: schedule ?? store.schedule,
     );
@@ -1476,27 +1282,19 @@ class MemorySellerStoreRepository
   }
 
   @override
-  Future<void> delete(
-      int storeId,
-      ) async {
-    final int index = _stores.indexWhere(
-          (SellerStore store) {
-        return store.storeId == storeId;
-      },
-    );
+  Future<void> delete(int storeId) async {
+    final int index = _stores.indexWhere((SellerStore store) {
+      return store.storeId == storeId;
+    });
 
     if (index < 0) {
-      throw StateError(
-        'store not found',
-      );
+      throw StateError('store not found');
     }
 
     final SellerStore store = _stores[index];
 
     if (store.myRole != 'OWNER') {
-      throw StateError(
-        'store owner role is required',
-      );
+      throw StateError('store owner role is required');
     }
 
     _stores[index] = store.copyWith(
@@ -1507,33 +1305,22 @@ class MemorySellerStoreRepository
   }
 }
 
-List<String> _readStringList(
-    Object? value,
-    ) {
+List<String> _readStringList(Object? value) {
   if (value is! List) {
     return const <String>[];
   }
 
-  return value
-      .whereType<String>()
-      .toList(
-    growable: false,
-  );
+  return value.whereType<String>().toList(growable: false);
 }
 
-String? _readNullableString(
-    Object? value,
-    ) {
+String? _readNullableString(Object? value) {
   if (value == null) {
     return null;
   }
 
-  final String text =
-  value.toString().trim();
+  final String text = value.toString().trim();
 
-  return text.isEmpty
-      ? null
-      : text;
+  return text.isEmpty ? null : text;
 }
 
 DateTime? _readDate(Object? value) {
