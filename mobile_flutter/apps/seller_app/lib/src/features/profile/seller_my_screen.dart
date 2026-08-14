@@ -420,10 +420,13 @@ class _SellerMyScreenState extends State<SellerMyScreen> {
                             '${store.address?.isNotEmpty == true ? ' · ${store.address}' : ''}',
                       ),
                       trailing: suspended && store.myRole == 'OWNER'
-                          ? FilledButton.tonal(
-                        onPressed: () =>
-                            _reopenStore(sheetContext, store),
-                        child: const Text('재개'),
+                          ? SizedBox(
+                        width: 88,
+                        child: FilledButton.tonal(
+                          onPressed: () =>
+                              _reopenStore(sheetContext, store),
+                          child: const Text('재개'),
+                        ),
                       )
                           : const Text('조회만 가능'),
                     );
