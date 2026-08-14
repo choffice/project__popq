@@ -270,6 +270,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _router = createCustomerRouter(
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onSendEmailVerificationCode: _sendEmailVerificationCode,
+      onVerifyEmailCode: _verifyEmailCode,
       onFindId: _findId,
       onVerifyForPasswordReset: _verifyForPasswordReset,
       onResetPassword: _resetPassword,
@@ -386,13 +388,23 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
+      emailVerificationToken: emailVerificationToken,
     );
+  }
+
+  Future<void> _sendEmailVerificationCode(String email) {
+    return _authRepository.sendEmailVerificationCode(email: email);
+  }
+
+  Future<String> _verifyEmailCode(String email, String code) {
+    return _authRepository.verifyEmailCode(email: email, code: code);
   }
 
   Future<String> _findId(String name, String phone) {

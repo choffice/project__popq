@@ -38,6 +38,7 @@ public class AuthService {
     private final JwtTokenService jwtTokenService;
     private final PasswordEncoder passwordEncoder;
     private final JwtDecoder refreshJwtDecoder;
+    private final EmailVerificationService emailVerificationService;
 
     public AuthService(
         UserRepository userRepository,
@@ -45,13 +46,15 @@ public class AuthService {
         JwtTokenService jwtTokenService,
         PasswordEncoder passwordEncoder,
         @Qualifier("refreshJwtDecoder")
-        JwtDecoder refreshJwtDecoder
+        JwtDecoder refreshJwtDecoder,
+        EmailVerificationService emailVerificationService
     ) {
         this.userRepository = userRepository;
         this.sellerProfileRepository = sellerProfileRepository;
         this.jwtTokenService = jwtTokenService;
         this.passwordEncoder = passwordEncoder;
         this.refreshJwtDecoder = refreshJwtDecoder;
+        this.emailVerificationService = emailVerificationService;
     }
 
     @Transactional
@@ -86,6 +89,11 @@ public class AuthService {
                 ErrorCode.DUPLICATE_PHONE
             );
         }
+
+        emailVerificationService.consumeSignupVerification(
+            normalizedEmail,
+            request.emailVerificationToken()
+        );
 
         User user = User.createWithPassword(
             normalizedEmail,

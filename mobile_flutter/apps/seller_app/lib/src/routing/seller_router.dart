@@ -98,8 +98,11 @@ GoRouter createSellerRouter({
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   })
   onSignUp,
+  required Future<void> Function(String email) onSendEmailVerificationCode,
+  required Future<String> Function(String email, String code) onVerifyEmailCode,
   required Future<String> Function(String name, String phone) onFindId,
   required Future<void> Function(String email, String phone)
   onVerifyForPasswordReset,
@@ -230,7 +233,11 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.signUp,
         builder: (context, state) {
-          return SellerSignUpScreen(onSignUp: onSignUp);
+          return SellerSignUpScreen(
+            onSignUp: onSignUp,
+            onSendEmailVerificationCode: onSendEmailVerificationCode,
+            onVerifyEmailCode: onVerifyEmailCode,
+          );
         },
       ),
       GoRoute(
