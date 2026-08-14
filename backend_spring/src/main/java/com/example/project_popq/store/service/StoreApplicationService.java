@@ -17,6 +17,7 @@ import com.example.project_popq.store.domain.StoreType;
 import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
+import com.example.project_popq.store.dto.ReorderStoresRequest;
 import com.example.project_popq.store.dto.SellerStoreDetailResponse;
 import com.example.project_popq.store.dto.SellerDashboardSummaryResponse;
 import com.example.project_popq.engagement.domain.ReviewStatus;
@@ -43,6 +44,8 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashMap;
@@ -157,6 +160,12 @@ public class StoreApplicationService {
             StoreRole.OWNER
         );
 
+        int nextDisplayOrder = storeMemberRepository
+            .findMaxDisplayOrderByUserId(currentUser.getId())
+            + 1;
+
+        owner.changeDisplayOrder(nextDisplayOrder);
+
         storeMemberRepository.save(owner);
 
         return StoreSummaryResponse.of(
@@ -172,7 +181,7 @@ public class StoreApplicationService {
         User currentUser
     ) {
         return storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )
@@ -190,10 +199,89 @@ public class StoreApplicationService {
             .toList();
     }
 
+    @Transactional
+    public void reorderStores(
+        User currentUser,
+        ReorderStoresRequest request
+    ) {
+        List<StoreMember> memberships = storeMemberRepository
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
+                currentUser.getId(),
+                StoreMemberStatus.ACTIVE
+            );
+
+        List<StoreMember> activeStoreMemberships = memberships
+            .stream()
+            .filter(member -> member.getStore().isActive())
+            .toList();
+
+        List<Long> requestedStoreIds = request.storeIds();
+
+        if (requestedStoreIds.size() != activeStoreMemberships.size()) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "현재 표시 중인 모든 가게 ID를 순서대로 전달해야 합니다."
+            );
+        }
+
+        Set<Long> requestedStoreIdSet = new HashSet<>(requestedStoreIds);
+
+        if (requestedStoreIdSet.size() != requestedStoreIds.size()) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "가게 순서 목록에 중복된 가게 ID가 있습니다."
+            );
+        }
+
+        Set<Long> activeStoreIds = activeStoreMemberships
+            .stream()
+            .map(member -> member.getStore().getId())
+            .collect(Collectors.toSet());
+
+        if (!activeStoreIds.containsAll(requestedStoreIdSet)) {
+            throw new BusinessException(
+                ErrorCode.STORE_ACCESS_DENIED
+            );
+        }
+
+        if (!requestedStoreIdSet.containsAll(activeStoreIds)) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "현재 표시 중인 모든 가게 ID를 순서대로 전달해야 합니다."
+            );
+        }
+
+        Map<Long, StoreMember> membershipByStoreId =
+            activeStoreMemberships
+                .stream()
+                .collect(Collectors.toMap(
+                    member -> member.getStore().getId(),
+                    member -> member
+                ));
+
+        for (int index = 0; index < requestedStoreIds.size(); index++) {
+            Long storeId = requestedStoreIds.get(index);
+            membershipByStoreId
+                .get(storeId)
+                .changeDisplayOrder(index);
+        }
+
+        int nextDisplayOrder = requestedStoreIds.size();
+
+        for (StoreMember membership : memberships) {
+            if (!membership.getStore().isActive()) {
+                membership.changeDisplayOrder(nextDisplayOrder);
+                nextDisplayOrder++;
+            }
+        }
+
+        storeMemberRepository.saveAll(memberships);
+    }
+
     @Transactional(readOnly = true)
     public List<StoreSummaryResponse> findMyInactiveStores(User currentUser) {
         return storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )
@@ -212,7 +300,7 @@ public class StoreApplicationService {
         User currentUser
     ) {
         List<Store> stores = storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )

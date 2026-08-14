@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -27,11 +29,12 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
 
   bool _selecting = false;
   bool _creating = false;
+  bool _reordering = false;
   int? _observedSelectedStoreId;
   String _searchQuery = '';
   Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
 
-  bool get _busy => _selecting || _creating;
+  bool get _busy => _selecting || _creating || _reordering;
 
   @override
   void initState() {
@@ -155,9 +158,61 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                   title: '조건에 맞는 사업장이 없습니다.',
                   description: '검색어를 지우고 다시 확인해 주세요.',
                 )
-              else
+              else if (_searchQuery.trim().isNotEmpty)
                 for (final SellerStore store in visibleStores)
-                  _buildStoreCard(store),
+                  _buildStoreCard(store)
+              else ...<Widget>[
+                if (visibleStores.length > 1) ...<Widget>[
+                  Row(
+                    children: <Widget>[
+                      const Icon(Icons.drag_indicator_rounded, size: 20),
+                      const SizedBox(width: PopqSpacing.xs),
+                      Expanded(
+                        child: Text(
+                          _reordering
+                              ? '사업장 순서를 저장하고 있어요.'
+                              : '오른쪽 핸들을 끌어 사업장 순서를 변경할 수 있어요.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                      if (_reordering) ...<Widget>[
+                        const SizedBox(width: PopqSpacing.sm),
+                        const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                ],
+                ReorderableListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  buildDefaultDragHandles: false,
+                  itemCount: visibleStores.length,
+                  onReorderItem: (int oldIndex, int newIndex) {
+                    if (_busy) {
+                      return;
+                    }
+
+                    unawaited(
+                      _reorderStores(
+                        stores,
+                        oldIndex,
+                        newIndex,
+                      ),
+                    );
+                  },
+                  itemBuilder: (BuildContext context, int index) {
+                    return _buildStoreCard(
+                      visibleStores[index],
+                      reorderIndex:
+                          visibleStores.length > 1 ? index : null,
+                    );
+                  },
+                ),
+              ],
             ],
           ),
         );
@@ -165,12 +220,16 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
     );
   }
 
-  Widget _buildStoreCard(SellerStore store) {
+  Widget _buildStoreCard(
+    SellerStore store, {
+    int? reorderIndex,
+  }) {
     final bool selected =
         widget.controller.selectedStoreId == store.storeId;
 
     final summary = _summariesByStoreId[store.storeId];
     return Tooltip(
+      key: ValueKey<String>('store-${store.storeId}'),
       message: '${store.name} 사업장 관리',
       child: Card(
         clipBehavior: Clip.antiAlias,
@@ -234,6 +293,28 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                   onPressed:
                       _busy || summary == null ? null : () => _openChats(store),
                 ),
+                if (reorderIndex != null) ...<Widget>[
+                  const SizedBox(width: PopqSpacing.xs),
+                  Semantics(
+                    button: true,
+                    label: '${store.name} 순서 변경',
+                    child: Tooltip(
+                      message: '순서 변경',
+                      child: ReorderableDragStartListener(
+                        index: reorderIndex,
+                        child: SizedBox.square(
+                          dimension: 40,
+                          child: Icon(
+                            Icons.drag_handle_rounded,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -309,6 +390,63 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
         _showMessage(notice);
       }
     });
+  }
+
+  Future<void> _reorderStores(
+    List<SellerStore> stores,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_busy || _searchQuery.trim().isNotEmpty) {
+      return;
+    }
+
+    if (oldIndex == newIndex) {
+      return;
+    }
+
+    final List<SellerStore> originalOrder =
+        List<SellerStore>.of(stores);
+    final List<SellerStore> reordered =
+        List<SellerStore>.of(stores);
+    final SellerStore moved = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, moved);
+
+    setState(() {
+      stores
+        ..clear()
+        ..addAll(reordered);
+      _reordering = true;
+    });
+
+    try {
+      await widget.repository.reorderStores(
+        reordered
+            .map((SellerStore store) => store.storeId)
+            .toList(growable: false),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _reordering = false;
+      });
+      _showMessage('사업장 순서를 변경했어요.');
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        stores
+          ..clear()
+          ..addAll(originalOrder);
+        _reordering = false;
+      });
+      _showMessage('사업장 순서를 저장하지 못했어요. 다시 시도해 주세요.');
+    }
   }
 
   Future<void> _select(SellerStore store) async {
