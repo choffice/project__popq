@@ -19,6 +19,7 @@ import '../features/announcements/public_announcement_screens.dart';
 import '../features/announcements/customer_platform_announcement_screens.dart';
 import '../features/catalog/product_detail_screen.dart';
 import '../features/catalog/product_list_screen.dart';
+import '../features/discovery/customer_search_location_controller.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
@@ -101,6 +102,7 @@ GoRouter createCustomerRouter({
   required SessionController sessionController,
   required OnboardingController onboardingController,
   required StoreDiscoveryRepository storeDiscoveryRepository,
+  CustomerSearchLocationController? searchLocationController,
   required CatalogRepository catalogRepository,
   required PublicAnnouncementRepository announcementRepository,
   required PlatformAnnouncementRepository platformAnnouncementRepository,
@@ -556,6 +558,7 @@ GoRouter createCustomerRouter({
               return StoreDiscoveryScreen(
                 repository: storeDiscoveryRepository,
                 permissionGateway: permissionGateway,
+                searchLocationController: searchLocationController,
                 engagementRepository: engagementRepository,
                 sessionController: sessionController,
               );

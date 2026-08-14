@@ -20,6 +20,7 @@ import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
 import 'kakao_store_map_web_stub.dart'
 if (dart.library.js_interop) 'kakao_store_map_web.dart';
+import 'customer_search_location_controller.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
 
@@ -27,6 +28,7 @@ class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
     required this.repository,
     required this.permissionGateway,
+    this.searchLocationController,
     this.engagementRepository,
     this.sessionController,
     super.key,
@@ -34,6 +36,12 @@ class StoreDiscoveryScreen extends StatefulWidget {
 
   final StoreDiscoveryRepository repository;
   final CustomerPermissionGateway permissionGateway;
+
+  /// 홈과 탐색 탭이 공유하는 업체 탐색 기준 위치입니다.
+  ///
+  /// 소비자 배송지/거주지 주소와는 별개이며, null이면 기존 탐색 화면처럼
+  /// 자체 위치 상태만 사용합니다.
+  final CustomerSearchLocationController? searchLocationController;
 
   /// 다음 단계에서 라우터가 전달합니다.
   ///
@@ -118,6 +126,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _controller = StoreDiscoveryController(
       repository: widget.repository,
       permissionGateway: widget.permissionGateway,
+      searchLocationController: widget.searchLocationController,
     )..addListener(_onControllerChanged);
 
     _createInterestController();

@@ -15,6 +15,7 @@ import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/announcements/public_announcement_repository.dart';
+import 'features/discovery/customer_search_location_controller.dart';
 import 'features/discovery/store_discovery_repository.dart';
 import 'features/home/customer_home_controller.dart';
 import 'features/home/customer_location_repository.dart';
@@ -107,6 +108,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
+  late final CustomerSearchLocationController _searchLocationController;
   late final CustomerHomeController _homeController;
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
@@ -257,6 +259,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final locationRepository =
         widget.locationRepository ?? ApiCustomerLocationRepository(_apiClient);
 
+    _searchLocationController = CustomerSearchLocationController(
+      permissionGateway: permissionGateway,
+      locationRepository: locationRepository,
+    );
+
     _cartController = widget.cartController ?? CartController();
 
     _homeController = CustomerHomeController(
@@ -278,6 +285,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       sessionController: _sessionController,
       onboardingController: _onboardingController,
       storeDiscoveryRepository: storeDiscoveryRepository,
+      searchLocationController: _searchLocationController,
       catalogRepository: catalogRepository,
       announcementRepository: announcementRepository,
       platformAnnouncementRepository: platformAnnouncementRepository,
@@ -843,6 +851,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _router.dispose();
     _apiClient.close();
     _cartController.dispose();
+    _searchLocationController.dispose();
     _homeController.dispose();
     _onboardingController.dispose();
     _sessionController.dispose();

@@ -130,6 +130,34 @@ class _CustomerHomeScreenState
     super.dispose();
   }
 
+  Future<void> _showLocationPicker() async {
+    final snapshot = _controller.snapshot;
+
+    if (!mounted || snapshot == null) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return _LocationPickerSheet(
+          controller: _controller,
+          currentLocationLabel:
+              snapshot.currentLocationLabel,
+          onOpenDiscovery: () {
+            Navigator.of(sheetContext).pop();
+            if (mounted) {
+              context.go(CustomerRoutes.discover);
+            }
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -168,6 +196,8 @@ class _CustomerHomeScreenState
               _LocationHeader(
                 locationLabel:
                 snapshot.currentLocationLabel,
+                onLocationPressed:
+                    _showLocationPicker,
                 onCartPressed: () {
                   context.push(
                     CustomerRoutes.cart,
@@ -268,7 +298,8 @@ class _CustomerHomeScreenState
                     );
                   },
                 )
-                    : ListView.separated(
+                    : snapshot.regionLabel == '부산'
+                    ? ListView.separated(
                   scrollDirection:
                   Axis.horizontal,
                   itemCount: snapshot
@@ -287,6 +318,10 @@ class _CustomerHomeScreenState
                           .temporaryRecommendations[index],
                     );
                   },
+                )
+                    : _RegionContentEmptyCard(
+                  regionLabel: snapshot.regionLabel,
+                  message: '등록된 인기 매장이 아직 없어요.',
                 ),
               ),
 
@@ -336,7 +371,8 @@ class _CustomerHomeScreenState
                     );
                   },
                 )
-                    : ListView.separated(
+                    : snapshot.regionLabel == '부산'
+                    ? ListView.separated(
                   scrollDirection:
                   Axis.horizontal,
                   itemCount: snapshot
@@ -354,6 +390,10 @@ class _CustomerHomeScreenState
                           .temporaryPopups[index],
                     );
                   },
+                )
+                    : _RegionContentEmptyCard(
+                  regionLabel: snapshot.regionLabel,
+                  message: '진행 중인 이벤트가 아직 없어요.',
                 ),
               ),
 
@@ -474,10 +514,12 @@ class _InitialLoadingView extends StatelessWidget {
 class _LocationHeader extends StatelessWidget {
   const _LocationHeader({
     required this.locationLabel,
+    required this.onLocationPressed,
     required this.onCartPressed,
   });
 
   final String locationLabel;
+  final VoidCallback onLocationPressed;
   final VoidCallback onCartPressed;
 
   @override
@@ -490,62 +532,819 @@ class _LocationHeader extends StatelessWidget {
         ? PopqPalette.nightMutedText
         : PopqPalette.lightMutedText;
 
+    final accentColor = isDark
+        ? PopqPalette.lime
+        : PopqPalette.forest;
+
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Text(
-                '현재 지역',
-                style:
-                theme.textTheme.bodySmall?.copyWith(
-                  color: mutedColor,
-                  fontWeight: FontWeight.w700,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onLocationPressed,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: PopqSpacing.xs,
+                ),
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '탐색 지역',
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(
+                        color: mutedColor,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(
+                      height: PopqSpacing.xs,
+                    ),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          size: 19,
+                          color: accentColor,
+                        ),
+                        const SizedBox(
+                          width: PopqSpacing.xs,
+                        ),
+                        Flexible(
+                          child: Text(
+                            locationLabel,
+                            maxLines: 1,
+                            overflow:
+                                TextOverflow.ellipsis,
+                            style: theme
+                                .textTheme.titleMedium
+                                ?.copyWith(
+                              fontWeight:
+                                  FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          size: 21,
+                          color: mutedColor,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(
-                height: PopqSpacing.xs,
+            ),
+          ),
+        ),
+        const SizedBox(width: PopqSpacing.sm),
+        _RoundActionButton(
+          tooltip: '장바구니',
+          icon: Icons.shopping_bag_outlined,
+          onPressed: onCartPressed,
+        ),
+      ],
+    );
+  }
+}
+
+class _LocationPickerSheet extends StatefulWidget {
+  const _LocationPickerSheet({
+    required this.controller,
+    required this.currentLocationLabel,
+    required this.onOpenDiscovery,
+  });
+
+  final CustomerHomeController controller;
+  final String currentLocationLabel;
+  final VoidCallback onOpenDiscovery;
+
+  @override
+  State<_LocationPickerSheet> createState() =>
+      _LocationPickerSheetState();
+}
+
+class _LocationPickerSheetState
+    extends State<_LocationPickerSheet> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  Timer? _searchDebounce;
+  int _searchRequestSequence = 0;
+
+  bool _usingCurrentLocation = false;
+  bool _searching = false;
+  String? _locationError;
+  String? _searchError;
+  List<CustomerLocationSearchResult> _searchResults =
+      const <CustomerLocationSearchResult>[];
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _useCurrentLocation() async {
+    if (_usingCurrentLocation) {
+      return;
+    }
+
+    setState(() {
+      _usingCurrentLocation = true;
+      _locationError = null;
+    });
+
+    final bool success = await widget.controller.useCurrentLocation();
+
+    if (!mounted) {
+      return;
+    }
+
+    if (success) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _usingCurrentLocation = false;
+      _locationError =
+          '현재 위치를 확인하지 못했어요. 위치 권한과 기기의 위치 서비스를 확인해 주세요.';
+    });
+  }
+
+  void _handleSearchChanged(String value) {
+    _searchDebounce?.cancel();
+
+    final String query = value.trim();
+
+    if (query.length < 2) {
+      _searchRequestSequence++;
+      setState(() {
+        _searching = false;
+        _searchError = null;
+        _searchResults = const <CustomerLocationSearchResult>[];
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(
+      const Duration(milliseconds: 350),
+      () => _search(query),
+    );
+  }
+
+  Future<void> _search(String rawQuery) async {
+    final String query = rawQuery.trim();
+
+    if (query.length < 2) {
+      return;
+    }
+
+    final int requestId = ++_searchRequestSequence;
+
+    setState(() {
+      _searching = true;
+      _searchError = null;
+    });
+
+    try {
+      final List<CustomerLocationSearchResult> results =
+          await widget.controller.searchLocations(query);
+
+      if (!mounted || requestId != _searchRequestSequence) {
+        return;
+      }
+
+      setState(() {
+        _searching = false;
+        _searchResults = results;
+        _searchError = results.isEmpty
+            ? '검색 결과가 없어요. 동 이름이나 시·구 이름을 조금 더 자세히 입력해 보세요.'
+            : null;
+      });
+    } catch (_) {
+      if (!mounted || requestId != _searchRequestSequence) {
+        return;
+      }
+
+      setState(() {
+        _searching = false;
+        _searchResults = const <CustomerLocationSearchResult>[];
+        _searchError = '지역 검색에 실패했어요. 잠시 후 다시 시도해 주세요.';
+      });
+    }
+  }
+
+  Future<void> _selectSearchResult(
+    CustomerLocationSearchResult result,
+  ) async {
+    await widget.controller.selectSearchLocation(result);
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
+  }
+
+  void _returnToBusan() {
+    widget.controller.returnToBusan();
+    Navigator.of(context).pop();
+  }
+
+  String? _secondaryAddress(CustomerLocationSearchResult result) {
+    final String display = result.displayLabel.trim();
+
+    final candidates = <String?>[
+      result.roadAddressName,
+      result.jibunAddressName,
+      result.addressName,
+    ];
+
+    for (final String? candidate in candidates) {
+      final String normalized = candidate?.trim() ?? '';
+      if (normalized.isNotEmpty && normalized != display) {
+        return normalized;
+      }
+    }
+
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final Color accentColor = isDark
+        ? PopqPalette.lime
+        : PopqPalette.forest;
+
+    final Color cardColor = isDark
+        ? PopqPalette.nightCard
+        : PopqPalette.lightCard;
+
+    final Color borderColor = isDark
+        ? PopqPalette.nightBorder
+        : PopqPalette.lightBorder;
+
+    final Color mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return FractionallySizedBox(
+      heightFactor: 0.9,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PopqSpacing.lg,
+              PopqSpacing.xs,
+              PopqSpacing.lg,
+              PopqSpacing.md,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '탐색 지역 설정',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: PopqSpacing.xs),
+                Text(
+                  '매장과 이벤트를 둘러볼 기준 위치를 설정해요. 소비자 주소 등록과는 별개예요.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: mutedColor,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              keyboardDismissBehavior:
+                  ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: EdgeInsets.fromLTRB(
+                PopqSpacing.lg,
+                0,
+                PopqSpacing.lg,
+                MediaQuery.viewInsetsOf(context).bottom + PopqSpacing.xl,
               ),
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.location_on_rounded,
-                    size: 19,
-                    color: isDark
-                        ? PopqPalette.lime
-                        : PopqPalette.forest,
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(PopqSpacing.md),
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(
+                        alpha: isDark ? 0.13 : 0.08,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: accentColor.withValues(
+                          alpha: isDark ? 0.34 : 0.24,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          color: accentColor,
+                        ),
+                        const SizedBox(width: PopqSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '현재 탐색 위치',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: mutedColor,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                widget.currentLocationLabel,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(
-                    width: PopqSpacing.xs,
+                  const SizedBox(height: PopqSpacing.lg),
+                  Text(
+                    '지역·주소 검색',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                  Flexible(
-                    child: Text(
-                      locationLabel,
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.titleMedium
-                          ?.copyWith(
-                        fontWeight:
-                        FontWeight.w900,
+                  const SizedBox(height: PopqSpacing.xs),
+                  Text(
+                    '예: 성수동, 서울 성동구, 부산 해운대구',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: mutedColor,
+                    ),
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  TextField(
+                    controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    textInputAction: TextInputAction.search,
+                    onChanged: _handleSearchChanged,
+                    onSubmitted: _search,
+                    decoration: InputDecoration(
+                      hintText: '탐색할 지역을 검색해 주세요',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: '검색어 지우기',
+                              onPressed: () {
+                                _searchDebounce?.cancel();
+                                _searchController.clear();
+                                _searchRequestSequence++;
+                                setState(() {
+                                  _searching = false;
+                                  _searchError = null;
+                                  _searchResults =
+                                      const <CustomerLocationSearchResult>[];
+                                });
+                                _searchFocusNode.requestFocus();
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                      filled: true,
+                      fillColor: cardColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: borderColor),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: accentColor,
+                          width: 1.5,
+                        ),
                       ),
                     ),
                   ),
+                  if (_searching) ...[
+                    const SizedBox(height: PopqSpacing.md),
+                    const LinearProgressIndicator(minHeight: 3),
+                  ],
+                  if (_searchError != null) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    _LocationMessageCard(
+                      icon: Icons.info_outline_rounded,
+                      message: _searchError!,
+                    ),
+                  ],
+                  if (_searchResults.isNotEmpty) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        children: [
+                          for (int index = 0;
+                              index < _searchResults.length;
+                              index++) ...[
+                            _LocationSearchResultTile(
+                              result: _searchResults[index],
+                              secondaryAddress:
+                                  _secondaryAddress(_searchResults[index]),
+                              accentColor: accentColor,
+                              mutedColor: mutedColor,
+                              onTap: () => _selectSearchResult(
+                                _searchResults[index],
+                              ),
+                            ),
+                            if (index != _searchResults.length - 1)
+                              Divider(
+                                height: 1,
+                                indent: PopqSpacing.md,
+                                endIndent: PopqSpacing.md,
+                                color: borderColor,
+                              ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: PopqSpacing.lg),
+                  Text(
+                    '빠른 설정',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  _LocationActionTile(
+                    icon: Icons.my_location_rounded,
+                    title: '현재 위치 사용',
+                    description: '휴대폰 GPS 위치 주변을 탐색해요',
+                    accentColor: accentColor,
+                    mutedColor: mutedColor,
+                    cardColor: cardColor,
+                    borderColor: borderColor,
+                    loading: _usingCurrentLocation,
+                    onTap: _usingCurrentLocation
+                        ? null
+                        : _useCurrentLocation,
+                  ),
+                  if (_locationError != null) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    _LocationMessageCard(
+                      icon: Icons.location_off_outlined,
+                      message: _locationError!,
+                    ),
+                  ],
+                  const SizedBox(height: PopqSpacing.sm),
+                  _LocationActionTile(
+                    icon: Icons.map_outlined,
+                    title: '지도에서 위치 변경',
+                    description: '탐색 탭의 지도를 움직여 원하는 위치를 정해요',
+                    accentColor: accentColor,
+                    mutedColor: mutedColor,
+                    cardColor: cardColor,
+                    borderColor: borderColor,
+                    onTap: widget.onOpenDiscovery,
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  _LocationActionTile(
+                    icon: Icons.restart_alt_rounded,
+                    title: '기본 위치 부산으로 돌아가기',
+                    description: '위치 권한을 사용하지 않을 때의 기본 탐색 위치예요',
+                    accentColor: accentColor,
+                    mutedColor: mutedColor,
+                    cardColor: cardColor,
+                    borderColor: borderColor,
+                    onTap: _returnToBusan,
+                  ),
                 ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationSearchResultTile extends StatelessWidget {
+  const _LocationSearchResultTile({
+    required this.result,
+    required this.secondaryAddress,
+    required this.accentColor,
+    required this.mutedColor,
+    required this.onTap,
+  });
+
+  final CustomerLocationSearchResult result;
+  final String? secondaryAddress;
+  final Color accentColor;
+  final Color mutedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(PopqSpacing.md),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Icon(
+                  Icons.place_outlined,
+                  size: 21,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      result.displayLabel,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (secondaryAddress != null) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        secondaryAddress!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: mutedColor,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.xs),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: mutedColor,
               ),
             ],
           ),
         ),
-        _RoundActionButton(
-          tooltip: '장바구니',
-          icon:
-          Icons.shopping_bag_outlined,
-          onPressed: onCartPressed,
+      ),
+    );
+  }
+}
+
+class _LocationActionTile extends StatelessWidget {
+  const _LocationActionTile({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.accentColor,
+    required this.mutedColor,
+    required this.cardColor,
+    required this.borderColor,
+    required this.onTap,
+    this.loading = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String description;
+  final Color accentColor;
+  final Color mutedColor;
+  final Color cardColor;
+  final Color borderColor;
+  final VoidCallback? onTap;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Material(
+      color: cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: borderColor),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(PopqSpacing.md),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: mutedColor,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: PopqSpacing.sm),
+              if (loading)
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: accentColor,
+                  ),
+                )
+              else
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: mutedColor,
+                ),
+            ],
+          ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _LocationMessageCard extends StatelessWidget {
+  const _LocationMessageCard({
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
+    final Color mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+    final Color borderColor = isDark
+        ? PopqPalette.nightBorder
+        : PopqPalette.lightBorder;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.sm),
+      decoration: BoxDecoration(
+        color: isDark
+            ? PopqPalette.nightCard
+            : PopqPalette.lightCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: mutedColor,
+          ),
+          const SizedBox(width: PopqSpacing.xs),
+          Expanded(
+            child: Text(
+              message,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: mutedColor,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RegionContentEmptyCard extends StatelessWidget {
+  const _RegionContentEmptyCard({
+    required this.regionLabel,
+    required this.message,
+  });
+
+  final String regionLabel;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
+
+    final mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    final accentColor = isDark
+        ? PopqPalette.lime
+        : PopqPalette.forest;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(PopqSpacing.lg),
+      decoration: BoxDecoration(
+        color: isDark
+            ? PopqPalette.nightCard
+            : PopqPalette.lightCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isDark
+              ? PopqPalette.nightBorder
+              : PopqPalette.lightBorder,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.location_searching_rounded,
+            color: accentColor,
+            size: 30,
+          ),
+          const SizedBox(height: PopqSpacing.sm),
+          Text(
+            regionLabel,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: mutedColor,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
