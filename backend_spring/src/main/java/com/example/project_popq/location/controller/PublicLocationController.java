@@ -1,16 +1,15 @@
 package com.example.project_popq.location.controller;
 
 import com.example.project_popq.common.api.ApiResponse;
+import com.example.project_popq.location.dto.RegionCenterResponse;
 import com.example.project_popq.location.dto.ReverseGeocodeResponse;
+import com.example.project_popq.location.service.RegionCenterService;
 import com.example.project_popq.location.service.ReverseGeocodeService;
-import com.example.project_popq.store.dto.KakaoAddressSearchResponse;
-import com.example.project_popq.store.service.KakaoLocationService;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,26 +24,30 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicLocationController {
 
   private final ReverseGeocodeService reverseGeocodeService;
-  private final KakaoLocationService kakaoLocationService;
+  private final RegionCenterService regionCenterService;
 
   /**
-   * 구매자 앱에서 업체를 탐색할 기준 위치를 찾기 위한 주소 검색입니다.
+   * 홈/탐색에서 사용자가 선택한 시/도 + 구/군의 대표 탐색 좌표를 반환합니다.
    *
-   * 이 API는 사용자의 배송지/거주지 주소를 등록하는 기능이 아니라,
-   * 검색 지도와 홈의 탐색 중심 좌표를 정하기 위한 공개 조회 API입니다.
+   * <p>소비자 주소/배송지를 등록하는 기능이 아니라,
+   * 주변 업체를 조회하고 탐색 지도의 중심을 이동하기 위한 공개 조회 API입니다.</p>
    */
-  @GetMapping("/addresses")
-  public ApiResponse<List<KakaoAddressSearchResponse>> searchAddresses(
+  @GetMapping("/region-center")
+  public ApiResponse<RegionCenterResponse> regionCenter(
       @RequestParam
-      @NotBlank(message = "검색할 지역이나 주소를 입력해 주세요.")
-      @Size(
-          max = 200,
-          message = "검색어는 200자 이하로 입력해 주세요."
-      )
-      String query
+      @NotBlank(message = "시/도를 선택해 주세요.")
+      @Size(max = 30, message = "시/도 값이 너무 깁니다.")
+      String province,
+
+      @RequestParam(defaultValue = "전체")
+      @Size(max = 30, message = "구/군 값이 너무 깁니다.")
+      String district
   ) {
     return ApiResponse.success(
-        kakaoLocationService.searchAddress(query)
+        regionCenterService.findCenter(
+            province,
+            district
+        )
     );
   }
 

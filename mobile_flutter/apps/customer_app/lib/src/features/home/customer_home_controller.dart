@@ -133,6 +133,11 @@ class CustomerHomeController extends ChangeNotifier {
   CustomerHomeStatus status = CustomerHomeStatus.initial;
   CustomerHomeSnapshot? snapshot;
 
+  bool _isApplyingRegionSelection = false;
+  String? regionSelectionError;
+
+  bool get isApplyingRegionSelection => _isApplyingRegionSelection;
+
   List<CustomerStore> _stores = const <CustomerStore>[];
   List<CustomerOrder> _orders = const <CustomerOrder>[];
 
@@ -219,14 +224,65 @@ class CustomerHomeController extends ChangeNotifier {
     _searchLocationController.returnToBusan();
   }
 
-  /// 업체 탐색용 지역/주소 후보를 검색합니다.
+  /// 드롭다운에서 고른 시/도 + 구/군을 업체 탐색 기준 위치로 적용합니다.
+  ///
+  /// 소비자 주소를 저장하는 기능이 아니라, 선택 지역의 대표 좌표를 받아
+  /// 홈과 탐색 탭이 함께 사용할 공통 탐색 위치를 변경합니다.
+  Future<bool> selectRegion({
+    required String province,
+    required String district,
+  }) async {
+    if (_isApplyingRegionSelection) {
+      return false;
+    }
+
+    final String normalizedProvince = province.trim();
+    final String normalizedDistrict =
+        district.trim().isEmpty ? '전체' : district.trim();
+
+    if (normalizedProvince.isEmpty) {
+      regionSelectionError = '시/도를 선택해 주세요.';
+      _notifySafely();
+      return false;
+    }
+
+    _isApplyingRegionSelection = true;
+    regionSelectionError = null;
+    _notifySafely();
+
+    try {
+      final CustomerRegionCenter center =
+          await _locationRepository.getRegionCenter(
+        province: normalizedProvince,
+        district: normalizedDistrict,
+      );
+
+      await _searchLocationController.setAddressSearchLocation(
+        location: center.location,
+        label: center.label,
+      );
+
+      return true;
+    } catch (_) {
+      regionSelectionError = '선택한 지역의 위치를 불러오지 못했어요.';
+      return false;
+    } finally {
+      _isApplyingRegionSelection = false;
+      _notifySafely();
+    }
+  }
+
+  /// 이전 검색형 화면과 다음 화면 교체 사이의 컴파일 호환용입니다.
+  /// 새 드롭다운 UI에서는 사용하지 않습니다.
+  @Deprecated('selectRegion()을 사용하세요.')
   Future<List<CustomerLocationSearchResult>> searchLocations(
     String query,
   ) {
     return _locationRepository.searchAddresses(query);
   }
 
-  /// 검색한 지역/주소를 업체 탐색 기준 위치로 적용합니다.
+  /// 이전 검색형 화면과 다음 화면 교체 사이의 컴파일 호환용입니다.
+  @Deprecated('selectRegion()을 사용하세요.')
   Future<void> selectSearchLocation(
     CustomerLocationSearchResult result,
   ) {
@@ -236,9 +292,9 @@ class CustomerHomeController extends ChangeNotifier {
     );
   }
 
-  /// 이전 부산 구·군 선택 UI가 남아 있는 동안의 호환용입니다.
-  ///
-  /// 새 화면에서는 사용하지 않습니다. `부산`만 기본 위치 복귀로 처리합니다.
+  /// 아주 오래된 부산 구·군 선택 UI와의 컴파일 호환용입니다.
+  /// 새 화면에서는 사용하지 않습니다.
+  @Deprecated('selectRegion()을 사용하세요.')
   Future<void> selectLocationLabel(String locationLabel) async {
     final String normalized = locationLabel.trim();
     if (normalized == '부산' || normalized == '부산광역시') {

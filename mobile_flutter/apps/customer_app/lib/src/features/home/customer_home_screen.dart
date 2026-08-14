@@ -147,12 +147,6 @@ class _CustomerHomeScreenState
           controller: _controller,
           currentLocationLabel:
               snapshot.currentLocationLabel,
-          onOpenDiscovery: () {
-            Navigator.of(sheetContext).pop();
-            if (mounted) {
-              context.go(CustomerRoutes.discover);
-            }
-          },
         );
       },
     );
@@ -616,12 +610,10 @@ class _LocationPickerSheet extends StatefulWidget {
   const _LocationPickerSheet({
     required this.controller,
     required this.currentLocationLabel,
-    required this.onOpenDiscovery,
   });
 
   final CustomerHomeController controller;
   final String currentLocationLabel;
-  final VoidCallback onOpenDiscovery;
 
   @override
   State<_LocationPickerSheet> createState() =>
@@ -630,25 +622,21 @@ class _LocationPickerSheet extends StatefulWidget {
 
 class _LocationPickerSheetState
     extends State<_LocationPickerSheet> {
-  final TextEditingController _searchController = TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-
-  Timer? _searchDebounce;
-  int _searchRequestSequence = 0;
-
   bool _usingCurrentLocation = false;
-  bool _searching = false;
   String? _locationError;
-  String? _searchError;
-  List<CustomerLocationSearchResult> _searchResults =
-      const <CustomerLocationSearchResult>[];
 
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    _searchController.dispose();
-    _searchFocusNode.dispose();
-    super.dispose();
+  Future<void> _selectLocation(
+    String locationLabel,
+  ) async {
+    await widget.controller.selectLocationLabel(
+      locationLabel,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
   }
 
   Future<void> _useCurrentLocation() async {
@@ -661,7 +649,8 @@ class _LocationPickerSheetState
       _locationError = null;
     });
 
-    final bool success = await widget.controller.useCurrentLocation();
+    final success =
+        await widget.controller.useCurrentLocation();
 
     if (!mounted) {
       return;
@@ -675,132 +664,47 @@ class _LocationPickerSheetState
     setState(() {
       _usingCurrentLocation = false;
       _locationError =
-          '현재 위치를 확인하지 못했어요. 위치 권한과 기기의 위치 서비스를 확인해 주세요.';
+          '현재 위치를 확인하지 못했어요. 위치 권한을 확인하거나 아래에서 지역을 직접 선택해 주세요.';
     });
   }
 
-  void _handleSearchChanged(String value) {
-    _searchDebounce?.cancel();
-
-    final String query = value.trim();
-
-    if (query.length < 2) {
-      _searchRequestSequence++;
-      setState(() {
-        _searching = false;
-        _searchError = null;
-        _searchResults = const <CustomerLocationSearchResult>[];
-      });
-      return;
+  String _displayLabel(String locationLabel) {
+    if (locationLabel == '부산') {
+      return '부산 전체';
     }
 
-    _searchDebounce = Timer(
-      const Duration(milliseconds: 350),
-      () => _search(query),
-    );
-  }
-
-  Future<void> _search(String rawQuery) async {
-    final String query = rawQuery.trim();
-
-    if (query.length < 2) {
-      return;
-    }
-
-    final int requestId = ++_searchRequestSequence;
-
-    setState(() {
-      _searching = true;
-      _searchError = null;
-    });
-
-    try {
-      final List<CustomerLocationSearchResult> results =
-          await widget.controller.searchLocations(query);
-
-      if (!mounted || requestId != _searchRequestSequence) {
-        return;
-      }
-
-      setState(() {
-        _searching = false;
-        _searchResults = results;
-        _searchError = results.isEmpty
-            ? '검색 결과가 없어요. 동 이름이나 시·구 이름을 조금 더 자세히 입력해 보세요.'
-            : null;
-      });
-    } catch (_) {
-      if (!mounted || requestId != _searchRequestSequence) {
-        return;
-      }
-
-      setState(() {
-        _searching = false;
-        _searchResults = const <CustomerLocationSearchResult>[];
-        _searchError = '지역 검색에 실패했어요. 잠시 후 다시 시도해 주세요.';
-      });
-    }
-  }
-
-  Future<void> _selectSearchResult(
-    CustomerLocationSearchResult result,
-  ) async {
-    await widget.controller.selectSearchLocation(result);
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(context).pop();
-  }
-
-  void _returnToBusan() {
-    widget.controller.returnToBusan();
-    Navigator.of(context).pop();
-  }
-
-  String? _secondaryAddress(CustomerLocationSearchResult result) {
-    final String display = result.displayLabel.trim();
-
-    final candidates = <String?>[
-      result.roadAddressName,
-      result.jibunAddressName,
-      result.addressName,
-    ];
-
-    for (final String? candidate in candidates) {
-      final String normalized = candidate?.trim() ?? '';
-      if (normalized.isNotEmpty && normalized != display) {
-        return normalized;
-      }
-    }
-
-    return null;
+    return locationLabel
+        .replaceFirst('부산 ', '')
+        .trim();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
+    final isDark =
+        theme.brightness == Brightness.dark;
 
-    final Color accentColor = isDark
+    final accentColor = isDark
         ? PopqPalette.lime
         : PopqPalette.forest;
 
-    final Color cardColor = isDark
+    final cardColor = isDark
         ? PopqPalette.nightCard
         : PopqPalette.lightCard;
 
-    final Color borderColor = isDark
+    final borderColor = isDark
         ? PopqPalette.nightBorder
         : PopqPalette.lightBorder;
 
-    final Color mutedColor = isDark
+    final mutedColor = isDark
         ? PopqPalette.nightMutedText
         : PopqPalette.lightMutedText;
 
+    final recentLocations =
+        widget.controller.recentLocationLabels;
+
     return FractionallySizedBox(
-      heightFactor: 0.9,
+      heightFactor: 0.82,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -812,18 +716,21 @@ class _LocationPickerSheetState
               PopqSpacing.md,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Text(
                   '탐색 지역 설정',
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
                 ),
                 const SizedBox(height: PopqSpacing.xs),
                 Text(
-                  '매장과 이벤트를 둘러볼 기준 위치를 설정해요. 소비자 주소 등록과는 별개예요.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
+                  '선택한 지역을 기준으로 홈의 매장과 이벤트를 보여줘요.',
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(
                     color: mutedColor,
                     height: 1.4,
                   ),
@@ -833,220 +740,185 @@ class _LocationPickerSheetState
           ),
           Expanded(
             child: SingleChildScrollView(
-              keyboardDismissBehavior:
-                  ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: EdgeInsets.fromLTRB(
+              padding: const EdgeInsets.fromLTRB(
                 PopqSpacing.lg,
                 0,
                 PopqSpacing.lg,
-                MediaQuery.viewInsetsOf(context).bottom + PopqSpacing.xl,
+                PopqSpacing.xl,
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                    CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(PopqSpacing.md),
-                    decoration: BoxDecoration(
-                      color: accentColor.withValues(
-                        alpha: isDark ? 0.13 : 0.08,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: accentColor.withValues(
-                          alpha: isDark ? 0.34 : 0.24,
-                        ),
+                  Material(
+                    color: cardColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(16),
+                      side: BorderSide(
+                        color: borderColor,
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_rounded,
-                          color: accentColor,
+                    child: InkWell(
+                      onTap: _usingCurrentLocation
+                          ? null
+                          : _useCurrentLocation,
+                      borderRadius:
+                          BorderRadius.circular(16),
+                      child: Padding(
+                        padding: const EdgeInsets.all(
+                          PopqSpacing.md,
                         ),
-                        const SizedBox(width: PopqSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '현재 탐색 위치',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: mutedColor,
-                                  fontWeight: FontWeight.w700,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: accentColor.withValues(
+                                  alpha: isDark ? 0.16 : 0.10,
                                 ),
+                                borderRadius:
+                                    BorderRadius.circular(12),
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                widget.currentLocationLabel,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w900,
+                              child: Icon(
+                                Icons.my_location_rounded,
+                                color: accentColor,
+                              ),
+                            ),
+                            const SizedBox(
+                              width: PopqSpacing.md,
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '현재 위치로 설정',
+                                    style: theme
+                                        .textTheme.titleSmall
+                                        ?.copyWith(
+                                      fontWeight:
+                                          FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '휴대폰 위치를 기준으로 탐색해요',
+                                    style: theme
+                                        .textTheme.bodySmall
+                                        ?.copyWith(
+                                      color: mutedColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_usingCurrentLocation)
+                              SizedBox(
+                                width: 22,
+                                height: 22,
+                                child:
+                                    CircularProgressIndicator(
+                                  strokeWidth: 2.4,
+                                  color: accentColor,
                                 ),
+                              )
+                            else
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                color: mutedColor,
                               ),
-                            ],
-                          ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
+                  if (_locationError != null) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(
+                        PopqSpacing.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer
+                            .withValues(alpha: 0.55),
+                        borderRadius:
+                            BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _locationError!,
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(
+                          color: theme
+                              .colorScheme.onErrorContainer,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (recentLocations.isNotEmpty) ...[
+                    const SizedBox(height: PopqSpacing.lg),
+                    Text(
+                      '최근 설정 지역',
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: PopqSpacing.sm),
+                    Wrap(
+                      spacing: PopqSpacing.sm,
+                      runSpacing: PopqSpacing.sm,
+                      children: [
+                        for (final location
+                            in recentLocations)
+                          _LocationChoiceChip(
+                            label: _displayLabel(location),
+                            selected:
+                                widget.currentLocationLabel ==
+                                    location,
+                            onTap: () =>
+                                _selectLocation(location),
+                          ),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: PopqSpacing.lg),
                   Text(
-                    '지역·주소 검색',
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    '지역 직접 선택',
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: PopqSpacing.xs),
                   Text(
-                    '예: 성수동, 서울 성동구, 부산 해운대구',
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    '현재 POPQ 서비스 범위인 부산 지역에서 선택할 수 있어요.',
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(
                       color: mutedColor,
                     ),
                   ),
-                  const SizedBox(height: PopqSpacing.sm),
-                  TextField(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
-                    textInputAction: TextInputAction.search,
-                    onChanged: _handleSearchChanged,
-                    onSubmitted: _search,
-                    decoration: InputDecoration(
-                      hintText: '탐색할 지역을 검색해 주세요',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _searchController.text.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: '검색어 지우기',
-                              onPressed: () {
-                                _searchDebounce?.cancel();
-                                _searchController.clear();
-                                _searchRequestSequence++;
-                                setState(() {
-                                  _searching = false;
-                                  _searchError = null;
-                                  _searchResults =
-                                      const <CustomerLocationSearchResult>[];
-                                });
-                                _searchFocusNode.requestFocus();
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                      filled: true,
-                      fillColor: cardColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: borderColor),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: borderColor),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(
-                          color: accentColor,
-                          width: 1.5,
+                  const SizedBox(height: PopqSpacing.md),
+                  Wrap(
+                    spacing: PopqSpacing.sm,
+                    runSpacing: PopqSpacing.sm,
+                    children: [
+                      for (final location
+                          in CustomerHomeController
+                              .supportedLocationLabels)
+                        _LocationChoiceChip(
+                          label: _displayLabel(location),
+                          selected:
+                              widget.currentLocationLabel ==
+                                  location,
+                          onTap: () =>
+                              _selectLocation(location),
                         ),
-                      ),
-                    ),
-                  ),
-                  if (_searching) ...[
-                    const SizedBox(height: PopqSpacing.md),
-                    const LinearProgressIndicator(minHeight: 3),
-                  ],
-                  if (_searchError != null) ...[
-                    const SizedBox(height: PopqSpacing.sm),
-                    _LocationMessageCard(
-                      icon: Icons.info_outline_rounded,
-                      message: _searchError!,
-                    ),
-                  ],
-                  if (_searchResults.isNotEmpty) ...[
-                    const SizedBox(height: PopqSpacing.sm),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Column(
-                        children: [
-                          for (int index = 0;
-                              index < _searchResults.length;
-                              index++) ...[
-                            _LocationSearchResultTile(
-                              result: _searchResults[index],
-                              secondaryAddress:
-                                  _secondaryAddress(_searchResults[index]),
-                              accentColor: accentColor,
-                              mutedColor: mutedColor,
-                              onTap: () => _selectSearchResult(
-                                _searchResults[index],
-                              ),
-                            ),
-                            if (index != _searchResults.length - 1)
-                              Divider(
-                                height: 1,
-                                indent: PopqSpacing.md,
-                                endIndent: PopqSpacing.md,
-                                color: borderColor,
-                              ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: PopqSpacing.lg),
-                  Text(
-                    '빠른 설정',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: PopqSpacing.sm),
-                  _LocationActionTile(
-                    icon: Icons.my_location_rounded,
-                    title: '현재 위치 사용',
-                    description: '휴대폰 GPS 위치 주변을 탐색해요',
-                    accentColor: accentColor,
-                    mutedColor: mutedColor,
-                    cardColor: cardColor,
-                    borderColor: borderColor,
-                    loading: _usingCurrentLocation,
-                    onTap: _usingCurrentLocation
-                        ? null
-                        : _useCurrentLocation,
-                  ),
-                  if (_locationError != null) ...[
-                    const SizedBox(height: PopqSpacing.sm),
-                    _LocationMessageCard(
-                      icon: Icons.location_off_outlined,
-                      message: _locationError!,
-                    ),
-                  ],
-                  const SizedBox(height: PopqSpacing.sm),
-                  _LocationActionTile(
-                    icon: Icons.map_outlined,
-                    title: '지도에서 위치 변경',
-                    description: '탐색 탭의 지도를 움직여 원하는 위치를 정해요',
-                    accentColor: accentColor,
-                    mutedColor: mutedColor,
-                    cardColor: cardColor,
-                    borderColor: borderColor,
-                    onTap: widget.onOpenDiscovery,
-                  ),
-                  const SizedBox(height: PopqSpacing.sm),
-                  _LocationActionTile(
-                    icon: Icons.restart_alt_rounded,
-                    title: '기본 위치 부산으로 돌아가기',
-                    description: '위치 권한을 사용하지 않을 때의 기본 탐색 위치예요',
-                    accentColor: accentColor,
-                    mutedColor: mutedColor,
-                    cardColor: cardColor,
-                    borderColor: borderColor,
-                    onTap: _returnToBusan,
+                    ],
                   ),
                 ],
               ),
@@ -1058,225 +930,81 @@ class _LocationPickerSheetState
   }
 }
 
-class _LocationSearchResultTile extends StatelessWidget {
-  const _LocationSearchResultTile({
-    required this.result,
-    required this.secondaryAddress,
-    required this.accentColor,
-    required this.mutedColor,
+class _LocationChoiceChip extends StatelessWidget {
+  const _LocationChoiceChip({
+    required this.label,
+    required this.selected,
     required this.onTap,
   });
 
-  final CustomerLocationSearchResult result;
-  final String? secondaryAddress;
-  final Color accentColor;
-  final Color mutedColor;
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark =
+        theme.brightness == Brightness.dark;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(PopqSpacing.md),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: Icon(
-                  Icons.place_outlined,
-                  size: 21,
-                  color: accentColor,
-                ),
-              ),
-              const SizedBox(width: PopqSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.displayLabel,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (secondaryAddress != null) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        secondaryAddress!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: mutedColor,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: PopqSpacing.xs),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: mutedColor,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+    final accentColor = isDark
+        ? PopqPalette.lime
+        : PopqPalette.forest;
 
-class _LocationActionTile extends StatelessWidget {
-  const _LocationActionTile({
-    required this.icon,
-    required this.title,
-    required this.description,
-    required this.accentColor,
-    required this.mutedColor,
-    required this.cardColor,
-    required this.borderColor,
-    required this.onTap,
-    this.loading = false,
-  });
+    final borderColor = selected
+        ? accentColor
+        : (isDark
+            ? PopqPalette.nightBorder
+            : PopqPalette.lightBorder);
 
-  final IconData icon;
-  final String title;
-  final String description;
-  final Color accentColor;
-  final Color mutedColor;
-  final Color cardColor;
-  final Color borderColor;
-  final VoidCallback? onTap;
-  final bool loading;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: cardColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: borderColor),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(PopqSpacing.md),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accentColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  color: accentColor,
-                ),
-              ),
-              const SizedBox(width: PopqSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: mutedColor,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: PopqSpacing.sm),
-              if (loading)
-                SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.4,
-                    color: accentColor,
-                  ),
-                )
-              else
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: mutedColor,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LocationMessageCard extends StatelessWidget {
-  const _LocationMessageCard({
-    required this.icon,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final bool isDark = theme.brightness == Brightness.dark;
-    final Color mutedColor = isDark
-        ? PopqPalette.nightMutedText
-        : PopqPalette.lightMutedText;
-    final Color borderColor = isDark
-        ? PopqPalette.nightBorder
-        : PopqPalette.lightBorder;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(PopqSpacing.sm),
-      decoration: BoxDecoration(
-        color: isDark
+    final backgroundColor = selected
+        ? accentColor.withValues(
+            alpha: isDark ? 0.16 : 0.10,
+          )
+        : (isDark
             ? PopqPalette.nightCard
-            : PopqPalette.lightCard,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: borderColor),
+            : PopqPalette.lightCard);
+
+    return Material(
+      color: backgroundColor,
+      shape: StadiumBorder(
+        side: BorderSide(
+          color: borderColor,
+          width: selected ? 1.5 : 1,
+        ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: mutedColor,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const StadiumBorder(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: PopqSpacing.md,
+            vertical: 10,
           ),
-          const SizedBox(width: PopqSpacing.xs),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: mutedColor,
-                height: 1.4,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (selected) ...[
+                Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: accentColor,
+                ),
+                const SizedBox(width: 4),
+              ],
+              Text(
+                label,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(
+                  color: selected ? accentColor : null,
+                  fontWeight: selected
+                      ? FontWeight.w800
+                      : FontWeight.w600,
+                ),
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
