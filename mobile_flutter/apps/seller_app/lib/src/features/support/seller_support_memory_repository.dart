@@ -27,7 +27,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
         SellerSupportFaq(
           faqId: 3,
           audience: 'SELLER',
-          category: 'APP',
+          category: 'OTHER',
           question: '알림이 오지 않아요.',
           answer: '기기의 알림 권한과 판매자 앱의 알림 설정을 확인해 주세요.',
           displayOrder: 3,
@@ -48,7 +48,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
           ticket: SellerSupportTicketSummary(
             supportTicketId: 1,
             requesterType: 'SELLER',
-            category: SellerSupportCategory.app,
+            category: SellerSupportCategory.other,
             subject: '상품 등록 화면이 열리지 않아요',
             status: SellerSupportStatus.waitingRequester,
             lastMessageAt: DateTime(2026, 8, 13, 14, 30),
@@ -58,7 +58,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
           messages: [
             SellerSupportMessage(
               supportMessageId: 1,
-              senderType: SellerSupportSenderType.seller,
+              senderType: SellerSupportSenderType.requester,
               senderName: '판매자',
               content: '상품 등록 버튼을 누르면 화면이 멈춥니다.',
               createdAt: DateTime(2026, 8, 13, 10),
@@ -87,7 +87,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
           messages: [
             SellerSupportMessage(
               supportMessageId: 3,
-              senderType: SellerSupportSenderType.seller,
+              senderType: SellerSupportSenderType.requester,
               senderName: '판매자',
               content: '매장 등록을 완료했는데 검색 결과에 나오지 않습니다.',
               createdAt: DateTime(2026, 8, 12, 16),
@@ -108,7 +108,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
           messages: [
             SellerSupportMessage(
               supportMessageId: 4,
-              senderType: SellerSupportSenderType.seller,
+              senderType: SellerSupportSenderType.requester,
               senderName: '판매자',
               content: '전화번호를 변경하고 싶습니다.',
               createdAt: DateTime(2026, 8, 9, 9),
@@ -192,7 +192,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
       messages: [
         SellerSupportMessage(
           supportMessageId: messageId,
-          senderType: SellerSupportSenderType.seller,
+          senderType: SellerSupportSenderType.requester,
           senderName: '판매자',
           content: normalizedContent,
           createdAt: now,
@@ -249,7 +249,7 @@ class MemorySellerSupportRepository implements SellerSupportRepository {
         ...current.messages,
         SellerSupportMessage(
           supportMessageId: _nextMessageId++,
-          senderType: SellerSupportSenderType.seller,
+          senderType: SellerSupportSenderType.requester,
           senderName: '판매자',
           content: normalizedContent,
           createdAt: now,

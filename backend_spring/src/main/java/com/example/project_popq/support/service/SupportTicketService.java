@@ -5,6 +5,8 @@ import com.example.project_popq.admin.repository.AdminAuditLogRepository;
 import com.example.project_popq.common.api.PageResponse;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
+import com.example.project_popq.realtime.support.SupportTicketDomainEventPublisher;
+import com.example.project_popq.realtime.support.SupportTicketRealtimeEventType;
 import com.example.project_popq.support.domain.SupportCategory;
 import com.example.project_popq.support.domain.SupportMessage;
 import com.example.project_popq.support.domain.SupportRequesterType;
@@ -34,6 +36,7 @@ public class SupportTicketService {
     private final SupportTicketRepository ticketRepository;
     private final SupportMessageRepository messageRepository;
     private final AdminAuditLogRepository auditLogRepository;
+    private final SupportTicketDomainEventPublisher realtimeEventPublisher;
 
     @Transactional
     public SupportTicketDetailResponse create(
@@ -53,6 +56,12 @@ public class SupportTicketService {
                 ticket, requester, SupportSenderType.REQUESTER, request.content()
         ));
         ticket.messageAdded(SupportSenderType.REQUESTER, now);
+        realtimeEventPublisher.publish(
+            ticket,
+            SupportTicketRealtimeEventType.TICKET_CREATED,
+            SupportSenderType.REQUESTER,
+            now
+        );
         return SupportTicketDetailResponse.of(
                 ticket,
                 java.util.List.of(SupportMessageResponse.from(message))
@@ -96,7 +105,14 @@ public class SupportTicketService {
         messageRepository.save(SupportMessage.create(
                 ticket, requester, SupportSenderType.REQUESTER, request.content()
         ));
-        ticket.messageAdded(SupportSenderType.REQUESTER, Instant.now());
+        Instant now = Instant.now();
+        ticket.messageAdded(SupportSenderType.REQUESTER, now);
+        realtimeEventPublisher.publish(
+            ticket,
+            SupportTicketRealtimeEventType.MESSAGE_ADDED,
+            SupportSenderType.REQUESTER,
+            now
+        );
         return detail(ticket);
     }
 
@@ -164,11 +180,18 @@ public class SupportTicketService {
                 ticket, admin, SupportSenderType.ADMIN, request.content()
         ));
         SupportTicketStatus before = ticket.getStatus();
-        ticket.messageAdded(SupportSenderType.ADMIN, Instant.now());
+        Instant now = Instant.now();
+        ticket.messageAdded(SupportSenderType.ADMIN, now);
         auditLogRepository.save(AdminAuditLog.create(
-                admin, "SUPPORT_TICKET", ticketId, "REPLY",
-                before, ticket.getStatus(), "고객지원 답변"
+            admin, "SUPPORT_TICKET", ticketId, "REPLY",
+            before, ticket.getStatus(), "고객지원 답변"
         ));
+        realtimeEventPublisher.publish(
+            ticket,
+            SupportTicketRealtimeEventType.MESSAGE_ADDED,
+            SupportSenderType.ADMIN,
+            now
+        );
         return detail(ticket);
     }
 
@@ -181,11 +204,18 @@ public class SupportTicketService {
         requireAdmin(admin);
         SupportTicket ticket = findTicket(ticketId);
         SupportTicketStatus before = ticket.getStatus();
+        Instant now = Instant.now();
         ticket.changeStatus(request.status());
         auditLogRepository.save(AdminAuditLog.create(
-                admin, "SUPPORT_TICKET", ticketId, "CHANGE_STATUS",
-                before, request.status(), "문의 상태 변경"
+            admin, "SUPPORT_TICKET", ticketId, "CHANGE_STATUS",
+            before, request.status(), "문의 상태 변경"
         ));
+        realtimeEventPublisher.publish(
+            ticket,
+            SupportTicketRealtimeEventType.STATUS_CHANGED,
+            SupportSenderType.ADMIN,
+            now
+        );
         return detail(ticket);
     }
 

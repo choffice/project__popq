@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+
+import '../../realtime/customer_realtime_scope.dart';
 import 'customer_support_inquiry.dart';
 import 'customer_support_repository.dart';
 import 'customer_support_types.dart';
@@ -28,22 +32,63 @@ class _CustomerSupportInquiryDetailScreenState
   bool _loading = true;
   bool _sending = false;
   String? _errorMessage;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
     _messageController.dispose();
     super.dispose();
   }
-
   @override
   void initState() {
     super.initState();
     _loadDetail();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = CustomerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.ticketId != widget.supportInquiryId) {
+          return;
+        }
+
+        if (event.requesterType != 'CUSTOMER') {
+          return;
+        }
+
+        unawaited(_loadDetail());
+      },
+    );
+  }
+
   Future<void> _loadDetail() async {
+    final showInitialLoading = _detail == null;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -150,12 +195,19 @@ class _CustomerSupportInquiryDetailScreenState
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                _InquiryHeader(inquiry: detail.inquiry),
-                const SizedBox(height: 20),
-                ...detail.messages.map(
-                  (message) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _MessageBubble(message: message),
+                _InquiryHeader(
+                  inquiry: detail.inquiry,
+                  firstMessage:
+                  detail.messages.isEmpty ? null : detail.messages.first,
+                ),
+                const SizedBox(height: 24),
+                _InquiryReplySection(
+                  messages: detail.messages.skip(1).toList(growable: false),
+                  additionalInquiryForm: _MessageComposer(
+                    controller: _messageController,
+                    closed: closed,
+                    sending: _sending,
+                    onSend: _sendMessage,
                   ),
                 ),
                 if (_errorMessage != null) ...[
@@ -171,128 +223,334 @@ class _CustomerSupportInquiryDetailScreenState
             ),
           ),
         ),
-        _MessageComposer(
-          controller: _messageController,
-          closed: closed,
-          sending: _sending,
-          onSend: _sendMessage,
-        ),
       ],
     );
   }
 }
 
 class _InquiryHeader extends StatelessWidget {
-  const _InquiryHeader({required this.inquiry});
+  const _InquiryHeader({
+    required this.inquiry,
+    required this.firstMessage,
+  });
 
   final CustomerSupportInquirySummary inquiry;
+  final CustomerSupportInquiryMessage? firstMessage;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '내가 보낸 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Text(
+                    inquiry.category.label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    inquiry.status.label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               Text(
-                inquiry.category.label,
+                inquiry.title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _formatDateTime(inquiry.createdAt),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Divider(
+                height: 1,
+                color: colorScheme.outlineVariant,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '문의 내용',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const Spacer(),
-              Text(
-                inquiry.status.label,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              const SizedBox(height: 10),
+              SelectableText(
+                firstMessage?.content ?? '등록된 문의 내용이 없습니다.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  height: 1.6,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            inquiry.title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+        ),
+      ],
+    );
+  }
+}
+class _InquiryReplySection extends StatelessWidget {
+  const _InquiryReplySection({
+    required this.messages,
+    required this.additionalInquiryForm,
+  });
+
+  final List<CustomerSupportInquiryMessage> messages;
+  final Widget additionalInquiryForm;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '답변 및 추가 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 8),
-          Text(
-            _formatDateTime(inquiry.createdAt),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colorScheme.outlineVariant,
             ),
           ),
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (messages.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.hourglass_empty_rounded,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '관리자 답변을 기다리고 있어요.',
+                          textAlign: TextAlign.center,
+                          style:
+                          Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: List<Widget>.generate(
+                    messages.length,
+                        (index) {
+                      final message = messages[index];
+
+                      final firstAdminReply = !message.sentByCustomer &&
+                          messages
+                              .take(index)
+                              .where((item) => !item.sentByCustomer)
+                              .isEmpty;
+
+                      final hasCustomerFollowUpBefore = messages
+                          .take(index)
+                          .any((item) => item.sentByCustomer);
+
+                      return _InquiryReplyItem(
+                        message: message,
+                        firstAdminReply: firstAdminReply,
+                        hasCustomerFollowUpBefore: hasCustomerFollowUpBefore,
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 20),
+              additionalInquiryForm,
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
+class _InquiryReplyItem extends StatelessWidget {
+  const _InquiryReplyItem({
+    required this.message,
+    required this.firstAdminReply,
+    required this.hasCustomerFollowUpBefore,
+  });
 
   final CustomerSupportInquiryMessage message;
+  final bool firstAdminReply;
+  final bool hasCustomerFollowUpBefore;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     final sentByCustomer = message.sentByCustomer;
 
-    return Align(
-      alignment: sentByCustomer ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 310),
-        child: Column(
-          crossAxisAlignment: sentByCustomer
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          children: [
-            Text(
-              sentByCustomer ? '나' : 'POPQ 고객센터',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+    final title = sentByCustomer
+        ? '내가 한 추가 문의'
+        : firstAdminReply
+        ? '관리자 답변'
+        : '관리자 추가 답변';
+
+    final icon = sentByCustomer
+        ? Icons.person_outline_rounded
+        : Icons.support_agent_rounded;
+
+    final accentColor =
+    sentByCustomer ? colorScheme.tertiary : colorScheme.primary;
+
+    final leftPadding = sentByCustomer
+        ? 20.0
+        : hasCustomerFollowUpBefore
+        ? 40.0
+        : 0.0;
+
+    return Padding(
+      padding: EdgeInsets.only(left: leftPadding),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (leftPadding > 0) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Icon(
+                Icons.subdirectory_arrow_right_rounded,
+                size: 22,
                 color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-              decoration: BoxDecoration(
-                color: sentByCustomer
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(16),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 16,
               ),
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  color: sentByCustomer
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurface,
-                  height: 1.45,
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor:
+                      accentColor.withValues(alpha: 0.12),
+                      foregroundColor: accentColor,
+                      child: Icon(
+                        icon,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleSmall
+                                      ?.copyWith(
+                                    color: accentColor,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _formatDateTime(message.createdAt),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                  color:
+                                  colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SelectableText(
+                            message.content,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                              height: 1.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              _formatDateTime(message.createdAt),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -346,55 +604,88 @@ class _MessageComposerState extends State<_MessageComposer> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     final canSend =
         !widget.closed &&
-        !widget.sending &&
-        widget.controller.text.trim().isNotEmpty;
+            !widget.sending &&
+            widget.controller.text.trim().isNotEmpty;
 
-    return Material(
-      elevation: 8,
-      color: Theme.of(context).colorScheme.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-          child: widget.closed
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Center(child: Text('종료된 문의입니다.')),
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: widget.controller,
-                        enabled: !widget.sending,
-                        minLines: 1,
-                        maxLines: 4,
-                        maxLength: 3000,
-                        decoration: const InputDecoration(
-                          hintText: '추가로 문의할 내용을 입력하세요',
-                          counterText: '',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      onPressed: canSend ? widget.onSend : null,
-                      tooltip: '보내기',
-                      icon: widget.sending
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.send_rounded),
-                    ),
-                  ],
-                ),
+    if (widget.closed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '추가 문의',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 18,
+            ),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '종료된 문의에는 추가 문의를 등록할 수 없어요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '추가 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
-      ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: widget.controller,
+          enabled: !widget.sending,
+          minLines: 4,
+          maxLines: 7,
+          maxLength: 4000,
+          keyboardType: TextInputType.multiline,
+          textInputAction: TextInputAction.newline,
+          decoration: const InputDecoration(
+            hintText: '추가로 문의할 내용을 입력해 주세요.',
+            alignLabelWithHint: true,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: FilledButton(
+            onPressed: canSend ? widget.onSend : null,
+            child: widget.sending
+                ? SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.onPrimary,
+              ),
+            )
+                : const Text('등록'),
+          ),
+        ),
+      ],
     );
   }
 }

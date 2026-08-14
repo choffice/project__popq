@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+
+import '../../realtime/seller_realtime_scope.dart';
 import 'seller_support_repository.dart';
 import 'seller_support_ticket.dart';
 import 'seller_support_types.dart';
@@ -30,6 +34,8 @@ class _SellerSupportTicketDetailScreenState
   bool _loading = true;
   bool _sending = false;
   String? _errorMessage;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void initState() {
@@ -39,7 +45,38 @@ class _SellerSupportTicketDetailScreenState
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = SellerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.ticketId != widget.supportTicketId) {
+          return;
+        }
+
+        unawaited(_loadDetail());
+      },
+    );
+  }
+
+  @override
   void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
     _messageController.removeListener(_handleMessageChanged);
     _messageController.dispose();
     super.dispose();

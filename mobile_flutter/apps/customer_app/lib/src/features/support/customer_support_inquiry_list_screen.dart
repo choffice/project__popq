@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+
+import '../../realtime/customer_realtime_scope.dart';
 import 'customer_support_inquiry.dart';
 import 'customer_support_repository.dart';
 import 'customer_support_types.dart';
@@ -25,7 +29,11 @@ class _CustomerSupportInquiryListScreenState
   List<CustomerSupportInquirySummary> _inquiries = const [];
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
+
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void initState() {
@@ -33,9 +41,50 @@ class _CustomerSupportInquiryListScreenState
     _loadInquiries();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = CustomerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.requesterType != 'CUSTOMER') {
+          return;
+        }
+
+        unawaited(_loadInquiries());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    super.dispose();
+  }
+
   Future<void> _loadInquiries() async {
+    final showInitialLoading = !_hasLoadedOnce;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -49,6 +98,7 @@ class _CustomerSupportInquiryListScreenState
       setState(() {
         _inquiries = inquiries;
         _loading = false;
+        _hasLoadedOnce = true;
       });
     } catch (_) {
       if (!mounted) {
@@ -57,6 +107,7 @@ class _CustomerSupportInquiryListScreenState
 
       setState(() {
         _loading = false;
+        _hasLoadedOnce = true;
         _errorMessage = '문의 내역을 불러오지 못했어요.';
       });
     }
@@ -75,8 +126,8 @@ class _CustomerSupportInquiryListScreenState
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_errorMessage != null) {
-      return _InquiryListMessage(
+    if (_errorMessage != null && _inquiries.isEmpty) {
+        return _InquiryListMessage(
         icon: Icons.error_outline_rounded,
         message: _errorMessage!,
         buttonLabel: '다시 시도',
@@ -216,20 +267,20 @@ class _StatusChip extends StatelessWidget {
 
     final (backgroundColor, foregroundColor) = switch (status) {
       CustomerSupportStatus.received => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
+      colorScheme.secondaryContainer,
+      colorScheme.onSecondaryContainer,
       ),
-      CustomerSupportStatus.inProgress => (
-        colorScheme.tertiaryContainer,
-        colorScheme.onTertiaryContainer,
+      CustomerSupportStatus.waitingAdmin => (
+      colorScheme.tertiaryContainer,
+      colorScheme.onTertiaryContainer,
       ),
-      CustomerSupportStatus.answered => (
-        colorScheme.primaryContainer,
-        colorScheme.onPrimaryContainer,
+      CustomerSupportStatus.waitingRequester => (
+      colorScheme.primaryContainer,
+      colorScheme.onPrimaryContainer,
       ),
       CustomerSupportStatus.closed => (
-        colorScheme.surfaceContainerHighest,
-        colorScheme.onSurfaceVariant,
+      colorScheme.surfaceContainerHighest,
+      colorScheme.onSurfaceVariant,
       ),
     };
 

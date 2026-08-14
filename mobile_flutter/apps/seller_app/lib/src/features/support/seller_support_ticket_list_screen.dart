@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+
+import '../../realtime/seller_realtime_scope.dart';
 import 'seller_support_repository.dart';
 import 'seller_support_ticket.dart';
 import 'seller_support_types.dart';
@@ -25,11 +29,45 @@ class _SellerSupportTicketListScreenState
   List<SellerSupportTicketSummary> _tickets = const [];
   bool _loading = true;
   String? _errorMessage;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadTickets();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = SellerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (_) {
+        unawaited(_loadTickets());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    super.dispose();
   }
 
   Future<void> _loadTickets() async {
