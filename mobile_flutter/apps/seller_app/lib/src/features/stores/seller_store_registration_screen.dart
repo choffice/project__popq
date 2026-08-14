@@ -13,17 +13,14 @@ import 'seller_store_location_picker_screen.dart';
 import 'seller_local_file_image_io.dart'
     if (dart.library.html) 'seller_local_file_image_web.dart';
 import 'seller_phone_input.dart';
+import 'seller_event_name_autocomplete.dart';
 import 'seller_store_repository.dart';
 import 'seller_store_selection_controller.dart';
 import 'seller_tag_editor.dart';
 import '../auth/seller_identity_repository.dart';
 import 'package:geolocator/geolocator.dart';
 
-enum _ImportedValueChoice {
-  current,
-  imported,
-  manual,
-}
+enum _ImportedValueChoice { current, imported, manual }
 
 class _ImportedStoreInformation {
   const _ImportedStoreInformation({
@@ -58,10 +55,7 @@ class _SelectedStoreLocation {
 }
 
 class _DeviceLocation {
-  const _DeviceLocation({
-    required this.latitude,
-    required this.longitude,
-  });
+  const _DeviceLocation({required this.latitude, required this.longitude});
 
   final double latitude;
   final double longitude;
@@ -86,6 +80,10 @@ class SellerStoreRegistrationScreen extends StatefulWidget {
 
 class _SellerStoreRegistrationScreenState
     extends State<SellerStoreRegistrationScreen> {
+  static const double _eventSuggestionRadiusKm = 10;
+  static const Duration _eventSuggestionDebounceDuration = Duration(
+    milliseconds: 300,
+  );
   static const List<String> _categories = [
     '카페',
     '디저트',
@@ -107,23 +105,21 @@ class _SellerStoreRegistrationScreenState
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _nameController =
-  TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
 
-  final TextEditingController _addressController =
-  TextEditingController();
+  final TextEditingController _addressController = TextEditingController();
 
   final TextEditingController _detailAddressController =
-  TextEditingController();
+      TextEditingController();
 
-  final TextEditingController _phoneController =
-  TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
-  final TextEditingController _descriptionController =
-  TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
 
-  final TextEditingController _imageUrlController =
-  TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController();
+
+  final TextEditingController _eventNameController = TextEditingController();
+  final FocusNode _eventNameFocusNode = FocusNode();
 
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -132,13 +128,26 @@ class _SellerStoreRegistrationScreenState
 
   bool _pickingRepresentativeImage = false;
 
-  final BusinessRegistrationOcrService
-  _businessRegistrationOcrService =
-  BusinessRegistrationOcrService();
+  final BusinessRegistrationOcrService _businessRegistrationOcrService =
+      BusinessRegistrationOcrService();
 
   bool _recognizingBusinessRegistration = false;
 
-  _SelectedStoreLocation? _selectedStoreLocation;
+  _SelectedStoreLocation? _selectedStoreLocationValue;
+  Timer? _eventSuggestionDebounce;
+  int _eventSuggestionRequestSerial = 0;
+  List<SellerNearbyEventSuggestion> _eventSuggestions =
+      const <SellerNearbyEventSuggestion>[];
+  bool _loadingEventSuggestions = false;
+  String? _eventSuggestionError;
+
+  _SelectedStoreLocation? get _selectedStoreLocation =>
+      _selectedStoreLocationValue;
+
+  set _selectedStoreLocation(_SelectedStoreLocation? value) {
+    _selectedStoreLocationValue = value;
+    _scheduleEventSuggestionRefresh(value);
+  }
 
   bool _searchingAddressLocation = false;
 
@@ -170,20 +179,17 @@ class _SellerStoreRegistrationScreenState
   @override
   void initState() {
     super.initState();
+    _operationStartDate = _todayInSeoul();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-          (Duration _) async {
-        await _recoverLostRepresentativeImage();
+    WidgetsBinding.instance.addPostFrameCallback((Duration _) async {
+      await _recoverLostRepresentativeImage();
 
-        if (!mounted) {
-          return;
-        }
+      if (!mounted) {
+        return;
+      }
 
-        await _loadCurrentDeviceLocation(
-          requestPermission: false,
-        );
-      },
-    );
+      await _loadCurrentDeviceLocation(requestPermission: false);
+    });
   }
 
   @override
@@ -194,6 +200,9 @@ class _SellerStoreRegistrationScreenState
     _phoneController.dispose();
     _descriptionController.dispose();
     _imageUrlController.dispose();
+    _eventSuggestionDebounce?.cancel();
+    _eventNameController.dispose();
+    _eventNameFocusNode.dispose();
     super.dispose();
   }
 
@@ -202,89 +211,53 @@ class _SellerStoreRegistrationScreenState
     return PopScope<Object?>(
       canPop: !_submitting || _registrationCompleted,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('새 사업장 등록'),
-        ),
+        appBar: AppBar(title: const Text('새 사업장 등록')),
         body: Form(
           key: _formKey,
-          autovalidateMode:
-          AutovalidateMode.onUserInteraction,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: ListView(
-            padding: const EdgeInsets.all(
-              PopqSpacing.lg,
-            ),
+            padding: const EdgeInsets.all(PopqSpacing.lg),
             children: [
               Text(
                 '사업장 기본 정보',
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
+              const SizedBox(height: PopqSpacing.sm),
               Text(
                 '고객에게 공개될 사업장 정보를 입력해 주세요.',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(
-                height: PopqSpacing.lg,
-              ),
+              const SizedBox(height: PopqSpacing.lg),
 
               _buildInformationImportCard(context),
 
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
+              const SizedBox(height: PopqSpacing.md),
 
               _buildBasicInformationCard(context),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
-              _buildOperationPeriodCard(context),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
+              const SizedBox(height: PopqSpacing.md),
+              if (_storeType == 'EVENT_COMMERCE')
+                _buildEventInformationCard(context)
+              else
+                _buildOperationPeriodCard(context),
+              const SizedBox(height: PopqSpacing.md),
               _buildOperatingHoursCard(context),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
+              const SizedBox(height: PopqSpacing.md),
               _buildOrderPolicyCard(context),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
+              const SizedBox(height: PopqSpacing.md),
               _buildTagCard(context),
-              const SizedBox(
-                height: PopqSpacing.xl,
-              ),
+              const SizedBox(height: PopqSpacing.xl),
               FilledButton.icon(
-                key: const Key(
-                  'submit-store-registration',
-                ),
-                onPressed:
-                _submitting ? null : _submit,
+                key: const Key('submit-store-registration'),
+                onPressed: _submitting ? null : _submit,
                 icon: _submitting
                     ? const SizedBox.square(
-                  dimension: 20,
-                  child:
-                  CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Icon(
-                  Icons.add_business_rounded,
-                ),
-                label: Text(
-                  _submitting
-                      ? '등록 요청 중...'
-                      : '사업장 등록',
-                ),
+                        dimension: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add_business_rounded),
+                label: Text(_submitting ? '등록 요청 중...' : '사업장 등록'),
               ),
-              const SizedBox(
-                height: PopqSpacing.lg,
-              ),
+              const SizedBox(height: PopqSpacing.lg),
             ],
           ),
         ),
@@ -292,57 +265,34 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildInformationImportCard(
-      BuildContext context,
-      ) {
+  Widget _buildInformationImportCard(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
+        padding: const EdgeInsets.all(PopqSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '사업장 정보 자동 입력',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            Text('사업장 정보 자동 입력', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: PopqSpacing.sm),
             Text(
               '사업자등록증을 촬영하거나 카카오맵에 등록된 업체 정보를 불러올 수 있습니다.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
 
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                key: const Key(
-                  'import-business-registration',
-                ),
-                onPressed:
-                _submitting ||
-                    _recognizingBusinessRegistration
+                key: const Key('import-business-registration'),
+                onPressed: _submitting || _recognizingBusinessRegistration
                     ? null
                     : _openBusinessRegistrationImport,
                 icon: _recognizingBusinessRegistration
                     ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Icon(
-                  Icons.document_scanner_outlined,
-                ),
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.document_scanner_outlined),
                 label: Text(
                   _recognizingBusinessRegistration
                       ? '사업자등록증 인식 중...'
@@ -351,48 +301,32 @@ class _SellerStoreRegistrationScreenState
               ),
             ),
 
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
 
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                key: const Key(
-                  'import-kakao-place',
-                ),
-                onPressed:
-                _submitting ||
-                    _searchingKakaoPlace
+                key: const Key('import-kakao-place'),
+                onPressed: _submitting || _searchingKakaoPlace
                     ? null
                     : _openKakaoPlaceImport,
                 icon: _searchingKakaoPlace
                     ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                  ),
-                )
-                    : const Icon(
-                  Icons.map_outlined,
-                ),
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.map_outlined),
                 label: Text(
-                  _searchingKakaoPlace
-                      ? '카카오맵 업체 검색 중...'
-                      : '카카오맵 업체 정보 불러오기',
+                  _searchingKakaoPlace ? '카카오맵 업체 검색 중...' : '카카오맵 업체 정보 불러오기',
                 ),
               ),
             ),
 
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
 
             Text(
               '불러온 정보는 등록 전에 직접 확인하고 수정할 수 있습니다.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
@@ -400,34 +334,20 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildBasicInformationCard(
-      BuildContext context,
-      ) {
+  Widget _buildBasicInformationCard(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
+        padding: const EdgeInsets.all(PopqSpacing.md),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '기본 정보',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            Text('기본 정보', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: PopqSpacing.md),
             DropdownButtonFormField<String>(
               initialValue: _storeType,
               decoration: const InputDecoration(
                 labelText: '사업장 유형',
-                prefixIcon: Icon(
-                  Icons.category_outlined,
-                ),
+                prefixIcon: Icon(Icons.category_outlined),
               ),
               items: const [
                 DropdownMenuItem<String>(
@@ -442,65 +362,56 @@ class _SellerStoreRegistrationScreenState
               onChanged: _submitting
                   ? null
                   : (String? value) {
-                if (value == null) {
-                  return;
-                }
+                      if (value == null) {
+                        return;
+                      }
 
-                setState(() {
-                  _storeType = value;
-                });
-              },
+                      setState(() {
+                        _storeType = value;
+                        if (value == 'LOCAL_STORE') {
+                          _eventNameController.clear();
+                        }
+                        _scheduleEventSuggestionRefresh(_selectedStoreLocation);
+                      });
+                    },
             ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
             TextFormField(
               key: const Key('store-name'),
               controller: _nameController,
               enabled: !_submitting,
               maxLength: 150,
-              textInputAction:
-              TextInputAction.next,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: '사업장명',
                 hintText: '예: 서면 포포분식',
-                prefixIcon: Icon(
-                  Icons.storefront_outlined,
-                ),
+                prefixIcon: Icon(Icons.storefront_outlined),
               ),
               validator: (String? value) {
-                if (value == null ||
-                    value.trim().isEmpty) {
+                if (value == null || value.trim().isEmpty) {
                   return '사업장명을 입력해 주세요.';
                 }
 
                 return null;
               },
             ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
             DropdownButtonFormField<String>(
-              initialValue:
-              _representativeCategory,
+              initialValue: _representativeCategory,
               decoration: const InputDecoration(
                 labelText: '대표 카테고리',
-                prefixIcon: Icon(
-                  Icons.restaurant_menu_rounded,
-                ),
+                prefixIcon: Icon(Icons.restaurant_menu_rounded),
               ),
               items: _categories
                   .map(
-                    (String category) =>
-                    DropdownMenuItem<String>(
+                    (String category) => DropdownMenuItem<String>(
                       value: category,
                       child: Text(category),
                     ),
-              )
+                  )
                   .toList(),
               validator: (String? value) {
-                if (value == null ||
-                    value.isEmpty) {
+                if (value == null || value.isEmpty) {
                   return '대표 카테고리를 선택해 주세요.';
                 }
 
@@ -509,40 +420,31 @@ class _SellerStoreRegistrationScreenState
               onChanged: _submitting
                   ? null
                   : (String? value) {
-                setState(() {
-                  _representativeCategory =
-                      value;
-                });
-              },
+                      setState(() {
+                        _representativeCategory = value;
+                      });
+                    },
             ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
             TextFormField(
               controller: _addressController,
               enabled: !_submitting,
               maxLength: 255,
-              textInputAction:
-              TextInputAction.next,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: '주소',
-                hintText:
-                '예: 부산광역시 부산진구 중앙대로 123',
-                prefixIcon: Icon(
-                  Icons.location_on_outlined,
-                ),
+                hintText: '예: 부산광역시 부산진구 중앙대로 123',
+                prefixIcon: Icon(Icons.location_on_outlined),
               ),
               validator: (String? value) {
-                if (value == null ||
-                    value.trim().isEmpty) {
+                if (value == null || value.trim().isEmpty) {
                   return '주소를 입력해 주세요.';
                 }
 
                 return null;
               },
               onChanged: (String value) {
-                final _SelectedStoreLocation?
-                selectedLocation =
+                final _SelectedStoreLocation? selectedLocation =
                     _selectedStoreLocation;
 
                 if (selectedLocation == null) {
@@ -550,12 +452,8 @@ class _SellerStoreRegistrationScreenState
                 }
 
                 final bool stillMatches =
-                    _normalizeComparisonText(
-                      value,
-                    ) ==
-                        _normalizeComparisonText(
-                          selectedLocation.address,
-                        );
+                    _normalizeComparisonText(value) ==
+                    _normalizeComparisonText(selectedLocation.address);
 
                 if (stillMatches) {
                   return;
@@ -566,92 +464,59 @@ class _SellerStoreRegistrationScreenState
                 });
               },
             ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
             TextFormField(
-              controller:
-              _detailAddressController,
+              controller: _detailAddressController,
               enabled: !_submitting,
               maxLength: 255,
-              textInputAction:
-              TextInputAction.next,
+              textInputAction: TextInputAction.next,
               decoration: const InputDecoration(
                 labelText: '상세 주소',
-                hintText:
-                '예: 포포빌딩 1층 101호',
-                prefixIcon: Icon(
-                  Icons.maps_home_work_outlined,
-                ),
+                hintText: '예: 포포빌딩 1층 101호',
+                prefixIcon: Icon(Icons.maps_home_work_outlined),
               ),
-              validator: (String? value) {
-                if (value == null ||
-                    value.trim().isEmpty) {
-                  return '상세 주소를 입력해 주세요.';
-                }
-
-                return null;
-              },
             ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
 
             _buildStoreLocationSection(context),
 
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
             SellerPhoneInput(
               controller: _phoneController,
               enabled: !_submitting,
               identityRepository: widget.identityRepository,
               validator: (String? value) {
-                final String phone =
-                    value?.trim() ?? '';
+                final String phone = value?.trim() ?? '';
 
                 if (phone.isEmpty) {
                   return '사업장 연락처를 입력해 주세요.';
                 }
 
-                final RegExp validCharacters =
-                RegExp(
-                  r'^[0-9+\-()\s]+$',
-                );
+                final RegExp validCharacters = RegExp(r'^[0-9+\-()\s]+$');
 
-                if (!validCharacters
-                    .hasMatch(phone)) {
+                if (!validCharacters.hasMatch(phone)) {
                   return '연락처 형식을 확인해 주세요.';
                 }
 
                 return null;
               },
             ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
             TextFormField(
-              controller:
-              _descriptionController,
+              controller: _descriptionController,
               enabled: !_submitting,
               maxLength: 1000,
               minLines: 3,
               maxLines: 5,
-              textInputAction:
-              TextInputAction.newline,
+              textInputAction: TextInputAction.newline,
               decoration: const InputDecoration(
                 labelText: '사업장 설명',
-                hintText:
-                '사업장의 특징과 주요 판매 상품을 소개해 주세요.',
+                hintText: '사업장의 특징과 주요 판매 상품을 소개해 주세요.',
                 alignLabelWithHint: true,
-                prefixIcon: Icon(
-                  Icons.description_outlined,
-                ),
+                prefixIcon: Icon(Icons.description_outlined),
               ),
             ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            const SizedBox(height: PopqSpacing.sm),
             _buildRepresentativeImageSection(context),
           ],
         ),
@@ -659,187 +524,126 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildRepresentativeImageSection(
-      BuildContext context,
-      ) {
-    final XFile? selectedImage =
-        _selectedRepresentativeImage;
+  Widget _buildRepresentativeImageSection(BuildContext context) {
+    final XFile? selectedImage = _selectedRepresentativeImage;
 
-    final bool imageActionDisabled =
-        _submitting ||
-            _pickingRepresentativeImage;
+    final bool imageActionDisabled = _submitting || _pickingRepresentativeImage;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '대표 이미지',
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium,
-        ),
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        Text('대표 이미지', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: PopqSpacing.sm),
         Text(
           '카메라로 촬영하거나 갤러리에서 사업장 대표 사진을 선택해 주세요.',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(
-          height: PopqSpacing.md,
-        ),
+        const SizedBox(height: PopqSpacing.md),
         AspectRatio(
           aspectRatio: 16 / 9,
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: selectedImage == null
                 ? DecoratedBox(
-              decoration: BoxDecoration(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-              ),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.add_photo_alternate_outlined,
-                      size: 48,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
+                    decoration: BoxDecoration(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                     ),
-                    const SizedBox(
-                      height: PopqSpacing.sm,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate_outlined,
+                            size: 48,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(height: PopqSpacing.sm),
+                          Text(
+                            '선택된 대표 사진이 없습니다.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
                     ),
-                    Text(
-                      '선택된 대표 사진이 없습니다.',
-                      style: Theme.of(context)
-                          .textTheme
-                          .bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-            )
+                  )
                 : kIsWeb
                 ? Image.memory(
-              _selectedRepresentativeImageBytes!,
-              width: double.infinity,
-              fit: BoxFit.cover,
-            )
+                    _selectedRepresentativeImageBytes!,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  )
                 : buildSellerLocalFileImage(
-              selectedImage.path,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              errorBuilder: (
-                  BuildContext context,
-                  Object error,
-                  StackTrace? stackTrace,
-                  ) {
-                return const Center(
-                  child: Text(
-                    '이미지를 표시하지 못했습니다.',
+                    selectedImage.path,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder:
+                        (
+                          BuildContext context,
+                          Object error,
+                          StackTrace? stackTrace,
+                        ) {
+                          return const Center(child: Text('이미지를 표시하지 못했습니다.'));
+                        },
                   ),
-                );
-              },
-            ),
           ),
         ),
-        const SizedBox(
-          height: PopqSpacing.md,
-        ),
+        const SizedBox(height: PopqSpacing.md),
         Row(
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                key: const Key(
-                  'take-representative-image',
-                ),
+                key: const Key('take-representative-image'),
                 onPressed: imageActionDisabled
                     ? null
                     : () {
-                  _pickRepresentativeImage(
-                    ImageSource.camera,
-                  );
-                },
-                icon: const Icon(
-                  Icons.photo_camera_outlined,
-                ),
-                label: const Text(
-                  '카메라 촬영',
-                ),
+                        _pickRepresentativeImage(ImageSource.camera);
+                      },
+                icon: const Icon(Icons.photo_camera_outlined),
+                label: const Text('카메라 촬영'),
               ),
             ),
-            const SizedBox(
-              width: PopqSpacing.sm,
-            ),
+            const SizedBox(width: PopqSpacing.sm),
             Expanded(
               child: OutlinedButton.icon(
-                key: const Key(
-                  'select-representative-image',
-                ),
+                key: const Key('select-representative-image'),
                 onPressed: imageActionDisabled
                     ? null
                     : () {
-                  _pickRepresentativeImage(
-                    ImageSource.gallery,
-                  );
-                },
-                icon: const Icon(
-                  Icons.photo_library_outlined,
-                ),
-                label: const Text(
-                  '갤러리 선택',
-                ),
+                        _pickRepresentativeImage(ImageSource.gallery);
+                      },
+                icon: const Icon(Icons.photo_library_outlined),
+                label: const Text('갤러리 선택'),
               ),
             ),
           ],
         ),
         if (_pickingRepresentativeImage) ...[
-          const SizedBox(
-            height: PopqSpacing.sm,
-          ),
+          const SizedBox(height: PopqSpacing.sm),
           const LinearProgressIndicator(),
         ],
         if (selectedImage != null) ...[
-          const SizedBox(
-            height: PopqSpacing.sm,
-          ),
+          const SizedBox(height: PopqSpacing.sm),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: _submitting
-                  ? null
-                  : _removeRepresentativeImage,
-              icon: const Icon(
-                Icons.delete_outline_rounded,
-              ),
-              label: const Text(
-                '선택한 사진 제거',
-              ),
+              onPressed: _submitting ? null : _removeRepresentativeImage,
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('선택한 사진 제거'),
             ),
           ),
         ],
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        const SizedBox(height: PopqSpacing.sm),
         Text(
           '선택한 사진은 사업장 등록 시 서버에 업로드됩니다.',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(
-          height: PopqSpacing.md,
-        ),
+        const SizedBox(height: PopqSpacing.md),
         const Divider(),
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        const SizedBox(height: PopqSpacing.sm),
         TextFormField(
           controller: _imageUrlController,
           enabled: !_submitting,
@@ -849,30 +653,22 @@ class _SellerStoreRegistrationScreenState
           decoration: const InputDecoration(
             labelText: '대표 이미지 URL',
             hintText: 'https://example.com/store.jpg',
-            prefixIcon: Icon(
-              Icons.link_rounded,
-            ),
-            helperText:
-            '사진을 선택하지 않은 경우에만 이 URL을 사용합니다.',
+            prefixIcon: Icon(Icons.link_rounded),
+            helperText: '사진을 선택하지 않은 경우에만 이 URL을 사용합니다.',
           ),
           validator: (String? value) {
-            final String imageUrl =
-                value?.trim() ?? '';
+            final String imageUrl = value?.trim() ?? '';
 
             if (imageUrl.isEmpty) {
               return null;
             }
 
-            final Uri? uri =
-            Uri.tryParse(imageUrl);
+            final Uri? uri = Uri.tryParse(imageUrl);
 
             final bool validScheme =
-                uri?.scheme == 'http' ||
-                    uri?.scheme == 'https';
+                uri?.scheme == 'http' || uri?.scheme == 'https';
 
-            if (uri == null ||
-                !validScheme ||
-                uri.host.isEmpty) {
+            if (uri == null || !validScheme || uri.host.isEmpty) {
               return '올바른 이미지 URL을 입력해 주세요.';
             }
 
@@ -883,42 +679,25 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildStoreLocationSection(
-      BuildContext context,
-      ) {
-    final _SelectedStoreLocation? location =
-        _selectedStoreLocation;
+  Widget _buildStoreLocationSection(BuildContext context) {
+    final _SelectedStoreLocation? location = _selectedStoreLocation;
 
-    final ColorScheme colorScheme =
-        Theme.of(context).colorScheme;
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '지도 위치',
-          style: Theme.of(context)
-              .textTheme
-              .titleMedium,
-        ),
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        Text('지도 위치', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: PopqSpacing.sm),
         Text(
           '고객 탐색 지도에 표시할 정확한 사업장 위치를 선택해 주세요.',
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall,
+          style: Theme.of(context).textTheme.bodySmall,
         ),
-        const SizedBox(
-          height: PopqSpacing.md,
-        ),
+        const SizedBox(height: PopqSpacing.md),
 
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(
-            PopqSpacing.md,
-          ),
+          padding: const EdgeInsets.all(PopqSpacing.md),
           decoration: BoxDecoration(
             color: location == null
                 ? colorScheme.surfaceContainerHighest
@@ -932,205 +711,126 @@ class _SellerStoreRegistrationScreenState
           ),
           child: location == null
               ? const Row(
-            children: [
-              Icon(
-                Icons.location_off_outlined,
-              ),
-              SizedBox(
-                width: PopqSpacing.sm,
-              ),
-              Expanded(
-                child: Text(
-                  '아직 지도 위치가 확정되지 않았습니다.',
-                ),
-              ),
-            ],
-          )
+                  children: [
+                    Icon(Icons.location_off_outlined),
+                    SizedBox(width: PopqSpacing.sm),
+                    Expanded(child: Text('아직 지도 위치가 확정되지 않았습니다.')),
+                  ],
+                )
               : Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on_rounded,
-                  ),
-                  const SizedBox(
-                    width: PopqSpacing.sm,
-                  ),
-                  Expanded(
-                    child: Text(
-                      '위치 선택 완료',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded),
+                        const SizedBox(width: PopqSpacing.sm),
+                        Expanded(
+                          child: Text(
+                            '위치 선택 완료',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(
-                height: PopqSpacing.sm,
-              ),
-              Text(
-                location.address,
-              ),
-              const SizedBox(
-                height: PopqSpacing.xs,
-              ),
-              Text(
-                '위도 ${location.latitude.toStringAsFixed(6)} · '
-                    '경도 ${location.longitude.toStringAsFixed(6)}',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall,
-              ),
-              const SizedBox(
-                height: PopqSpacing.xs,
-              ),
-              Text(
-                '선택 방식: ${location.sourceLabel}',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall,
-              ),
-            ],
-          ),
+                    const SizedBox(height: PopqSpacing.sm),
+                    Text(location.address),
+                    const SizedBox(height: PopqSpacing.xs),
+                    Text(
+                      '위도 ${location.latitude.toStringAsFixed(6)} · '
+                      '경도 ${location.longitude.toStringAsFixed(6)}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    const SizedBox(height: PopqSpacing.xs),
+                    Text(
+                      '선택 방식: ${location.sourceLabel}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
         ),
 
-        const SizedBox(
-          height: PopqSpacing.md,
-        ),
+        const SizedBox(height: PopqSpacing.md),
 
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            key: const Key(
-              'search-location-by-address',
-            ),
-            onPressed:
-            _submitting ||
-                _searchingAddressLocation
+            key: const Key('search-location-by-address'),
+            onPressed: _submitting || _searchingAddressLocation
                 ? null
                 : _prepareAddressLocationSearch,
             icon: _searchingAddressLocation
                 ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            )
-                : const Icon(
-              Icons.manage_search_rounded,
-            ),
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.manage_search_rounded),
             label: Text(
-              _searchingAddressLocation
-                  ? '주소 검색 중...'
-                  : '입력한 주소로 위치 찾기',
+              _searchingAddressLocation ? '주소 검색 중...' : '입력한 주소로 위치 찾기',
             ),
           ),
         ),
 
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        const SizedBox(height: PopqSpacing.sm),
 
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            key: const Key(
-              'load-current-location',
-            ),
-            onPressed:
-            _submitting ||
-                _loadingCurrentLocation
+            key: const Key('load-current-location'),
+            onPressed: _submitting || _loadingCurrentLocation
                 ? null
                 : () {
-              _loadCurrentDeviceLocation(
-                requestPermission: true,
-              );
-            },
+                    _loadCurrentDeviceLocation(requestPermission: true);
+                  },
             icon: _loadingCurrentLocation
                 ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-              ),
-            )
-                : const Icon(
-              Icons.my_location_rounded,
-            ),
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.my_location_rounded),
             label: Text(
-              _loadingCurrentLocation
-                  ? '현재 위치 확인 중...'
-                  : '현재 위치 불러오기',
+              _loadingCurrentLocation ? '현재 위치 확인 중...' : '현재 위치 불러오기',
             ),
           ),
         ),
 
         if (_currentLocationMessage != null) ...[
-          const SizedBox(
-            height: PopqSpacing.xs,
-          ),
+          const SizedBox(height: PopqSpacing.xs),
           Text(
             _currentLocationMessage!,
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
 
         if (_currentDeviceLocation != null) ...[
-          const SizedBox(
-            height: PopqSpacing.xs,
-          ),
+          const SizedBox(height: PopqSpacing.xs),
           Text(
             '현재 위치: '
-                '${_currentDeviceLocation!.latitude.toStringAsFixed(6)}, '
-                '${_currentDeviceLocation!.longitude.toStringAsFixed(6)}',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall,
+            '${_currentDeviceLocation!.latitude.toStringAsFixed(6)}, '
+            '${_currentDeviceLocation!.longitude.toStringAsFixed(6)}',
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
 
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
+        const SizedBox(height: PopqSpacing.sm),
 
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
-            key: const Key(
-              'select-location-on-map',
-            ),
-            onPressed: _submitting
-                ? null
-                : _prepareMapLocationSelection,
-            icon: const Icon(
-              Icons.map_outlined,
-            ),
-            label: const Text(
-              '지도에서 직접 위치 선택',
-            ),
+            key: const Key('select-location-on-map'),
+            onPressed: _submitting ? null : _prepareMapLocationSelection,
+            icon: const Icon(Icons.map_outlined),
+            label: const Text('지도에서 직접 위치 선택'),
           ),
         ),
 
         if (location != null) ...[
-          const SizedBox(
-            height: PopqSpacing.sm,
-          ),
+          const SizedBox(height: PopqSpacing.sm),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              onPressed: _submitting
-                  ? null
-                  : _clearSelectedStoreLocation,
-              icon: const Icon(
-                Icons.refresh_rounded,
-              ),
-              label: const Text(
-                '위치 다시 선택',
-              ),
+              onPressed: _submitting ? null : _clearSelectedStoreLocation,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('위치 다시 선택'),
             ),
           ),
         ],
@@ -1138,36 +838,20 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildOperatingHoursCard(
-      BuildContext context,
-      ) {
+  Widget _buildOperatingHoursCard(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
+        padding: const EdgeInsets.all(PopqSpacing.md),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '영업 정보',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            Text('영업 정보', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: PopqSpacing.sm),
             Text(
               '야간 영업처럼 종료 시간이 다음 날이어도 등록할 수 있습니다.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall,
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-            const SizedBox(
-              height: PopqSpacing.md,
-            ),
+            const SizedBox(height: PopqSpacing.md),
             SellerBusinessScheduleEditor(
               initialSchedule: _schedule,
               enabled: !_submitting,
@@ -1179,28 +863,37 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildOperationPeriodCard(BuildContext context) {
-    final bool eventStore = _storeType == 'EVENT_COMMERCE';
+  Widget _buildEventInformationCard(BuildContext context) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(PopqSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              eventStore ? '행사 운영 기간' : '영업 시작일',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
+            Text('행사 정보', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: PopqSpacing.sm),
             Text(
-              eventStore
-                  ? '행사 시작일과 종료일을 선택해 주세요.'
-                  : '정식 영업 시작일을 선택할 수 있습니다. 종료일은 선택 사항입니다.',
+              _selectedStoreLocation == null
+                  ? '위치를 선택하면 반경 10km 안의 활성 행사를 추천합니다. 직접 입력도 가능합니다.'
+                  : '반경 10km 안의 활성 행사를 선택하거나 새 행사명을 직접 입력할 수 있습니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: PopqSpacing.md),
+            SellerEventNameAutocomplete(
+              controller: _eventNameController,
+              focusNode: _eventNameFocusNode,
+              suggestions: _eventSuggestions,
+              enabled: !_submitting,
+              loading: _loadingEventSuggestions,
+              errorMessage: _eventSuggestionError,
+              validator: (String? value) =>
+                  value == null || value.trim().isEmpty
+                  ? '행사명을 입력해 주세요.'
+                  : null,
+            ),
+            const SizedBox(height: PopqSpacing.sm),
             _operationDateTile(
-              label: eventStore ? '행사 시작일' : '영업 시작일',
+              label: '영업 시작일 *',
               value: _operationStartDate,
               onTap: () => _selectOperationDate(start: true),
               onClear: _operationStartDate == null
@@ -1209,7 +902,44 @@ class _SellerStoreRegistrationScreenState
             ),
             const SizedBox(height: PopqSpacing.sm),
             _operationDateTile(
-              label: eventStore ? '행사 종료일' : '영업 종료일(선택)',
+              label: '영업 종료일 *',
+              value: _operationEndDate,
+              onTap: () => _selectOperationDate(start: false),
+              onClear: _operationEndDate == null
+                  ? null
+                  : () => setState(() => _operationEndDate = null),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOperationPeriodCard(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(PopqSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('영업 기간', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: PopqSpacing.sm),
+            Text(
+              '영업 시작일과 종료일을 선택할 수 있습니다. 종료일은 선택 사항입니다.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: PopqSpacing.md),
+            _operationDateTile(
+              label: '영업 시작일',
+              value: _operationStartDate,
+              onTap: () => _selectOperationDate(start: true),
+              onClear: _operationStartDate == null
+                  ? null
+                  : () => setState(() => _operationStartDate = null),
+            ),
+            const SizedBox(height: PopqSpacing.sm),
+            _operationDateTile(
+              label: '영업 종료일(선택)',
               value: _operationEndDate,
               onTap: () => _selectOperationDate(start: false),
               onClear: _operationEndDate == null
@@ -1262,8 +992,8 @@ class _SellerStoreRegistrationScreenState
     final DateTime initial = candidate.isBefore(first)
         ? first
         : candidate.isAfter(last)
-            ? last
-            : candidate;
+        ? last
+        : candidate;
     final DateTime? selected = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -1286,80 +1016,109 @@ class _SellerStoreRegistrationScreenState
     return '${value.year}.$month.$day';
   }
 
-  Widget _buildOrderPolicyCard(
-      BuildContext context,
-      ) {
+  DateTime _todayInSeoul() {
+    final DateTime seoulNow = DateTime.now().toUtc().add(
+      const Duration(hours: 9),
+    );
+    return DateTime(seoulNow.year, seoulNow.month, seoulNow.day);
+  }
+
+  void _scheduleEventSuggestionRefresh(_SelectedStoreLocation? location) {
+    _eventSuggestionDebounce?.cancel();
+    final int requestSerial = ++_eventSuggestionRequestSerial;
+    _eventSuggestions = const <SellerNearbyEventSuggestion>[];
+    _eventSuggestionError = null;
+    if (location == null || _storeType != 'EVENT_COMMERCE') {
+      _loadingEventSuggestions = false;
+      return;
+    }
+    _loadingEventSuggestions = true;
+
+    _eventSuggestionDebounce = Timer(
+      _eventSuggestionDebounceDuration,
+      () => _loadEventSuggestions(location, requestSerial),
+    );
+  }
+
+  Future<void> _loadEventSuggestions(
+    _SelectedStoreLocation location,
+    int requestSerial,
+  ) async {
+    try {
+      final List<SellerNearbyEventSuggestion> suggestions = await widget
+          .repository
+          .findNearbyEventNames(
+            latitude: location.latitude,
+            longitude: location.longitude,
+            radiusKm: _eventSuggestionRadiusKm,
+          );
+      if (!mounted || requestSerial != _eventSuggestionRequestSerial) {
+        return;
+      }
+      setState(() {
+        _eventSuggestions = suggestions;
+        _loadingEventSuggestions = false;
+        _eventSuggestionError = null;
+      });
+    } catch (_) {
+      if (!mounted || requestSerial != _eventSuggestionRequestSerial) {
+        return;
+      }
+      setState(() {
+        _eventSuggestions = const <SellerNearbyEventSuggestion>[];
+        _loadingEventSuggestions = false;
+        _eventSuggestionError = '인근 행사 정보를 불러오지 못했습니다. 행사명을 직접 입력할 수 있습니다.';
+      });
+    }
+  }
+
+  Widget _buildOrderPolicyCard(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
+        padding: const EdgeInsets.all(PopqSpacing.md),
         child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '주문 운영 설정',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge,
-            ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
+            Text('주문 운영 설정', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: PopqSpacing.sm),
             SwitchListTile(
-              contentPadding:
-              EdgeInsets.zero,
+              contentPadding: EdgeInsets.zero,
               title: const Text('포장 가능'),
-              subtitle: const Text(
-                '고객이 포장 주문을 선택할 수 있습니다.',
-              ),
+              subtitle: const Text('고객이 포장 주문을 선택할 수 있습니다.'),
               value: _takeoutAvailable,
               onChanged: _submitting
                   ? null
                   : (bool value) {
-                setState(() {
-                  _takeoutAvailable =
-                      value;
-                });
-              },
+                      setState(() {
+                        _takeoutAvailable = value;
+                      });
+                    },
             ),
             SwitchListTile(
-              contentPadding:
-              EdgeInsets.zero,
-              title:
-              const Text('매장 식사 가능'),
-              subtitle: const Text(
-                '고객이 매장 식사를 선택할 수 있습니다.',
-              ),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('매장 식사 가능'),
+              subtitle: const Text('고객이 매장 식사를 선택할 수 있습니다.'),
               value: _dineInAvailable,
               onChanged: _submitting
                   ? null
                   : (bool value) {
-                setState(() {
-                  _dineInAvailable =
-                      value;
-                });
-              },
+                      setState(() {
+                        _dineInAvailable = value;
+                      });
+                    },
             ),
             SwitchListTile(
-              contentPadding:
-              EdgeInsets.zero,
-              title:
-              const Text('주문 접수 가능'),
-              subtitle: const Text(
-                '등록 직후 주문을 받을 수 있도록 설정합니다.',
-              ),
-              value:
-              _orderAcceptingEnabled,
+              contentPadding: EdgeInsets.zero,
+              title: const Text('주문 접수 가능'),
+              subtitle: const Text('등록 직후 주문을 받을 수 있도록 설정합니다.'),
+              value: _orderAcceptingEnabled,
               onChanged: _submitting
                   ? null
                   : (bool value) {
-                setState(() {
-                  _orderAcceptingEnabled =
-                      value;
-                });
-              },
+                      setState(() {
+                        _orderAcceptingEnabled = value;
+                      });
+                    },
             ),
           ],
         ),
@@ -1367,14 +1126,10 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Widget _buildTagCard(
-      BuildContext context,
-      ) {
+  Widget _buildTagCard(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(
-          PopqSpacing.md,
-        ),
+        padding: const EdgeInsets.all(PopqSpacing.md),
         child: SellerTagBlocks(
           title: '검색 키워드',
           description: '고객이 사업장을 찾기 쉽도록 최대 8개까지 등록할 수 있습니다.',
@@ -1389,71 +1144,41 @@ class _SellerStoreRegistrationScreenState
   }
 
   Future<void> _openBusinessRegistrationImport() async {
-    if (_submitting ||
-        _recognizingBusinessRegistration) {
+    if (_submitting || _recognizingBusinessRegistration) {
       return;
     }
 
-    final ImageSource? source =
-    await showModalBottomSheet<ImageSource>(
+    final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
-      builder: (
-          BuildContext bottomSheetContext,
-          ) {
+      builder: (BuildContext bottomSheetContext) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(
-              PopqSpacing.md,
-            ),
+            padding: const EdgeInsets.all(PopqSpacing.md),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 ListTile(
-                  leading: const Icon(
-                    Icons.photo_camera_outlined,
-                  ),
-                  title: const Text(
-                    '사업자등록증 촬영',
-                  ),
-                  subtitle: const Text(
-                    '카메라로 등록증을 촬영합니다.',
-                  ),
+                  leading: const Icon(Icons.photo_camera_outlined),
+                  title: const Text('사업자등록증 촬영'),
+                  subtitle: const Text('카메라로 등록증을 촬영합니다.'),
                   onTap: () {
-                    Navigator.of(
-                      bottomSheetContext,
-                    ).pop(
-                      ImageSource.camera,
-                    );
+                    Navigator.of(bottomSheetContext).pop(ImageSource.camera);
                   },
                 ),
                 ListTile(
-                  leading: const Icon(
-                    Icons.photo_library_outlined,
-                  ),
-                  title: const Text(
-                    '갤러리에서 선택',
-                  ),
-                  subtitle: const Text(
-                    '저장된 등록증 사진을 선택합니다.',
-                  ),
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('갤러리에서 선택'),
+                  subtitle: const Text('저장된 등록증 사진을 선택합니다.'),
                   onTap: () {
-                    Navigator.of(
-                      bottomSheetContext,
-                    ).pop(
-                      ImageSource.gallery,
-                    );
+                    Navigator.of(bottomSheetContext).pop(ImageSource.gallery);
                   },
                 ),
-                const SizedBox(
-                  height: PopqSpacing.sm,
-                ),
+                const SizedBox(height: PopqSpacing.sm),
                 SizedBox(
                   width: double.infinity,
                   child: TextButton(
                     onPressed: () {
-                      Navigator.of(
-                        bottomSheetContext,
-                      ).pop();
+                      Navigator.of(bottomSheetContext).pop();
                     },
                     child: const Text('취소'),
                   ),
@@ -1469,21 +1194,16 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    await _recognizeBusinessRegistration(
-      source,
-    );
+    await _recognizeBusinessRegistration(source);
   }
 
-  Future<void> _recognizeBusinessRegistration(
-      ImageSource source,
-      ) async {
+  Future<void> _recognizeBusinessRegistration(ImageSource source) async {
     setState(() {
       _recognizingBusinessRegistration = true;
     });
 
     try {
-      final XFile? selectedImage =
-      await _imagePicker.pickImage(
+      final XFile? selectedImage = await _imagePicker.pickImage(
         source: source,
         maxWidth: 2400,
         maxHeight: 2400,
@@ -1496,32 +1216,25 @@ class _SellerStoreRegistrationScreenState
       }
 
       final BusinessRegistrationOcrResult result =
-      await _businessRegistrationOcrService
-          .recognize(
-        imagePath: selectedImage.path,
-      );
+          await _businessRegistrationOcrService.recognize(
+            imagePath: selectedImage.path,
+          );
 
       if (!mounted) {
         return;
       }
 
-      final bool applyToForm =
-      await _showBusinessRegistrationOcrResult(
-        result,
-      );
+      final bool applyToForm = await _showBusinessRegistrationOcrResult(result);
 
       if (!mounted || !applyToForm) {
         return;
       }
 
       final bool hasImportedFormValue =
-          result.businessName != null ||
-              result.businessAddress != null;
+          result.businessName != null || result.businessAddress != null;
 
       if (!hasImportedFormValue) {
-        _showMessage(
-          '사업자등록번호는 확인했지만 상호명과 주소를 자동으로 찾지 못했습니다. 직접 입력해 주세요.',
-        );
+        _showMessage('사업자등록번호는 확인했지만 상호명과 주소를 자동으로 찾지 못했습니다. 직접 입력해 주세요.');
         return;
       }
 
@@ -1533,24 +1246,18 @@ class _SellerStoreRegistrationScreenState
           phone: null,
         ),
       );
-    } on BusinessRegistrationOcrException catch (
-    exception
-    ) {
+    } on BusinessRegistrationOcrException catch (exception) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        exception.message,
-      );
+      _showMessage(exception.message);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        '사업자등록증을 인식하는 중 오류가 발생했습니다.',
-      );
+      _showMessage('사업자등록증을 인식하는 중 오류가 발생했습니다.');
     } finally {
       if (mounted) {
         setState(() {
@@ -1560,117 +1267,83 @@ class _SellerStoreRegistrationScreenState
     }
   }
 
-  Future<bool>
-  _showBusinessRegistrationOcrResult(
-      BusinessRegistrationOcrResult result,
-      ) async {
+  Future<bool> _showBusinessRegistrationOcrResult(
+    BusinessRegistrationOcrResult result,
+  ) async {
     final bool hasImportableValue =
-        result.businessName != null ||
-            result.businessAddress != null;
+        result.businessName != null || result.businessAddress != null;
 
-    final bool? applyToForm =
-    await showDialog<bool>(
+    final bool? applyToForm = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (
-          BuildContext dialogContext,
-          ) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text(
-            '사업자등록증 인식 결과',
-          ),
+          title: const Text('사업자등록증 인식 결과'),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildOcrResultItem(
                     context: context,
                     label: '사업자등록번호',
                     value: result.businessNumber,
                   ),
-                  const SizedBox(
-                    height: PopqSpacing.md,
-                  ),
+                  const SizedBox(height: PopqSpacing.md),
                   _buildOcrResultItem(
                     context: context,
                     label: '상호명',
                     value: result.businessName,
                   ),
-                  const SizedBox(
-                    height: PopqSpacing.md,
-                  ),
+                  const SizedBox(height: PopqSpacing.md),
                   _buildOcrResultItem(
                     context: context,
                     label: '대표자명',
-                    value:
-                    result.representativeName,
+                    value: result.representativeName,
                   ),
-                  const SizedBox(
-                    height: PopqSpacing.md,
-                  ),
+                  const SizedBox(height: PopqSpacing.md),
                   _buildOcrResultItem(
                     context: context,
                     label: '사업장 소재지',
-                    value:
-                    result.businessAddress,
+                    value: result.businessAddress,
                   ),
-                  const SizedBox(
-                    height: PopqSpacing.lg,
-                  ),
+                  const SizedBox(height: PopqSpacing.lg),
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(
-                      PopqSpacing.sm,
-                    ),
+                    padding: const EdgeInsets.all(PopqSpacing.sm),
                     decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      borderRadius:
-                      BorderRadius.circular(8),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
                       '사업자등록번호와 대표자명은 확인용이며 '
-                          '현재 사업장 DB에는 저장하지 않습니다.',
+                      '현재 사업장 DB에는 저장하지 않습니다.',
                     ),
                   ),
-                  const SizedBox(
-                    height: PopqSpacing.lg,
-                  ),
+                  const SizedBox(height: PopqSpacing.lg),
                   ExpansionTile(
                     tilePadding: EdgeInsets.zero,
-                    childrenPadding:
-                    const EdgeInsets.only(
+                    childrenPadding: const EdgeInsets.only(
                       bottom: PopqSpacing.sm,
                     ),
-                    title: const Text(
-                      'OCR 전체 원문 보기',
-                    ),
+                    title: const Text('OCR 전체 원문 보기'),
                     children: [
                       DecoratedBox(
                         decoration: BoxDecoration(
                           border: Border.all(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .outlineVariant,
+                            color: Theme.of(context).colorScheme.outlineVariant,
                           ),
-                          borderRadius:
-                          BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Padding(
-                          padding:
-                          const EdgeInsets.all(
-                            PopqSpacing.sm,
-                          ),
+                          padding: const EdgeInsets.all(PopqSpacing.sm),
                           child: SizedBox(
                             width: double.infinity,
-                            child: SelectableText(
-                              result.rawText,
-                            ),
+                            child: SelectableText(result.rawText),
                           ),
                         ),
                       ),
@@ -1683,25 +1356,17 @@ class _SellerStoreRegistrationScreenState
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(false);
+                Navigator.of(dialogContext).pop(false);
               },
-              child: const Text(
-                '취소',
-              ),
+              child: const Text('취소'),
             ),
             FilledButton(
               onPressed: hasImportableValue
                   ? () {
-                Navigator.of(
-                  dialogContext,
-                ).pop(true);
-              }
+                      Navigator.of(dialogContext).pop(true);
+                    }
                   : null,
-              child: const Text(
-                '입력폼에 반영',
-              ),
+              child: const Text('입력폼에 반영'),
             ),
           ],
         );
@@ -1716,53 +1381,32 @@ class _SellerStoreRegistrationScreenState
     required String label,
     required String? value,
   }) {
-    final String displayedValue =
-    value?.trim().isNotEmpty == true
+    final String displayedValue = value?.trim().isNotEmpty == true
         ? value!.trim()
         : '인식하지 못함';
 
-    final bool recognized =
-        value?.trim().isNotEmpty == true;
+    final bool recognized = value?.trim().isNotEmpty == true;
 
     return Column(
-      crossAxisAlignment:
-      CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .labelLarge,
-        ),
-        const SizedBox(
-          height: PopqSpacing.xs,
-        ),
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: PopqSpacing.xs),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(
-            PopqSpacing.sm,
-          ),
+          padding: const EdgeInsets.all(PopqSpacing.sm),
           decoration: BoxDecoration(
             border: Border.all(
               color: recognized
-                  ? Theme.of(context)
-                  .colorScheme
-                  .outlineVariant
-                  : Theme.of(context)
-                  .colorScheme
-                  .error,
+                  ? Theme.of(context).colorScheme.outlineVariant
+                  : Theme.of(context).colorScheme.error,
             ),
-            borderRadius:
-            BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: SelectableText(
             displayedValue,
             style: TextStyle(
-              color: recognized
-                  ? null
-                  : Theme.of(context)
-                  .colorScheme
-                  .error,
+              color: recognized ? null : Theme.of(context).colorScheme.error,
             ),
           ),
         ),
@@ -1771,17 +1415,13 @@ class _SellerStoreRegistrationScreenState
   }
 
   Future<void> _openKakaoPlaceImport() async {
-    if (_submitting ||
-        _searchingKakaoPlace) {
+    if (_submitting || _searchingKakaoPlace) {
       return;
     }
 
-    final String? query =
-    await _showKakaoPlaceSearchQueryDialog();
+    final String? query = await _showKakaoPlaceSearchQueryDialog();
 
-    if (!mounted ||
-        query == null ||
-        query.trim().isEmpty) {
+    if (!mounted || query == null || query.trim().isEmpty) {
       return;
     }
 
@@ -1790,11 +1430,8 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
-      final List<SellerKakaoPlaceSearchResult>
-      results =
-      await widget.repository.searchPlaces(
-        query,
-      );
+      final List<SellerKakaoPlaceSearchResult> results = await widget.repository
+          .searchPlaces(query);
 
       if (!mounted) {
         return;
@@ -1803,41 +1440,31 @@ class _SellerStoreRegistrationScreenState
       if (results.isEmpty) {
         _showMessage(
           '카카오맵에서 업체를 찾지 못했습니다. '
-              '지역명과 업체명을 함께 입력해 다시 검색해 주세요.',
+          '지역명과 업체명을 함께 입력해 다시 검색해 주세요.',
         );
         return;
       }
 
-      final SellerKakaoPlaceSearchResult?
-      selectedPlace =
-      await _showKakaoPlaceSearchResultDialog(
-        results,
-      );
+      final SellerKakaoPlaceSearchResult? selectedPlace =
+          await _showKakaoPlaceSearchResultDialog(results);
 
-      if (!mounted ||
-          selectedPlace == null) {
+      if (!mounted || selectedPlace == null) {
         return;
       }
 
-      await _applySelectedKakaoPlace(
-        selectedPlace,
-      );
+      await _applySelectedKakaoPlace(selectedPlace);
     } on PopqFailure catch (failure) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        failure.message,
-      );
+      _showMessage(failure.message);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        '카카오맵 업체를 검색하는 중 오류가 발생했습니다.',
-      );
+      _showMessage('카카오맵 업체를 검색하는 중 오류가 발생했습니다.');
     } finally {
       if (mounted) {
         setState(() {
@@ -1847,21 +1474,15 @@ class _SellerStoreRegistrationScreenState
     }
   }
 
-  Future<String?>
-  _showKakaoPlaceSearchQueryDialog() async {
-    final String currentName =
-    _nameController.text.trim();
+  Future<String?> _showKakaoPlaceSearchQueryDialog() async {
+    final String currentName = _nameController.text.trim();
 
-    final String currentAddress =
-    _addressController.text.trim();
+    final String currentAddress = _addressController.text.trim();
 
-    final String initialQuery =
-    <String>[
+    final String initialQuery = <String>[
       currentAddress,
       currentName,
-    ].where(
-          (String value) => value.isNotEmpty,
-    ).join(' ');
+    ].where((String value) => value.isNotEmpty).join(' ');
 
     String queryValue = initialQuery;
     String? errorText;
@@ -1869,66 +1490,46 @@ class _SellerStoreRegistrationScreenState
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
-      builder: (
-          BuildContext dialogContext,
-          ) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter setDialogState,
-              ) {
+          builder: (BuildContext context, StateSetter setDialogState) {
             void submitSearch() {
-              final String trimmed =
-              queryValue.trim();
+              final String trimmed = queryValue.trim();
 
               if (trimmed.isEmpty) {
                 setDialogState(() {
-                  errorText =
-                  '검색할 업체명이나 지역을 입력해 주세요.';
+                  errorText = '검색할 업체명이나 지역을 입력해 주세요.';
                 });
                 return;
               }
 
-              FocusScope.of(
-                dialogContext,
-              ).unfocus();
+              FocusScope.of(dialogContext).unfocus();
 
-              Navigator.of(
-                dialogContext,
-              ).pop(trimmed);
+              Navigator.of(dialogContext).pop(trimmed);
             }
 
             return AlertDialog(
-              title: const Text(
-                '카카오맵 업체 검색',
-              ),
+              title: const Text('카카오맵 업체 검색'),
               content: TextFormField(
                 initialValue: initialQuery,
                 autofocus: true,
-                textInputAction:
-                TextInputAction.search,
+                textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   labelText: '업체명 또는 검색어',
-                  hintText:
-                  '예: 부산 서면 포포카페',
+                  hintText: '예: 부산 서면 포포카페',
                   errorText: errorText,
-                  prefixIcon: const Icon(
-                    Icons.search_rounded,
-                  ),
+                  prefixIcon: const Icon(Icons.search_rounded),
                 ),
                 onChanged: (String value) {
                   queryValue = value;
 
-                  if (errorText != null &&
-                      value.trim().isNotEmpty) {
+                  if (errorText != null && value.trim().isNotEmpty) {
                     setDialogState(() {
                       errorText = null;
                     });
                   }
                 },
-                onFieldSubmitted: (
-                    String value,
-                    ) {
+                onFieldSubmitted: (String value) {
                   queryValue = value;
                   submitSearch();
                 },
@@ -1936,24 +1537,13 @@ class _SellerStoreRegistrationScreenState
               actions: [
                 TextButton(
                   onPressed: () {
-                    FocusScope.of(
-                      dialogContext,
-                    ).unfocus();
+                    FocusScope.of(dialogContext).unfocus();
 
-                    Navigator.of(
-                      dialogContext,
-                    ).pop();
+                    Navigator.of(dialogContext).pop();
                   },
-                  child: const Text(
-                    '취소',
-                  ),
+                  child: const Text('취소'),
                 ),
-                FilledButton(
-                  onPressed: submitSearch,
-                  child: const Text(
-                    '검색',
-                  ),
-                ),
+                FilledButton(onPressed: submitSearch, child: const Text('검색')),
               ],
             );
           },
@@ -1962,65 +1552,37 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  Future<SellerKakaoPlaceSearchResult?>
-  _showKakaoPlaceSearchResultDialog(
-      List<SellerKakaoPlaceSearchResult>
-      results,
-      ) {
-    SellerKakaoPlaceSearchResult
-    selectedPlace = results.first;
+  Future<SellerKakaoPlaceSearchResult?> _showKakaoPlaceSearchResultDialog(
+    List<SellerKakaoPlaceSearchResult> results,
+  ) {
+    SellerKakaoPlaceSearchResult selectedPlace = results.first;
 
-    return showDialog<
-        SellerKakaoPlaceSearchResult>(
+    return showDialog<SellerKakaoPlaceSearchResult>(
       context: context,
       barrierDismissible: false,
-      builder: (
-          BuildContext dialogContext,
-          ) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter setDialogState,
-              ) {
+          builder: (BuildContext context, StateSetter setDialogState) {
             return AlertDialog(
-              title: const Text(
-                '카카오맵 업체 선택',
-              ),
+              title: const Text('카카오맵 업체 선택'),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ConstrainedBox(
-                  constraints:
-                  const BoxConstraints(
-                    maxHeight: 500,
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 500),
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: results.length,
-                    separatorBuilder: (
-                        BuildContext context,
-                        int index,
-                        ) {
+                    separatorBuilder: (BuildContext context, int index) {
                       return const Divider();
                     },
-                    itemBuilder: (
-                        BuildContext context,
-                        int index,
-                        ) {
-                      final SellerKakaoPlaceSearchResult
-                      place =
-                      results[index];
+                    itemBuilder: (BuildContext context, int index) {
+                      final SellerKakaoPlaceSearchResult place = results[index];
 
-                      return RadioListTile<
-                          SellerKakaoPlaceSearchResult>(
-                        contentPadding:
-                        EdgeInsets.zero,
+                      return RadioListTile<SellerKakaoPlaceSearchResult>(
+                        contentPadding: EdgeInsets.zero,
                         value: place,
-                        groupValue:
-                        selectedPlace,
-                        onChanged: (
-                            SellerKakaoPlaceSearchResult?
-                            value,
-                            ) {
+                        groupValue: selectedPlace,
+                        onChanged: (SellerKakaoPlaceSearchResult? value) {
                           if (value == null) {
                             return;
                           }
@@ -2029,14 +1591,8 @@ class _SellerStoreRegistrationScreenState
                             selectedPlace = value;
                           });
                         },
-                        title: Text(
-                          place.placeName,
-                        ),
-                        subtitle: Text(
-                          _buildKakaoPlaceSubtitle(
-                            place,
-                          ),
-                        ),
+                        title: Text(place.placeName),
+                        subtitle: Text(_buildKakaoPlaceSubtitle(place)),
                       );
                     },
                   ),
@@ -2045,25 +1601,15 @@ class _SellerStoreRegistrationScreenState
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.of(
-                      dialogContext,
-                    ).pop();
+                    Navigator.of(dialogContext).pop();
                   },
-                  child: const Text(
-                    '취소',
-                  ),
+                  child: const Text('취소'),
                 ),
                 FilledButton(
                   onPressed: () {
-                    Navigator.of(
-                      dialogContext,
-                    ).pop(
-                      selectedPlace,
-                    );
+                    Navigator.of(dialogContext).pop(selectedPlace);
                   },
-                  child: const Text(
-                    '이 업체 선택',
-                  ),
+                  child: const Text('이 업체 선택'),
                 ),
               ],
             );
@@ -2073,177 +1619,129 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  String _buildKakaoPlaceSubtitle(
-      SellerKakaoPlaceSearchResult place,
-      ) {
-    final List<String> lines =
-    <String>[];
+  String _buildKakaoPlaceSubtitle(SellerKakaoPlaceSearchResult place) {
+    final List<String> lines = <String>[];
 
-    final String? category =
-        place.categoryName;
+    final String? category = place.categoryName;
 
-    final String? phone =
-        place.phone;
+    final String? phone = place.phone;
 
-    final String? roadAddress =
-        place.roadAddressName;
+    final String? roadAddress = place.roadAddressName;
 
-    final String? jibunAddress =
-        place.addressName;
+    final String? jibunAddress = place.addressName;
 
-    if (category != null &&
-        category.isNotEmpty) {
+    if (category != null && category.isNotEmpty) {
       lines.add(category);
     }
 
-    if (roadAddress != null &&
-        roadAddress.isNotEmpty) {
-      lines.add(
-        '도로명: $roadAddress',
-      );
+    if (roadAddress != null && roadAddress.isNotEmpty) {
+      lines.add('도로명: $roadAddress');
     }
 
     if (jibunAddress != null &&
         jibunAddress.isNotEmpty &&
         jibunAddress != roadAddress) {
-      lines.add(
-        '지번: $jibunAddress',
-      );
+      lines.add('지번: $jibunAddress');
     }
 
-    if (phone != null &&
-        phone.isNotEmpty) {
-      lines.add(
-        '전화: $phone',
-      );
+    if (phone != null && phone.isNotEmpty) {
+      lines.add('전화: $phone');
     }
 
     lines.add(
       '위도 ${place.latitude.toStringAsFixed(6)} · '
-          '경도 ${place.longitude.toStringAsFixed(6)}',
+      '경도 ${place.longitude.toStringAsFixed(6)}',
     );
 
     return lines.join('\n');
   }
 
   Future<void> _applySelectedKakaoPlace(
-      SellerKakaoPlaceSearchResult place,
-      ) async {
-    final String importedAddress =
-    place.displayAddress.trim();
+    SellerKakaoPlaceSearchResult place,
+  ) async {
+    final String importedAddress = place.displayAddress.trim();
 
-    final String resolvedName =
-    await _resolveImportedText(
+    final String resolvedName = await _resolveImportedText(
       fieldLabel: '사업장명',
       sourceLabel: '카카오맵',
-      currentValue:
-      _nameController.text,
-      importedValue:
-      place.placeName,
+      currentValue: _nameController.text,
+      importedValue: place.placeName,
     );
 
     if (!mounted) {
       return;
     }
 
-    final String resolvedAddress =
-    await _resolveImportedText(
+    final String resolvedAddress = await _resolveImportedText(
       fieldLabel: '주소',
       sourceLabel: '카카오맵',
-      currentValue:
-      _addressController.text,
-      importedValue:
-      importedAddress,
+      currentValue: _addressController.text,
+      importedValue: importedAddress,
     );
 
     if (!mounted) {
       return;
     }
 
-    final String resolvedPhone =
-    await _resolveImportedText(
+    final String resolvedPhone = await _resolveImportedText(
       fieldLabel: '사업장 연락처',
       sourceLabel: '카카오맵',
-      currentValue:
-      _phoneController.text,
-      importedValue:
-      place.phone,
+      currentValue: _phoneController.text,
+      importedValue: place.phone,
     );
 
     if (!mounted) {
       return;
     }
 
-    final String normalizedResolvedAddress =
-    _normalizeComparisonText(
+    final String normalizedResolvedAddress = _normalizeComparisonText(
       resolvedAddress,
     );
 
-    final Set<String> placeAddresses =
-    <String>{
+    final Set<String> placeAddresses = <String>{
       if (place.roadAddressName != null &&
-          place.roadAddressName!
-              .trim()
-              .isNotEmpty)
-        _normalizeComparisonText(
-          place.roadAddressName!,
-        ),
-      if (place.addressName != null &&
-          place.addressName!
-              .trim()
-              .isNotEmpty)
-        _normalizeComparisonText(
-          place.addressName!,
-        ),
+          place.roadAddressName!.trim().isNotEmpty)
+        _normalizeComparisonText(place.roadAddressName!),
+      if (place.addressName != null && place.addressName!.trim().isNotEmpty)
+        _normalizeComparisonText(place.addressName!),
     };
 
-    final bool addressMatchesPlace =
-    placeAddresses.contains(
+    final bool addressMatchesPlace = placeAddresses.contains(
       normalizedResolvedAddress,
     );
 
     setState(() {
-      _nameController.text =
-          resolvedName;
+      _nameController.text = resolvedName;
 
-      _addressController.text =
-          resolvedAddress;
+      _addressController.text = resolvedAddress;
 
-      _phoneController.text =
-          resolvedPhone;
+      _phoneController.text = resolvedPhone;
 
-      _selectedStoreLocation =
-      addressMatchesPlace
+      _selectedStoreLocation = addressMatchesPlace
           ? _SelectedStoreLocation(
-        latitude:
-        place.latitude,
-        longitude:
-        place.longitude,
-        address:
-        resolvedAddress,
-        sourceLabel:
-        '카카오 업체 검색',
-      )
+              latitude: place.latitude,
+              longitude: place.longitude,
+              address: resolvedAddress,
+              sourceLabel: '카카오 업체 검색',
+            )
           : null;
     });
 
     if (!addressMatchesPlace) {
       _showMessage(
         '업체 정보는 반영했지만 선택한 주소가 '
-            '카카오 업체 주소와 달라 지도 위치를 저장하지 않았습니다. '
-            '주소 검색이나 지도 직접 선택으로 위치를 확인해 주세요.',
+        '카카오 업체 주소와 달라 지도 위치를 저장하지 않았습니다. '
+        '주소 검색이나 지도 직접 선택으로 위치를 확인해 주세요.',
       );
       return;
     }
 
-    _showMessage(
-      '카카오맵 업체 정보와 위치를 입력폼에 반영했습니다.',
-    );
+    _showMessage('카카오맵 업체 정보와 위치를 입력폼에 반영했습니다.');
   }
 
   Future<void> _applyImportedInformation(
-      _ImportedStoreInformation information,
-      ) async {
+    _ImportedStoreInformation information,
+  ) async {
     if (_submitting) {
       return;
     }
@@ -2281,28 +1779,19 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    final _SelectedStoreLocation?
-    previousLocation =
-        _selectedStoreLocation;
+    final _SelectedStoreLocation? previousLocation = _selectedStoreLocation;
 
     final bool locationAddressChanged =
         previousLocation != null &&
-            _normalizeComparisonText(
-              previousLocation.address,
-            ) !=
-                _normalizeComparisonText(
-                  resolvedAddress,
-                );
+        _normalizeComparisonText(previousLocation.address) !=
+            _normalizeComparisonText(resolvedAddress);
 
     setState(() {
-      _nameController.text =
-          resolvedName;
+      _nameController.text = resolvedName;
 
-      _addressController.text =
-          resolvedAddress;
+      _addressController.text = resolvedAddress;
 
-      _phoneController.text =
-          resolvedPhone;
+      _phoneController.text = resolvedPhone;
 
       if (locationAddressChanged) {
         _selectedStoreLocation = null;
@@ -2312,7 +1801,7 @@ class _SellerStoreRegistrationScreenState
     _showMessage(
       locationAddressChanged
           ? '${information.sourceLabel} 정보를 반영했습니다. '
-          '주소가 변경되어 지도 위치를 다시 선택해 주세요.'
+                '주소가 변경되어 지도 위치를 다시 선택해 주세요.'
           : '${information.sourceLabel} 정보를 입력폼에 반영했습니다.',
     );
   }
@@ -2350,15 +1839,8 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  String _normalizeComparisonText(
-      String value,
-      ) {
-    return value
-        .replaceAll(
-      RegExp(r'\s+'),
-      '',
-    )
-        .toLowerCase();
+  String _normalizeComparisonText(String value) {
+    return value.replaceAll(RegExp(r'\s+'), '').toLowerCase();
   }
 
   Future<String> _showImportedValueConflictDialog({
@@ -2367,13 +1849,11 @@ class _SellerStoreRegistrationScreenState
     required String currentValue,
     required String importedValue,
   }) async {
-    final TextEditingController manualController =
-    TextEditingController(
+    final TextEditingController manualController = TextEditingController(
       text: currentValue,
     );
 
-    _ImportedValueChoice selectedChoice =
-        _ImportedValueChoice.current;
+    _ImportedValueChoice selectedChoice = _ImportedValueChoice.current;
 
     String? manualInputError;
 
@@ -2382,41 +1862,24 @@ class _SellerStoreRegistrationScreenState
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter setDialogState,
-              ) {
+          builder: (BuildContext context, StateSetter setDialogState) {
             return AlertDialog(
-              title: Text(
-                '$fieldLabel 정보 확인',
-              ),
+              title: Text('$fieldLabel 정보 확인'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '$sourceLabel에서 불러온 정보가 현재 입력한 내용과 다릅니다.',
-                    ),
-                    const SizedBox(
-                      height: PopqSpacing.md,
-                    ),
+                    Text('$sourceLabel에서 불러온 정보가 현재 입력한 내용과 다릅니다.'),
+                    const SizedBox(height: PopqSpacing.md),
 
                     RadioListTile<_ImportedValueChoice>(
                       contentPadding: EdgeInsets.zero,
-                      value:
-                      _ImportedValueChoice.current,
+                      value: _ImportedValueChoice.current,
                       groupValue: selectedChoice,
-                      title: const Text(
-                        '현재 입력 유지',
-                      ),
-                      subtitle: Text(
-                        currentValue,
-                      ),
-                      onChanged: (
-                          _ImportedValueChoice? value,
-                          ) {
+                      title: const Text('현재 입력 유지'),
+                      subtitle: Text(currentValue),
+                      onChanged: (_ImportedValueChoice? value) {
                         if (value == null) {
                           return;
                         }
@@ -2430,18 +1893,11 @@ class _SellerStoreRegistrationScreenState
 
                     RadioListTile<_ImportedValueChoice>(
                       contentPadding: EdgeInsets.zero,
-                      value:
-                      _ImportedValueChoice.imported,
+                      value: _ImportedValueChoice.imported,
                       groupValue: selectedChoice,
-                      title: Text(
-                        '$sourceLabel 정보 사용',
-                      ),
-                      subtitle: Text(
-                        importedValue,
-                      ),
-                      onChanged: (
-                          _ImportedValueChoice? value,
-                          ) {
+                      title: Text('$sourceLabel 정보 사용'),
+                      subtitle: Text(importedValue),
+                      onChanged: (_ImportedValueChoice? value) {
                         if (value == null) {
                           return;
                         }
@@ -2455,15 +1911,10 @@ class _SellerStoreRegistrationScreenState
 
                     RadioListTile<_ImportedValueChoice>(
                       contentPadding: EdgeInsets.zero,
-                      value:
-                      _ImportedValueChoice.manual,
+                      value: _ImportedValueChoice.manual,
                       groupValue: selectedChoice,
-                      title: const Text(
-                        '직접 입력',
-                      ),
-                      onChanged: (
-                          _ImportedValueChoice? value,
-                          ) {
+                      title: const Text('직접 입력'),
+                      onChanged: (_ImportedValueChoice? value) {
                         if (value == null) {
                           return;
                         }
@@ -2476,24 +1927,18 @@ class _SellerStoreRegistrationScreenState
                     ),
 
                     Padding(
-                      padding: const EdgeInsets.only(
-                        left: PopqSpacing.md,
-                      ),
+                      padding: const EdgeInsets.only(left: PopqSpacing.md),
                       child: TextField(
                         controller: manualController,
-                        enabled: selectedChoice ==
-                            _ImportedValueChoice.manual,
+                        enabled: selectedChoice == _ImportedValueChoice.manual,
                         decoration: InputDecoration(
                           labelText: '$fieldLabel 직접 입력',
                           errorText: manualInputError,
                         ),
                         onTap: () {
-                          if (selectedChoice !=
-                              _ImportedValueChoice.manual) {
+                          if (selectedChoice != _ImportedValueChoice.manual) {
                             setDialogState(() {
-                              selectedChoice =
-                                  _ImportedValueChoice
-                                      .manual;
+                              selectedChoice = _ImportedValueChoice.manual;
                               manualInputError = null;
                             });
                           }
@@ -2506,44 +1951,32 @@ class _SellerStoreRegistrationScreenState
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.of(dialogContext).pop(
-                      currentValue,
-                    );
+                    Navigator.of(dialogContext).pop(currentValue);
                   },
                   child: const Text('취소'),
                 ),
                 FilledButton(
                   onPressed: () {
-                    if (selectedChoice ==
-                        _ImportedValueChoice.current) {
-                      Navigator.of(dialogContext).pop(
-                        currentValue,
-                      );
+                    if (selectedChoice == _ImportedValueChoice.current) {
+                      Navigator.of(dialogContext).pop(currentValue);
                       return;
                     }
 
-                    if (selectedChoice ==
-                        _ImportedValueChoice.imported) {
-                      Navigator.of(dialogContext).pop(
-                        importedValue,
-                      );
+                    if (selectedChoice == _ImportedValueChoice.imported) {
+                      Navigator.of(dialogContext).pop(importedValue);
                       return;
                     }
 
-                    final String manualValue =
-                    manualController.text.trim();
+                    final String manualValue = manualController.text.trim();
 
                     if (manualValue.isEmpty) {
                       setDialogState(() {
-                        manualInputError =
-                        '$fieldLabel을 입력해 주세요.';
+                        manualInputError = '$fieldLabel을 입력해 주세요.';
                       });
                       return;
                     }
 
-                    Navigator.of(dialogContext).pop(
-                      manualValue,
-                    );
+                    Navigator.of(dialogContext).pop(manualValue);
                   },
                   child: const Text('확인'),
                 ),
@@ -2557,11 +1990,8 @@ class _SellerStoreRegistrationScreenState
     return result ?? currentValue;
   }
 
-  Future<void> _pickRepresentativeImage(
-      ImageSource source,
-      ) async {
-    if (_submitting ||
-        _pickingRepresentativeImage) {
+  Future<void> _pickRepresentativeImage(ImageSource source) async {
+    if (_submitting || _pickingRepresentativeImage) {
       return;
     }
 
@@ -2570,8 +2000,7 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
-      final XFile? selectedImage =
-      await _imagePicker.pickImage(
+      final XFile? selectedImage = await _imagePicker.pickImage(
         source: source,
         maxWidth: 1920,
         maxHeight: 1920,
@@ -2591,14 +2020,13 @@ class _SellerStoreRegistrationScreenState
         return;
       }
 
-      final Uint8List? selectedImageBytes =
-      kIsWeb ? await selectedImage.readAsBytes() : null;
+      final Uint8List? selectedImageBytes = kIsWeb
+          ? await selectedImage.readAsBytes()
+          : null;
 
       setState(() {
-        _selectedRepresentativeImage =
-            selectedImage;
-        _selectedRepresentativeImageBytes =
-            selectedImageBytes;
+        _selectedRepresentativeImage = selectedImage;
+        _selectedRepresentativeImageBytes = selectedImageBytes;
 
         _pickingRepresentativeImage = false;
       });
@@ -2635,25 +2063,18 @@ class _SellerStoreRegistrationScreenState
       _selectedRepresentativeImageBytes = null;
     });
 
-    _showMessage(
-      '선택한 대표 사진을 제거했습니다.',
-    );
+    _showMessage('선택한 대표 사진을 제거했습니다.');
   }
 
-  Future<void>
-  _prepareAddressLocationSearch() async {
-    if (_submitting ||
-        _searchingAddressLocation) {
+  Future<void> _prepareAddressLocationSearch() async {
+    if (_submitting || _searchingAddressLocation) {
       return;
     }
 
-    final String address =
-    _addressController.text.trim();
+    final String address = _addressController.text.trim();
 
     if (address.isEmpty) {
-      _showMessage(
-        '위치를 검색할 주소를 먼저 입력해 주세요.',
-      );
+      _showMessage('위치를 검색할 주소를 먼저 입력해 주세요.');
       return;
     }
 
@@ -2662,12 +2083,8 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
-      final List<SellerAddressSearchResult>
-      results =
-      await widget.repository
-          .searchAddresses(
-        address,
-      );
+      final List<SellerAddressSearchResult> results = await widget.repository
+          .searchAddresses(address);
 
       if (!mounted) {
         return;
@@ -2676,115 +2093,76 @@ class _SellerStoreRegistrationScreenState
       if (results.isEmpty) {
         _showMessage(
           '입력한 주소의 검색 결과를 찾지 못했습니다. '
-              '상세 주소를 제외하고 도로명이나 지번 주소로 다시 검색해 주세요.',
+          '상세 주소를 제외하고 도로명이나 지번 주소로 다시 검색해 주세요.',
         );
         return;
       }
 
-      final SellerAddressSearchResult?
-      selectedResult =
-      await _showAddressSearchResultDialog(
-        results,
-      );
+      final SellerAddressSearchResult? selectedResult =
+          await _showAddressSearchResultDialog(results);
 
-      if (!mounted ||
-          selectedResult == null) {
+      if (!mounted || selectedResult == null) {
         return;
       }
 
       await _applySelectedStoreLocation(
         sourceLabel: '카카오 주소 검색',
-        address:
-        selectedResult.addressName,
-        latitude:
-        selectedResult.latitude,
-        longitude:
-        selectedResult.longitude,
+        address: selectedResult.addressName,
+        latitude: selectedResult.latitude,
+        longitude: selectedResult.longitude,
       );
     } on PopqFailure catch (failure) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        failure.message,
-      );
+      _showMessage(failure.message);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        '주소를 검색하는 중 오류가 발생했습니다.',
-      );
+      _showMessage('주소를 검색하는 중 오류가 발생했습니다.');
     } finally {
       if (mounted) {
         setState(() {
-          _searchingAddressLocation =
-          false;
+          _searchingAddressLocation = false;
         });
       }
     }
   }
 
-  Future<SellerAddressSearchResult?>
-  _showAddressSearchResultDialog(
-      List<SellerAddressSearchResult> results,
-      ) {
-    SellerAddressSearchResult
-    selectedResult = results.first;
+  Future<SellerAddressSearchResult?> _showAddressSearchResultDialog(
+    List<SellerAddressSearchResult> results,
+  ) {
+    SellerAddressSearchResult selectedResult = results.first;
 
-    return showDialog<
-        SellerAddressSearchResult>(
+    return showDialog<SellerAddressSearchResult>(
       context: context,
       barrierDismissible: false,
-      builder: (
-          BuildContext dialogContext,
-          ) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
-          builder: (
-              BuildContext context,
-              StateSetter setDialogState,
-              ) {
+          builder: (BuildContext context, StateSetter setDialogState) {
             return AlertDialog(
-              title: const Text(
-                '사업장 위치 선택',
-              ),
+              title: const Text('사업장 위치 선택'),
               content: SizedBox(
                 width: double.maxFinite,
                 child: ConstrainedBox(
-                  constraints:
-                  const BoxConstraints(
-                    maxHeight: 460,
-                  ),
+                  constraints: const BoxConstraints(maxHeight: 460),
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: results.length,
-                    separatorBuilder: (
-                        BuildContext context,
-                        int index,
-                        ) {
+                    separatorBuilder: (BuildContext context, int index) {
                       return const Divider();
                     },
-                    itemBuilder: (
-                        BuildContext context,
-                        int index,
-                        ) {
-                      final SellerAddressSearchResult
-                      result =
-                      results[index];
+                    itemBuilder: (BuildContext context, int index) {
+                      final SellerAddressSearchResult result = results[index];
 
-                      return RadioListTile<
-                          SellerAddressSearchResult>(
-                        contentPadding:
-                        EdgeInsets.zero,
+                      return RadioListTile<SellerAddressSearchResult>(
+                        contentPadding: EdgeInsets.zero,
                         value: result,
-                        groupValue:
-                        selectedResult,
-                        onChanged: (
-                            SellerAddressSearchResult?
-                            value,
-                            ) {
+                        groupValue: selectedResult,
+                        onChanged: (SellerAddressSearchResult? value) {
                           if (value == null) {
                             return;
                           }
@@ -2793,14 +2171,8 @@ class _SellerStoreRegistrationScreenState
                             selectedResult = value;
                           });
                         },
-                        title: Text(
-                          result.addressName,
-                        ),
-                        subtitle: Text(
-                          _buildAddressSearchSubtitle(
-                            result,
-                          ),
-                        ),
+                        title: Text(result.addressName),
+                        subtitle: Text(_buildAddressSearchSubtitle(result)),
                       );
                     },
                   ),
@@ -2809,25 +2181,15 @@ class _SellerStoreRegistrationScreenState
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.of(
-                      dialogContext,
-                    ).pop();
+                    Navigator.of(dialogContext).pop();
                   },
-                  child: const Text(
-                    '취소',
-                  ),
+                  child: const Text('취소'),
                 ),
                 FilledButton(
                   onPressed: () {
-                    Navigator.of(
-                      dialogContext,
-                    ).pop(
-                      selectedResult,
-                    );
+                    Navigator.of(dialogContext).pop(selectedResult);
                   },
-                  child: const Text(
-                    '이 위치 선택',
-                  ),
+                  child: const Text('이 위치 선택'),
                 ),
               ],
             );
@@ -2837,45 +2199,32 @@ class _SellerStoreRegistrationScreenState
     );
   }
 
-  String _buildAddressSearchSubtitle(
-      SellerAddressSearchResult result,
-      ) {
-    final List<String> lines =
-    <String>[];
+  String _buildAddressSearchSubtitle(SellerAddressSearchResult result) {
+    final List<String> lines = <String>[];
 
-    final String? roadAddress =
-        result.roadAddressName;
+    final String? roadAddress = result.roadAddressName;
 
-    final String? jibunAddress =
-        result.jibunAddressName;
+    final String? jibunAddress = result.jibunAddressName;
 
     if (roadAddress != null &&
         roadAddress.isNotEmpty &&
-        roadAddress !=
-            result.addressName) {
-      lines.add(
-        '도로명: $roadAddress',
-      );
+        roadAddress != result.addressName) {
+      lines.add('도로명: $roadAddress');
     }
 
     if (jibunAddress != null &&
         jibunAddress.isNotEmpty &&
-        jibunAddress !=
-            result.addressName) {
-      lines.add(
-        '지번: $jibunAddress',
-      );
+        jibunAddress != result.addressName) {
+      lines.add('지번: $jibunAddress');
     }
 
     if (result.zoneNo != null) {
-      lines.add(
-        '우편번호: ${result.zoneNo}',
-      );
+      lines.add('우편번호: ${result.zoneNo}');
     }
 
     lines.add(
       '위도 ${result.latitude.toStringAsFixed(6)} · '
-          '경도 ${result.longitude.toStringAsFixed(6)}',
+      '경도 ${result.longitude.toStringAsFixed(6)}',
     );
 
     return lines.join('\n');
@@ -2894,8 +2243,7 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
-      final bool serviceEnabled =
-      await Geolocator.isLocationServiceEnabled();
+      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
       if (!serviceEnabled) {
         if (!mounted) {
@@ -2903,20 +2251,16 @@ class _SellerStoreRegistrationScreenState
         }
 
         setState(() {
-          _currentLocationMessage =
-          '기기의 위치 서비스가 꺼져 있습니다.';
+          _currentLocationMessage = '기기의 위치 서비스가 꺼져 있습니다.';
         });
 
         return;
       }
 
-      LocationPermission permission =
-      await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
 
-      if (permission == LocationPermission.denied &&
-          requestPermission) {
-        permission =
-        await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied && requestPermission) {
+        permission = await Geolocator.requestPermission();
       }
 
       if (permission == LocationPermission.denied) {
@@ -2925,39 +2269,32 @@ class _SellerStoreRegistrationScreenState
         }
 
         setState(() {
-          _currentLocationMessage =
-          '현재 위치를 사용하려면 위치 권한을 허용해 주세요.';
+          _currentLocationMessage = '현재 위치를 사용하려면 위치 권한을 허용해 주세요.';
         });
 
         return;
       }
 
-      if (permission ==
-          LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
         if (!mounted) {
           return;
         }
 
         setState(() {
           _currentLocationMessage =
-          '위치 권한이 영구적으로 거부되었습니다. '
+              '위치 권한이 영구적으로 거부되었습니다. '
               '앱 설정에서 위치 권한을 허용해 주세요.';
         });
 
         return;
       }
 
-      Position? position =
-      await Geolocator.getLastKnownPosition();
+      Position? position = await Geolocator.getLastKnownPosition();
 
-      position ??=
-      await Geolocator.getCurrentPosition(
-        locationSettings:
-        const LocationSettings(
+      position ??= await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          timeLimit: Duration(
-            seconds: 12,
-          ),
+          timeLimit: Duration(seconds: 12),
         ),
       );
       final Position resolvedPosition = position;
@@ -2967,16 +2304,17 @@ class _SellerStoreRegistrationScreenState
       }
 
       if (requestPermission) {
-        final SellerReverseGeocodeResult result =
-        await widget.repository.reverseGeocode(
-          latitude: resolvedPosition.latitude,
-          longitude: resolvedPosition.longitude,
-        );
+        final SellerReverseGeocodeResult result = await widget.repository
+            .reverseGeocode(
+              latitude: resolvedPosition.latitude,
+              longitude: resolvedPosition.longitude,
+            );
         if (!mounted) return;
 
         final String currentAddress = _addressController.text.trim();
         final String resolvedAddress = result.displayAddress.trim();
-        bool applyAddress = currentAddress.isEmpty ||
+        bool applyAddress =
+            currentAddress.isEmpty ||
             _normalizeComparisonText(currentAddress) ==
                 _normalizeComparisonText(resolvedAddress) ||
             result.addressCandidates.any(
@@ -2986,7 +2324,8 @@ class _SellerStoreRegistrationScreenState
             );
 
         if (!applyAddress) {
-          applyAddress = await showDialog<bool>(
+          applyAddress =
+              await showDialog<bool>(
                 context: context,
                 builder: (BuildContext dialogContext) => AlertDialog(
                   title: const Text('현재 위치 주소 적용'),
@@ -3023,14 +2362,12 @@ class _SellerStoreRegistrationScreenState
       }
 
       setState(() {
-        _currentDeviceLocation =
-            _DeviceLocation(
-              latitude: resolvedPosition.latitude,
-              longitude: resolvedPosition.longitude,
-            );
+        _currentDeviceLocation = _DeviceLocation(
+          latitude: resolvedPosition.latitude,
+          longitude: resolvedPosition.longitude,
+        );
 
-        _currentLocationMessage =
-        '현재 위치를 지도 시작점으로 준비했습니다.';
+        _currentLocationMessage = '현재 위치를 지도 시작점으로 준비했습니다.';
       });
     } on TimeoutException {
       if (!mounted) {
@@ -3038,8 +2375,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       setState(() {
-        _currentLocationMessage =
-        '현재 위치를 확인하는 데 시간이 오래 걸리고 있습니다.';
+        _currentLocationMessage = '현재 위치를 확인하는 데 시간이 오래 걸리고 있습니다.';
       });
     } catch (_) {
       if (!mounted) {
@@ -3047,8 +2383,7 @@ class _SellerStoreRegistrationScreenState
       }
 
       setState(() {
-        _currentLocationMessage =
-        '현재 위치를 확인하지 못했습니다.';
+        _currentLocationMessage = '현재 위치를 확인하지 못했습니다.';
       });
     } finally {
       if (mounted) {
@@ -3059,36 +2394,28 @@ class _SellerStoreRegistrationScreenState
     }
   }
 
-  Future<void>
-  _prepareMapLocationSelection() async {
+  Future<void> _prepareMapLocationSelection() async {
     if (_submitting) {
       return;
     }
 
-    final String address =
-    _addressController.text.trim();
+    final String address = _addressController.text.trim();
 
     if (address.isEmpty) {
       _showMessage(
         '지도 위치를 선택하기 전에 '
-            '사업장 주소를 먼저 입력해 주세요.',
+        '사업장 주소를 먼저 입력해 주세요.',
       );
       return;
     }
 
-    final _SelectedStoreLocation?
-    selectedLocation =
-        _selectedStoreLocation;
+    final _SelectedStoreLocation? selectedLocation = _selectedStoreLocation;
 
-    final _DeviceLocation?
-    currentLocation =
-        _currentDeviceLocation;
+    final _DeviceLocation? currentLocation = _currentDeviceLocation;
 
-    const double busanLatitude =
-    35.157746;
+    const double busanLatitude = 35.157746;
 
-    const double busanLongitude =
-    129.059319;
+    const double busanLongitude = 129.059319;
 
     /*
    * 시작 중심 우선순위:
@@ -3099,111 +2426,84 @@ class _SellerStoreRegistrationScreenState
    */
     final double initialLatitude =
         selectedLocation?.latitude ??
-            currentLocation?.latitude ??
-            busanLatitude;
+        currentLocation?.latitude ??
+        busanLatitude;
 
     final double initialLongitude =
         selectedLocation?.longitude ??
-            currentLocation?.longitude ??
-            busanLongitude;
+        currentLocation?.longitude ??
+        busanLongitude;
 
-    final SellerMapLocationPickResult?
-    result =
-    await Navigator.of(context).push<
-        SellerMapLocationPickResult>(
-      MaterialPageRoute<
-          SellerMapLocationPickResult>(
-        builder: (
-            BuildContext context,
-            ) {
-          return SellerStoreLocationPickerScreen(
-            initialLatitude:
-            initialLatitude,
-            initialLongitude:
-            initialLongitude,
-            currentLatitude:
-            currentLocation?.latitude,
-            currentLongitude:
-            currentLocation?.longitude,
-            addressLabel: address,
-          );
-        },
-      ),
-    );
+    final SellerMapLocationPickResult? result = await Navigator.of(context)
+        .push<SellerMapLocationPickResult>(
+          MaterialPageRoute<SellerMapLocationPickResult>(
+            builder: (BuildContext context) {
+              return SellerStoreLocationPickerScreen(
+                initialLatitude: initialLatitude,
+                initialLongitude: initialLongitude,
+                currentLatitude: currentLocation?.latitude,
+                currentLongitude: currentLocation?.longitude,
+                addressLabel: address,
+              );
+            },
+          ),
+        );
 
     if (!mounted || result == null) {
       return;
     }
 
     setState(() {
-      _reverseGeocodingMapLocation =
-      true;
+      _reverseGeocodingMapLocation = true;
     });
 
     try {
-      final SellerReverseGeocodeResult
-      reverseResult =
-      await widget.repository
+      final SellerReverseGeocodeResult reverseResult = await widget.repository
           .reverseGeocode(
-        latitude: result.latitude,
-        longitude: result.longitude,
-      );
+            latitude: result.latitude,
+            longitude: result.longitude,
+          );
 
       if (!mounted) {
         return;
       }
 
-      await _applyReverseGeocodedMapLocation(
-        reverseResult,
-      );
+      await _applyReverseGeocodedMapLocation(reverseResult);
     } on PopqFailure catch (failure) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        failure.message,
-      );
+      _showMessage(failure.message);
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        '선택한 지도 위치의 주소를 확인하지 못했습니다.',
-      );
+      _showMessage('선택한 지도 위치의 주소를 확인하지 못했습니다.');
     } finally {
       if (mounted) {
         setState(() {
-          _reverseGeocodingMapLocation =
-          false;
+          _reverseGeocodingMapLocation = false;
         });
       }
     }
   }
 
-  Future<void>
-  _applyReverseGeocodedMapLocation(
-      SellerReverseGeocodeResult result,
-      ) async {
-    final String currentAddress =
-    _addressController.text.trim();
+  Future<void> _applyReverseGeocodedMapLocation(
+    SellerReverseGeocodeResult result,
+  ) async {
+    final String currentAddress = _addressController.text.trim();
 
-    final String mapAddress =
-    result.displayAddress.trim();
+    final String mapAddress = result.displayAddress.trim();
 
     if (mapAddress.isEmpty) {
-      _showMessage(
-        '지도에서 선택한 위치의 주소를 확인하지 못했습니다.',
-      );
+      _showMessage('지도에서 선택한 위치의 주소를 확인하지 못했습니다.');
       return;
     }
 
-    final Set<String> normalizedCandidates =
-    result.addressCandidates
-        .map(
-      _normalizeComparisonText,
-    )
+    final Set<String> normalizedCandidates = result.addressCandidates
+        .map(_normalizeComparisonText)
         .toSet();
 
     /*
@@ -3212,30 +2512,23 @@ class _SellerStoreRegistrationScreenState
    */
     if (currentAddress.isEmpty) {
       setState(() {
-        _addressController.text =
-            mapAddress;
+        _addressController.text = mapAddress;
 
-        _selectedStoreLocation =
-            _SelectedStoreLocation(
-              latitude: result.latitude,
-              longitude: result.longitude,
-              address: mapAddress,
-              sourceLabel: '지도 직접 선택',
-            );
+        _selectedStoreLocation = _SelectedStoreLocation(
+          latitude: result.latitude,
+          longitude: result.longitude,
+          address: mapAddress,
+          sourceLabel: '지도 직접 선택',
+        );
       });
 
-      _showMessage(
-        '지도에서 선택한 주소와 위치를 적용했습니다.',
-      );
+      _showMessage('지도에서 선택한 주소와 위치를 적용했습니다.');
 
       return;
     }
 
-    final bool currentAddressMatches =
-    normalizedCandidates.contains(
-      _normalizeComparisonText(
-        currentAddress,
-      ),
+    final bool currentAddressMatches = normalizedCandidates.contains(
+      _normalizeComparisonText(currentAddress),
     );
 
     /*
@@ -3244,18 +2537,15 @@ class _SellerStoreRegistrationScreenState
    */
     if (currentAddressMatches) {
       setState(() {
-        _selectedStoreLocation =
-            _SelectedStoreLocation(
-              latitude: result.latitude,
-              longitude: result.longitude,
-              address: currentAddress,
-              sourceLabel: '지도 직접 선택',
-            );
+        _selectedStoreLocation = _SelectedStoreLocation(
+          latitude: result.latitude,
+          longitude: result.longitude,
+          address: currentAddress,
+          sourceLabel: '지도 직접 선택',
+        );
       });
 
-      _showMessage(
-        '입력한 주소와 지도 위치가 일치합니다.',
-      );
+      _showMessage('입력한 주소와 지도 위치가 일치합니다.');
 
       return;
     }
@@ -3263,8 +2553,7 @@ class _SellerStoreRegistrationScreenState
     /*
    * 주소가 다르면 기존에 만든 충돌 모달을 사용한다.
    */
-    final String resolvedAddress =
-    await _showImportedValueConflictDialog(
+    final String resolvedAddress = await _showImportedValueConflictDialog(
       fieldLabel: '주소',
       sourceLabel: '지도에서 선택한 위치',
       currentValue: currentAddress,
@@ -3275,16 +2564,12 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    final bool resolvedMatchesMap =
-    normalizedCandidates.contains(
-      _normalizeComparisonText(
-        resolvedAddress,
-      ),
+    final bool resolvedMatchesMap = normalizedCandidates.contains(
+      _normalizeComparisonText(resolvedAddress),
     );
 
     setState(() {
-      _addressController.text =
-          resolvedAddress;
+      _addressController.text = resolvedAddress;
 
       /*
      * 지도 주소를 선택했거나 직접 입력값이
@@ -3292,32 +2577,25 @@ class _SellerStoreRegistrationScreenState
      *
      * 기존의 다른 주소를 유지했다면 좌표는 저장하지 않는다.
      */
-      _selectedStoreLocation =
-      resolvedMatchesMap
+      _selectedStoreLocation = resolvedMatchesMap
           ? _SelectedStoreLocation(
-        latitude:
-        result.latitude,
-        longitude:
-        result.longitude,
-        address:
-        resolvedAddress,
-        sourceLabel:
-        '지도 직접 선택',
-      )
+              latitude: result.latitude,
+              longitude: result.longitude,
+              address: resolvedAddress,
+              sourceLabel: '지도 직접 선택',
+            )
           : null;
     });
 
     if (!resolvedMatchesMap) {
       _showMessage(
         '입력 주소를 유지했습니다. '
-            '현재 주소에 맞는 지도 위치를 다시 선택해 주세요.',
+        '현재 주소에 맞는 지도 위치를 다시 선택해 주세요.',
       );
       return;
     }
 
-    _showMessage(
-      '지도에서 선택한 주소와 위치를 적용했습니다.',
-    );
+    _showMessage('지도에서 선택한 주소와 위치를 적용했습니다.');
   }
 
   void _clearSelectedStoreLocation() {
@@ -3329,9 +2607,7 @@ class _SellerStoreRegistrationScreenState
       _selectedStoreLocation = null;
     });
 
-    _showMessage(
-      '선택된 지도 위치를 초기화했습니다.',
-    );
+    _showMessage('선택된 지도 위치를 초기화했습니다.');
   }
 
   Future<void> _applySelectedStoreLocation({
@@ -3340,25 +2616,19 @@ class _SellerStoreRegistrationScreenState
     required double latitude,
     required double longitude,
   }) async {
-    final String importedAddress =
-    address.trim();
+    final String importedAddress = address.trim();
 
-    final String previousAddress =
-    _addressController.text.trim();
+    final String previousAddress = _addressController.text.trim();
 
     if (importedAddress.isEmpty) {
-      _showMessage(
-        '선택한 위치에 주소 정보가 없습니다.',
-      );
+      _showMessage('선택한 위치에 주소 정보가 없습니다.');
       return;
     }
 
-    final String resolvedAddress =
-    await _resolveImportedText(
+    final String resolvedAddress = await _resolveImportedText(
       fieldLabel: '주소',
       sourceLabel: sourceLabel,
-      currentValue:
-      _addressController.text,
+      currentValue: _addressController.text,
       importedValue: importedAddress,
     );
 
@@ -3371,47 +2641,34 @@ class _SellerStoreRegistrationScreenState
    * 선택했다면, 해당 좌표가 실제로 그 주소와 일치하는지
    * 보장할 수 없으므로 좌표를 저장하지 않는다.
    */
-    final String normalizedResolved =
-    _normalizeComparisonText(
-      resolvedAddress,
-    );
+    final String normalizedResolved = _normalizeComparisonText(resolvedAddress);
 
     final bool addressMatchesLocation =
-        normalizedResolved ==
-            _normalizeComparisonText(
-              importedAddress,
-            ) ||
-            normalizedResolved ==
-                _normalizeComparisonText(
-                  previousAddress,
-                );
+        normalizedResolved == _normalizeComparisonText(importedAddress) ||
+        normalizedResolved == _normalizeComparisonText(previousAddress);
 
     setState(() {
-      _addressController.text =
-          resolvedAddress;
+      _addressController.text = resolvedAddress;
 
-      _selectedStoreLocation =
-      addressMatchesLocation
+      _selectedStoreLocation = addressMatchesLocation
           ? _SelectedStoreLocation(
-        latitude: latitude,
-        longitude: longitude,
-        address: importedAddress,
-        sourceLabel: sourceLabel,
-      )
+              latitude: latitude,
+              longitude: longitude,
+              address: importedAddress,
+              sourceLabel: sourceLabel,
+            )
           : null;
     });
 
     if (!addressMatchesLocation) {
       _showMessage(
         '주소는 선택한 내용으로 반영했습니다. '
-            '지도 위치는 변경된 주소로 다시 확인해 주세요.',
+        '지도 위치는 변경된 주소로 다시 확인해 주세요.',
       );
       return;
     }
 
-    _showMessage(
-      '$sourceLabel 위치를 적용했습니다.',
-    );
+    _showMessage('$sourceLabel 위치를 적용했습니다.');
   }
 
   Future<void> _addTag() async {
@@ -3420,9 +2677,7 @@ class _SellerStoreRegistrationScreenState
     }
 
     if (_tags.length >= 8) {
-      _showMessage(
-        '검색 키워드는 최대 8개까지 등록할 수 있어요.',
-      );
+      _showMessage('검색 키워드는 최대 8개까지 등록할 수 있어요.');
 
       return;
     }
@@ -3439,14 +2694,10 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
-    final bool valid =
-        _formKey.currentState?.validate() ??
-            false;
+    final bool valid = _formKey.currentState?.validate() ?? false;
 
     if (!valid) {
-      _showMessage(
-        '필수 입력 항목을 확인해 주세요.',
-      );
+      _showMessage('필수 입력 항목을 확인해 주세요.');
 
       return;
     }
@@ -3457,18 +2708,30 @@ class _SellerStoreRegistrationScreenState
       return;
     }
 
+    if (_storeType == 'EVENT_COMMERCE') {
+      if (_eventNameController.text.trim().isEmpty) {
+        _showMessage('행사명을 입력해 주세요.');
+        return;
+      }
+      if (_operationStartDate == null) {
+        _showMessage('영업 시작일을 선택해 주세요.');
+        return;
+      }
+      if (_operationEndDate == null) {
+        _showMessage('영업 종료일을 선택해 주세요.');
+        return;
+      }
+    }
+
     if (_operationStartDate != null &&
         _operationEndDate != null &&
         _operationEndDate!.isBefore(_operationStartDate!)) {
-      _showMessage('운영 종료일은 시작일보다 빠를 수 없습니다.');
+      _showMessage('영업 종료일은 시작일보다 빠를 수 없습니다.');
       return;
     }
 
-    if (!_takeoutAvailable &&
-        !_dineInAvailable) {
-      _showMessage(
-        '포장 또는 매장 식사 중 하나는 가능해야 해요.',
-      );
+    if (!_takeoutAvailable && !_dineInAvailable) {
+      _showMessage('포장 또는 매장 식사 중 하나는 가능해야 해요.');
 
       return;
     }
@@ -3478,18 +2741,12 @@ class _SellerStoreRegistrationScreenState
     });
 
     try {
-      String? representativeImageUrl =
-      _emptyToNull(
-        _imageUrlController.text,
-      );
+      String? representativeImageUrl = _emptyToNull(_imageUrlController.text);
 
-      final XFile? selectedImage =
-          _selectedRepresentativeImage;
+      final XFile? selectedImage = _selectedRepresentativeImage;
 
       if (selectedImage != null) {
-        _showMessage(
-          '대표 사진을 업로드하고 있습니다.',
-        );
+        _showMessage('대표 사진을 업로드하고 있습니다.');
 
         representativeImageUrl = kIsWeb
             ? await widget.repository.uploadRepresentativeImageBytes(
@@ -3505,32 +2762,25 @@ class _SellerStoreRegistrationScreenState
           return;
         }
 
-        _imageUrlController.text =
-            representativeImageUrl;
+        _imageUrlController.text = representativeImageUrl;
       }
 
-      final SellerStore created =
-      await widget.repository.create(
+      final SellerStore created = await widget.repository.create(
         storeType: _storeType,
         name: _nameController.text.trim(),
-        description: _emptyToNull(
-          _descriptionController.text,
-        ),
-        address:
-        _addressController.text.trim(),
-        detailAddress:
-        _detailAddressController.text
-            .trim(),
-        representativeCategory:
-        _representativeCategory,
+        eventName: _storeType == 'EVENT_COMMERCE'
+            ? _eventNameController.text.trim()
+            : null,
+        description: _emptyToNull(_descriptionController.text),
+        address: _addressController.text.trim(),
+        detailAddress: _detailAddressController.text.trim(),
+        representativeCategory: _representativeCategory,
         imageUrl: representativeImageUrl,
         phone: _phoneController.text.trim(),
 
-        latitude:
-        _selectedStoreLocation?.latitude,
+        latitude: _selectedStoreLocation?.latitude,
 
-        longitude:
-        _selectedStoreLocation?.longitude,
+        longitude: _selectedStoreLocation?.longitude,
 
         openTime: _schedule.legacyOpenTimeForApi,
         closeTime: _schedule.legacyCloseTimeForApi,
@@ -3538,21 +2788,13 @@ class _SellerStoreRegistrationScreenState
         operationEndDate: _operationEndDate,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
-        takeoutAvailable:
-        _takeoutAvailable,
-        dineInAvailable:
-        _dineInAvailable,
-        orderAcceptingEnabled:
-        _orderAcceptingEnabled,
-        tags: List<String>.unmodifiable(
-          _tags,
-        ),
+        takeoutAvailable: _takeoutAvailable,
+        dineInAvailable: _dineInAvailable,
+        orderAcceptingEnabled: _orderAcceptingEnabled,
+        tags: List<String>.unmodifiable(_tags),
       );
 
-      await widget.selectionController
-          .select(
-        created.storeId,
-      );
+      await widget.selectionController.select(created.storeId);
 
       if (!mounted) {
         return;
@@ -3562,18 +2804,13 @@ class _SellerStoreRegistrationScreenState
         _registrationCompleted = true;
       });
 
-      WidgetsBinding.instance
-          .addPostFrameCallback(
-            (Duration _) {
-          if (!mounted) {
-            return;
-          }
+      WidgetsBinding.instance.addPostFrameCallback((Duration _) {
+        if (!mounted) {
+          return;
+        }
 
-          context.pop<SellerStore>(
-            created,
-          );
-        },
-      );
+        context.pop<SellerStore>(created);
+      });
     } on PopqFailure catch (failure) {
       if (!mounted) {
         return;
@@ -3583,9 +2820,7 @@ class _SellerStoreRegistrationScreenState
         _submitting = false;
       });
 
-      _showMessage(
-        failure.message,
-      );
+      _showMessage(failure.message);
     } catch (_) {
       if (!mounted) {
         return;
@@ -3595,39 +2830,25 @@ class _SellerStoreRegistrationScreenState
         _submitting = false;
       });
 
-      _showMessage(
-        '사업장을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.',
-      );
+      _showMessage('사업장을 등록하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     }
   }
 
-  String? _emptyToNull(
-      String value,
-      ) {
-    final String normalized =
-    value.trim();
+  String? _emptyToNull(String value) {
+    final String normalized = value.trim();
 
-    return normalized.isEmpty
-        ? null
-        : normalized;
+    return normalized.isEmpty ? null : normalized;
   }
 
-  void _showMessage(
-      String message,
-      ) {
+  void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentTopSnackBar()
-      ..showTopSnackBar(
-        SnackBar(
-          content: Text(message),
-        ),
-      );
+      ..showTopSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _recoverLostRepresentativeImage() async {
     try {
-      final LostDataResponse response =
-      await _imagePicker.retrieveLostData();
+      final LostDataResponse response = await _imagePicker.retrieveLostData();
 
       if (response.isEmpty || !mounted) {
         return;
@@ -3637,33 +2858,28 @@ class _SellerStoreRegistrationScreenState
 
       if (files != null && files.isNotEmpty) {
         final XFile recoveredImage = files.first;
-        final Uint8List? recoveredImageBytes =
-        kIsWeb ? await recoveredImage.readAsBytes() : null;
+        final Uint8List? recoveredImageBytes = kIsWeb
+            ? await recoveredImage.readAsBytes()
+            : null;
         setState(() {
           _selectedRepresentativeImage = recoveredImage;
           _selectedRepresentativeImageBytes = recoveredImageBytes;
         });
 
-        _showMessage(
-          '이전에 선택하던 대표 사진을 복구했습니다.',
-        );
+        _showMessage('이전에 선택하던 대표 사진을 복구했습니다.');
 
         return;
       }
 
       if (response.exception != null) {
-        _showMessage(
-          '이전에 선택하던 이미지를 복구하지 못했습니다.',
-        );
+        _showMessage('이전에 선택하던 이미지를 복구하지 못했습니다.');
       }
     } catch (_) {
       if (!mounted) {
         return;
       }
 
-      _showMessage(
-        '이미지 선택 정보를 복구하지 못했습니다.',
-      );
+      _showMessage('이미지 선택 정보를 복구하지 못했습니다.');
     }
   }
 }

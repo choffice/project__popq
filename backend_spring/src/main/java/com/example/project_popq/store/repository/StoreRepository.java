@@ -6,6 +6,7 @@ import com.example.project_popq.store.domain.StoreStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -43,6 +44,25 @@ public interface StoreRepository extends JpaRepository<Store, Long>,
     List<Store> searchPublicStores(
             @Param("query") String query,
             @Param("tag") String tag
+    );
+
+    @Query("""
+            select store
+            from Store store
+            where store.storeType = com.example.project_popq.store.domain.StoreType.EVENT_COMMERCE
+              and store.eventName is not null
+              and trim(store.eventName) <> ''
+              and store.operationEndDate >= :today
+              and store.status = com.example.project_popq.store.domain.StoreStatus.ACTIVE
+              and store.businessStatus in (
+                com.example.project_popq.store.domain.BusinessStatus.PRE_OPEN,
+                com.example.project_popq.store.domain.BusinessStatus.OPEN
+              )
+              and store.latitude is not null
+              and store.longitude is not null
+            """)
+    List<Store> findEventNameSuggestionCandidates(
+            @Param("today") LocalDate today
     );
 
     Optional<Store> findByIdAndStatusAndBusinessStatusIn(

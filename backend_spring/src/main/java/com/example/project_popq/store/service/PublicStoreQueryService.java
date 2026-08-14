@@ -23,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PublicStoreQueryService {
 
-    private static final double EARTH_RADIUS_METERS = 6_371_000.0;
     private static final List<BusinessStatus> DISCOVERABLE_BUSINESS_STATUSES =
             List.of(BusinessStatus.PRE_OPEN, BusinessStatus.OPEN);
 
@@ -39,7 +38,9 @@ public class PublicStoreQueryService {
             BigDecimal longitude,
             Double radiusKm
     ) {
-        validateLocation(latitude, longitude, radiusKm);
+        StoreDiscoveryLocationPolicy.validateOptionalLocation(
+                latitude, longitude, radiusKm
+        );
         List<Store> stores = storeRepository.searchPublicStores(
                 normalize(query),
                 normalize(tag)
@@ -114,7 +115,7 @@ public class PublicStoreQueryService {
         Long distance = null;
         if (latitude != null && store.getLatitude() != null
                 && store.getLongitude() != null) {
-            distance = Math.round(distanceMeters(
+            distance = Math.round(StoreDiscoveryLocationPolicy.distanceMeters(
                     latitude.doubleValue(),
                     longitude.doubleValue(),
                     store.getLatitude().doubleValue(),
@@ -124,19 +125,6 @@ public class PublicStoreQueryService {
         return PublicStoreResponse.of(
                 store, tags, distance, schedule
         );
-    }
-
-    private void validateLocation(
-            BigDecimal latitude,
-            BigDecimal longitude,
-            Double radiusKm
-    ) {
-        if ((latitude == null) != (longitude == null)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
-        if (radiusKm != null && (latitude == null || radiusKm <= 0 || radiusKm > 100)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
     }
 
     private String normalize(String value) {
@@ -156,20 +144,4 @@ public class PublicStoreQueryService {
         return left.compareTo(right);
     }
 
-    private double distanceMeters(
-            double fromLatitude,
-            double fromLongitude,
-            double toLatitude,
-            double toLongitude
-    ) {
-        double latitudeDistance = Math.toRadians(toLatitude - fromLatitude);
-        double longitudeDistance = Math.toRadians(toLongitude - fromLongitude);
-        double startLatitude = Math.toRadians(fromLatitude);
-        double endLatitude = Math.toRadians(toLatitude);
-        double haversine = Math.pow(Math.sin(latitudeDistance / 2), 2)
-                + Math.cos(startLatitude) * Math.cos(endLatitude)
-                * Math.pow(Math.sin(longitudeDistance / 2), 2);
-        return EARTH_RADIUS_METERS * 2
-                * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-    }
 }
