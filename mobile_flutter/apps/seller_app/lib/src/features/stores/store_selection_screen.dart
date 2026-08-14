@@ -19,8 +19,7 @@ class StoreSelectionScreen extends StatefulWidget {
   final SellerStoreSelectionController controller;
 
   @override
-  State<StoreSelectionScreen> createState() =>
-      _StoreSelectionScreenState();
+  State<StoreSelectionScreen> createState() => _StoreSelectionScreenState();
 }
 
 class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
@@ -30,6 +29,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   bool _selecting = false;
   bool _creating = false;
   bool _reordering = false;
+  bool _dragging = false;
+
   int? _observedSelectedStoreId;
   String _searchQuery = '';
   Map<int, SellerDashboardSummary> _summariesByStoreId = const {};
@@ -69,168 +70,172 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
   Widget build(BuildContext context) {
     return FutureBuilder<List<SellerStore>>(
       future: _stores,
-      builder: (
-        BuildContext context,
-        AsyncSnapshot<List<SellerStore>> snapshot,
-      ) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const PopqLoadingView(
-            message: '사업장을 불러오고 있어요.',
-          );
-        }
+      builder:
+          (BuildContext context, AsyncSnapshot<List<SellerStore>> snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const PopqLoadingView(message: '사업장을 불러오고 있어요.');
+            }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return PopqErrorView(
-            message: '사업장을 불러오지 못했어요.',
-            onRetry: _reload,
-          );
-        }
+            if (snapshot.hasError || !snapshot.hasData) {
+              return PopqErrorView(
+                message: '사업장을 불러오지 못했어요.',
+                onRetry: _reload,
+              );
+            }
 
-        final List<SellerStore> stores = snapshot.requireData;
-        final List<SellerStore> visibleStores = _search(stores);
-        _showDashboardNoticeAfterFrame();
+            final List<SellerStore> stores = snapshot.requireData;
+            final List<SellerStore> visibleStores = _search(stores);
+            _showDashboardNoticeAfterFrame();
 
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(PopqSpacing.lg),
-            children: <Widget>[
-              Text(
-                '사업장 대시보드',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const SizedBox(height: PopqSpacing.sm),
-              const Text(
-                '운영 중인 사업장을 확인하고 관리할 사업장을 선택하세요.',
-              ),
-              const SizedBox(height: PopqSpacing.md),
-              FilledButton.icon(
-                key: const Key('add-store'),
-                onPressed: _busy ? null : _openRegistrationScreen,
-                icon: _creating
-                    ? const SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.add_business_rounded),
-                label: Text(
-                  _creating ? '등록 화면 여는 중...' : '새 사업장 등록',
-                ),
-              ),
-              const SizedBox(height: PopqSpacing.lg),
-              TextField(
-                controller: _searchController,
-                enabled: !_busy,
-                decoration: InputDecoration(
-                  labelText: '사업장 검색',
-                  hintText: '사업장명, 주소, 상세주소, 대표 카테고리',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _searchQuery.isEmpty
-                      ? null
-                      : IconButton(
-                          tooltip: '검색어 지우기',
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {
-                              _searchQuery = '';
-                            });
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                ),
-                onChanged: (String value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
-              ),
-              const SizedBox(height: PopqSpacing.lg),
-              if (stores.isEmpty)
-                const PopqEmptyView(
-                  icon: Icons.storefront_outlined,
-                  title: '등록된 사업장이 없어요.',
-                  description: '새 사업장 등록을 눌러 첫 운영 공간을 만들어 주세요.',
-                )
-              else if (visibleStores.isEmpty)
-                const PopqEmptyView(
-                  icon: Icons.search_off_rounded,
-                  title: '조건에 맞는 사업장이 없습니다.',
-                  description: '검색어를 지우고 다시 확인해 주세요.',
-                )
-              else if (_searchQuery.trim().isNotEmpty)
-                for (final SellerStore store in visibleStores)
-                  _buildStoreCard(store)
-              else ...<Widget>[
-                if (visibleStores.length > 1) ...<Widget>[
-                  Row(
-                    children: <Widget>[
-                      const Icon(Icons.drag_indicator_rounded, size: 20),
-                      const SizedBox(width: PopqSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          _reordering
-                              ? '사업장 순서를 저장하고 있어요.'
-                              : '오른쪽 핸들을 끌어 사업장 순서를 변경할 수 있어요.',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                      if (_reordering) ...<Widget>[
-                        const SizedBox(width: PopqSpacing.sm),
-                        const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      ],
-                    ],
+            return RefreshIndicator(
+              onRefresh: _refresh,
+              notificationPredicate: (ScrollNotification notification) {
+                return !_dragging && notification.depth == 0;
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(PopqSpacing.lg),
+                children: <Widget>[
+                  Text(
+                    '사업장 대시보드',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: PopqSpacing.sm),
-                ],
-                ReorderableListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  buildDefaultDragHandles: false,
-                  itemCount: visibleStores.length,
-                  onReorderItem: (int oldIndex, int newIndex) {
-                    if (_busy) {
-                      return;
-                    }
-
-                    unawaited(
-                      _reorderStores(
-                        stores,
-                        oldIndex,
-                        newIndex,
+                  const Text('운영 중인 사업장을 확인하고 관리할 사업장을 선택하세요.'),
+                  const SizedBox(height: PopqSpacing.md),
+                  FilledButton.icon(
+                    key: const Key('add-store'),
+                    onPressed: _busy ? null : _openRegistrationScreen,
+                    icon: _creating
+                        ? const SizedBox.square(
+                            dimension: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.add_business_rounded),
+                    label: Text(_creating ? '등록 화면 여는 중...' : '새 사업장 등록'),
+                  ),
+                  const SizedBox(height: PopqSpacing.lg),
+                  TextField(
+                    controller: _searchController,
+                    enabled: !_busy,
+                    decoration: InputDecoration(
+                      labelText: '사업장 검색',
+                      hintText: '사업장명, 주소, 상세주소, 대표 카테고리',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _searchQuery.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: '검색어 지우기',
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
+                    onChanged: (String value) {
+                      setState(() {
+                        _searchQuery = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: PopqSpacing.lg),
+                  if (stores.isEmpty)
+                    const PopqEmptyView(
+                      icon: Icons.storefront_outlined,
+                      title: '등록된 사업장이 없어요.',
+                      description: '새 사업장 등록을 눌러 첫 운영 공간을 만들어 주세요.',
+                    )
+                  else if (visibleStores.isEmpty)
+                    const PopqEmptyView(
+                      icon: Icons.search_off_rounded,
+                      title: '조건에 맞는 사업장이 없습니다.',
+                      description: '검색어를 지우고 다시 확인해 주세요.',
+                    )
+                  else if (_searchQuery.trim().isNotEmpty)
+                    for (final SellerStore store in visibleStores)
+                      _buildStoreCard(store)
+                  else ...<Widget>[
+                    if (visibleStores.length > 1) ...<Widget>[
+                      Row(
+                        children: <Widget>[
+                          const Icon(Icons.drag_indicator_rounded, size: 20),
+                          const SizedBox(width: PopqSpacing.xs),
+                          Expanded(
+                            child: Text(
+                              _reordering
+                                  ? '사업장 순서를 저장하고 있어요.'
+                                  : '오른쪽 핸들을 끌어 사업장 순서를 변경할 수 있어요.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          if (_reordering) ...<Widget>[
+                            const SizedBox(width: PopqSpacing.sm),
+                            const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ],
+                        ],
                       ),
-                    );
-                  },
-                  itemBuilder: (BuildContext context, int index) {
-                    return _buildStoreCard(
-                      visibleStores[index],
-                      reorderIndex:
-                          visibleStores.length > 1 ? index : null,
-                    );
-                  },
-                ),
-              ],
-            ],
-          ),
-        );
-      },
+                      const SizedBox(height: PopqSpacing.sm),
+                    ],
+                        ReorderableListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          buildDefaultDragHandles: false,
+                          itemCount: visibleStores.length,
+
+                          onReorderStart: (int index) {
+                            _dragging = true;
+                          },
+
+                          onReorderEnd: (int index) {
+                            _dragging = false;
+                          },
+
+                          onReorderItem: (int oldIndex, int newIndex) {
+                            if (_busy) {
+                              return;
+                            }
+
+                            unawaited(
+                              _reorderStores(
+                                stores,
+                                oldIndex,
+                                newIndex,
+                              ),
+                            );
+                          },
+                      itemBuilder: (BuildContext context, int index) {
+                        return _buildStoreCard(
+                          visibleStores[index],
+                          reorderIndex: visibleStores.length > 1 ? index : null,
+                        );
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
     );
   }
 
   Widget _buildStoreCard(
-    SellerStore store, {
-    int? reorderIndex,
-  }) {
+      SellerStore store, {
+        int? reorderIndex,
+      }) {
     final bool selected =
         widget.controller.selectedStoreId == store.storeId;
 
-    final summary = _summariesByStoreId[store.storeId];
-    return Tooltip(
+    final SellerDashboardSummary? summary =
+    _summariesByStoreId[store.storeId];
+
+    return KeyedSubtree(
       key: ValueKey<String>('store-${store.storeId}'),
-      message: '${store.name} 사업장 관리',
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -238,7 +243,7 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
           child: Padding(
             padding: const EdgeInsets.all(PopqSpacing.md),
             child: Row(
-              children: [
+              children: <Widget>[
                 CircleAvatar(
                   child: Icon(
                     store.storeType == 'EVENT_COMMERCE'
@@ -246,28 +251,34 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                         : Icons.storefront_rounded,
                   ),
                 ),
+
                 const SizedBox(width: PopqSpacing.sm),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                    children: <Widget>[
                       Text(
                         store.name,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
+
                       if (store.address?.trim().isNotEmpty ?? false)
                         Text(
                           store.address!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+
                       Text(
                         '${_typeLabel(store.storeType)} · '
-                        '${_roleLabel(store.myRole)} · '
-                        '${_statusLabel(store.businessStatus)}'
-                        '${selected ? ' · 현재 선택' : ''}',
+                            '${_roleLabel(store.myRole)} · '
+                            '${_statusLabel(store.businessStatus)}'
+                            '${selected ? ' · 현재 선택' : ''}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall,
@@ -275,41 +286,49 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
                     ],
                   ),
                 ),
+
                 const SizedBox(width: PopqSpacing.xs),
+
                 _StoreAlertButton(
                   icon: Icons.notifications_rounded,
                   count: summary?.waitingOrderCount ?? 0,
-                  tooltip: '${store.name} 접수대기 주문 '
+                  tooltip:
+                  '${store.name} 접수대기 주문 '
                       '${summary?.waitingOrderCount ?? 0}건',
-                  onPressed:
-                      _busy || summary == null ? null : () => _openOrders(store),
+                  onPressed: _busy || summary == null
+                      ? null
+                      : () => _openOrders(store),
                 ),
+
                 const SizedBox(width: PopqSpacing.xs),
+
                 _StoreAlertButton(
                   icon: Icons.chat_bubble_rounded,
                   count: summary?.unreadChatCount ?? 0,
-                  tooltip: '${store.name} 읽지 않은 채팅 메시지 '
+                  tooltip:
+                  '${store.name} 읽지 않은 채팅 메시지 '
                       '${summary?.unreadChatCount ?? 0}건',
-                  onPressed:
-                      _busy || summary == null ? null : () => _openChats(store),
+                  onPressed: _busy || summary == null
+                      ? null
+                      : () => _openChats(store),
                 ),
+
                 if (reorderIndex != null) ...<Widget>[
                   const SizedBox(width: PopqSpacing.xs),
+
                   Semantics(
                     button: true,
                     label: '${store.name} 순서 변경',
-                    child: Tooltip(
-                      message: '순서 변경',
-                      child: ReorderableDragStartListener(
-                        index: reorderIndex,
-                        child: SizedBox.square(
-                          dimension: 40,
-                          child: Icon(
-                            Icons.drag_handle_rounded,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant,
-                          ),
+                    child: ReorderableDragStartListener(
+                      index: reorderIndex,
+                      enabled: !_busy,
+                      child: SizedBox.square(
+                        dimension: 44,
+                        child: Icon(
+                          Icons.drag_handle_rounded,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -322,23 +341,24 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       ),
     );
   }
-
   List<SellerStore> _search(List<SellerStore> stores) {
     final String query = _searchQuery.trim().toLowerCase();
     if (query.isEmpty) {
       return stores;
     }
 
-    return stores.where((SellerStore store) {
-      return <String?>[
-        store.name,
-        store.address,
-        store.detailAddress,
-        store.representativeCategory,
-      ].any(
-        (String? value) => value?.toLowerCase().contains(query) ?? false,
-      );
-    }).toList(growable: false);
+    return stores
+        .where((SellerStore store) {
+          return <String?>[
+            store.name,
+            store.address,
+            store.detailAddress,
+            store.representativeCategory,
+          ].any(
+            (String? value) => value?.toLowerCase().contains(query) ?? false,
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<List<SellerStore>> _load() async {
@@ -352,7 +372,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       for (final summary in summaries) summary.storeId: summary,
     };
     final int? selectedId = widget.controller.selectedStoreId;
-    final bool selectedStoreExists = selectedId == null ||
+    final bool selectedStoreExists =
+        selectedId == null ||
         stores.any((SellerStore store) => store.storeId == selectedId);
 
     if (!selectedStoreExists) {
@@ -405,10 +426,8 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       return;
     }
 
-    final List<SellerStore> originalOrder =
-        List<SellerStore>.of(stores);
-    final List<SellerStore> reordered =
-        List<SellerStore>.of(stores);
+    final List<SellerStore> originalOrder = List<SellerStore>.of(stores);
+    final List<SellerStore> reordered = List<SellerStore>.of(stores);
     final SellerStore moved = reordered.removeAt(oldIndex);
     reordered.insert(newIndex, moved);
 
@@ -518,8 +537,9 @@ class _StoreSelectionScreenState extends State<StoreSelectionScreen> {
       _creating = true;
     });
 
-    final Future<SellerStore?> routeFuture =
-        context.push<SellerStore>(SellerRoutes.storeRegistration);
+    final Future<SellerStore?> routeFuture = context.push<SellerStore>(
+      SellerRoutes.storeRegistration,
+    );
 
     if (mounted) {
       setState(() {
@@ -618,7 +638,10 @@ class _StoreAlertButton extends StatelessWidget {
                     top: -1,
                     right: -1,
                     child: Container(
-                      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       decoration: BoxDecoration(
                         color: colors.error,
@@ -664,3 +687,4 @@ String _statusLabel(String status) {
 String _typeLabel(String type) {
   return type == 'EVENT_COMMERCE' ? '행사·이벤트' : '로컬마켓';
 }
+
