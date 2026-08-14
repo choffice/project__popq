@@ -87,8 +87,13 @@ class _SellerSupportTicketDetailScreenState
   }
 
   Future<void> _loadDetail() async {
+    final showInitialLoading = _detail == null;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -230,13 +235,20 @@ class _SellerSupportTicketDetailScreenState
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               children: [
-                _TicketHeader(ticket: detail.ticket),
+                _TicketHeader(
+                  ticket: detail.ticket,
+                  firstMessage:
+                  detail.messages.isEmpty ? null : detail.messages.first,
+                ),
                 const SizedBox(height: 24),
-                ...detail.messages.map(
-                  (message) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _MessageBubble(message: message),
-                  ),
+            _TicketReplySection(
+              messages: detail.messages.skip(1).toList(growable: false),
+              additionalInquiryForm: _MessageComposer(
+                controller: _messageController,
+                closed: closed,
+                sending: _sending,
+                onSend: _sendMessage,
+              ),
                 ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 8),
@@ -251,66 +263,329 @@ class _SellerSupportTicketDetailScreenState
             ),
           ),
         ),
-        _MessageComposer(
-          controller: _messageController,
-          closed: closed,
-          sending: _sending,
-          onSend: _sendMessage,
-        ),
       ],
     );
   }
 }
 
 class _TicketHeader extends StatelessWidget {
-  const _TicketHeader({required this.ticket});
+  const _TicketHeader({
+    required this.ticket,
+    required this.firstMessage,
+  });
 
   final SellerSupportTicketSummary ticket;
+  final SellerSupportMessage? firstMessage;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '내가 보낸 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Row(
+                children: [
+                  Text(
+                    ticket.category.label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    ticket.status.label,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
               Text(
-                ticket.category.label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: colorScheme.primary,
+                ticket.subject,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
+                  height: 1.35,
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 8),
               Text(
-                ticket.status.label,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
+                _formatDateTime(ticket.createdAt),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Divider(
+                height: 1,
+                color: colorScheme.outlineVariant,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                '문의 내용',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SelectableText(
+                firstMessage?.content ?? '등록된 문의 내용이 없습니다.',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  height: 1.6,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            ticket.subject,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              height: 1.35,
+        ),
+      ],
+    );
+  }
+}
+
+class _TicketReplySection extends StatelessWidget {
+  const _TicketReplySection({
+    required this.messages,
+    required this.additionalInquiryForm,
+  });
+
+  final List<SellerSupportMessage> messages;
+  final Widget additionalInquiryForm;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '답변 및 추가 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 18,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: colorScheme.outlineVariant,
             ),
           ),
-          const SizedBox(height: 10),
-          Text(
-            '문의일 ${_formatDateTime(ticket.createdAt)}',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (messages.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 28),
+                  child: Center(
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.hourglass_empty_rounded,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '관리자 답변을 기다리고 있어요.',
+                          textAlign: TextAlign.center,
+                          style:
+                          Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: List<Widget>.generate(
+                    messages.length,
+                        (index) {
+                      final message = messages[index];
+
+                      final firstAdminReply = !message.sentBySeller &&
+                          messages
+                              .take(index)
+                              .where((item) => !item.sentBySeller)
+                              .isEmpty;
+
+                      final hasSellerFollowUpBefore = messages
+                          .take(index)
+                          .any((item) => item.sentBySeller);
+
+                      return _TicketReplyItem(
+                        message: message,
+                        firstAdminReply: firstAdminReply,
+                        hasSellerFollowUpBefore: hasSellerFollowUpBefore,
+                      );
+                    },
+                  ),
+                ),
+              const SizedBox(height: 20),
+              additionalInquiryForm,
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+class _TicketReplyItem extends StatelessWidget {
+  const _TicketReplyItem({
+    required this.message,
+    required this.firstAdminReply,
+    required this.hasSellerFollowUpBefore,
+  });
+
+  final SellerSupportMessage message;
+  final bool firstAdminReply;
+  final bool hasSellerFollowUpBefore;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final sentBySeller = message.sentBySeller;
+
+    final title = sentBySeller
+        ? '내가 한 추가 문의'
+        : firstAdminReply
+        ? '관리자 답변'
+        : '관리자 추가 답변';
+
+    final icon = sentBySeller
+        ? Icons.person_outline_rounded
+        : Icons.support_agent_rounded;
+
+    final accentColor =
+    sentBySeller ? colorScheme.tertiary : colorScheme.primary;
+
+    final leftPadding = sentBySeller
+        ? 20.0
+        : hasSellerFollowUpBefore
+        ? 40.0
+        : 0.0;
+
+    return Padding(
+      padding: EdgeInsets.only(left: leftPadding),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (leftPadding > 0) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Icon(
+                Icons.subdirectory_arrow_right_rounded,
+                size: 22,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 4,
+                vertical: 16,
+              ),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: colorScheme.outlineVariant,
+                  ),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor:
+                    accentColor.withValues(alpha: 0.12),
+                    foregroundColor: accentColor,
+                    child: Icon(
+                      icon,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(
+                                  color: accentColor,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _formatDateTime(message.createdAt),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        SelectableText(
+                          message.content,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                            height: 1.6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -319,75 +594,6 @@ class _TicketHeader extends StatelessWidget {
   }
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message});
-
-  final SellerSupportMessage message;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final sentBySeller = message.sentBySeller;
-
-    return Align(
-      alignment: sentBySeller ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 310),
-        child: Column(
-          crossAxisAlignment: sentBySeller
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                sentBySeller ? '판매자' : message.senderName,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: sentBySeller
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(18),
-                  topRight: const Radius.circular(18),
-                  bottomLeft: Radius.circular(sentBySeller ? 18 : 4),
-                  bottomRight: Radius.circular(sentBySeller ? 4 : 18),
-                ),
-              ),
-              child: Text(
-                message.content,
-                style: TextStyle(
-                  color: sentBySeller
-                      ? colorScheme.onPrimary
-                      : colorScheme.onSurface,
-                  height: 1.45,
-                ),
-              ),
-            ),
-            const SizedBox(height: 5),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                _formatDateTime(message.createdAt),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _MessageComposer extends StatelessWidget {
   const _MessageComposer({
@@ -405,65 +611,87 @@ class _MessageComposer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final canSend = !closed && !sending && controller.text.trim().isNotEmpty;
 
-    return Material(
-      elevation: 8,
-      color: colorScheme.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-          child: closed
-              ? Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: const Text('종료된 문의입니다.', textAlign: TextAlign.center),
-                )
-              : Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        enabled: !sending,
-                        minLines: 1,
-                        maxLines: 5,
-                        maxLength: 4000,
-                        keyboardType: TextInputType.multiline,
-                        textInputAction: TextInputAction.newline,
-                        decoration: const InputDecoration(
-                          hintText: '추가 문의 내용을 입력해 주세요',
-                          counterText: '',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton.filled(
-                      tooltip: '메시지 전송',
-                      onPressed: canSend ? onSend : null,
-                      icon: sending
-                          ? SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: colorScheme.onPrimary,
-                              ),
-                            )
-                          : const Icon(Icons.send_rounded),
-                    ),
-                  ],
-                ),
+    final canSend =
+        !closed &&
+            !sending &&
+            controller.text.trim().isNotEmpty;
+
+    if (closed) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '추가 문의',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 18,
+            ),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '종료된 문의에는 추가 문의를 등록할 수 없어요.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '추가 문의',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
         ),
-      ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: controller,
+          enabled: !sending,
+          minLines: 4,
+          maxLines: 7,
+          maxLength: 4000,
+          keyboardType: TextInputType.multiline,
+          textInputAction: TextInputAction.newline,
+          decoration: const InputDecoration(
+            hintText: '추가로 문의할 내용을 입력해 주세요.',
+            alignLabelWithHint: true,
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: FilledButton(
+            onPressed: canSend ? onSend : null,
+            child: sending
+                ? SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colorScheme.onPrimary,
+              ),
+            )
+                : const Text('등록'),
+          ),
+        ),
+      ],
     );
   }
 }

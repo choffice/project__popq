@@ -28,6 +28,7 @@ class _SellerSupportTicketListScreenState
     extends State<SellerSupportTicketListScreen> {
   List<SellerSupportTicketSummary> _tickets = const [];
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
   PopqRealtimeClient? _realtimeClient;
   PopqRealtimeSubscription? _supportSubscription;
@@ -57,7 +58,11 @@ class _SellerSupportTicketListScreenState
     }
 
     _supportSubscription = nextClient.subscribeToSupportTickets(
-      onEvent: (_) {
+      onEvent: (event) {
+        if (event.requesterType != 'SELLER') {
+          return;
+        }
+
         unawaited(_loadTickets());
       },
     );
@@ -71,8 +76,13 @@ class _SellerSupportTicketListScreenState
   }
 
   Future<void> _loadTickets() async {
+    final showInitialLoading = !_hasLoadedOnce;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -86,6 +96,7 @@ class _SellerSupportTicketListScreenState
       setState(() {
         _tickets = tickets;
         _loading = false;
+        _hasLoadedOnce = true;
       });
     } catch (_) {
       if (!mounted) {
@@ -94,6 +105,7 @@ class _SellerSupportTicketListScreenState
 
       setState(() {
         _loading = false;
+        _hasLoadedOnce = true;
         _errorMessage = '문의 내역을 불러오지 못했어요.';
       });
     }
@@ -112,8 +124,8 @@ class _SellerSupportTicketListScreenState
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_errorMessage != null) {
-      return _TicketListMessage(
+    if (_errorMessage != null && _tickets.isEmpty) {
+        return _TicketListMessage(
         icon: Icons.error_outline_rounded,
         message: _errorMessage!,
         actionLabel: '다시 시도',

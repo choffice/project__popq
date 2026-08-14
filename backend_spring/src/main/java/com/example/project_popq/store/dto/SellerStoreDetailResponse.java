@@ -16,6 +16,7 @@ import java.util.List;
 public record SellerStoreDetailResponse(
         Long storeId,
         StoreType storeType,
+        String eventName,
         String name,
         String description,
         String address,
@@ -50,6 +51,7 @@ public record SellerStoreDetailResponse(
         return new SellerStoreDetailResponse(
                 store.getId(),
                 store.getStoreType(),
+                store.getEventName(),
                 store.getName(),
                 store.getDescription(),
                 store.getAddress(),

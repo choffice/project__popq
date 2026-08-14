@@ -4,7 +4,6 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
-import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreTag;
 import com.example.project_popq.store.dto.PublicStoreResponse;
 import com.example.project_popq.store.dto.StoreScheduleResponse;
@@ -12,6 +11,8 @@ import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTagRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,7 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PublicStoreQueryService {
 
-    private static final double EARTH_RADIUS_METERS = 6_371_000.0;
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
+
     private static final List<BusinessStatus> DISCOVERABLE_BUSINESS_STATUSES =
             List.of(BusinessStatus.PRE_OPEN, BusinessStatus.OPEN);
 
@@ -39,13 +41,18 @@ public class PublicStoreQueryService {
             BigDecimal longitude,
             Double radiusKm
     ) {
-        validateLocation(latitude, longitude, radiusKm);
+        StoreDiscoveryLocationPolicy.validateOptionalLocation(
+                latitude, longitude, radiusKm
+        );
+        Instant now = Instant.now();
+        LocalDate today = LocalDate.now(SEOUL_ZONE);
         List<Store> stores = storeRepository.searchPublicStores(
                 normalize(query),
-                normalize(tag)
+                normalize(tag),
+                now,
+                today
         );
         Map<Long, List<String>> tagsByStore = findTags(stores);
-        Instant now = Instant.now();
         Map<Long, StoreScheduleResponse> schedules =
                 storeScheduleService.findAllForEvaluation(stores, now);
         return stores.stream()
@@ -68,10 +75,10 @@ public class PublicStoreQueryService {
 
     @Transactional(readOnly = true)
     public PublicStoreResponse findDetail(Long storeId) {
-        Store store = storeRepository.findByIdAndStatusAndBusinessStatusIn(
+        Store store = storeRepository.findPublicDetail(
                         storeId,
-                        StoreStatus.ACTIVE,
-                        DISCOVERABLE_BUSINESS_STATUSES
+                        DISCOVERABLE_BUSINESS_STATUSES,
+                        LocalDate.now(SEOUL_ZONE)
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         StoreScheduleResponse schedule = storeScheduleService.find(store);
@@ -114,7 +121,7 @@ public class PublicStoreQueryService {
         Long distance = null;
         if (latitude != null && store.getLatitude() != null
                 && store.getLongitude() != null) {
-            distance = Math.round(distanceMeters(
+            distance = Math.round(StoreDiscoveryLocationPolicy.distanceMeters(
                     latitude.doubleValue(),
                     longitude.doubleValue(),
                     store.getLatitude().doubleValue(),
@@ -124,19 +131,6 @@ public class PublicStoreQueryService {
         return PublicStoreResponse.of(
                 store, tags, distance, schedule
         );
-    }
-
-    private void validateLocation(
-            BigDecimal latitude,
-            BigDecimal longitude,
-            Double radiusKm
-    ) {
-        if ((latitude == null) != (longitude == null)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
-        if (radiusKm != null && (latitude == null || radiusKm <= 0 || radiusKm > 100)) {
-            throw new BusinessException(ErrorCode.INVALID_REQUEST);
-        }
     }
 
     private String normalize(String value) {
@@ -156,20 +150,4 @@ public class PublicStoreQueryService {
         return left.compareTo(right);
     }
 
-    private double distanceMeters(
-            double fromLatitude,
-            double fromLongitude,
-            double toLatitude,
-            double toLongitude
-    ) {
-        double latitudeDistance = Math.toRadians(toLatitude - fromLatitude);
-        double longitudeDistance = Math.toRadians(toLongitude - fromLongitude);
-        double startLatitude = Math.toRadians(fromLatitude);
-        double endLatitude = Math.toRadians(toLatitude);
-        double haversine = Math.pow(Math.sin(latitudeDistance / 2), 2)
-                + Math.cos(startLatitude) * Math.cos(endLatitude)
-                * Math.pow(Math.sin(longitudeDistance / 2), 2);
-        return EARTH_RADIUS_METERS * 2
-                * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
-    }
 }

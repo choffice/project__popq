@@ -89,6 +89,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
           final store = snapshot.requireData;
           final schedule = store.resolvedSchedule;
           final orderPaused = !store.orderAcceptingEnabled;
+          final String eventName = store.eventName?.trim() ?? '';
           return Column(
             children: <Widget>[
               StoreSectionTopBar(store: store, selected: StoreSection.info),
@@ -135,10 +136,22 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ],
+                    if (store.storeType == 'EVENT_COMMERCE' &&
+                        eventName.isNotEmpty) ...[
+                      const SizedBox(height: PopqSpacing.sm),
+                      ListTile(
+                        key: const Key('store-detail-event-name'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.celebration_outlined),
+                        title: const Text('행사명'),
+                        subtitle: Text(eventName),
+                      ),
+                    ],
                     if (store.operationStartDate != null ||
                         store.operationEndDate != null) ...[
                       const SizedBox(height: PopqSpacing.sm),
                       ListTile(
+                        key: const Key('store-detail-operation-period'),
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.event_outlined),
                         title: Text(

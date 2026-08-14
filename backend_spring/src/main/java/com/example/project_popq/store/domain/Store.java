@@ -32,6 +32,9 @@ public class Store extends BaseTimeEntity {
     @Column(name = "store_type", nullable = false, length = 30)
     private StoreType storeType;
 
+    @Column(name = "event_name", length = 150)
+    private String eventName;
+
     @Column(name = "name", nullable = false, length = 150)
     private String name;
 
@@ -115,6 +118,10 @@ public class Store extends BaseTimeEntity {
 
     public void changeStoreType(StoreType storeType) {
         this.storeType = storeType;
+    }
+
+    public void updateEventName(String eventName) {
+        this.eventName = eventName;
     }
 
     public void updateDiscoveryProfile(

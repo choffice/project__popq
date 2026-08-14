@@ -14,6 +14,7 @@ import 'seller_store_location_picker_screen.dart';
 import 'seller_local_file_image_io.dart'
     if (dart.library.html) 'seller_local_file_image_web.dart';
 import 'seller_phone_input.dart';
+import 'seller_event_name_autocomplete.dart';
 import 'seller_store_repository.dart';
 import 'seller_tag_editor.dart';
 import '../auth/seller_identity_repository.dart';
@@ -53,6 +54,10 @@ class SellerStoreEditScreen extends StatefulWidget {
 }
 
 class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
+  static const double _eventSuggestionRadiusKm = 10;
+  static const Duration _eventSuggestionDebounceDuration = Duration(
+    milliseconds: 300,
+  );
   static const List<String> _categories = <String>[
     '카페',
     '디저트',
@@ -85,6 +90,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   late final TextEditingController _addressController;
   late final TextEditingController _detailAddressController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _eventNameController;
+  final FocusNode _eventNameFocusNode = FocusNode();
   late final List<String> _tags;
 
   late String _storeType;
@@ -94,13 +101,29 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   Uint8List? _selectedRepresentativeImageBytes;
   _RepresentativeImageAction _representativeImageAction =
       _RepresentativeImageAction.keep;
-  _SelectedStoreLocation? _selectedLocation;
+  _SelectedStoreLocation? _selectedLocationValue;
+  Timer? _eventSuggestionDebounce;
+  int _eventSuggestionRequestSerial = 0;
+  List<SellerNearbyEventSuggestion> _eventSuggestions =
+      const <SellerNearbyEventSuggestion>[];
+  bool _loadingEventSuggestions = false;
+  String? _eventSuggestionError;
+
+  _SelectedStoreLocation? get _selectedLocation => _selectedLocationValue;
+
+  set _selectedLocation(_SelectedStoreLocation? value) {
+    _selectedLocationValue = value;
+    _scheduleEventSuggestionRefresh(value);
+  }
+
   late SellerBusinessSchedule _schedule;
   late bool _takeoutAvailable;
   late bool _dineInAvailable;
   late bool _orderAcceptingEnabled;
   DateTime? _operationStartDate;
   DateTime? _operationEndDate;
+  late final DateTime? _initialOperationEndDate;
+  bool _operationEndDateTouched = false;
 
   bool _pickingRepresentativeImage = false;
   bool _recognizingBusinessRegistration = false;
@@ -122,20 +145,24 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController = TextEditingController(text: store.address);
     _detailAddressController = TextEditingController(text: store.detailAddress);
     _phoneController = TextEditingController(text: store.phone);
+    _eventNameController = TextEditingController(text: store.eventName);
     _tags = List<String>.of(store.tags);
     _storeType = store.storeType;
     _representativeCategory = store.representativeCategory;
     _existingImageUrl = _emptyToNull(store.imageUrl);
-    _schedule = store.schedule ?? SellerBusinessSchedule.legacy(
-      openTime: store.openTime,
-      closeTime: store.closeTime,
-      closedDays: store.closedDays,
-    );
+    _schedule =
+        store.schedule ??
+        SellerBusinessSchedule.legacy(
+          openTime: store.openTime,
+          closeTime: store.closeTime,
+          closedDays: store.closedDays,
+        );
     _takeoutAvailable = store.takeoutAvailable;
     _dineInAvailable = store.dineInAvailable;
     _orderAcceptingEnabled = store.orderAcceptingEnabled;
     _operationStartDate = store.operationStartDate;
     _operationEndDate = store.operationEndDate;
+    _initialOperationEndDate = store.operationEndDate;
 
     if (store.latitude != null && store.longitude != null) {
       _selectedLocation = _SelectedStoreLocation(
@@ -154,6 +181,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     _addressController.dispose();
     _detailAddressController.dispose();
     _phoneController.dispose();
+    _eventSuggestionDebounce?.cancel();
+    _eventNameController.dispose();
+    _eventNameFocusNode.dispose();
     super.dispose();
   }
 
@@ -233,7 +263,15 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                         ? null
                         : (String? value) {
                             if (value != null) {
-                              setState(() => _storeType = value);
+                              setState(() {
+                                _storeType = value;
+                                if (value == 'LOCAL_STORE') {
+                                  _eventNameController.clear();
+                                }
+                                _scheduleEventSuggestionRefresh(
+                                  _selectedLocation,
+                                );
+                              });
                             }
                           },
                   ),
@@ -291,7 +329,10 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
               ),
               _buildAddressSection(context),
               _buildImageSection(context),
-              _buildOperationPeriodSection(context),
+              if (_storeType == 'EVENT_COMMERCE')
+                _buildEventInformationSection(context)
+              else
+                _buildOperationPeriodSection(context),
               _buildOperatingSection(context),
               _buildOrderSection(context),
               _buildSection(
@@ -406,8 +447,6 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
           enabled: !_busy,
           maxLength: 255,
           decoration: const InputDecoration(labelText: '상세주소'),
-          validator: (String? value) =>
-              _requiredValidator(value, '상세주소를 입력해 주세요.'),
         ),
         const SizedBox(height: PopqSpacing.sm),
         Row(
@@ -500,14 +539,14 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                 borderRadius: BorderRadius.circular(12),
                 child: showLocalImage
                     ? kIsWeb
-                    ? Image.memory(
-                        _selectedRepresentativeImageBytes!,
-                        fit: BoxFit.cover,
-                      )
-                    : buildSellerLocalFileImage(
-                        localImage.path,
-                        fit: BoxFit.cover,
-                      )
+                          ? Image.memory(
+                              _selectedRepresentativeImageBytes!,
+                              fit: BoxFit.cover,
+                            )
+                          : buildSellerLocalFileImage(
+                              localImage.path,
+                              fit: BoxFit.cover,
+                            )
                     : showExistingImage
                     ? Image.network(
                         _existingImageUrl!,
@@ -536,7 +575,9 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
                         key: const Key('edit-store-image-remove'),
                         tooltip: '대표사진 제거',
                         icon: Icons.delete_outline_rounded,
-                        onPressed: _busy ? null : _confirmRepresentativeImageRemoval,
+                        onPressed: _busy
+                            ? null
+                            : _confirmRepresentativeImageRemoval,
                       ),
                     ],
                   ],
@@ -586,13 +627,12 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
   }
 
   Widget _buildOperationPeriodSection(BuildContext context) {
-    final bool eventStore = _storeType == 'EVENT_COMMERCE';
     return _buildSection(
       context,
-      title: eventStore ? '행사 운영 기간' : '영업 시작일',
+      title: '영업 기간',
       children: <Widget>[
         _operationDateTile(
-          label: eventStore ? '행사 시작일' : '영업 시작일',
+          label: '영업 시작일',
           value: _operationStartDate,
           onTap: () => _selectOperationDate(start: true),
           onClear: _operationStartDate == null
@@ -601,12 +641,62 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         ),
         const SizedBox(height: PopqSpacing.sm),
         _operationDateTile(
-          label: eventStore ? '행사 종료일' : '영업 종료일(선택)',
+          label: '영업 종료일(선택)',
           value: _operationEndDate,
           onTap: () => _selectOperationDate(start: false),
           onClear: _operationEndDate == null
               ? null
-              : () => setState(() => _operationEndDate = null),
+              : () => setState(() {
+                  _operationEndDate = null;
+                  _operationEndDateTouched = true;
+                }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEventInformationSection(BuildContext context) {
+    return _buildSection(
+      context,
+      title: '행사 정보',
+      children: <Widget>[
+        Text(
+          _selectedLocation == null
+              ? '위치를 선택하면 반경 10km 안의 활성 행사를 추천합니다. 직접 입력도 가능합니다.'
+              : '반경 10km 안의 활성 행사를 선택하거나 새 행사명을 직접 입력할 수 있습니다.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: PopqSpacing.md),
+        SellerEventNameAutocomplete(
+          controller: _eventNameController,
+          focusNode: _eventNameFocusNode,
+          suggestions: _eventSuggestions,
+          enabled: !_busy,
+          loading: _loadingEventSuggestions,
+          errorMessage: _eventSuggestionError,
+          validator: (String? value) =>
+              value == null || value.trim().isEmpty ? '행사명을 입력해 주세요.' : null,
+        ),
+        const SizedBox(height: PopqSpacing.sm),
+        _operationDateTile(
+          label: '영업 시작일 *',
+          value: _operationStartDate,
+          onTap: () => _selectOperationDate(start: true),
+          onClear: _operationStartDate == null
+              ? null
+              : () => setState(() => _operationStartDate = null),
+        ),
+        const SizedBox(height: PopqSpacing.sm),
+        _operationDateTile(
+          label: '영업 종료일 *',
+          value: _operationEndDate,
+          onTap: () => _selectOperationDate(start: false),
+          onClear: _operationEndDate == null
+              ? null
+              : () => setState(() {
+                  _operationEndDate = null;
+                  _operationEndDateTouched = true;
+                }),
         ),
       ],
     );
@@ -652,8 +742,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     final DateTime initial = candidate.isBefore(first)
         ? first
         : candidate.isAfter(last)
-            ? last
-            : candidate;
+        ? last
+        : candidate;
     final DateTime? selected = await showDatePicker(
       context: context,
       initialDate: initial,
@@ -666,6 +756,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         _operationStartDate = DateUtils.dateOnly(selected);
       } else {
         _operationEndDate = DateUtils.dateOnly(selected);
+        _operationEndDateTouched = true;
       }
     });
   }
@@ -674,6 +765,55 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
     final String month = value.month.toString().padLeft(2, '0');
     final String day = value.day.toString().padLeft(2, '0');
     return '${value.year}.$month.$day';
+  }
+
+  void _scheduleEventSuggestionRefresh(_SelectedStoreLocation? location) {
+    _eventSuggestionDebounce?.cancel();
+    final int requestSerial = ++_eventSuggestionRequestSerial;
+    _eventSuggestions = const <SellerNearbyEventSuggestion>[];
+    _eventSuggestionError = null;
+    if (location == null || _storeType != 'EVENT_COMMERCE') {
+      _loadingEventSuggestions = false;
+      return;
+    }
+    _loadingEventSuggestions = true;
+
+    _eventSuggestionDebounce = Timer(
+      _eventSuggestionDebounceDuration,
+      () => _loadEventSuggestions(location, requestSerial),
+    );
+  }
+
+  Future<void> _loadEventSuggestions(
+    _SelectedStoreLocation location,
+    int requestSerial,
+  ) async {
+    try {
+      final List<SellerNearbyEventSuggestion> suggestions = await widget
+          .repository
+          .findNearbyEventNames(
+            latitude: location.latitude,
+            longitude: location.longitude,
+            radiusKm: _eventSuggestionRadiusKm,
+          );
+      if (!mounted || requestSerial != _eventSuggestionRequestSerial) {
+        return;
+      }
+      setState(() {
+        _eventSuggestions = suggestions;
+        _loadingEventSuggestions = false;
+        _eventSuggestionError = null;
+      });
+    } catch (_) {
+      if (!mounted || requestSerial != _eventSuggestionRequestSerial) {
+        return;
+      }
+      setState(() {
+        _eventSuggestions = const <SellerNearbyEventSuggestion>[];
+        _loadingEventSuggestions = false;
+        _eventSuggestionError = '인근 행사 정보를 불러오지 못했습니다. 행사명을 직접 입력할 수 있습니다.';
+      });
+    }
   }
 
   Widget _buildOrderSection(BuildContext context) {
@@ -752,23 +892,25 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         ),
       );
       final Position resolvedPosition = position;
-      final SellerReverseGeocodeResult result =
-          await widget.repository.reverseGeocode(
-        latitude: resolvedPosition.latitude,
-        longitude: resolvedPosition.longitude,
-      );
+      final SellerReverseGeocodeResult result = await widget.repository
+          .reverseGeocode(
+            latitude: resolvedPosition.latitude,
+            longitude: resolvedPosition.longitude,
+          );
       if (!mounted) return;
 
       final String currentAddress = _addressController.text.trim();
       final String resolvedAddress = result.displayAddress.trim();
-      bool apply = currentAddress.isEmpty ||
+      bool apply =
+          currentAddress.isEmpty ||
           _normalizeText(currentAddress) == _normalizeText(resolvedAddress) ||
           result.addressCandidates.any(
             (String candidate) =>
                 _normalizeText(candidate) == _normalizeText(currentAddress),
           );
       if (!apply) {
-        apply = await showDialog<bool>(
+        apply =
+            await showDialog<bool>(
               context: context,
               builder: (BuildContext dialogContext) => AlertDialog(
                 title: const Text('현재 위치 주소 적용'),
@@ -850,9 +992,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       context: context,
       builder: (BuildContext dialogContext) => AlertDialog(
         title: const Text('대표사진을 제거할까요?'),
-        content: const Text(
-          '대표사진 연결만 제거되며 서버에 업로드된 실제 파일은 삭제되지 않습니다.',
-        ),
+        content: const Text('대표사진 연결만 제거되며 서버에 업로드된 실제 파일은 삭제되지 않습니다.'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -892,8 +1032,7 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         return;
       }
       if (image != null) {
-        final Uint8List? imageBytes =
-        kIsWeb ? await image.readAsBytes() : null;
+        final Uint8List? imageBytes = kIsWeb ? await image.readAsBytes() : null;
         setState(() {
           _selectedRepresentativeImage = image;
           _selectedRepresentativeImageBytes = imageBytes;
@@ -1476,10 +1615,24 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       _showMessage(scheduleError);
       return;
     }
+    if (_storeType == 'EVENT_COMMERCE') {
+      if (_eventNameController.text.trim().isEmpty) {
+        _showMessage('행사명을 입력해 주세요.');
+        return;
+      }
+      if (_operationStartDate == null) {
+        _showMessage('영업 시작일을 선택해 주세요.');
+        return;
+      }
+      if (_operationEndDate == null) {
+        _showMessage('영업 종료일을 선택해 주세요.');
+        return;
+      }
+    }
     if (_operationStartDate != null &&
         _operationEndDate != null &&
         _operationEndDate!.isBefore(_operationStartDate!)) {
-      _showMessage('운영 종료일은 시작일보다 빠를 수 없습니다.');
+      _showMessage('영업 종료일은 시작일보다 빠를 수 없습니다.');
       return;
     }
     if (!_takeoutAvailable && !_dineInAvailable) {
@@ -1512,10 +1665,20 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
       }
 
       final _SelectedStoreLocation? location = _selectedLocation;
+      final bool? clearOperationEndDate =
+          _storeType == 'LOCAL_STORE' &&
+              _operationEndDateTouched &&
+              _initialOperationEndDate != null &&
+              _operationEndDate == null
+          ? true
+          : null;
       final SellerStore updated = await widget.repository.update(
         widget.store.storeId,
         storeType: _storeType,
         name: _nameController.text.trim(),
+        eventName: _storeType == 'EVENT_COMMERCE'
+            ? _eventNameController.text.trim()
+            : null,
         description: _emptyToNull(_descriptionController.text),
         address: _addressController.text.trim(),
         detailAddress: _detailAddressController.text.trim(),
@@ -1527,7 +1690,8 @@ class _SellerStoreEditScreenState extends State<SellerStoreEditScreen> {
         openTime: _schedule.legacyOpenTimeForApi,
         closeTime: _schedule.legacyCloseTimeForApi,
         operationStartDate: _operationStartDate,
-        operationEndDate: _operationEndDate,
+        operationEndDate: _operationEndDateTouched ? _operationEndDate : null,
+        clearOperationEndDate: clearOperationEndDate,
         closedDays: _schedule.legacyClosedDays,
         schedule: _schedule,
         takeoutAvailable: _takeoutAvailable,
