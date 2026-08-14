@@ -1,4 +1,5 @@
 export 'src/auth/auth_session.dart';
+export 'src/auth/auth_input_validator.dart';
 export 'src/auth/google_auth_service.dart';
 export 'src/auth/memory_session_store.dart';
 export 'src/auth/secure_session_store.dart';

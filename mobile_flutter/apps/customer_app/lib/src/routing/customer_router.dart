@@ -124,8 +124,11 @@ GoRouter createCustomerRouter({
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   })
   onSignUp,
+  required Future<void> Function(String email) onSendEmailVerificationCode,
+  required Future<String> Function(String email, String code) onVerifyEmailCode,
   required Future<String> Function(String name, String phone) onFindId,
   required Future<void> Function(String email, String phone)
   onVerifyForPasswordReset,
@@ -312,7 +315,11 @@ GoRouter createCustomerRouter({
       GoRoute(
         path: CustomerRoutes.signUp,
         builder: (context, state) {
-          return CustomerSignUpScreen(onSignUp: onSignUp);
+          return CustomerSignUpScreen(
+            onSignUp: onSignUp,
+            onSendEmailVerificationCode: onSendEmailVerificationCode,
+            onVerifyEmailCode: onVerifyEmailCode,
+          );
         },
       ),
       GoRoute(

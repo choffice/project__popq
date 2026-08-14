@@ -1,0 +1,147 @@
+import 'package:popq_app_core/popq_app_core.dart';
+
+import 'seller_support_faq.dart';
+import 'seller_support_repository.dart';
+import 'seller_support_ticket.dart';
+import 'seller_support_types.dart';
+
+class ApiSellerSupportRepository implements SellerSupportRepository {
+  ApiSellerSupportRepository(
+    this._apiClient, {
+    required SellerSupportRepository faqRepository,
+  }) : _faqRepository = faqRepository;
+
+  static const String _ticketPath = '/api/v1/support/tickets';
+
+  final PopqApiClient _apiClient;
+
+  /// FAQ 공통 API가 연결되기 전까지 기존 메모리 FAQ를 사용합니다.
+  final SellerSupportRepository _faqRepository;
+
+  @override
+  Future<List<SellerSupportFaq>> getPopularFaqs() {
+    return _faqRepository.getPopularFaqs();
+  }
+
+  @override
+  Future<List<SellerSupportFaq>> getFaqs({String? keyword}) {
+    return _faqRepository.getFaqs(keyword: keyword);
+  }
+
+  @override
+  Future<SellerSupportTicketDetail> createTicket({
+    required SellerSupportCategory category,
+    required String subject,
+    required String content,
+  }) {
+    final normalizedSubject = subject.trim();
+    final normalizedContent = content.trim();
+
+    _validateSubject(normalizedSubject);
+    _validateContent(normalizedContent);
+
+    return _apiClient.post(
+      _ticketPath,
+      body: <String, Object?>{
+        'requesterType': 'SELLER',
+        'category': category.apiValue,
+        'subject': normalizedSubject,
+        'content': normalizedContent,
+      },
+      decode: _decodeTicketDetail,
+    );
+  }
+
+  @override
+  Future<List<SellerSupportTicketSummary>> getMyTickets() {
+    return _apiClient.get(
+      _ticketPath,
+      query: const <String, Object?>{'page': 0, 'size': 100},
+      decode: (value) {
+        final page = Map<String, Object?>.from(value as Map);
+
+        final content = page['content'] as List<Object?>;
+
+        return content
+            .map(
+              (item) => SellerSupportTicketSummary.fromJson(
+                Map<String, Object?>.from(item as Map),
+              ),
+            )
+            .toList(growable: false);
+      },
+    );
+  }
+
+  @override
+  Future<SellerSupportTicketDetail> getMyTicket(int supportTicketId) {
+    _validateTicketId(supportTicketId);
+
+    return _apiClient.get(
+      '$_ticketPath/$supportTicketId',
+      decode: _decodeTicketDetail,
+    );
+  }
+
+  @override
+  Future<SellerSupportTicketDetail> sendMessage({
+    required int supportTicketId,
+    required String content,
+  }) {
+    _validateTicketId(supportTicketId);
+
+    final normalizedContent = content.trim();
+    _validateContent(normalizedContent);
+
+    return _apiClient.post(
+      '$_ticketPath/$supportTicketId/messages',
+      body: <String, Object?>{'content': normalizedContent},
+      decode: _decodeTicketDetail,
+    );
+  }
+
+  @override
+  Future<SellerSupportTicketDetail> markTicketAsRead(int supportTicketId) {
+    _validateTicketId(supportTicketId);
+
+    // 현재 공통 티켓 백엔드에는 읽음 처리 API가 없습니다.
+    // 상세 내용을 다시 조회해 현재 서버 상태를 반환합니다.
+    return getMyTicket(supportTicketId);
+  }
+
+  SellerSupportTicketDetail _decodeTicketDetail(Object? value) {
+    return SellerSupportTicketDetail.fromJson(
+      Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  void _validateTicketId(int supportTicketId) {
+    if (supportTicketId <= 0) {
+      throw ArgumentError.value(
+        supportTicketId,
+        'supportTicketId',
+        '문의 번호는 1 이상이어야 합니다.',
+      );
+    }
+  }
+
+  void _validateSubject(String subject) {
+    if (subject.isEmpty) {
+      throw ArgumentError('문의 제목을 입력해 주세요.');
+    }
+
+    if (subject.length > 200) {
+      throw ArgumentError('문의 제목은 200자 이하로 입력해 주세요.');
+    }
+  }
+
+  void _validateContent(String content) {
+    if (content.isEmpty) {
+      throw ArgumentError('문의 내용을 입력해 주세요.');
+    }
+
+    if (content.length > 4000) {
+      throw ArgumentError('문의 내용은 4000자 이하로 입력해 주세요.');
+    }
+  }
+}

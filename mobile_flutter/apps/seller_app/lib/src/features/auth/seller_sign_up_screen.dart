@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
@@ -6,15 +7,23 @@ import 'package:popq_design_system/popq_design_system.dart';
 import '../../routing/seller_router.dart';
 
 class SellerSignUpScreen extends StatefulWidget {
-  const SellerSignUpScreen({required this.onSignUp, super.key});
+  const SellerSignUpScreen({
+    required this.onSignUp,
+    required this.onSendEmailVerificationCode,
+    required this.onVerifyEmailCode,
+    super.key,
+  });
 
   final Future<void> Function({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   })
   onSignUp;
+  final Future<void> Function(String email) onSendEmailVerificationCode;
+  final Future<String> Function(String email, String code) onVerifyEmailCode;
 
   @override
   State<SellerSignUpScreen> createState() => _SellerSignUpScreenState();
@@ -23,12 +32,15 @@ class SellerSignUpScreen extends StatefulWidget {
 class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
+  final _emailCode = TextEditingController();
   final _password = TextEditingController();
   final _passwordConfirm = TextEditingController();
   final _name = TextEditingController();
   final _phone = TextEditingController();
   var _busy = false;
+  var _sendingCode = false;
   var _agreed = false;
+  String? _emailVerificationToken;
   String? _errorMessage;
 
   static final _passwordPattern = RegExp(r'^(?=.*[A-Za-z])(?=.*\d).+$');
@@ -41,6 +53,7 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
   @override
   void dispose() {
     _email.dispose();
+    _emailCode.dispose();
     _password.dispose();
     _passwordConfirm.dispose();
     _name.dispose();
@@ -70,15 +83,32 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(labelText: '이메일'),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '이메일을 입력해 주세요.';
+                    validator: AuthInputValidator.validateEmail,
+                    onChanged: (_) {
+                      if (_emailVerificationToken != null) {
+                        setState(() {
+                          _emailVerificationToken = null;
+                          _emailCode.clear();
+                        });
                       }
-                      if (!value.contains('@')) {
-                        return '올바른 이메일 형식이 아닙니다.';
-                      }
-                      return null;
                     },
+                  ),
+                  const SizedBox(height: PopqSpacing.sm),
+                  OutlinedButton(
+                    key: const Key('sign-up-send-email-code'),
+                    onPressed: _sendingCode || _emailVerificationToken != null
+                        ? null
+                        : _sendEmailCode,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    child: Text(
+                      _emailVerificationToken != null
+                          ? '이메일 인증 완료'
+                          : _sendingCode
+                          ? '발송 중...'
+                          : '인증번호 발송',
+                    ),
                   ),
                   const SizedBox(height: PopqSpacing.sm),
                   TextFormField(
@@ -87,7 +117,8 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                     maxLength: 7,
                     decoration: const InputDecoration(
                       labelText: '닉네임',
-                      helperText: '7자 이하 · 한글/영문/숫자/일본어/한자/공백',
+                      hintText: '한글·영문·숫자·일본어·한자, 7자 이하',
+                      counterText: '',
                     ),
                     validator: (value) {
                       final nickname = value?.trim() ?? '';
@@ -128,7 +159,7 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                     obscureText: true,
                     decoration: const InputDecoration(
                       labelText: '비밀번호',
-                      helperText: '영문과 숫자를 포함해 8자 이상 입력해 주세요.',
+                      hintText: '영문·숫자 포함 8자 이상',
                     ),
                     validator: (value) {
                       if (value == null || value.length < 8) {
@@ -163,7 +194,9 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
                           setState(() => _agreed = value ?? false);
                         },
                       ),
-                      const Text('데이터 잘 쓸게요'),
+                      const Expanded(
+                        child: Text('이용약관 및 개인정보 처리방침에 동의합니다. (필수)'),
+                      ),
                     ],
                   ),
                   const SizedBox(height: PopqSpacing.sm),
@@ -194,8 +227,13 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
 
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    final emailVerificationToken = _emailVerificationToken;
+    if (emailVerificationToken == null) {
+      setState(() => _errorMessage = '이메일 인증을 완료해 주세요.');
+      return;
+    }
     if (!_agreed) {
-      setState(() => _errorMessage = '데이터 이용에 동의해 주세요.');
+      setState(() => _errorMessage = '필수 약관에 동의해 주세요.');
       return;
     }
     setState(() {
@@ -208,6 +246,7 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
         password: _password.text,
         name: _name.text.trim(),
         phone: _phone.text.trim(),
+        emailVerificationToken: emailVerificationToken,
       );
 
       if (!mounted) return;
@@ -228,5 +267,139 @@ class _SellerSignUpScreenState extends State<SellerSignUpScreen> {
         _errorMessage = '회원가입에 실패했습니다. 다시 시도해 주세요.';
       });
     }
+  }
+
+  Future<void> _sendEmailCode() async {
+    final emailError = AuthInputValidator.validateEmail(_email.text);
+    if (emailError != null) {
+      setState(() => _errorMessage = emailError);
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _sendingCode = true;
+      _errorMessage = null;
+      _emailVerificationToken = null;
+      _emailCode.clear();
+    });
+    try {
+      await widget.onSendEmailVerificationCode(_email.text.trim());
+      if (!mounted) return;
+      setState(() {
+        _sendingCode = false;
+      });
+      final token = await _showEmailVerificationDialog(_email.text.trim());
+      if (!mounted || token == null) return;
+      setState(() {
+        _emailVerificationToken = token;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showTopSnackBar(const SnackBar(content: Text('이메일 인증이 완료되었습니다.')));
+    } on PopqFailure catch (failure) {
+      if (!mounted) return;
+      setState(() {
+        _sendingCode = false;
+        _errorMessage = failure.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _sendingCode = false;
+        _errorMessage = '인증번호를 발송하지 못했습니다. 다시 시도해 주세요.';
+      });
+    }
+  }
+
+  Future<String?> _showEmailVerificationDialog(String email) {
+    _emailCode.clear();
+    var verifying = false;
+    String? dialogError;
+
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: const Text('이메일 인증'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('$email\n이메일로 전송된 인증번호를 입력해 주세요.'),
+                  const SizedBox(height: PopqSpacing.md),
+                  TextField(
+                    key: const Key('sign-up-email-code-dialog'),
+                    controller: _emailCode,
+                    autofocus: true,
+                    enabled: !verifying,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: '인증번호',
+                      hintText: '숫자 6자리',
+                      errorText: dialogError,
+                      counterText: '',
+                    ),
+                    maxLength: 6,
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: verifying
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('취소'),
+                ),
+                FilledButton(
+                  key: const Key('sign-up-verify-email-code-dialog'),
+                  onPressed: verifying
+                      ? null
+                      : () async {
+                          if (_emailCode.text.length != 6) {
+                            setDialogState(() {
+                              dialogError = '인증번호 6자리를 입력해 주세요.';
+                            });
+                            return;
+                          }
+                          setDialogState(() {
+                            verifying = true;
+                            dialogError = null;
+                          });
+                          try {
+                            final token = await widget.onVerifyEmailCode(
+                              email,
+                              _emailCode.text,
+                            );
+                            if (!dialogContext.mounted) return;
+                            Navigator.of(dialogContext).pop(token);
+                          } on PopqFailure catch (failure) {
+                            if (!dialogContext.mounted) return;
+                            setDialogState(() {
+                              verifying = false;
+                              dialogError = failure.message;
+                            });
+                          } catch (_) {
+                            if (!dialogContext.mounted) return;
+                            setDialogState(() {
+                              verifying = false;
+                              dialogError = '인증번호를 확인하지 못했습니다.';
+                            });
+                          }
+                        },
+                  child: Text(verifying ? '확인 중...' : '확인'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 }

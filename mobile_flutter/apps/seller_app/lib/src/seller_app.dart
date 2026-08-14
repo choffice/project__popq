@@ -24,6 +24,7 @@ import 'features/stores/seller_store_repository.dart';
 import 'features/stores/seller_store_selection_controller.dart';
 import 'features/stores/seller_store_selection_store.dart';
 import 'features/support/seller_support_memory_repository.dart';
+import 'features/support/seller_support_api_repository.dart';
 import 'features/support/seller_support_repository.dart';
 import 'notifications/seller_push_device_repository.dart';
 import 'notifications/seller_push_notification_service.dart';
@@ -235,7 +236,11 @@ class _PopqSellerAppState extends State<PopqSellerApp>
         ApiSellerOperationalAlertRepository(_apiClient);
 
     _supportRepository =
-        widget.supportRepository ?? MemorySellerSupportRepository();
+        widget.supportRepository ??
+        ApiSellerSupportRepository(
+          _apiClient,
+          faqRepository: MemorySellerSupportRepository(),
+        );
 
     final identityRepository =
         widget.identityRepository ??
@@ -274,6 +279,8 @@ class _PopqSellerAppState extends State<PopqSellerApp>
       onConnectCustomerAccess: _connectCustomerAccess,
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onSendEmailVerificationCode: _sendEmailVerificationCode,
+      onVerifyEmailCode: _verifyEmailCode,
       onFindId: _findId,
       onVerifyForPasswordReset: _verifyForPasswordReset,
       onResetPassword: _resetPassword,
@@ -313,13 +320,23 @@ class _PopqSellerAppState extends State<PopqSellerApp>
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
+      emailVerificationToken: emailVerificationToken,
     );
+  }
+
+  Future<void> _sendEmailVerificationCode(String email) {
+    return _authRepository.sendEmailVerificationCode(email: email);
+  }
+
+  Future<String> _verifyEmailCode(String email, String code) {
+    return _authRepository.verifyEmailCode(email: email, code: code);
   }
 
   Future<String> _findId(String name, String phone) {

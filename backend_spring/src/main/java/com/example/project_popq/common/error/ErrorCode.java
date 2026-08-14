@@ -15,6 +15,12 @@ public enum ErrorCode {
   DUPLICATE_USER(HttpStatus.CONFLICT, "이미 등록된 사용자입니다."),
   DUPLICATE_PHONE(HttpStatus.CONFLICT, "이미 등록된 전화번호입니다."),
   INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
+  EMAIL_VERIFICATION_REQUIRED(HttpStatus.BAD_REQUEST, "이메일 인증을 완료해 주세요."),
+  EMAIL_VERIFICATION_INVALID(HttpStatus.BAD_REQUEST, "이메일 인증번호가 올바르지 않습니다."),
+  EMAIL_VERIFICATION_EXPIRED(HttpStatus.BAD_REQUEST, "이메일 인증번호가 만료되었습니다. 다시 발송해 주세요."),
+  EMAIL_VERIFICATION_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "인증번호는 1분 후 다시 발송할 수 있습니다."),
+  EMAIL_VERIFICATION_ATTEMPTS_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "인증번호 입력 횟수를 초과했습니다. 다시 발송해 주세요."),
+  EMAIL_DELIVERY_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "인증 이메일을 발송하지 못했습니다."),
   INVALID_SOCIAL_TOKEN(
           HttpStatus.UNAUTHORIZED,
           "유효하지 않은 소셜 로그인 토큰입니다."

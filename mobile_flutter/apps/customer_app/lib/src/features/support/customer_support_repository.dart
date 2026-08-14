@@ -17,7 +17,9 @@ abstract interface class CustomerSupportRepository {
 
   Future<List<CustomerSupportInquirySummary>> getMyInquiries();
 
-  Future<CustomerSupportInquiryDetail> getMyInquiry(int supportInquiryId);
+  Future<CustomerSupportInquiryDetail> getMyInquiry(
+      int supportInquiryId,
+      );
 
   Future<CustomerSupportInquiryDetail> sendMessage({
     required int supportInquiryId,
@@ -25,27 +27,34 @@ abstract interface class CustomerSupportRepository {
   });
 }
 
-class ApiCustomerSupportRepository implements CustomerSupportRepository {
+class ApiCustomerSupportRepository
+    implements CustomerSupportRepository {
   ApiCustomerSupportRepository(this._apiClient);
+
+  static const String _ticketPath = '/api/v1/support/tickets';
+  static const String _faqPath = '/api/v1/customer/support/faqs';
 
   final PopqApiClient _apiClient;
 
   @override
   Future<List<CustomerSupportFaq>> getPopularFaqs() {
     return _apiClient.get(
-      '/api/v1/customer/support/faqs/popular',
+      '$_faqPath/popular',
       decode: _decodeFaqList,
     );
   }
 
   @override
-  Future<List<CustomerSupportFaq>> getFaqs({String? keyword}) {
+  Future<List<CustomerSupportFaq>> getFaqs({
+    String? keyword,
+  }) {
     final normalizedKeyword = keyword?.trim();
 
     return _apiClient.get(
-      '/api/v1/customer/support/faqs',
+      _faqPath,
       query: <String, Object?>{
-        if (normalizedKeyword != null && normalizedKeyword.isNotEmpty)
+        if (normalizedKeyword != null &&
+            normalizedKeyword.isNotEmpty)
           'keyword': normalizedKeyword,
       },
       decode: _decodeFaqList,
@@ -65,10 +74,11 @@ class ApiCustomerSupportRepository implements CustomerSupportRepository {
     _validateContent(normalizedContent);
 
     return _apiClient.post(
-      '/api/v1/customer/support/inquiries',
+      _ticketPath,
       body: <String, Object?>{
+        'requesterType': 'CUSTOMER',
         'category': category.apiValue,
-        'title': normalizedTitle,
+        'subject': normalizedTitle,
         'content': normalizedContent,
       },
       decode: _decodeInquiryDetail,
@@ -76,28 +86,43 @@ class ApiCustomerSupportRepository implements CustomerSupportRepository {
   }
 
   @override
-  Future<List<CustomerSupportInquirySummary>> getMyInquiries() {
+  Future<List<CustomerSupportInquirySummary>>
+  getMyInquiries() {
     return _apiClient.get(
-      '/api/v1/customer/support/inquiries',
+      _ticketPath,
+      query: const <String, Object?>{
+        'page': 0,
+        'size': 100,
+      },
       decode: (Object? value) {
-        return (value as List<Object?>)
+        final page = Map<String, Object?>.from(
+          value as Map,
+        );
+
+        final content = page['content'] as List<Object?>;
+
+        return content
             .map(
-              (item) => CustomerSupportInquirySummary.fromJson(
-                Map<String, Object?>.from(item as Map),
+              (item) =>
+              CustomerSupportInquirySummary.fromJson(
+                Map<String, Object?>.from(
+                  item as Map,
+                ),
               ),
-            )
+        )
             .toList(growable: false);
       },
     );
   }
 
   @override
-  Future<CustomerSupportInquiryDetail> getMyInquiry(int supportInquiryId) {
+  Future<CustomerSupportInquiryDetail> getMyInquiry(
+      int supportInquiryId,
+      ) {
     _validateInquiryId(supportInquiryId);
 
     return _apiClient.get(
-      '/api/v1/customer/support/inquiries/'
-      '$supportInquiryId',
+      '$_ticketPath/$supportInquiryId',
       decode: _decodeInquiryDetail,
     );
   }
@@ -113,24 +138,29 @@ class ApiCustomerSupportRepository implements CustomerSupportRepository {
     _validateContent(normalizedContent);
 
     return _apiClient.post(
-      '/api/v1/customer/support/inquiries/'
-      '$supportInquiryId/messages',
-      body: <String, Object?>{'content': normalizedContent},
+      '$_ticketPath/$supportInquiryId/messages',
+      body: <String, Object?>{
+        'content': normalizedContent,
+      },
       decode: _decodeInquiryDetail,
     );
   }
 
-  List<CustomerSupportFaq> _decodeFaqList(Object? value) {
+  List<CustomerSupportFaq> _decodeFaqList(
+      Object? value,
+      ) {
     return (value as List<Object?>)
         .map(
           (item) => CustomerSupportFaq.fromJson(
-            Map<String, Object?>.from(item as Map),
-          ),
-        )
+        Map<String, Object?>.from(item as Map),
+      ),
+    )
         .toList(growable: false);
   }
 
-  CustomerSupportInquiryDetail _decodeInquiryDetail(Object? value) {
+  CustomerSupportInquiryDetail _decodeInquiryDetail(
+      Object? value,
+      ) {
     return CustomerSupportInquiryDetail.fromJson(
       Map<String, Object?>.from(value as Map),
     );
@@ -141,28 +171,36 @@ class ApiCustomerSupportRepository implements CustomerSupportRepository {
       throw ArgumentError.value(
         supportInquiryId,
         'supportInquiryId',
-        '문의 ID는 1 이상이어야 합니다.',
+        '문의 번호는 1 이상이어야 합니다.',
       );
     }
   }
 
   void _validateTitle(String title) {
     if (title.isEmpty) {
-      throw ArgumentError.value(title, 'title', '문의 제목을 입력해 주세요.');
+      throw ArgumentError(
+        '문의 제목을 입력해 주세요.',
+      );
     }
 
     if (title.length > 200) {
-      throw ArgumentError.value(title, 'title', '문의 제목은 200자 이하여야 합니다.');
+      throw ArgumentError(
+        '문의 제목은 200자 이하로 입력해 주세요.',
+      );
     }
   }
 
   void _validateContent(String content) {
     if (content.isEmpty) {
-      throw ArgumentError.value(content, 'content', '문의 내용을 입력해 주세요.');
+      throw ArgumentError(
+        '문의 내용을 입력해 주세요.',
+      );
     }
 
-    if (content.length > 3000) {
-      throw ArgumentError.value(content, 'content', '문의 내용은 3,000자 이하여야 합니다.');
+    if (content.length > 4000) {
+      throw ArgumentError(
+        '문의 내용은 4,000자 이하로 입력해 주세요.',
+      );
     }
   }
 }

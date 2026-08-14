@@ -13,6 +13,9 @@ typedef PopqRealtimeEventCallback = void Function(PopqRealtimeEvent event);
 typedef PopqOrderRealtimeEventCallback =
     void Function(PopqOrderRealtimeEvent event);
 
+typedef PopqSupportTicketRealtimeEventCallback =
+    void Function(PopqSupportTicketRealtimeEvent event);
+
 typedef _PopqRealtimeJsonCallback = void Function(Map<String, Object?> json);
 
 typedef PopqRealtimeErrorCallback = void Function(Object error);
@@ -228,6 +231,19 @@ class PopqRealtimeClient extends ChangeNotifier {
     );
   }
 
+  PopqRealtimeSubscription subscribeToSupportTickets({
+    required PopqSupportTicketRealtimeEventCallback onEvent,
+    PopqRealtimeErrorCallback? onError,
+  }) {
+    return _subscribe(
+      destination: '/user/queue/support/tickets',
+      onJson: (Map<String, Object?> json) {
+        onEvent(PopqSupportTicketRealtimeEvent.fromJson(json));
+      },
+      onError: onError,
+    );
+  }
+
   PopqRealtimeSubscription subscribeToCustomerOrders({
     required PopqOrderRealtimeEventCallback onEvent,
     PopqRealtimeErrorCallback? onError,
@@ -394,19 +410,11 @@ class PopqRealtimeClient extends ChangeNotifier {
           );
 
           if (_isAuthenticationError(frame)) {
-            unawaited(
-              _handleAuthenticationFailure(
-                generation,
-                error,
-              ),
-            );
+            unawaited(_handleAuthenticationFailure(generation, error));
             return;
           }
 
-          _handleConnectionLost(
-            generation,
-            error,
-          );
+          _handleConnectionLost(generation, error);
         },
         onWebSocketError: (dynamic error) {
           _handleConnectionLost(

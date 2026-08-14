@@ -5,8 +5,10 @@ import {
   getAdminSupportInquiry,
   sendAdminSupportAnswer,
 } from "../../services/api";
+import { connectAdminSupportRealtime } from "../../services/realtime";
 import type {
   SellerConnection,
+  SupportInquiryCategory,
   SupportInquiryDetail,
   SupportInquiryStatus,
   SupportInquirySummary,
@@ -25,12 +27,10 @@ const statusLabels: Record<SupportInquiryStatus, string> = {
   CLOSED: "종료",
 };
 
-const categoryLabels: Record<string, string> = {
+const categoryLabels: Record<SupportInquiryCategory, string> = {
   ACCOUNT: "계정",
-  ORDER: "주문",
-  PAYMENT: "결제·환불",
-  COUPON: "쿠폰",
-  APP: "앱 이용",
+  STORE_VISIBILITY: "매장 노출",
+  ORDER_PAYMENT: "주문·결제",
   OTHER: "기타",
 };
 
@@ -134,6 +134,47 @@ export function SupportManagement({
       window.clearTimeout(timer);
     };
   }, [onError, refreshList]);
+
+  useEffect(() => {
+    if (!connection) {
+      return;
+    }
+
+    return connectAdminSupportRealtime(connection, (event) => {
+      if (event.requesterType !== "CUSTOMER") {
+        return;
+      }
+
+      void refreshList()
+        .then(() => {
+          onError(null);
+        })
+        .catch((caught: unknown) => {
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : "문의 목록을 새로 불러오지 못했습니다.",
+          );
+        });
+
+      if (selectedId !== event.ticketId) {
+        return;
+      }
+
+      void getAdminSupportInquiry(connection, event.ticketId)
+        .then((result) => {
+          setDetail(result);
+          onError(null);
+        })
+        .catch((caught: unknown) => {
+          onError(
+            caught instanceof Error
+              ? caught.message
+              : "문의 내용을 새로 불러오지 못했습니다.",
+          );
+        });
+    });
+  }, [connection, onError, refreshList, selectedId]);
 
   useEffect(() => {
     let active = true;

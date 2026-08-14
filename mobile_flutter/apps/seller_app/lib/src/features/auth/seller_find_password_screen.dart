@@ -71,7 +71,7 @@ class _SellerFindPasswordScreenState extends State<SellerFindPasswordScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return '아이디를 입력해 주세요.';
                       }
-                      if (!value.contains('@')) {
+                      if (!AuthInputValidator.isValidEmail(value)) {
                         return '올바른 이메일 형식이 아닙니다.';
                       }
                       return null;
@@ -130,7 +130,7 @@ class _SellerFindPasswordScreenState extends State<SellerFindPasswordScreen> {
                       obscureText: true,
                       decoration: const InputDecoration(
                         labelText: '새 비밀번호',
-                        helperText: '영문과 숫자를 포함해 8자 이상 입력해 주세요.',
+                        hintText: '영문·숫자 포함 8자 이상',
                       ),
                       validator: (value) {
                         if (value == null || value.length < 8) {
