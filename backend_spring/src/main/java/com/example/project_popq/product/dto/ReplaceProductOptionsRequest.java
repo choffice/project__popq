@@ -16,8 +16,23 @@ public record ReplaceProductOptionsRequest(
             @PositiveOrZero int maxSelect,
             boolean required,
             @PositiveOrZero int displayOrder,
-            @NotNull @Size(min = 1) @Valid List<OptionRequest> options
+            @NotNull @Size(min = 1) @Valid List<OptionRequest> options,
+            Long templateId,
+            @PositiveOrZero Long appliedTemplateVersion
     ) {
+        public OptionGroupRequest(
+                String name,
+                int minSelect,
+                int maxSelect,
+                boolean required,
+                int displayOrder,
+                List<OptionRequest> options
+        ) {
+            this(
+                    name, minSelect, maxSelect, required, displayOrder,
+                    options, null, null
+            );
+        }
     }
 
     public record OptionRequest(
@@ -27,4 +42,3 @@ public record ReplaceProductOptionsRequest(
     ) {
     }
 }
-

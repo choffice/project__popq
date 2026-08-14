@@ -51,6 +51,13 @@ public class ProductOptionGroup extends BaseTimeEntity {
     @Column(name = "display_order", nullable = false)
     private int displayOrder;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_option_group_template_id")
+    private StoreOptionGroupTemplate storeOptionGroupTemplate;
+
+    @Column(name = "applied_template_version")
+    private Long appliedTemplateVersion;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private CatalogStatus status;
@@ -69,7 +76,9 @@ public class ProductOptionGroup extends BaseTimeEntity {
             int minSelect,
             int maxSelect,
             boolean required,
-            int displayOrder
+            int displayOrder,
+            StoreOptionGroupTemplate storeOptionGroupTemplate,
+            Long appliedTemplateVersion
     ) {
         this.product = product;
         this.name = name;
@@ -77,6 +86,8 @@ public class ProductOptionGroup extends BaseTimeEntity {
         this.maxSelect = maxSelect;
         this.required = required;
         this.displayOrder = displayOrder;
+        this.storeOptionGroupTemplate = storeOptionGroupTemplate;
+        this.appliedTemplateVersion = appliedTemplateVersion;
         this.status = CatalogStatus.ACTIVE;
     }
 
@@ -94,12 +105,54 @@ public class ProductOptionGroup extends BaseTimeEntity {
                 minSelect,
                 maxSelect,
                 required,
-                displayOrder
+                displayOrder,
+                null,
+                null
+        );
+    }
+
+    public static ProductOptionGroup createFromTemplate(
+            Product product,
+            String name,
+            int minSelect,
+            int maxSelect,
+            boolean required,
+            int displayOrder,
+            StoreOptionGroupTemplate template,
+            Long appliedTemplateVersion
+    ) {
+        return new ProductOptionGroup(
+                product,
+                name,
+                minSelect,
+                maxSelect,
+                required,
+                displayOrder,
+                template,
+                appliedTemplateVersion
         );
     }
 
     public void addOption(String name, long additionalPrice, int displayOrder) {
         options.add(ProductOption.create(this, name, additionalPrice, displayOrder));
     }
-}
 
+    public void applyTemplateValues(
+            String name,
+            int minSelect,
+            int maxSelect,
+            boolean required,
+            long templateVersion,
+            List<StoreOptionTemplateOption.Value> optionValues
+    ) {
+        this.name = name;
+        this.minSelect = minSelect;
+        this.maxSelect = maxSelect;
+        this.required = required;
+        this.appliedTemplateVersion = templateVersion;
+        this.options.clear();
+        optionValues.forEach(value -> addOption(
+                value.name(), value.additionalPrice(), value.displayOrder()
+        ));
+    }
+}

@@ -483,6 +483,8 @@ abstract interface class SellerStoreRepository {
 
   Future<List<SellerStore>> findInactive();
 
+  Future<void> reorderStores(List<int> storeIds);
+
   Future<List<SellerDashboardSummary>> findDashboardSummaries();
 
   Future<List<SellerAddressSearchResult>>
@@ -616,6 +618,25 @@ class ApiSellerStoreRepository
           )
           .toList(),
     );
+  }
+
+  @override
+  Future<void> reorderStores(List<int> storeIds) async {
+    final bool reordered = await _apiClient.patch<bool>(
+      '/api/v1/seller/stores/reorder',
+      body: <String, Object?>{
+        'storeIds': storeIds,
+      },
+      decode: (Object? value) {
+        return value as bool;
+      },
+    );
+
+    if (!reordered) {
+      throw StateError(
+        'store reorder failed',
+      );
+    }
   }
 
   @override
@@ -1042,6 +1063,43 @@ class MemorySellerStoreRepository
     return List<SellerStore>.unmodifiable(
       _stores.where((store) => store.status != 'ACTIVE'),
     );
+  }
+
+  @override
+  Future<void> reorderStores(List<int> storeIds) async {
+    final List<SellerStore> activeStores = _stores
+        .where((SellerStore store) => store.status == 'ACTIVE')
+        .toList(growable: false);
+
+    final Set<int> activeStoreIds = activeStores
+        .map((SellerStore store) => store.storeId)
+        .toSet();
+    final Set<int> requestedStoreIds = storeIds.toSet();
+
+    if (storeIds.length != requestedStoreIds.length ||
+        activeStoreIds.length != requestedStoreIds.length ||
+        !activeStoreIds.containsAll(requestedStoreIds)) {
+      throw StateError(
+        'invalid store reorder request',
+      );
+    }
+
+    final Map<int, SellerStore> activeStoreById = <int, SellerStore>{
+      for (final SellerStore store in activeStores)
+        store.storeId: store,
+    };
+
+    final List<SellerStore> reorderedActiveStores = storeIds
+        .map((int storeId) => activeStoreById[storeId]!)
+        .toList(growable: false);
+    final List<SellerStore> inactiveStores = _stores
+        .where((SellerStore store) => store.status != 'ACTIVE')
+        .toList(growable: false);
+
+    _stores
+      ..clear()
+      ..addAll(reorderedActiveStores)
+      ..addAll(inactiveStores);
   }
 
   @override
