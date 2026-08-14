@@ -12,6 +12,7 @@ import '../permissions/customer_permission_gateway.dart';
 import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
 import 'customer_location_repository.dart';
+import 'customer_region_catalog.dart';
 
 
 class CustomerHomeScreen extends StatefulWidget {
@@ -622,25 +623,59 @@ class _LocationPickerSheet extends StatefulWidget {
 
 class _LocationPickerSheetState
     extends State<_LocationPickerSheet> {
+  late CustomerRegionProvince _selectedProvince;
+  String _selectedDistrict = CustomerRegionCatalog.allDistrictLabel;
+
   bool _usingCurrentLocation = false;
+  bool _applyingRegion = false;
   String? _locationError;
 
-  Future<void> _selectLocation(
-    String locationLabel,
-  ) async {
-    await widget.controller.selectLocationLabel(
-      locationLabel,
-    );
+  @override
+  void initState() {
+    super.initState();
 
-    if (!mounted) {
-      return;
+    final CustomerRegionSelection initialSelection =
+        _resolveInitialSelection(widget.currentLocationLabel);
+
+    _selectedProvince = initialSelection.province;
+    _selectedDistrict = initialSelection.district ??
+        CustomerRegionCatalog.allDistrictLabel;
+  }
+
+  CustomerRegionSelection _resolveInitialSelection(String label) {
+    final String normalized = label.trim();
+
+    for (final CustomerRegionProvince province
+        in CustomerRegionCatalog.provinces) {
+      final bool provinceMatches =
+          normalized.contains(province.name) ||
+              normalized.contains(province.shortName);
+
+      if (!provinceMatches) {
+        continue;
+      }
+
+      for (final String district in province.districts) {
+        if (normalized.contains(district)) {
+          return CustomerRegionSelection(
+            province: province,
+            district: district,
+          );
+        }
+      }
+
+      return CustomerRegionSelection(
+        province: province,
+      );
     }
 
-    Navigator.of(context).pop();
+    return CustomerRegionSelection(
+      province: CustomerRegionCatalog.defaultProvince,
+    );
   }
 
   Future<void> _useCurrentLocation() async {
-    if (_usingCurrentLocation) {
+    if (_usingCurrentLocation || _applyingRegion) {
       return;
     }
 
@@ -649,7 +684,7 @@ class _LocationPickerSheetState
       _locationError = null;
     });
 
-    final success =
+    final bool success =
         await widget.controller.useCurrentLocation();
 
     if (!mounted) {
@@ -664,348 +699,451 @@ class _LocationPickerSheetState
     setState(() {
       _usingCurrentLocation = false;
       _locationError =
-          '현재 위치를 확인하지 못했어요. 위치 권한을 확인하거나 아래에서 지역을 직접 선택해 주세요.';
+          '현재 위치를 확인하지 못했어요. 위치 권한을 확인하거나 지역을 직접 선택해 주세요.';
     });
   }
 
-  String _displayLabel(String locationLabel) {
-    if (locationLabel == '부산') {
-      return '부산 전체';
+  Future<void> _applySelectedRegion() async {
+    if (_applyingRegion || _usingCurrentLocation) {
+      return;
     }
 
-    return locationLabel
-        .replaceFirst('부산 ', '')
-        .trim();
+    setState(() {
+      _applyingRegion = true;
+      _locationError = null;
+    });
+
+    final bool success = await widget.controller.selectRegion(
+      province: _selectedProvince.name,
+      district: _selectedDistrict,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (success) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() {
+      _applyingRegion = false;
+      _locationError = widget.controller.regionSelectionError ??
+          '선택한 지역을 적용하지 못했어요. 잠시 후 다시 시도해 주세요.';
+    });
+  }
+
+  void _onProvinceChanged(String? provinceName) {
+    if (provinceName == null ||
+        provinceName == _selectedProvince.name) {
+      return;
+    }
+
+    final CustomerRegionProvince? province =
+        CustomerRegionCatalog.provinceByName(provinceName);
+
+    if (province == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedProvince = province;
+      _selectedDistrict = CustomerRegionCatalog.allDistrictLabel;
+      _locationError = null;
+    });
+  }
+
+  void _onDistrictChanged(String? district) {
+    if (district == null || district == _selectedDistrict) {
+      return;
+    }
+
+    setState(() {
+      _selectedDistrict = district;
+      _locationError = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
+    final ThemeData theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
 
-    final accentColor = isDark
-        ? PopqPalette.lime
-        : PopqPalette.forest;
-
-    final cardColor = isDark
-        ? PopqPalette.nightCard
-        : PopqPalette.lightCard;
-
-    final borderColor = isDark
-        ? PopqPalette.nightBorder
-        : PopqPalette.lightBorder;
-
-    final mutedColor = isDark
+    final Color accentColor =
+        isDark ? PopqPalette.lime : PopqPalette.forest;
+    final Color cardColor =
+        isDark ? PopqPalette.nightCard : PopqPalette.lightCard;
+    final Color borderColor =
+        isDark ? PopqPalette.nightBorder : PopqPalette.lightBorder;
+    final Color mutedColor = isDark
         ? PopqPalette.nightMutedText
         : PopqPalette.lightMutedText;
 
-    final recentLocations =
-        widget.controller.recentLocationLabels;
+    final List<String> districtItems = <String>[
+      CustomerRegionCatalog.allDistrictLabel,
+      ..._selectedProvince.districts,
+    ];
 
-    return FractionallySizedBox(
-      heightFactor: 0.82,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
+    final bool busy = _usingCurrentLocation || _applyingRegion;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: PopqSpacing.lg,
+          right: PopqSpacing.lg,
+          bottom: MediaQuery.viewInsetsOf(context).bottom +
               PopqSpacing.lg,
-              PopqSpacing.xs,
-              PopqSpacing.lg,
-              PopqSpacing.md,
-            ),
-            child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '탐색 지역 설정',
-                  style: theme.textTheme.titleLarge
-                      ?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '탐색 지역 설정',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: PopqSpacing.xs),
-                Text(
-                  '선택한 지역을 기준으로 홈의 매장과 이벤트를 보여줘요.',
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(
-                    color: mutedColor,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                PopqSpacing.lg,
-                0,
-                PopqSpacing.lg,
-                PopqSpacing.xl,
               ),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
-                children: [
-                  Material(
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(16),
-                      side: BorderSide(
-                        color: borderColor,
-                      ),
-                    ),
-                    child: InkWell(
-                      onTap: _usingCurrentLocation
-                          ? null
-                          : _useCurrentLocation,
-                      borderRadius:
-                          BorderRadius.circular(16),
-                      child: Padding(
-                        padding: const EdgeInsets.all(
-                          PopqSpacing.md,
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: accentColor.withValues(
-                                  alpha: isDark ? 0.16 : 0.10,
-                                ),
-                                borderRadius:
-                                    BorderRadius.circular(12),
-                              ),
-                              child: Icon(
-                                Icons.my_location_rounded,
-                                color: accentColor,
-                              ),
-                            ),
-                            const SizedBox(
-                              width: PopqSpacing.md,
-                            ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '현재 위치로 설정',
-                                    style: theme
-                                        .textTheme.titleSmall
-                                        ?.copyWith(
-                                      fontWeight:
-                                          FontWeight.w800,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '휴대폰 위치를 기준으로 탐색해요',
-                                    style: theme
-                                        .textTheme.bodySmall
-                                        ?.copyWith(
-                                      color: mutedColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_usingCurrentLocation)
-                              SizedBox(
-                                width: 22,
-                                height: 22,
-                                child:
-                                    CircularProgressIndicator(
-                                  strokeWidth: 2.4,
-                                  color: accentColor,
-                                ),
-                              )
-                            else
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                color: mutedColor,
-                              ),
-                          ],
-                        ),
-                      ),
+              const SizedBox(height: PopqSpacing.xs),
+              Text(
+                '업체를 둘러볼 기준 지역을 선택해 주세요.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: mutedColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.lg),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(PopqSpacing.md),
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(
+                    alpha: isDark ? 0.12 : 0.07,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: accentColor.withValues(
+                      alpha: isDark ? 0.32 : 0.18,
                     ),
                   ),
-                  if (_locationError != null) ...[
-                    const SizedBox(height: PopqSpacing.sm),
+                ),
+                child: Row(
+                  children: [
                     Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(
-                        PopqSpacing.sm,
-                      ),
+                      width: 40,
+                      height: 40,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.errorContainer
-                            .withValues(alpha: 0.55),
-                        borderRadius:
-                            BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _locationError!,
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(
-                          color: theme
-                              .colorScheme.onErrorContainer,
-                          height: 1.4,
+                        color: accentColor.withValues(
+                          alpha: isDark ? 0.18 : 0.12,
                         ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.location_on_rounded,
+                        color: accentColor,
+                      ),
+                    ),
+                    const SizedBox(width: PopqSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '현재 탐색 위치',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: mutedColor,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.currentLocationLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
-                  if (recentLocations.isNotEmpty) ...[
-                    const SizedBox(height: PopqSpacing.lg),
-                    Text(
-                      '최근 설정 지역',
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(height: PopqSpacing.sm),
-                    Wrap(
-                      spacing: PopqSpacing.sm,
-                      runSpacing: PopqSpacing.sm,
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.md),
+              Material(
+                color: cardColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: borderColor),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: busy ? null : _useCurrentLocation,
+                  child: Padding(
+                    padding: const EdgeInsets.all(PopqSpacing.md),
+                    child: Row(
                       children: [
-                        for (final location
-                            in recentLocations)
-                          _LocationChoiceChip(
-                            label: _displayLabel(location),
-                            selected:
-                                widget.currentLocationLabel ==
-                                    location,
-                            onTap: () =>
-                                _selectLocation(location),
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: accentColor.withValues(
+                              alpha: isDark ? 0.16 : 0.10,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.my_location_rounded,
+                            color: accentColor,
+                          ),
+                        ),
+                        const SizedBox(width: PopqSpacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '현재 위치 사용',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '휴대폰 위치를 탐색 기준으로 사용해요',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: mutedColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (_usingCurrentLocation)
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: accentColor,
+                            ),
+                          )
+                        else
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: mutedColor,
                           ),
                       ],
                     ),
-                  ],
-                  const SizedBox(height: PopqSpacing.lg),
-                  Text(
-                    '지역 직접 선택',
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(
-                      fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.lg),
+              Text(
+                '지역 선택',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.xs),
+              Text(
+                '시/도와 구/군만 고르면 돼요. 세부 위치는 탐색 지도에서 자유롭게 이동할 수 있어요.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: mutedColor,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.md),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _RegionDropdown(
+                      label: '시/도',
+                      value: _selectedProvince.name,
+                      items: CustomerRegionCatalog.provinces
+                          .map((CustomerRegionProvince province) => province.name)
+                          .toList(growable: false),
+                      enabled: !busy,
+                      onChanged: _onProvinceChanged,
                     ),
                   ),
-                  const SizedBox(height: PopqSpacing.xs),
-                  Text(
-                    '현재 POPQ 서비스 범위인 부산 지역에서 선택할 수 있어요.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(
-                      color: mutedColor,
+                  const SizedBox(width: PopqSpacing.sm),
+                  Expanded(
+                    child: _RegionDropdown(
+                      label: '구/군',
+                      value: _selectedDistrict,
+                      items: districtItems,
+                      enabled: !busy,
+                      onChanged: _onDistrictChanged,
                     ),
-                  ),
-                  const SizedBox(height: PopqSpacing.md),
-                  Wrap(
-                    spacing: PopqSpacing.sm,
-                    runSpacing: PopqSpacing.sm,
-                    children: [
-                      for (final location
-                          in CustomerHomeController
-                              .supportedLocationLabels)
-                        _LocationChoiceChip(
-                          label: _displayLabel(location),
-                          selected:
-                              widget.currentLocationLabel ==
-                                  location,
-                          onTap: () =>
-                              _selectLocation(location),
-                        ),
-                    ],
                   ),
                 ],
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LocationChoiceChip extends StatelessWidget {
-  const _LocationChoiceChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    final accentColor = isDark
-        ? PopqPalette.lime
-        : PopqPalette.forest;
-
-    final borderColor = selected
-        ? accentColor
-        : (isDark
-            ? PopqPalette.nightBorder
-            : PopqPalette.lightBorder);
-
-    final backgroundColor = selected
-        ? accentColor.withValues(
-            alpha: isDark ? 0.16 : 0.10,
-          )
-        : (isDark
-            ? PopqPalette.nightCard
-            : PopqPalette.lightCard);
-
-    return Material(
-      color: backgroundColor,
-      shape: StadiumBorder(
-        side: BorderSide(
-          color: borderColor,
-          width: selected ? 1.5 : 1,
-        ),
-      ),
-      child: InkWell(
-        onTap: onTap,
-        customBorder: const StadiumBorder(),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: PopqSpacing.md,
-            vertical: 10,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) ...[
-                Icon(
-                  Icons.check_rounded,
-                  size: 16,
-                  color: accentColor,
+              if (_locationError != null) ...[
+                const SizedBox(height: PopqSpacing.md),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(PopqSpacing.sm),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.errorContainer
+                        .withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _locationError!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                      height: 1.4,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 4),
               ],
-              Text(
-                label,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(
-                  color: selected ? accentColor : null,
-                  fontWeight: selected
-                      ? FontWeight.w800
-                      : FontWeight.w600,
+              const SizedBox(height: PopqSpacing.lg),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: busy ? null : _applySelectedRegion,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: accentColor,
+                    foregroundColor:
+                        isDark ? Colors.black : Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: _applyingRegion
+                      ? SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: isDark ? Colors.black : Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          '이 지역으로 보기',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: PopqSpacing.md),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(PopqSpacing.sm),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 18,
+                      color: mutedColor,
+                    ),
+                    const SizedBox(width: PopqSpacing.xs),
+                    Expanded(
+                      child: Text(
+                        '이 설정은 소비자 주소 등록이 아니라 업체·이벤트 탐색 기준 위치예요. 위치 권한을 사용하지 않으면 부산이 기본값이에요.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: mutedColor,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _RegionDropdown extends StatelessWidget {
+  const _RegionDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final List<String> items;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final bool isDark = theme.brightness == Brightness.dark;
+
+    final Color cardColor =
+        isDark ? PopqPalette.nightCard : PopqPalette.lightCard;
+    final Color borderColor =
+        isDark ? PopqPalette.nightBorder : PopqPalette.lightBorder;
+    final Color mutedColor = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: mutedColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: PopqSpacing.xs),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(
+            horizontal: PopqSpacing.sm,
+          ),
+          decoration: BoxDecoration(
+            color: cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              borderRadius: BorderRadius.circular(14),
+              menuMaxHeight: 360,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              items: items
+                  .map(
+                    (String item) => DropdownMenuItem<String>(
+                      value: item,
+                      child: Text(
+                        item,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: enabled ? onChanged : null,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

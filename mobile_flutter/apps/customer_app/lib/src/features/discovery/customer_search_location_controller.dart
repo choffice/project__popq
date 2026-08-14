@@ -17,7 +17,7 @@ enum CustomerSearchLocationSource {
   /// 사용자가 탐색 지도를 직접 움직여 지정한 위치입니다.
   map,
 
-  /// 사용자가 주소 검색으로 직접 지정한 위치입니다.
+  /// 사용자가 지역 선택으로 직접 지정한 위치입니다.
   addressSearch,
 }
 
@@ -74,8 +74,10 @@ class CustomerSearchLocationController extends ChangeNotifier {
   /// GPS 좌표를 얻는 순간 위치 설정은 성공한 것으로 처리합니다.
   /// 좌표 -> 주소 라벨 변환이 실패하더라도 GPS 성공을 취소하지 않습니다.
   Future<LocationRequestResult> useCurrentLocation() async {
-    final result = await _permissionGateway.requestLocation();
-    final location = result.location;
+    final LocationRequestResult result =
+    await _permissionGateway.requestLocation();
+
+    final CustomerLocation? location = result.location;
 
     if (location == null) {
       return result;
@@ -86,8 +88,21 @@ class CustomerSearchLocationController extends ChangeNotifier {
     searchRadiusKm = currentLocationRadiusKm;
     source = CustomerSearchLocationSource.currentLocation;
 
+    // GPS 좌표를 얻었으면 즉시 현재 위치가 적용됐다는 것을 보여줍니다.
+    //
+    // 기존 코드에서는 이 값이 부산으로 남아 있다가
+    // 역지오코딩이 끝나야 바뀌어서 현재 위치 버튼이
+    // 동작하지 않는 것처럼 보일 수 있었습니다.
+    displayLabel = '현재 위치';
+
+    // 이전 라벨 요청이 있다면 무효화합니다.
+    _labelRequestSequence++;
+    isResolvingLabel = false;
+
     notifyListeners();
 
+    // 실제 탐색 위치 적용은 이미 끝난 상태입니다.
+    // 아래 주소 변환은 화면에 보여줄 지역명만 얻기 위한 부가 작업입니다.
     await _resolveDisplayLabel(
       location,
       fallbackLabel: '현재 위치',
@@ -107,18 +122,25 @@ class CustomerSearchLocationController extends ChangeNotifier {
     searchRadiusKm = _normalizeRadius(radiusKm);
     source = CustomerSearchLocationSource.map;
 
+    // 지도 좌표가 적용되는 순간 화면에도 즉시 반영합니다.
+    displayLabel = '지도에서 선택한 위치';
+
+    _labelRequestSequence++;
+    isResolvingLabel = false;
+
     notifyListeners();
 
+    // 주소 변환은 탐색 좌표 적용 여부와 별개로 처리합니다.
     await _resolveDisplayLabel(
       center,
       fallbackLabel: '지도에서 선택한 위치',
     );
   }
 
-  /// 주소 검색 결과를 탐색 기준으로 적용합니다.
+  /// 드롭다운 지역 선택 결과를 탐색 기준으로 적용합니다.
   ///
-  /// 현재 백엔드에 구매자용 주소 검색 API를 붙이면 이 메서드를 그대로
-  /// 연결할 수 있도록 미리 분리해 둡니다.
+  /// 이름은 기존 코드와의 호환 때문에 유지하고 있지만,
+  /// 현재는 자유 주소 검색이 아니라 시/도 + 구/군 선택 결과에도 사용합니다.
   Future<void> setAddressSearchLocation({
     required CustomerLocation location,
     required String label,
@@ -128,11 +150,16 @@ class CustomerSearchLocationController extends ChangeNotifier {
     searchRadiusKm = _normalizeRadius(radiusKm);
     source = CustomerSearchLocationSource.addressSearch;
 
-    final normalizedLabel = label.trim();
-    displayLabel = normalizedLabel.isEmpty ? '선택한 위치' : normalizedLabel;
+    final String normalizedLabel = label.trim();
 
+    displayLabel =
+    normalizedLabel.isEmpty ? '선택한 지역' : normalizedLabel;
+
+    // 이미 지역 선택 API에서 표시명을 받았으므로
+    // 별도의 역지오코딩은 수행하지 않습니다.
     _labelRequestSequence++;
     isResolvingLabel = false;
+
     notifyListeners();
   }
 
@@ -145,6 +172,7 @@ class CustomerSearchLocationController extends ChangeNotifier {
 
     _labelRequestSequence++;
     isResolvingLabel = false;
+
     notifyListeners();
   }
 
@@ -153,10 +181,10 @@ class CustomerSearchLocationController extends ChangeNotifier {
   }
 
   Future<void> _resolveDisplayLabel(
-    CustomerLocation location, {
-    required String fallbackLabel,
-  }) async {
-    final requestId = ++_labelRequestSequence;
+      CustomerLocation location, {
+        required String fallbackLabel,
+      }) async {
+    final int requestId = ++_labelRequestSequence;
 
     isResolvingLabel = true;
     notifyListeners();
@@ -164,22 +192,27 @@ class CustomerSearchLocationController extends ChangeNotifier {
     String? resolvedLabel;
 
     try {
-      resolvedLabel = await _locationRepository.reverseGeocode(location);
+      resolvedLabel =
+      await _locationRepository.reverseGeocode(location);
     } catch (_) {
       // 주소 라벨 조회 실패는 탐색 위치 좌표 자체의 실패가 아닙니다.
     }
 
+    // 주소 변환을 기다리는 동안 다른 위치가 선택됐다면
+    // 이전 요청 결과로 최신 위치 이름을 덮어쓰지 않습니다.
     if (requestId != _labelRequestSequence) {
       return;
     }
 
-    final normalizedLabel = resolvedLabel?.trim();
+    final String? normalizedLabel = resolvedLabel?.trim();
 
-    displayLabel = normalizedLabel == null || normalizedLabel.isEmpty
+    displayLabel =
+    normalizedLabel == null || normalizedLabel.isEmpty
         ? fallbackLabel
         : normalizedLabel;
 
     isResolvingLabel = false;
+
     notifyListeners();
   }
 }

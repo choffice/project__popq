@@ -272,6 +272,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       _sessionController,
       permissionGateway,
       locationRepository,
+      searchLocationController: _searchLocationController,
     );
 
     _router = createCustomerRouter(
