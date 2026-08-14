@@ -1,5 +1,9 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+
+import '../../realtime/customer_realtime_scope.dart';
 import 'customer_support_inquiry.dart';
 import 'customer_support_repository.dart';
 import 'customer_support_types.dart';
@@ -29,8 +33,13 @@ class _CustomerSupportInquiryDetailScreenState
   bool _sending = false;
   String? _errorMessage;
 
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
+
   @override
   void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
     _messageController.dispose();
     super.dispose();
   }
@@ -39,6 +48,39 @@ class _CustomerSupportInquiryDetailScreenState
   void initState() {
     super.initState();
     _loadDetail();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = CustomerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.ticketId != widget.supportInquiryId) {
+          return;
+        }
+
+        if (event.requesterType != 'CUSTOMER') {
+          return;
+        }
+
+        unawaited(_loadDetail());
+      },
+    );
   }
 
   Future<void> _loadDetail() async {
