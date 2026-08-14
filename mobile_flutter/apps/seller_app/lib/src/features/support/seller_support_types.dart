@@ -46,6 +46,9 @@ enum SellerSupportSenderType {
   final String apiValue;
 
   static SellerSupportSenderType fromJson(Object? value) {
+    if (value == 'REQUESTER') {
+      return SellerSupportSenderType.seller;
+    }
     return SellerSupportSenderType.values.firstWhere(
       (type) => type.apiValue == value,
       orElse: () => SellerSupportSenderType.seller,
