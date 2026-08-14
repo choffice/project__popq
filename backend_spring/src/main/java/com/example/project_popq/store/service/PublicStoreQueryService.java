@@ -4,7 +4,6 @@ import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
-import com.example.project_popq.store.domain.StoreStatus;
 import com.example.project_popq.store.domain.StoreTag;
 import com.example.project_popq.store.dto.PublicStoreResponse;
 import com.example.project_popq.store.dto.StoreScheduleResponse;
@@ -12,6 +11,8 @@ import com.example.project_popq.store.repository.StoreRepository;
 import com.example.project_popq.store.repository.StoreTagRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class PublicStoreQueryService {
+
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private static final List<BusinessStatus> DISCOVERABLE_BUSINESS_STATUSES =
             List.of(BusinessStatus.PRE_OPEN, BusinessStatus.OPEN);
@@ -41,12 +44,15 @@ public class PublicStoreQueryService {
         StoreDiscoveryLocationPolicy.validateOptionalLocation(
                 latitude, longitude, radiusKm
         );
+        Instant now = Instant.now();
+        LocalDate today = LocalDate.now(SEOUL_ZONE);
         List<Store> stores = storeRepository.searchPublicStores(
                 normalize(query),
-                normalize(tag)
+                normalize(tag),
+                now,
+                today
         );
         Map<Long, List<String>> tagsByStore = findTags(stores);
-        Instant now = Instant.now();
         Map<Long, StoreScheduleResponse> schedules =
                 storeScheduleService.findAllForEvaluation(stores, now);
         return stores.stream()
@@ -69,10 +75,10 @@ public class PublicStoreQueryService {
 
     @Transactional(readOnly = true)
     public PublicStoreResponse findDetail(Long storeId) {
-        Store store = storeRepository.findByIdAndStatusAndBusinessStatusIn(
+        Store store = storeRepository.findPublicDetail(
                         storeId,
-                        StoreStatus.ACTIVE,
-                        DISCOVERABLE_BUSINESS_STATUSES
+                        DISCOVERABLE_BUSINESS_STATUSES,
+                        LocalDate.now(SEOUL_ZONE)
                 )
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         StoreScheduleResponse schedule = storeScheduleService.find(store);
