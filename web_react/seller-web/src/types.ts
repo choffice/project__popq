@@ -601,46 +601,44 @@ export type SupportTicketDetail = {
 };
 
 export type SupportInquiryCategory =
-  | 'ACCOUNT'
-  | 'ORDER'
-  | 'PAYMENT'
-  | 'COUPON'
-  | 'APP'
-  | 'OTHER'
+  | "ACCOUNT"
+  | "STORE_VISIBILITY"
+  | "ORDER_PAYMENT"
+  | "OTHER";
 
 export type SupportInquiryStatus =
-  | 'RECEIVED'
-  | 'IN_PROGRESS'
-  | 'ANSWERED'
-  | 'CLOSED'
+  | "RECEIVED"
+  | "IN_PROGRESS"
+  | "ANSWERED"
+  | "CLOSED";
 
 export type SupportInquirySummary = {
-  supportInquiryId: number
-  customerUserId: number
-  customerName: string
-  customerEmail: string
-  category: SupportInquiryCategory
-  title: string
-  status: SupportInquiryStatus
-  unreadMessageCount: number
-  answeredAt: string | null
-  closedAt: string | null
-  createdAt: string
-  updatedAt: string
-}
+  supportInquiryId: number;
+  customerUserId: number;
+  customerName: string;
+  customerEmail: string;
+  category: SupportInquiryCategory;
+  title: string;
+  status: SupportInquiryStatus;
+  unreadMessageCount: number;
+  answeredAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type SupportInquiryMessage = {
-  supportInquiryMessageId: number
-  senderUserId: number
-  senderName: string
-  senderType: 'CUSTOMER' | 'ADMIN'
-  content: string
-  read: boolean
-  readAt: string | null
-  createdAt: string
-}
+  supportInquiryMessageId: number;
+  senderUserId: number;
+  senderName: string;
+  senderType: "CUSTOMER" | "ADMIN";
+  content: string;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+};
 
 export type SupportInquiryDetail = {
-  inquiry: SupportInquirySummary
-  messages: SupportInquiryMessage[]
-}
+  inquiry: SupportInquirySummary;
+  messages: SupportInquiryMessage[];
+};
