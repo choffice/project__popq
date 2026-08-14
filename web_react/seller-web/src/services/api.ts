@@ -40,6 +40,9 @@ import type {
   SupportTicketDetail,
   SupportTicketStatus,
   SupportTicketSummary,
+  SupportInquiryDetail,
+  SupportInquiryStatus,
+  SupportInquirySummary,
   UserStatus,
 } from '../types'
 
@@ -391,6 +394,50 @@ export function updateAdminSupportTicketStatus(
 ) {
   return request<SupportTicketDetail>(
     adminPath(`/support/tickets/${ticketId}/status`),
+    connection,
+    { method: 'PATCH', body: JSON.stringify({ status }) },
+  )
+}
+
+export function getAdminSupportInquiries(
+  connection: SellerConnection,
+  status?: SupportInquiryStatus,
+) {
+  return request<SupportInquirySummary[]>(
+    withQuery(adminPath('/support/inquiries'), { status }),
+    connection,
+  )
+}
+
+export function getAdminSupportInquiry(
+  connection: SellerConnection,
+  supportInquiryId: number,
+) {
+  return request<SupportInquiryDetail>(
+    adminPath(`/support/inquiries/${supportInquiryId}`),
+    connection,
+  )
+}
+
+export function sendAdminSupportAnswer(
+  connection: SellerConnection,
+  supportInquiryId: number,
+  content: string,
+) {
+  return request<SupportInquiryDetail>(
+    adminPath(`/support/inquiries/${supportInquiryId}/messages`),
+    connection,
+    { method: 'POST', body: JSON.stringify({ content: content.trim() }) },
+  )
+}
+
+export function changeAdminSupportInquiryStatus(
+  connection: SellerConnection,
+  supportInquiryId: number,
+  status: SupportInquiryStatus,
+) {
+  return request<SupportInquirySummary>(
+    adminPath(`/support/inquiries/${supportInquiryId}/status`),
     connection,
     { method: 'PATCH', body: JSON.stringify({ status }) },
   )
