@@ -1,18 +1,56 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'customer_engagement_repository.dart';
+
+const String _attendanceHiddenDateKey =
+    'popq.customer.attendance.hidden_date';
+
+String _attendanceDateKey(DateTime value) {
+  final local = value.toLocal();
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  return '${local.year}-$month-$day';
+}
+
+Future<bool> shouldHideCustomerAttendanceDialogForDate(DateTime date) async {
+  final preferences = await SharedPreferences.getInstance();
+  final hiddenDate = preferences.getString(_attendanceHiddenDateKey);
+  return hiddenDate == _attendanceDateKey(date);
+}
+
+Future<void> setCustomerAttendanceDialogHiddenForDate(
+  DateTime date,
+  bool hidden,
+) async {
+  final preferences = await SharedPreferences.getInstance();
+
+  if (hidden) {
+    await preferences.setString(
+      _attendanceHiddenDateKey,
+      _attendanceDateKey(date),
+    );
+    return;
+  }
+
+  await preferences.remove(_attendanceHiddenDateKey);
+}
 
 Future<void> showCustomerAttendanceDialog({
   required BuildContext context,
   required CustomerEngagementRepository repository,
   required ValueChanged<CustomerActivitySummary> onSummaryChanged,
+  CustomerAttendance? initialAttendance,
 }) {
   return showDialog<void>(
     context: context,
     builder: (context) => _CustomerAttendanceDialog(
       repository: repository,
       onSummaryChanged: onSummaryChanged,
+      initialAttendance: initialAttendance,
     ),
   );
 }
@@ -21,10 +59,12 @@ class _CustomerAttendanceDialog extends StatefulWidget {
   const _CustomerAttendanceDialog({
     required this.repository,
     required this.onSummaryChanged,
+    this.initialAttendance,
   });
 
   final CustomerEngagementRepository repository;
   final ValueChanged<CustomerActivitySummary> onSummaryChanged;
+  final CustomerAttendance? initialAttendance;
 
   @override
   State<_CustomerAttendanceDialog> createState() =>
@@ -37,11 +77,13 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
   Object? _loadError;
   bool _loading = true;
   bool _checking = false;
+  bool _hideForToday = false;
   String? _resultMessage;
 
   @override
   void initState() {
     super.initState();
+    _attendance = widget.initialAttendance;
     _load();
   }
 
@@ -52,12 +94,22 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
     });
 
     try {
-      final results = await Future.wait<Object>([
-        widget.repository.getAttendance(),
-        widget.repository.getMonthlyRaffleStatus(),
-      ]);
-      final attendance = results[0] as CustomerAttendance;
-      final raffle = results[1] as MonthlyRaffleStatus;
+      final initialAttendance = _attendance;
+      final CustomerAttendance attendance;
+      final MonthlyRaffleStatus raffle;
+
+      if (initialAttendance != null) {
+        attendance = initialAttendance;
+        raffle = await widget.repository.getMonthlyRaffleStatus();
+      } else {
+        final results = await Future.wait<Object>([
+          widget.repository.getAttendance(),
+          widget.repository.getMonthlyRaffleStatus(),
+        ]);
+        attendance = results[0] as CustomerAttendance;
+        raffle = results[1] as MonthlyRaffleStatus;
+      }
+
       if (!mounted) return;
       setState(() {
         _attendance = attendance;
@@ -220,6 +272,33 @@ class _CustomerAttendanceDialogState extends State<_CustomerAttendanceDialog> {
                       minimumSize: const Size.fromHeight(50),
                     ),
                   ),
+                  if (!_attendance!.checkedToday) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    CheckboxListTile(
+                      value: _hideForToday,
+                      onChanged: _checking
+                          ? null
+                          : (value) {
+                              final nextValue = value ?? false;
+                              setState(() {
+                                _hideForToday = nextValue;
+                              });
+                              final attendance = _attendance;
+                              if (attendance != null) {
+                                unawaited(
+                                  setCustomerAttendanceDialogHiddenForDate(
+                                    attendance.today,
+                                    nextValue,
+                                  ),
+                                );
+                              }
+                            },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('오늘 하루 보지 않기'),
+                    ),
+                  ],
                 ],
               ],
             ),

@@ -353,6 +353,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     } catch (_) {
       // 일시적인 네트워크 오류 등은 세션을 로그아웃시키지 않고 그대로 둡니다.
     }
+
+    if (_sessionController.isSignedIn) {
+      _scheduleAttendanceDialog();
+    }
   }
 
   Future<void> _developmentSignIn() async {
@@ -490,32 +494,72 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   void _scheduleAttendanceDialog() {
-    if (_attendanceDialogScheduled) return;
+    if (_attendanceDialogScheduled || !_sessionController.isSignedIn) {
+      return;
+    }
+
     _attendanceDialogScheduled = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || !_sessionController.isSignedIn) {
         _attendanceDialogScheduled = false;
         return;
       }
 
-      final dialogContext = _rootNavigatorKey.currentContext;
-      if (dialogContext == null) {
-        _attendanceDialogScheduled = false;
-        return;
-      }
+      try {
+        // 출석 여부는 기기 날짜가 아니라 서버 응답을 기준으로 판단합니다.
+        // 이미 오늘 출석한 사용자는 팝업을 다시 띄우지 않습니다.
+        final attendance = await _engagementRepository.getAttendance();
 
-      unawaited(
-        showCustomerAttendanceDialog(
+        if (!mounted || !_sessionController.isSignedIn) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        _activitySummaryNotifier.value = attendance.activitySummary;
+
+        if (attendance.checkedToday) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        final hideForToday =
+            await shouldHideCustomerAttendanceDialogForDate(
+          attendance.today,
+        );
+
+        if (!mounted || !_sessionController.isSignedIn) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        if (hideForToday) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        final dialogContext = _rootNavigatorKey.currentContext;
+        if (dialogContext == null) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        await showCustomerAttendanceDialog(
           context: dialogContext,
           repository: _engagementRepository,
+          initialAttendance: attendance,
           onSummaryChanged: (summary) {
             _activitySummaryNotifier.value = summary;
           },
-        ).whenComplete(() {
-          _attendanceDialogScheduled = false;
-        }),
-      );
+        );
+      } catch (error, stackTrace) {
+        // 네트워크가 잠시 불안정하면 팝업을 억지로 띄우지 않고,
+        // 다음 앱 실행/복귀 시 다시 확인합니다.
+        debugPrint('Customer 출석 상태 확인 실패: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      } finally {
+        _attendanceDialogScheduled = false;
+      }
     });
   }
 
@@ -837,6 +881,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
           unawaited(_realtimeClient.connect());
           unawaited(_recoverPendingPaymentIfNeeded());
           unawaited(_syncAppBadge());
+          _scheduleAttendanceDialog();
         }
 
         return;
