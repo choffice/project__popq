@@ -179,18 +179,13 @@ class _OrderDetailScreenState extends State<OrderDetailScreen>
   }
 
   void _goBack() {
-    if (context.canPop()) {
-      context.pop();
-      return;
-    }
-
     context.go(CustomerRoutes.orders);
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope<Object?>(
-      canPop: context.canPop(),
+      canPop: false,
       onPopInvokedWithResult: (
         bool didPop,
         Object? result,
