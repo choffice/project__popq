@@ -4,7 +4,10 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'customer_engagement_repository.dart';
 
 class CustomerPointHistoryScreen extends StatefulWidget {
-  const CustomerPointHistoryScreen({required this.repository, super.key});
+  const CustomerPointHistoryScreen({
+    required this.repository,
+    super.key,
+  });
 
   final CustomerEngagementRepository repository;
 
@@ -25,45 +28,69 @@ class _CustomerPointHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<CustomerPointSummary>(
-      future: _summary,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const PopqLoadingView(message: '포인트 내역을 불러오고 있어요.');
-        }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('포인트 내역'),
+      ),
+      body: FutureBuilder<CustomerPointSummary>(
+        future: _summary,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const PopqLoadingView(
+              message: '포인트 내역을 불러오고 있어요.',
+            );
+          }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return PopqErrorView(message: '포인트 내역을 불러오지 못했어요.', onRetry: _reload);
-        }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return PopqErrorView(
+              message: '포인트 내역을 불러오지 못했어요.',
+              onRetry: _reload,
+            );
+          }
 
-        final summary = snapshot.requireData;
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(PopqSpacing.lg),
-            children: [
-              _PointBalanceCard(summary: summary),
-              const SizedBox(height: PopqSpacing.lg),
-              Text(
-                '포인트 내역',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: PopqSpacing.sm),
-              if (summary.histories.isEmpty)
-                const _EmptyPointHistory()
-              else
-                for (final history in summary.histories)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
-                    child: _PointHistoryCard(history: history),
+          final summary = snapshot.requireData;
+
+          return RefreshIndicator(
+            onRefresh: () async => _reload(),
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(PopqSpacing.lg),
+              children: [
+                _PointBalanceCard(
+                  summary: summary,
+                ),
+                const SizedBox(
+                  height: PopqSpacing.lg,
+                ),
+                Text(
+                  '포인트 내역',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
-            ],
-          ),
-        );
-      },
+                ),
+                const SizedBox(
+                  height: PopqSpacing.sm,
+                ),
+                if (summary.histories.isEmpty)
+                  const _EmptyPointHistory()
+                else
+                  for (final history in summary.histories)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        bottom: PopqSpacing.sm,
+                      ),
+                      child: _PointHistoryCard(
+                        history: history,
+                      ),
+                    ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -75,7 +102,9 @@ class _CustomerPointHistoryScreenState
 }
 
 class _PointBalanceCard extends StatelessWidget {
-  const _PointBalanceCard({required this.summary});
+  const _PointBalanceCard({
+    required this.summary,
+  });
 
   final CustomerPointSummary summary;
 
@@ -83,22 +112,35 @@ class _PointBalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(PopqSpacing.lg),
+        padding: const EdgeInsets.all(
+          PopqSpacing.lg,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('보유 포인트', style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: PopqSpacing.xs),
+            Text(
+              '보유 포인트',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(
+              height: PopqSpacing.xs,
+            ),
             Text(
               '${_formatNumber(summary.balance)} P',
-              style: Theme.of(
-                context,
-              ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w800),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineMedium
+                  ?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            const SizedBox(height: PopqSpacing.sm),
+            const SizedBox(
+              height: PopqSpacing.sm,
+            ),
             Text(
-              '결제 금액의 ${summary.rewardRatePercent.toStringAsFixed(1)}%가 '
-              '포인트로 적립돼요. 소수점은 제외됩니다.',
+              '결제 금액의 '
+                  '${summary.rewardRatePercent.toStringAsFixed(1)}%가 '
+                  '포인트로 적립돼요. 소수점은 제외됩니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -109,62 +151,90 @@ class _PointBalanceCard extends StatelessWidget {
 }
 
 class _PointHistoryCard extends StatelessWidget {
-  const _PointHistoryCard({required this.history});
+  const _PointHistoryCard({
+    required this.history,
+  });
 
   final CustomerPointHistory history;
 
   @override
   Widget build(BuildContext context) {
     final isReward = history.isReward;
-    final isRaffle = history.type == 'RAFFLE_TICKET_PURCHASE';
+    final isRaffle =
+        history.type == 'RAFFLE_TICKET_PURCHASE';
+
     final pointColor = isReward
         ? const Color(0xFF16805B)
         : Theme.of(context).colorScheme.error;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(PopqSpacing.md),
+        padding: const EdgeInsets.all(
+          PopqSpacing.md,
+        ),
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor: pointColor.withValues(alpha: 0.12),
+              backgroundColor:
+              pointColor.withValues(alpha: 0.12),
               foregroundColor: pointColor,
-              child: Icon(isReward ? Icons.add_rounded : Icons.remove_rounded),
+              child: Icon(
+                isReward
+                    ? Icons.add_rounded
+                    : Icons.remove_rounded,
+              ),
             ),
-            const SizedBox(width: PopqSpacing.md),
+            const SizedBox(
+              width: PopqSpacing.md,
+            ),
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment:
+                CrossAxisAlignment.start,
                 children: [
                   Text(
                     history.storeName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleSmall
+                        ?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(
+                    height: 2,
+                  ),
                   Text(
                     isReward
                         ? '${_formatNumber(history.paymentAmount)}원 결제 적립'
                         : isRaffle
-                            ? '월간 응모권 구매'
-                            : '${_formatNumber(history.paymentAmount)}원 환불 회수',
-                    style: Theme.of(context).textTheme.bodySmall,
+                        ? '월간 응모권 구매'
+                        : '${_formatNumber(history.paymentAmount)}원 환불 회수',
+                    style:
+                    Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    _formatDateTime(history.occurredAt),
-                    style: Theme.of(context).textTheme.bodySmall,
+                    _formatDateTime(
+                      history.occurredAt,
+                    ),
+                    style:
+                    Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: PopqSpacing.sm),
+            const SizedBox(
+              width: PopqSpacing.sm,
+            ),
             Text(
               '${history.points > 0 ? '+' : ''}'
-              '${_formatNumber(history.points)} P',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  '${_formatNumber(history.points)} P',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(
                 color: pointColor,
                 fontWeight: FontWeight.w800,
               ),
@@ -182,16 +252,23 @@ class _EmptyPointHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: PopqSpacing.xl),
+      padding: const EdgeInsets.symmetric(
+        vertical: PopqSpacing.xl,
+      ),
       child: Column(
         children: [
           Icon(
             Icons.savings_outlined,
             size: 48,
-            color: Theme.of(context).colorScheme.outline,
+            color:
+            Theme.of(context).colorScheme.outline,
           ),
-          const SizedBox(height: PopqSpacing.sm),
-          const Text('아직 적립된 포인트가 없어요.'),
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          const Text(
+            '아직 적립된 포인트가 없어요.',
+          ),
         ],
       ),
     );
@@ -201,21 +278,39 @@ class _EmptyPointHistory extends StatelessWidget {
 String _formatNumber(int value) {
   final negative = value < 0;
   final digits = value.abs().toString();
+
   final buffer = StringBuffer();
+
   for (var index = 0; index < digits.length; index++) {
-    if (index > 0 && (digits.length - index) % 3 == 0) {
+    if (index > 0 &&
+        (digits.length - index) % 3 == 0) {
       buffer.write(',');
     }
-    buffer.write(digits[index]);
+
+    buffer.write(
+      digits[index],
+    );
   }
-  return negative ? '-$buffer' : buffer.toString();
+
+  return negative
+      ? '-$buffer'
+      : buffer.toString();
 }
 
 String _formatDateTime(DateTime value) {
   final local = value.toLocal();
-  final month = local.month.toString().padLeft(2, '0');
-  final day = local.day.toString().padLeft(2, '0');
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
+
+  final month =
+  local.month.toString().padLeft(2, '0');
+
+  final day =
+  local.day.toString().padLeft(2, '0');
+
+  final hour =
+  local.hour.toString().padLeft(2, '0');
+
+  final minute =
+  local.minute.toString().padLeft(2, '0');
+
   return '${local.year}.$month.$day $hour:$minute';
 }
