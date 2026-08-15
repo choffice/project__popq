@@ -98,8 +98,8 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
     _isAppActive =
         WidgetsBinding.instance.lifecycleState == null ||
-        WidgetsBinding.instance.lifecycleState ==
-            AppLifecycleState.resumed;
+            WidgetsBinding.instance.lifecycleState ==
+                AppLifecycleState.resumed;
 
     widget.sessionController.addListener(
       _handleSessionChanged,
@@ -139,8 +139,8 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
   @override
   void didUpdateWidget(
-    covariant CustomerRootScreen oldWidget,
-  ) {
+      covariant CustomerRootScreen oldWidget,
+      ) {
     super.didUpdateWidget(oldWidget);
 
     if (oldWidget.location != widget.location) {
@@ -176,8 +176,8 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
   @override
   void didChangeAppLifecycleState(
-    AppLifecycleState state,
-  ) {
+      AppLifecycleState state,
+      ) {
     super.didChangeAppLifecycleState(state);
 
     switch (state) {
@@ -366,16 +366,16 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   }
 
   void _handleCustomerChatEvent(
-    PopqRealtimeEvent event,
-  ) {
+      PopqRealtimeEvent event,
+      ) {
     if (!mounted) {
       return;
     }
 
     final shouldRefresh =
         event.isMessageRead ||
-        (event.isMessageCreated &&
-            event.message?.sentBySeller == true);
+            (event.isMessageCreated &&
+                event.message?.sentBySeller == true);
 
     if (!shouldRefresh) {
       return;
@@ -387,8 +387,8 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   }
 
   void _handleCustomerChatError(
-    Object error,
-  ) {
+      Object error,
+      ) {
     debugPrint(
       '구매자 전역 채팅 이벤트를 처리하지 못했습니다: $error',
     );
@@ -408,14 +408,14 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
     _customerChatSubscription =
         realtimeClient.subscribeToCustomerChat(
-      onEvent: _handleCustomerChatEvent,
-      onError: _handleCustomerChatError,
-    );
+          onEvent: _handleCustomerChatEvent,
+          onError: _handleCustomerChatError,
+        );
   }
 
   void _scheduleUnreadRefresh() {
     WidgetsBinding.instance.addPostFrameCallback(
-      (_) {
+          (_) {
         if (!mounted) {
           return;
         }
@@ -452,7 +452,7 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
     _unreadPollingTimer = Timer.periodic(
       _unreadPollingInterval,
-      (_) {
+          (_) {
         unawaited(
           _refreshUnreadMessageCount(),
         );
@@ -485,7 +485,7 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
 
       final totalUnreadCount = unreadCounts.fold<int>(
         0,
-        (int total, item) {
+            (int total, item) {
           return total + item.unreadCount;
         },
       );
@@ -529,6 +529,7 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   // "마이" 탭 안에서 열리는 하위 화면들입니다.
   // 이 화면들에 있을 때도 하단 탭은 "마이"로 유지되어야 합니다.
   static const List<String> _profileSubRoutes = <String>[
+    CustomerRoutes.orders,
     CustomerRoutes.myInfo,
     CustomerRoutes.myReviews,
     CustomerRoutes.pointHistory,
@@ -537,16 +538,16 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   ];
 
   int _routeIndexForLocation(
-    String value,
-  ) {
+      String value,
+      ) {
     if (_profileSubRoutes.any(
-      (String candidate) => value.startsWith(candidate),
+          (String candidate) => value.startsWith(candidate),
     )) {
       return _locations.indexOf(CustomerRoutes.profile);
     }
 
     final index = _locations.indexWhere(
-      (String candidate) => value.startsWith(candidate),
+          (String candidate) => value.startsWith(candidate),
     );
 
     return index < 0 ? 0 : index;
