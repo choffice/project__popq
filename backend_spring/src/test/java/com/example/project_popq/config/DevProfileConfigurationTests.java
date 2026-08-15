@@ -19,12 +19,12 @@ class DevProfileConfigurationTests {
                     .withPropertyValues("spring.profiles.active=dev");
 
     @Test
-    void devLoginIsDisabledByDefaultInDevProfile() {
+    void devLoginIsEnabledInDevProfile() {
         contextRunner.run(context ->
                 assertThat(context.getEnvironment().getProperty(
                         DEV_LOGIN_PROPERTY,
                         Boolean.class
-                )).isFalse()
+                )).isTrue()
         );
     }
 
