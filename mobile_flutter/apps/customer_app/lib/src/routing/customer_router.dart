@@ -476,29 +476,6 @@ GoRouter createCustomerRouter({
         },
       ),
       GoRoute(
-        path: CustomerRoutes.platformAnnouncements,
-        builder: (context, state) {
-          return CustomerPlatformAnnouncementListScreen(
-            repository: platformAnnouncementRepository,
-          );
-        },
-      ),
-      GoRoute(
-        path: '${CustomerRoutes.platformAnnouncements}/:platformAnnouncementId',
-        builder: (context, state) {
-          final id = int.tryParse(
-            state.pathParameters['platformAnnouncementId'] ?? '',
-          );
-          if (id == null || id <= 0) {
-            return const PopqErrorView(message: '공지사항 번호가 올바르지 않습니다.');
-          }
-          return CustomerPlatformAnnouncementDetailScreen(
-            platformAnnouncementId: id,
-            repository: platformAnnouncementRepository,
-          );
-        },
-      ),
-      GoRoute(
         path: '${CustomerRoutes.orders}/:orderPublicId/messages',
         builder: (context, state) {
           final orderPublicId = state.pathParameters['orderPublicId'] ?? '';
@@ -636,6 +613,34 @@ GoRouter createCustomerRouter({
             builder: (context, state) {
               return CustomerNotificationSettingsScreen(
                 repository: engagementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.platformAnnouncements,
+            builder: (context, state) {
+              return CustomerPlatformAnnouncementListScreen(
+                repository: platformAnnouncementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path:
+                '${CustomerRoutes.platformAnnouncements}/:platformAnnouncementId',
+            builder: (context, state) {
+              final id = int.tryParse(
+                state.pathParameters['platformAnnouncementId'] ?? '',
+              );
+
+              if (id == null || id <= 0) {
+                return const PopqErrorView(
+                  message: '공지사항 번호가 올바르지 않습니다.',
+                );
+              }
+
+              return CustomerPlatformAnnouncementDetailScreen(
+                platformAnnouncementId: id,
+                repository: platformAnnouncementRepository,
               );
             },
           ),
