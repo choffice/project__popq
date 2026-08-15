@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/cart/cart_controller.dart';
+import 'features/cart/customer_cart_action.dart';
 import 'features/common/theme_mode_toggle.dart';
 import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
@@ -18,6 +20,7 @@ class CustomerRootScreen extends StatefulWidget {
     required this.child,
     required this.notificationRepository,
     required this.orderMessageRepository,
+    required this.cartController,
     required this.sessionController,
     this.themeController,
     super.key,
@@ -27,6 +30,7 @@ class CustomerRootScreen extends StatefulWidget {
   final Widget child;
   final CustomerNotificationRepository notificationRepository;
   final CustomerOrderMessageRepository orderMessageRepository;
+  final CartController cartController;
   final SessionController sessionController;
   final PopqThemeController? themeController;
 
@@ -249,6 +253,9 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
         NotificationAction(
           repository: widget.notificationRepository,
           sessionController: widget.sessionController,
+        ),
+        CustomerCartAction(
+          controller: widget.cartController,
         ),
       ],
       selectedIndex: selectedIndex,

@@ -7,7 +7,6 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
-import '../common/customer_count_badge.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
@@ -192,23 +191,11 @@ class _CustomerHomeScreenState
                 ),
               ],
 
-              AnimatedBuilder(
-                animation: widget.cartController,
-                builder: (context, child) {
-                  return _LocationHeader(
-                    locationLabel:
-                        snapshot.currentLocationLabel,
-                    cartItemCount:
-                        widget.cartController.itemCount,
-                    onLocationPressed:
-                        _showLocationPicker,
-                    onCartPressed: () {
-                      context.push(
-                        CustomerRoutes.cart,
-                      );
-                    },
-                  );
-                },
+              _LocationHeader(
+                locationLabel:
+                    snapshot.currentLocationLabel,
+                onLocationPressed:
+                    _showLocationPicker,
               ),
 
               const SizedBox(
@@ -520,15 +507,11 @@ class _InitialLoadingView extends StatelessWidget {
 class _LocationHeader extends StatelessWidget {
   const _LocationHeader({
     required this.locationLabel,
-    required this.cartItemCount,
     required this.onLocationPressed,
-    required this.onCartPressed,
   });
 
   final String locationLabel;
-  final int cartItemCount;
   final VoidCallback onLocationPressed;
-  final VoidCallback onCartPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -607,15 +590,6 @@ class _LocationHeader extends StatelessWidget {
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(width: PopqSpacing.sm),
-        CustomerCountBadge(
-          count: cartItemCount,
-          child: _RoundActionButton(
-            tooltip: '장바구니',
-            icon: Icons.shopping_bag_outlined,
-            onPressed: onCartPressed,
           ),
         ),
       ],

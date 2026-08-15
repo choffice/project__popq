@@ -443,6 +443,7 @@ GoRouter createCustomerRouter({
             sessionController: sessionController,
             catalogRepository: catalogRepository,
             announcementRepository: announcementRepository,
+            cartController: cartController,
           );
         },
       ),
@@ -517,6 +518,7 @@ GoRouter createCustomerRouter({
             location: state.uri.path,
             notificationRepository: notificationRepository,
             orderMessageRepository: orderMessageRepository,
+            cartController: cartController,
             sessionController: sessionController,
             themeController: themeController,
             child: child,
