@@ -4,6 +4,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
+import '../common/customer_count_badge.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../discovery/store_hours_dialog.dart';
 import '../discovery/store_section_widgets.dart';
@@ -317,9 +318,8 @@ class _CartButtonState extends State<_CartButton> {
 
   @override
   Widget build(BuildContext context) {
-    return Badge(
-      isLabelVisible: widget.cartController.itemCount > 0,
-      label: Text('${widget.cartController.itemCount}'),
+    return CustomerCountBadge(
+      count: widget.cartController.itemCount,
       child: IconButton(
         tooltip: '장바구니',
         onPressed: () => context.push(CustomerRoutes.cart),

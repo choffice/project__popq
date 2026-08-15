@@ -6,6 +6,8 @@ import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
+import '../cart/cart_controller.dart';
+import '../common/customer_count_badge.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
@@ -22,6 +24,7 @@ class CustomerHomeScreen extends StatefulWidget {
     required this.sessionController,
     required this.permissionGateway,
     required this.locationRepository,
+    required this.cartController,
     this.preloadedController,
     super.key,
   });
@@ -31,6 +34,7 @@ class CustomerHomeScreen extends StatefulWidget {
   final SessionController sessionController;
   final CustomerPermissionGateway permissionGateway;
   final CustomerLocationRepository locationRepository;
+  final CartController cartController;
 
   /// 앱 부팅 시 스플래시 화면과 함께 미리 로딩을 시작한 컨트롤러입니다.
   ///
@@ -188,14 +192,21 @@ class _CustomerHomeScreenState
                 ),
               ],
 
-              _LocationHeader(
-                locationLabel:
-                snapshot.currentLocationLabel,
-                onLocationPressed:
-                    _showLocationPicker,
-                onCartPressed: () {
-                  context.push(
-                    CustomerRoutes.cart,
+              AnimatedBuilder(
+                animation: widget.cartController,
+                builder: (context, child) {
+                  return _LocationHeader(
+                    locationLabel:
+                        snapshot.currentLocationLabel,
+                    cartItemCount:
+                        widget.cartController.itemCount,
+                    onLocationPressed:
+                        _showLocationPicker,
+                    onCartPressed: () {
+                      context.push(
+                        CustomerRoutes.cart,
+                      );
+                    },
                   );
                 },
               ),
@@ -509,11 +520,13 @@ class _InitialLoadingView extends StatelessWidget {
 class _LocationHeader extends StatelessWidget {
   const _LocationHeader({
     required this.locationLabel,
+    required this.cartItemCount,
     required this.onLocationPressed,
     required this.onCartPressed,
   });
 
   final String locationLabel;
+  final int cartItemCount;
   final VoidCallback onLocationPressed;
   final VoidCallback onCartPressed;
 
@@ -597,10 +610,13 @@ class _LocationHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: PopqSpacing.sm),
-        _RoundActionButton(
-          tooltip: '장바구니',
-          icon: Icons.shopping_bag_outlined,
-          onPressed: onCartPressed,
+        CustomerCountBadge(
+          count: cartItemCount,
+          child: _RoundActionButton(
+            tooltip: '장바구니',
+            icon: Icons.shopping_bag_outlined,
+            onPressed: onCartPressed,
+          ),
         ),
       ],
     );

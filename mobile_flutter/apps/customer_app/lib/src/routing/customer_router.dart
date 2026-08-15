@@ -532,6 +532,7 @@ GoRouter createCustomerRouter({
                 sessionController: sessionController,
                 permissionGateway: permissionGateway,
                 locationRepository: locationRepository,
+                cartController: cartController,
                 preloadedController: homeController,
               );
             },

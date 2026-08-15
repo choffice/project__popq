@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 
 import '../../routing/customer_router.dart';
+import '../common/customer_count_badge.dart';
 import 'customer_notification_repository.dart';
 
 class NotificationAction extends StatefulWidget {
@@ -51,9 +52,8 @@ class _NotificationActionState extends State<NotificationAction> {
       future: _unreadCount,
       builder: (context, snapshot) {
         final count = snapshot.data ?? 0;
-        return Badge(
-          isLabelVisible: count > 0,
-          label: Text(count > 99 ? '99+' : '$count'),
+        return CustomerCountBadge(
+          count: count,
           child: IconButton(
             tooltip: '알림',
             onPressed: _openNotifications,
