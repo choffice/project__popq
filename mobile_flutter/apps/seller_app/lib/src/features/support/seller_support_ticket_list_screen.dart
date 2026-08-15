@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../realtime/seller_realtime_scope.dart';
 import 'seller_support_repository.dart';
 import 'seller_support_ticket.dart';
 import 'seller_support_types.dart';
+
 
 class SellerSupportTicketListScreen extends StatefulWidget {
   const SellerSupportTicketListScreen({
@@ -134,9 +136,21 @@ class _SellerSupportTicketListScreenState
     }
 
     if (_tickets.isEmpty) {
-      return const _TicketListMessage(
-        icon: Icons.forum_outlined,
-        message: '아직 등록한 문의가 없어요.',
+      return RefreshIndicator(
+        onRefresh: _loadTickets,
+        child: const CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.forum_outlined,
+                title: '아직 등록한 문의가 없어요.',
+                description: '문의가 등록되면 이곳에서 진행 상태와 답변을 확인할 수 있어요.',
+              ),
+            ),
+          ],
+        ),
       );
     }
 

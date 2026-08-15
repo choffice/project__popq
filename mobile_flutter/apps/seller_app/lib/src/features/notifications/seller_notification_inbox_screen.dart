@@ -260,23 +260,33 @@ class _AlertList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (children.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.notifications_none_rounded,
+                title: emptyTitle,
+                description: '아래로 당겨 새로고침할 수 있어요.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.separated(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(vertical: PopqSpacing.sm),
-        itemCount: children.isEmpty ? 1 : children.length,
+        itemCount: children.length,
         separatorBuilder: (_, _) => const Divider(height: 1),
-        itemBuilder: (context, index) => children.isEmpty
-            ? SizedBox(
-                height: MediaQuery.sizeOf(context).height * 0.55,
-                child: PopqEmptyView(
-                  icon: Icons.notifications_none_rounded,
-                  title: emptyTitle,
-                  description: '아래로 당겨 새로고침할 수 있어요.',
-                ),
-              )
-            : children[index],
+        itemBuilder: (context, index) => children[index],
       ),
     );
   }

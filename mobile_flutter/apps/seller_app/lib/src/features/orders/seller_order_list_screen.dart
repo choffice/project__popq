@@ -372,11 +372,11 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         if (orders.isEmpty) {
           return RefreshIndicator(
             onRefresh: _reload,
-            child: ListView(
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                SizedBox(
-                  height: MediaQuery.sizeOf(context).height * 0.5,
+              slivers: <Widget>[
+                SliverFillRemaining(
+                  hasScrollBody: false,
                   child: PopqEmptyView(
                     icon: Icons.receipt_long_outlined,
                     title: _tabController.index == 0

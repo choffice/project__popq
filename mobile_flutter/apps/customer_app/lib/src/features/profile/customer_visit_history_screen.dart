@@ -64,7 +64,9 @@ class _CustomerVisitHistoryScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('방문 기록')),
+      appBar: AppBar(
+        title: const Text('방문 기록'),
+      ),
       body: _buildBody(),
     );
   }
@@ -85,130 +87,130 @@ class _CustomerVisitHistoryScreenState
 
     final selectedLabel =
         popqStoreCategoryLabels[_selectedCategoryIndex];
+
     final filteredStores = _stores
         .where(
-          (store) =>
-              matchesStoreCategoryLabel(store.storeCategory, selectedLabel),
+          (store) => matchesStoreCategoryLabel(
+            store.storeCategory,
+            selectedLabel,
+          ),
         )
         .toList();
+
+    if (_stores.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                PopqSpacing.lg,
+                PopqSpacing.lg,
+                PopqSpacing.lg,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: PopqCategoryTabsRow(
+                  selectedIndex: _selectedCategoryIndex,
+                  onSelected: (index) {
+                    setState(() {
+                      _selectedCategoryIndex = index;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.history_rounded,
+                title: '아직 방문 기록이 없어요.',
+                description: '결제까지 완료한 매장이 이곳에 기록돼요.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (filteredStores.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                PopqSpacing.lg,
+                PopqSpacing.lg,
+                PopqSpacing.lg,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: PopqCategoryTabsRow(
+                  selectedIndex: _selectedCategoryIndex,
+                  onSelected: (index) {
+                    setState(() {
+                      _selectedCategoryIndex = index;
+                    });
+                  },
+                ),
+              ),
+            ),
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.filter_alt_off_outlined,
+                title: '$selectedLabel 카테고리의 방문 기록이 없어요.',
+                description: '다른 카테고리를 선택해 보세요.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.all(PopqSpacing.lg),
-        children: [
+        children: <Widget>[
           PopqCategoryTabsRow(
             selectedIndex: _selectedCategoryIndex,
             onSelected: (index) {
-              setState(() => _selectedCategoryIndex = index);
+              setState(() {
+                _selectedCategoryIndex = index;
+              });
             },
           ),
-          const SizedBox(height: PopqSpacing.md),
-          if (_stores.isEmpty)
-            _VisitHistoryEmptyView(
-              onDiscoverPressed: () {
-                context.go(CustomerRoutes.discover);
-              },
-            )
-          else if (filteredStores.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: PopqSpacing.xl),
-              child: Text(
-                '$selectedLabel 카테고리의 방문 기록이 없어요.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-            )
-          else ...[
-            Text(
-              '결제까지 완료한 매장 ${filteredStores.length}곳',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: PopqSpacing.sm),
-            for (final store in filteredStores)
-              Padding(
-                padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
-                child: _VisitedStoreCard(
-                  store: store,
-                  onTap: () {
-                    context.push(
-                      '${CustomerRoutes.stores}/${store.storeId}',
-                    );
-                  },
+          const SizedBox(
+            height: PopqSpacing.md,
+          ),
+          Text(
+            '결제까지 완료한 매장 ${filteredStores.length}곳',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
+          ),
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          for (final store in filteredStores)
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: PopqSpacing.sm,
               ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _VisitHistoryEmptyView extends StatelessWidget {
-  const _VisitHistoryEmptyView({required this.onDiscoverPressed});
-
-  final VoidCallback onDiscoverPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PopqSpacing.lg,
-        vertical: 48,
-      ),
-      decoration: BoxDecoration(
-        color: isDark ? PopqPalette.nightCard : PopqPalette.lightCard,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(
-          color: isDark ? PopqPalette.nightBorder : PopqPalette.lightBorder,
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? PopqPalette.purple.withValues(alpha: 0.2)
-                  : PopqPalette.coral.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+              child: _VisitedStoreCard(
+                store: store,
+                onTap: () {
+                  context.push(
+                    '${CustomerRoutes.stores}/${store.storeId}',
+                  );
+                },
+              ),
             ),
-            child: Icon(
-              Icons.history_rounded,
-              size: 40,
-              color: isDark ? PopqPalette.lime : PopqPalette.coral,
-            ),
-          ),
-          const SizedBox(height: PopqSpacing.md),
-          Text(
-            '아직 방문 기록이 없어요.',
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: PopqSpacing.sm),
-          Text(
-            '결제까지 완료한 매장이 이곳에 기록돼요.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: isDark
-                  ? PopqPalette.nightMutedText
-                  : PopqPalette.lightMutedText,
-            ),
-          ),
-          const SizedBox(height: PopqSpacing.lg),
-          FilledButton.icon(
-            onPressed: onDiscoverPressed,
-            icon: const Icon(Icons.search_rounded),
-            label: const Text('매장 둘러보기'),
-          ),
         ],
       ),
     );
@@ -227,6 +229,7 @@ class _VisitedStoreThumbnail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String url = imageUrl?.trim() ?? '';
+
     return SizedBox(
       width: 76,
       height: 76,
@@ -252,7 +255,9 @@ class _VisitedStoreThumbnail extends StatelessWidget {
         child: Icon(
           Icons.storefront_rounded,
           size: 34,
-          color: isDark ? PopqPalette.lime : PopqPalette.forest,
+          color: isDark
+              ? PopqPalette.lime
+              : PopqPalette.forest,
         ),
       ),
     );
@@ -285,7 +290,9 @@ class _VisitedStoreCard extends StatelessWidget {
                 imageUrl: store.storeImageUrl,
                 isDark: isDark,
               ),
-              const SizedBox(width: PopqSpacing.md),
+              const SizedBox(
+                width: PopqSpacing.md,
+              ),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,7 +305,9 @@ class _VisitedStoreCard extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: PopqSpacing.xs),
+                    const SizedBox(
+                      height: PopqSpacing.xs,
+                    ),
                     Text(
                       '최근 방문 ${_formatDate(store.lastVisitedAt)}',
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -326,6 +335,7 @@ class _VisitedStoreCard extends StatelessWidget {
 
 String _formatDate(DateTime value) {
   final local = value.toLocal();
+
   return '${local.year}.${local.month.toString().padLeft(2, '0')}.'
       '${local.day.toString().padLeft(2, '0')}';
 }
