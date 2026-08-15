@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -11,15 +12,10 @@ import '../../routing/customer_router.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
 
-/// 마이페이지 상단 카드에 표시하는 등급·활동 통계입니다.
-///
-/// 레벨, 방문 횟수, 보유 포인트는 아직 백엔드에
-/// 관련 API가 없어 화면 디자인 확인용 임시값입니다.
-/// 실제 API가 준비되면 [CustomerProfile]에 필드를 추가해 교체합니다.
+/// 마이페이지 상단 카드에 아직 API가 없는 임시 정보입니다.
 abstract final class _ProfileTemporaryStats {
   static const levelLabel = 'Lv.12';
   static const visitCount = 37;
-  static const pointLabel = '2,450P';
   static const locationLabel = '위치 정보를 설정해 보세요';
 }
 
@@ -38,6 +34,7 @@ const _dangerColor = Color(0xFFE5484D);
 class CustomerProfileScreen extends StatefulWidget {
   const CustomerProfileScreen({
     required this.repository,
+    required this.activitySummaryListenable,
     required this.messageRepository,
     required this.onSignOut,
     required this.onConnectSellerAccess,
@@ -46,6 +43,7 @@ class CustomerProfileScreen extends StatefulWidget {
   });
 
   final CustomerEngagementRepository repository;
+  final ValueListenable<CustomerActivitySummary?> activitySummaryListenable;
   final CustomerOrderMessageRepository messageRepository;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onConnectSellerAccess;
@@ -90,6 +88,7 @@ class _CustomerProfileScreenState
             AppLifecycleState.resumed;
 
     _profile = widget.repository.getProfile();
+    widget.activitySummaryListenable.addListener(_handleActivitySummaryChanged);
 
     unawaited(
       _refreshUnreadMessageCount(),
@@ -143,6 +142,16 @@ class _CustomerProfileScreenState
       });
     }
 
+    if (oldWidget.activitySummaryListenable !=
+        widget.activitySummaryListenable) {
+      oldWidget.activitySummaryListenable.removeListener(
+        _handleActivitySummaryChanged,
+      );
+      widget.activitySummaryListenable.addListener(
+        _handleActivitySummaryChanged,
+      );
+    }
+
     if (oldWidget.messageRepository !=
         widget.messageRepository) {
       _requestGeneration++;
@@ -180,6 +189,10 @@ class _CustomerProfileScreenState
   void dispose() {
     _requestGeneration++;
 
+    widget.activitySummaryListenable.removeListener(
+      _handleActivitySummaryChanged,
+    );
+
     _stopUnreadPolling();
 
     _customerChatSubscription?.cancel();
@@ -193,6 +206,17 @@ class _CustomerProfileScreenState
     WidgetsBinding.instance.removeObserver(this);
 
     super.dispose();
+  }
+
+  void _handleActivitySummaryChanged() {
+    final summary = widget.activitySummaryListenable.value;
+    if (summary == null || !mounted) return;
+
+    setState(() {
+      _profile = _profile.then(
+        (profile) => profile.copyWith(activitySummary: summary),
+      );
+    });
   }
 
   @override
@@ -242,16 +266,19 @@ class _CustomerProfileScreenState
                     title: '내 정보',
                     subtitle:
                     '프로필 사진, 연락처, 비밀번호를 관리해요',
-                    onTap: () {
-                      context.push(
+                    onTap: () async {
+                      await context.push(
                         CustomerRoutes.myInfo,
                       );
+                      if (context.mounted) {
+                        await _reload();
+                      }
                     },
                   ),
                   _MenuRowData(
                     icon:
                     Icons.confirmation_number_outlined,
-                    title: '예약 내역',
+                    title: '주문 내역',
                     subtitle: _unreadMessageCount > 0
                         ? '매장에서 보낸 새 답변이 '
                         '$_unreadMessageCount개 있어요'
@@ -286,11 +313,21 @@ class _CustomerProfileScreenState
                     },
                   ),
                   _MenuRowData(
-                    icon: Icons.star_border_rounded,
+                    icon: Icons.savings_outlined,
                     title: '포인트 내역',
+                    subtitle: '결제로 적립하거나 환불로 회수된 내역을 확인해요',
+                    onTap: () {
+                      context.push(CustomerRoutes.pointHistory);
+                    },
+                  ),
+                  _MenuRowData(
+                    icon: Icons.star_border_rounded,
+                    title: '공지사항',
                     subtitle:
-                    '포인트 적립 및 사용 내역을 확인해요',
-                    onTap: _showComingSoon,
+                    '버그 수정 / 업데이트 내역',
+                    onTap: () {
+                      context.push(CustomerRoutes.platformAnnouncements);
+                    },
                   ),
                   _MenuRowData(
                     icon:
@@ -309,7 +346,11 @@ class _CustomerProfileScreenState
                     title: '고객센터',
                     subtitle:
                     '자주 묻는 질문과 1:1 문의를 할 수 있어요',
-                    onTap: _showComingSoon,
+                    onTap: () {
+                      context.push(
+                        CustomerRoutes.support,
+                      );
+                    },
                   ),
                   _MenuRowData(
                     icon: Icons.storefront_rounded,
@@ -485,7 +526,7 @@ class _CustomerProfileScreenState
       });
     } catch (error, stackTrace) {
       debugPrint(
-        '예약 내역의 읽지 않은 답변 수를 '
+        '주문 내역의 읽지 않은 답변 수를 '
             '불러오지 못했습니다: $error',
       );
 
@@ -593,7 +634,14 @@ class _CustomerProfileScreenState
 
     setState(() => _uploadingProfileImage = true);
     try {
-      await widget.repository.uploadProfileImage(image.path);
+      if (kIsWeb) {
+        await widget.repository.uploadProfileImageBytes(
+          await image.readAsBytes(),
+          fileName: image.name,
+        );
+      } else {
+        await widget.repository.uploadProfileImage(image.path);
+      }
 
       if (!mounted) return;
       await _reload();
@@ -623,16 +671,6 @@ class _CustomerProfileScreenState
         setState(() => _uploadingProfileImage = false);
       }
     }
-  }
-
-  void _showComingSoon() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentTopSnackBar()
-      ..showTopSnackBar(
-        const SnackBar(
-          content: Text('준비 중인 기능이에요.'),
-        ),
-      );
   }
 
   Future<void> _signOut() async {
@@ -911,7 +949,27 @@ class _ProfileHeaderCard extends StatelessWidget {
                               const SizedBox(
                                 width: PopqSpacing.xs,
                               ),
-                              Container(
+                              if (profile.emblemVisible &&
+                                  profile.activitySummary
+                                  .badgeAssetPath != null) ...[
+                                Image.asset(
+                                  profile.activitySummary
+                                      .badgeAssetPath!,
+                                  width: 56,
+                                  height: 56,
+                                  fit: BoxFit.contain,
+                                  filterQuality:
+                                  FilterQuality.high,
+                                  semanticLabel: profile
+                                      .activitySummary
+                                      .badgeLabel,
+                                ),
+                                const SizedBox(
+                                  width: PopqSpacing.xs,
+                                ),
+                              ],
+                              if (profile.emblemVisible)
+                                Container(
                                 padding:
                                 const EdgeInsets
                                     .symmetric(
@@ -931,8 +989,8 @@ class _ProfileHeaderCard extends StatelessWidget {
                                   ),
                                 ),
                                 child: Text(
-                                  _ProfileTemporaryStats
-                                      .levelLabel,
+                                  profile.activitySummary
+                                      .badgeLabel,
                                   style: theme
                                       .textTheme
                                       .labelMedium
@@ -994,6 +1052,10 @@ class _ProfileHeaderCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: PopqSpacing.md),
+                _ActivityCheckpointProgress(
+                  summary: profile.activitySummary,
+                ),
               ],
             ),
           ),
@@ -1033,26 +1095,71 @@ class _ProfileHeaderCard extends StatelessWidget {
                   child: _StatItem(
                     icon: Icons
                         .calendar_today_outlined,
-                    label: '방문 횟수',
-                    value:
-                    '${_ProfileTemporaryStats.visitCount}',
+                    label: '누적 활동',
+                    value: '${profile.activitySummary.totalCount}',
                   ),
                 ),
                 _StatDivider(isDark: isDark),
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.paid_outlined,
-                    label: '보유 포인트',
-                    value: _ProfileTemporaryStats
-                        .pointLabel,
-                    highlight: true,
-                  ),
-                ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ActivityCheckpointProgress extends StatelessWidget {
+  const _ActivityCheckpointProgress({
+    required this.summary,
+  });
+
+  final CustomerActivitySummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final accent = isDark ? PopqPalette.lime : PopqPalette.forest;
+    final muted = isDark
+        ? PopqPalette.nightMutedText
+        : PopqPalette.lightMutedText;
+    final next = summary.nextCheckpoint;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                next == null
+                    ? '다이아 엠블럼을 달성했어요'
+                    : '다음 체크포인트 ${summary.remainingCount}회',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Text(
+              next == null ? '완료' : '${summary.remainingCount}회 남음',
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: muted,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: PopqSpacing.xs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 7,
+            value: summary.checkpointProgress.clamp(0.0, 1.0).toDouble(),
+            backgroundColor: accent.withValues(alpha: 0.14),
+            valueColor: AlwaysStoppedAnimation<Color>(accent),
+          ),
+        ),
+      ],
     );
   }
 }

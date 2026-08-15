@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+
+import '../profile/customer_engagement_repository.dart';
 import 'qr_webview_screen.dart';
 import 'qr_url_resolver.dart';
 
 class CustomerQrScannerScreen extends StatefulWidget {
   const CustomerQrScannerScreen({
     required this.apiBaseUrl,
+    required this.engagementRepository,
     super.key,
   });
 
   final String apiBaseUrl;
+  final CustomerEngagementRepository engagementRepository;
 
   @override
   State<CustomerQrScannerScreen> createState() =>
@@ -80,6 +84,26 @@ class _CustomerQrScannerScreenState
         scannedUrl: uri,
         apiBaseUrl: widget.apiBaseUrl,
       );
+
+      final qrToken = qrTokenFromUrl(uri);
+      if (qrToken != null) {
+        try {
+          final counted = await widget.engagementRepository.recordQrVisit(
+            qrToken,
+          );
+          if (counted && mounted) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text('방문 활동이 1회 기록되었어요.'),
+                ),
+              );
+          }
+        } catch (_) {
+          // 방문 기록 실패가 기존 QR 주문 진입을 막지 않도록 합니다.
+        }
+      }
 
       await Navigator.of(context).push(
         MaterialPageRoute<void>(

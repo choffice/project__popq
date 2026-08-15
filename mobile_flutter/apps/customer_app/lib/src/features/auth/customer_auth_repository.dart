@@ -1,11 +1,19 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
 abstract interface class CustomerAuthRepository {
+  Future<void> sendEmailVerificationCode({required String email});
+
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  });
+
   Future<AuthSession> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   });
 
   Future<AuthSession> logIn({
@@ -57,11 +65,34 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
   final PopqApiClient _apiClient;
 
   @override
+  Future<void> sendEmailVerificationCode({required String email}) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/email-verification/send',
+      body: {'email': email},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final response = await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/email-verification/confirm',
+      body: {'email': email, 'code': code},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+    return response['verificationToken'] as String;
+  }
+
+  @override
   Future<AuthSession> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) {
     return _submit('/api/v1/auth/signup', {
       'email': email,
@@ -69,6 +100,7 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
       'name': name,
       'phone': phone,
       'role': 'CUSTOMER',
+      'emailVerificationToken': emailVerificationToken,
     });
   }
 
@@ -191,7 +223,7 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
     final expiresIn = (response['expiresIn'] as num).toInt();
     return AuthSession(
       accessToken: response['accessToken'] as String,
-      refreshToken: '',
+      refreshToken: response['refreshToken'] as String,
       expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
     );
   }
@@ -199,11 +231,23 @@ class ApiCustomerAuthRepository implements CustomerAuthRepository {
 
 class MemoryCustomerAuthRepository implements CustomerAuthRepository {
   @override
+  Future<void> sendEmailVerificationCode({required String email}) async {}
+
+  @override
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    return 'memory-email-verification-token';
+  }
+
+  @override
   Future<AuthSession> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     return _session();
   }

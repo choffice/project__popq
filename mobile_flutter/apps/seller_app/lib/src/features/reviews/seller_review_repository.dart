@@ -1,5 +1,25 @@
 import 'package:popq_app_core/popq_app_core.dart';
 
+String sellerReviewEmblemLabel(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => '브론즈',
+    'SILVER' => '실버',
+    'GOLD' => '골드',
+    'DIAMOND' => '다이아',
+    _ => '',
+  };
+}
+
+String? sellerReviewEmblemAssetPath(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => 'assets/images/badges/badge_bronze.png',
+    'SILVER' => 'assets/images/badges/badge_silver.png',
+    'GOLD' => 'assets/images/badges/badge_gold.png',
+    'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+    _ => null,
+  };
+}
+
 class SellerReviewReplyTemplate {
   const SellerReviewReplyTemplate({
     required this.templateId,
@@ -26,8 +46,10 @@ class SellerReview {
     required this.rating,
     required this.createdAt,
     this.content,
+    this.imageUrl,
     this.sellerReply,
     this.sellerRepliedAt,
+    this.authorBadgeTier = 'NONE',
   });
 
   factory SellerReview.fromJson(Map<String, Object?> json) {
@@ -36,8 +58,10 @@ class SellerReview {
       orderPublicId: json['orderPublicId'] as String,
       storeId: (json['storeId'] as num).toInt(),
       authorName: json['authorName'] as String,
+      authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       sellerReply: json['sellerReply'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       sellerRepliedAt: json['sellerRepliedAt'] is String
@@ -50,11 +74,16 @@ class SellerReview {
   final String orderPublicId;
   final int storeId;
   final String authorName;
+  final String authorBadgeTier;
   final int rating;
   final String? content;
+  final String? imageUrl;
   final DateTime createdAt;
   final String? sellerReply;
   final DateTime? sellerRepliedAt;
+  String get authorEmblemLabel => sellerReviewEmblemLabel(authorBadgeTier);
+  String? get authorEmblemAssetPath =>
+      sellerReviewEmblemAssetPath(authorBadgeTier);
 
   SellerReview copyWith({String? sellerReply, bool clearReply = false}) {
     return SellerReview(
@@ -62,8 +91,10 @@ class SellerReview {
       orderPublicId: orderPublicId,
       storeId: storeId,
       authorName: authorName,
+      authorBadgeTier: authorBadgeTier,
       rating: rating,
       content: content,
+      imageUrl: imageUrl,
       createdAt: createdAt,
       sellerReply: clearReply ? null : sellerReply ?? this.sellerReply,
       sellerRepliedAt: clearReply ? null : DateTime.now().toUtc(),
@@ -121,9 +152,8 @@ class ApiSellerReviewRepository implements SellerReviewRepository {
       },
       decode: (value) => (value as List<Object?>)
           .map(
-            (item) => SellerReview.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
+            (item) =>
+                SellerReview.fromJson(Map<String, Object?>.from(item as Map)),
           )
           .toList(),
     );
@@ -144,9 +174,8 @@ class ApiSellerReviewRepository implements SellerReviewRepository {
     return _apiClient.put(
       '${_basePath(storeId)}/$reviewId/reply',
       body: {'reply': reply},
-      decode: (value) => SellerReview.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerReview.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -154,9 +183,8 @@ class ApiSellerReviewRepository implements SellerReviewRepository {
   Future<SellerReview> deleteReply(int storeId, int reviewId) {
     return _apiClient.delete(
       '${_basePath(storeId)}/$reviewId/reply',
-      decode: (value) => SellerReview.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerReview.fromJson(Map<String, Object?>.from(value as Map)),
     );
   }
 
@@ -214,7 +242,7 @@ class ApiSellerReviewRepository implements SellerReviewRepository {
 
 class MemorySellerReviewRepository implements SellerReviewRepository {
   MemorySellerReviewRepository({List<SellerReview> reviews = const []})
-      : _reviews = List.of(reviews);
+    : _reviews = List.of(reviews);
 
   final List<SellerReview> _reviews;
   final Map<int, List<SellerReviewReplyTemplate>> _templatesByStore = {};
@@ -249,7 +277,9 @@ class MemorySellerReviewRepository implements SellerReviewRepository {
       (review) => review.storeId == storeId && review.reviewId == reviewId,
     );
     if (index < 0) throw StateError('review not found');
-    return _reviews[index] = _reviews[index].copyWith(sellerReply: reply.trim());
+    return _reviews[index] = _reviews[index].copyWith(
+      sellerReply: reply.trim(),
+    );
   }
 
   @override
@@ -262,7 +292,9 @@ class MemorySellerReviewRepository implements SellerReviewRepository {
   }
 
   @override
-  Future<List<SellerReviewReplyTemplate>> findReplyTemplates(int storeId) async {
+  Future<List<SellerReviewReplyTemplate>> findReplyTemplates(
+    int storeId,
+  ) async {
     return List.unmodifiable(_templates(storeId));
   }
 
@@ -275,9 +307,9 @@ class MemorySellerReviewRepository implements SellerReviewRepository {
     final nextId = templates.isEmpty
         ? 1
         : templates
-                .map((item) => item.templateId)
-                .reduce((a, b) => a > b ? a : b) +
-            1;
+                  .map((item) => item.templateId)
+                  .reduce((a, b) => a > b ? a : b) +
+              1;
     final created = SellerReviewReplyTemplate(
       templateId: nextId,
       content: content.trim(),

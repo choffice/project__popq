@@ -11,10 +11,10 @@ import com.example.project_popq.order.repository.OrderRepository;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.service.StoreAuthorizationService;
-import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +28,7 @@ public class SellerOrderManagementService {
     private static final Set<Integer> PREPARATION_MINUTES = Set.of(
             0, 5, 10, 15, 20, 30, 40, 50
     );
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Seoul");
     private static final Set<OrderStatus> TERMINAL_STATUSES = Set.of(
             OrderStatus.COMPLETED,
             OrderStatus.CANCELED,
@@ -59,10 +60,10 @@ public class SellerOrderManagementService {
                 throw new BusinessException(ErrorCode.INVALID_REQUEST);
             }
             Instant fromInclusive = date.atStartOfDay(
-                    StoreOperatingHoursPolicy.BUSINESS_ZONE
+                    BUSINESS_ZONE
             ).toInstant();
             Instant toExclusive = date.plusDays(1).atStartOfDay(
-                    StoreOperatingHoursPolicy.BUSINESS_ZONE
+                    BUSINESS_ZONE
             ).toInstant();
             orders = orderRepository
                     .findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(

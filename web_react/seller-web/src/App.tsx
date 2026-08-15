@@ -16,9 +16,12 @@ import { QrManagement } from './features/qr/QrManagement'
 import { SalesAnalytics } from './features/analytics/SalesAnalytics'
 import { StoreSettings } from './features/store/StoreSettings'
 import { AdminManagement } from './features/admin/AdminManagement'
+import { AdminContentManagement } from './features/admin/AdminContentManagement'
+import { AdminSupportHub } from './features/admin/AdminSupportHub'
 import { AnnouncementManagement } from './features/announcements/AnnouncementManagement'
 import { SellerAuth } from './features/auth/SellerAuth'
 import { MessageManagement } from './features/messages/MessageManagement'
+import { ReviewManagement } from './features/reviews/ReviewManagement'
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -37,14 +40,25 @@ type SellerView =
   | 'analytics'
   | 'announcements'
   | 'messages'
+  | 'reviews'
   | 'settings'
-  | 'admin'
+  | 'admin-customers'
+  | 'admin-sellers'
+  | 'admin-stores'
+  | 'admin-announcements'
+  | 'admin-support'
+  | 'admin-faqs'
 type TransitionAction =
   | 'accept'
   | 'reject'
   | 'prepare'
   | 'ready'
   | 'complete'
+type TransitionOptions = {
+  reason?: string
+  preparationMinutes?: number
+  applyAsStoreDefault?: boolean
+}
 
 const CONNECTION_KEY = 'popq:seller:connection'
 const DEMO_KEY = 'popq:seller:demo'
@@ -132,8 +146,14 @@ const VIEW_COPY: Record<
   analytics: { eyebrow: 'SALES PULSE', title: '매출 분석' },
   announcements: { eyebrow: 'STORE ANNOUNCEMENTS', title: '공지사항' },
   messages: { eyebrow: 'CUSTOMER CONVERSATIONS', title: '고객 문의' },
+  reviews: { eyebrow: 'CUSTOMER REVIEWS', title: '리뷰 관리' },
   settings: { eyebrow: 'STORE OPERATIONS', title: '스토어 설정' },
-  admin: { eyebrow: 'PLATFORM CONTROL', title: '관리자 운영' },
+  'admin-customers': { eyebrow: 'MEMBER CONTROL', title: '구매자 회원 관리' },
+  'admin-sellers': { eyebrow: 'SELLER CONTROL', title: '판매자 회원 · 인증' },
+  'admin-stores': { eyebrow: 'STORE CONTROL', title: '스토어 관리' },
+  'admin-announcements': { eyebrow: 'PLATFORM CONTENT', title: '플랫폼 공지' },
+  'admin-support': { eyebrow: 'CUSTOMER SUPPORT', title: '문의 관리' },
+  'admin-faqs': { eyebrow: 'PLATFORM CONTENT', title: 'FAQ 관리' },
 }
 
 function money(value: number) {
@@ -210,7 +230,7 @@ function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
 function App() {
   const { theme, toggleTheme } = useThemePreference()
   const [activeView, setActiveView] = useState<SellerView>(() =>
-    readConnection()?.user?.role === 'ADMIN' ? 'admin' : 'orders',
+    readConnection()?.user?.role === 'ADMIN' ? 'admin-customers' : 'orders',
   )
   const [connection, setConnection] = useState<SellerConnection | null>(
     readConnection,
@@ -451,6 +471,7 @@ function App() {
   async function changeStatus(
     order: SellerOrder,
     action: TransitionAction,
+    options?: TransitionOptions,
   ) {
     setProcessing(true)
     try {
@@ -461,6 +482,14 @@ function App() {
           ...order,
           status: target,
           version: order.version + 1,
+          preparationMinutes:
+            action === 'accept'
+              ? (options?.preparationMinutes ?? 0)
+              : order.preparationMinutes,
+          estimatedReadyAt:
+            action === 'accept'
+              ? new Date(Date.now() + (options?.preparationMinutes ?? 0) * 60_000).toISOString()
+              : order.estimatedReadyAt,
           statusHistory: [
             ...order.statusHistory,
             {
@@ -468,7 +497,7 @@ function App() {
               currentStatus: target,
               actorType: 'SELLER',
               actorId: 1,
-              reason: action === 'reject' ? '데모 주문 거절' : '데모 상태 변경',
+              reason: options?.reason ?? (action === 'reject' ? '데모 주문 거절' : '데모 상태 변경'),
               changedAt: new Date().toISOString(),
             },
           ],
@@ -478,6 +507,7 @@ function App() {
           connection!,
           order.orderPublicId,
           action,
+          options,
         )
       }
       setOrders((current) =>
@@ -578,7 +608,7 @@ function App() {
     activeConnectionScope.current = connectionScope(nextConnection)
     setConnection(nextConnection)
     setAuthenticated(true)
-    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin' : 'orders')
+    setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin-customers' : 'orders')
     setOrders([])
     setSelectedId(null)
     setConnected(false)
@@ -697,10 +727,16 @@ function App() {
         </div>
         <nav aria-label={isAdmin ? '관리자 메뉴' : '판매자 메뉴'}>
           {isAdmin ? (
-            <button className="active" onClick={() => setActiveView('admin')}>
-              <span>◇</span>
-              관리자 운영
-            </button>
+            <>
+              <small className="sidebar-section-label">회원 관리</small>
+              <button className={activeView === 'admin-customers' ? 'active' : ''} onClick={() => setActiveView('admin-customers')}><span>◎</span>구매자 회원</button>
+              <button className={activeView === 'admin-sellers' ? 'active' : ''} onClick={() => setActiveView('admin-sellers')}><span>◇</span>판매자 · 인증</button>
+              <button className={activeView === 'admin-stores' ? 'active' : ''} onClick={() => setActiveView('admin-stores')}><span>□</span>스토어 관리</button>
+              <small className="sidebar-section-label">콘텐츠 · 지원</small>
+              <button className={activeView === 'admin-announcements' ? 'active' : ''} onClick={() => setActiveView('admin-announcements')}><span>◉</span>플랫폼 공지</button>
+              <button className={activeView === 'admin-support' ? 'active' : ''} onClick={() => setActiveView('admin-support')}><span>◌</span>문의 관리</button>
+              <button className={activeView === 'admin-faqs' ? 'active' : ''} onClick={() => setActiveView('admin-faqs')}><span>?</span>FAQ 관리</button>
+            </>
           ) : (
             <>
               <button
@@ -746,6 +782,13 @@ function App() {
                 <span>💬</span>
                 고객 문의
                 {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
+              </button>
+              <button
+                className={activeView === 'reviews' ? 'active' : ''}
+                onClick={() => setActiveView('reviews')}
+              >
+                <span>★</span>
+                리뷰 관리
               </button>
               <button
                 className={activeView === 'settings' ? 'active' : ''}
@@ -807,9 +850,7 @@ function App() {
                   <span />
                   {businessStatus === 'OPEN'
                     ? '영업 중'
-                    : businessStatus === 'PRE_OPEN'
-                      ? '오픈 준비'
-                      : '영업 종료'}
+                    : '준비중'}
                 </button>
               </>
             )}
@@ -1024,9 +1065,20 @@ function App() {
             onUnreadChange={setUnreadMessageCount}
           />
         )}
-        {isAdmin && activeView === 'admin' && (
-          <AdminManagement connection={connection} onError={setError} />
+        {activeView === 'reviews' && (
+          <ReviewManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
         )}
+        {isAdmin && activeView === 'admin-customers' && <AdminManagement connection={connection} section="customers" onError={setError} />}
+        {isAdmin && activeView === 'admin-sellers' && <AdminManagement connection={connection} section="sellers" onError={setError} />}
+        {isAdmin && activeView === 'admin-stores' && <AdminManagement connection={connection} section="stores" onError={setError} />}
+        {isAdmin && activeView === 'admin-announcements' && <AdminContentManagement connection={connection} kind="announcements" onError={setError} />}
+        {isAdmin && activeView === 'admin-support' && <AdminSupportHub connection={connection} onError={setError} />}
+        {isAdmin && activeView === 'admin-faqs' && <AdminContentManagement connection={connection} kind="faqs" onError={setError} />}
       </div>
 
       <aside
@@ -1042,7 +1094,7 @@ function App() {
             paymentLoading={paymentLoading}
             paymentSummary={paymentSummary}
             onClose={() => setSelectedId(null)}
-            onAction={(action) => void changeStatus(selectedOrder, action)}
+            onAction={(action, options) => void changeStatus(selectedOrder, action, options)}
             canRefund={canManageStore}
             onRefund={(amount, reason) =>
               void refundOrder(selectedOrder, amount, reason)
@@ -1197,12 +1249,15 @@ function OrderDetail({
   paymentSummary: SellerPaymentSummary | null
   canRefund: boolean
   onClose: () => void
-  onAction: (action: TransitionAction) => void
+  onAction: (action: TransitionAction, options?: TransitionOptions) => void
   onRefund: (amount: number, reason: string) => void
 }) {
   const [showRefundForm, setShowRefundForm] = useState(false)
   const [refundReason, setRefundReason] = useState('')
-  const [refundAmount, setRefundAmount] = useState('')
+  const [actionDialog, setActionDialog] = useState<'accept' | 'reject' | null>(null)
+  const [preparationMinutes, setPreparationMinutes] = useState(10)
+  const [applyAsStoreDefault, setApplyAsStoreDefault] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
   const actions = ACTIONS[order.status]
   const canRefund =
     canIssueRefund &&
@@ -1327,13 +1382,6 @@ function OrderDetail({
                     {refund.status === 'FAILED' && (
                       <div className="refund-failure-recovery">
                         <small>{refund.failureMessage ?? '환불 처리에 실패했습니다.'}</small>
-                        {canRefund && (
-                          <button onClick={() => {
-                            setRefundAmount(String(Math.min(refund.amount, paymentSummary.refundableAmount)))
-                            setRefundReason(refund.reason)
-                            setShowRefundForm(true)
-                          }}>같은 내용으로 다시 시도</button>
-                        )}
                       </div>
                     )}
                   </article>
@@ -1344,7 +1392,6 @@ function OrderDetail({
               <button
                 className="refund-open"
                 onClick={() => {
-                  setRefundAmount(String(paymentSummary.refundableAmount))
                   setShowRefundForm(true)
                 }}
               >
@@ -1353,17 +1400,7 @@ function OrderDetail({
             )}
             {canRefund && showRefundForm && (
               <div className="refund-form">
-                <label>
-                  환불 금액
-                  <input
-                    type="number"
-                    min={1}
-                    max={paymentSummary.refundableAmount}
-                    value={refundAmount}
-                    onChange={(event) => setRefundAmount(event.target.value)}
-                  />
-                  <small>환불 가능 {money(paymentSummary.refundableAmount)}</small>
-                </label>
+                <strong>{money(paymentSummary.refundableAmount)} 전액 환불</strong>
                 <label>
                   환불 사유
                   <textarea
@@ -1373,7 +1410,7 @@ function OrderDetail({
                     onChange={(event) => setRefundReason(event.target.value)}
                   />
                 </label>
-                <p>입력한 금액만 환불됩니다. 승인 후에는 되돌릴 수 없습니다.</p>
+                <p>환불 가능한 금액 전액을 처리합니다. 승인 후에는 되돌릴 수 없습니다.</p>
                 <div>
                   <button
                     className="secondary-action"
@@ -1385,17 +1422,11 @@ function OrderDetail({
                     className="refund-confirm"
                     disabled={
                       processing ||
-                      !refundReason.trim() ||
-                      Number(refundAmount) <= 0 ||
-                      Number(refundAmount) > paymentSummary.refundableAmount
+                      !refundReason.trim()
                     }
-                    onClick={() => onRefund(Number(refundAmount), refundReason.trim())}
+                    onClick={() => onRefund(paymentSummary.refundableAmount, refundReason.trim())}
                   >
-                    {processing
-                      ? '환불 처리 중…'
-                      : Number(refundAmount) === paymentSummary.refundableAmount
-                        ? '전액 환불 확정'
-                        : `${money(Number(refundAmount) || 0)} 부분 환불 확정`}
+                    {processing ? '환불 처리 중…' : '전액 환불 확정'}
                   </button>
                 </div>
               </div>
@@ -1427,7 +1458,10 @@ function OrderDetail({
             <button
               className="reject-action"
               disabled={processing}
-              onClick={() => onAction(actions.secondary!.action)}
+              onClick={() => {
+                if (actions.secondary!.action === 'reject') setActionDialog('reject')
+                else onAction(actions.secondary!.action)
+              }}
             >
               {actions.secondary.label}
             </button>
@@ -1435,7 +1469,10 @@ function OrderDetail({
           <button
             className="primary-action"
             disabled={processing}
-            onClick={() => onAction(actions.primary.action)}
+            onClick={() => {
+              if (actions.primary.action === 'accept') setActionDialog('accept')
+              else onAction(actions.primary.action)
+            }}
           >
             {processing ? '처리 중…' : actions.primary.label}
           </button>
@@ -1443,6 +1480,35 @@ function OrderDetail({
       ) : (
         <div className="terminal-note">
           이 주문의 처리가 종료되었습니다.
+        </div>
+      )}
+      {actionDialog === 'accept' && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="accept-order-title">
+            <button className="modal-close" aria-label="닫기" onClick={() => setActionDialog(null)}>×</button>
+            <p className="eyebrow">ACCEPT ORDER</p>
+            <h2 id="accept-order-title">준비시간 선택</h2>
+            <div className="status-options" role="radiogroup" aria-label="준비시간">
+              {[0, 5, 10, 15, 20, 30, 40, 50].map((minutes) => (
+                <button key={minutes} type="button" role="radio" aria-checked={preparationMinutes === minutes} className={preparationMinutes === minutes ? 'active' : ''} onClick={() => setPreparationMinutes(minutes)}>
+                  {minutes === 0 ? '즉시' : `${minutes}분`}
+                </button>
+              ))}
+            </div>
+            <label className="required-check"><input type="checkbox" checked={applyAsStoreDefault} onChange={(event) => setApplyAsStoreDefault(event.target.checked)} />이 시간을 사업장 기본 준비시간으로 사용</label>
+            <button className="primary-action" disabled={processing} onClick={() => { onAction('accept', { preparationMinutes, applyAsStoreDefault }); setActionDialog(null) }}>주문 접수</button>
+          </section>
+        </div>
+      )}
+      {actionDialog === 'reject' && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="reject-order-title">
+            <button className="modal-close" aria-label="닫기" onClick={() => setActionDialog(null)}>×</button>
+            <p className="eyebrow">REJECT ORDER</p>
+            <h2 id="reject-order-title">주문 거절 사유</h2>
+            <label>고객 안내 사유<textarea maxLength={500} rows={4} value={rejectReason} onChange={(event) => setRejectReason(event.target.value)} placeholder="재료 소진, 운영 종료 등 사유를 입력해 주세요." /></label>
+            <button className="danger-action" disabled={processing || !rejectReason.trim()} onClick={() => { onAction('reject', { reason: rejectReason.trim() }); setActionDialog(null) }}>주문 거절 확정</button>
+          </section>
         </div>
       )}
     </>

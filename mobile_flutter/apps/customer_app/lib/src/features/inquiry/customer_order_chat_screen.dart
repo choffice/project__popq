@@ -1,25 +1,31 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import '../../routing/customer_router.dart';
 import '../../realtime/customer_realtime_scope.dart';
 import '../orders/customer_order_repository.dart';
 import 'customer_order_message.dart';
 import 'customer_order_message_repository.dart';
+import '../../notifications/customer_app_badge_service.dart';
+import '../notifications/customer_notification_repository.dart';
 
 class CustomerOrderChatScreen extends StatefulWidget {
   const CustomerOrderChatScreen({
     required this.orderPublicId,
     required this.orderRepository,
     required this.messageRepository,
+    required this.notificationRepository,
     super.key,
   });
 
   final String orderPublicId;
   final CustomerOrderRepository orderRepository;
   final CustomerOrderMessageRepository messageRepository;
+  final CustomerNotificationRepository notificationRepository;
 
   @override
   State<CustomerOrderChatScreen> createState() {
@@ -70,9 +76,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
   bool _hasMoreOlder = false;
   bool _hasLoadedOlderPages = false;
   bool _pendingRealtimeSync = false;
-  bool _allowPop = false;
-  bool _popInProgress = false;
-
   @override
   void initState() {
     super.initState();
@@ -128,8 +131,6 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
       _lastReadRequestMessageId = 0;
       _pendingReadMessageId = 0;
       _readReceiptFuture = null;
-      _allowPop = false;
-      _popInProgress = false;
       _nextBeforeMessageId = null;
 
       _subscribeToCurrentOrder();
@@ -179,19 +180,38 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     super.dispose();
   }
 
+  void _goBack() {
+    _markLatestSellerMessageAsRead();
+
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+
+    context.go(CustomerRoutes.profile);
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope<Object?>(
-      canPop: _allowPop,
+      canPop: context.canPop(),
       onPopInvokedWithResult: (bool didPop, Object? result) {
-        if (didPop || _allowPop) {
+        _markLatestSellerMessageAsRead();
+
+        if (didPop) {
           return;
         }
 
-        unawaited(_handleBack(result));
+        context.go(CustomerRoutes.profile);
       },
       child: Scaffold(
         appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            tooltip: '뒤로가기',
+            onPressed: _goBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
           title: Text(_order?.storeName ?? '주문 문의'),
           actions: [
             IconButton(
@@ -399,6 +419,20 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     unawaited(_synchronizeAfterRealtimeConnection());
   }
 
+  Future<void> _syncAppBadge() async {
+    try {
+      final badgeCount =
+      await widget.notificationRepository.badgeCount();
+
+      await CustomerAppBadgeService.updateBadge(
+        badgeCount,
+      );
+    } catch (error, stackTrace) {
+      debugPrint('앱 아이콘 배지 갱신 실패: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   Future<void> _synchronizeAfterRealtimeConnection() async {
     if (!mounted ||
         !_isAppActive ||
@@ -518,6 +552,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
         );
 
         _lastReadRequestMessageId = targetMessageId;
+        await _syncAppBadge();
       } catch (error, stackTrace) {
         _pendingReadMessageId = _lastReadRequestMessageId;
         debugPrint('구매자 문의 읽음 처리 실패: $error');
@@ -540,32 +575,7 @@ class _CustomerOrderChatScreenState extends State<CustomerOrderChatScreen>
     }
   }
 
-  Future<void> _handleBack(Object? result) async {
-    if (_popInProgress) {
-      return;
-    }
 
-    _popInProgress = true;
-    _markLatestSellerMessageAsRead();
-
-    try {
-      await _readReceiptFuture;
-    } finally {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _allowPop = true;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          Navigator.of(context).pop(result);
-        }
-      });
-    }
-  }
 
   void _handleScroll() {
     if (!_scrollController.hasClients ||

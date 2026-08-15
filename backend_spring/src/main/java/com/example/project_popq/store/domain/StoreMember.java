@@ -21,11 +21,11 @@ import lombok.NoArgsConstructor;
 @Getter
 @Entity
 @Table(
-        name = "store_members",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uq_store_members_store_user",
-                columnNames = {"store_id", "user_id"}
-        )
+    name = "store_members",
+    uniqueConstraints = @UniqueConstraint(
+        name = "uq_store_members_store_user",
+        columnNames = {"store_id", "user_id"}
+    )
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class StoreMember extends BaseTimeEntity {
@@ -51,14 +51,40 @@ public class StoreMember extends BaseTimeEntity {
     @Column(name = "status", nullable = false, length = 30)
     private StoreMemberStatus status;
 
-    private StoreMember(Store store, User user, StoreRole role) {
+    @Column(name = "display_order", nullable = false)
+    private int displayOrder;
+
+    private StoreMember(
+        Store store,
+        User user,
+        StoreRole role
+    ) {
         this.store = store;
         this.user = user;
         this.role = role;
         this.status = StoreMemberStatus.ACTIVE;
+        this.displayOrder = 0;
     }
 
-    public static StoreMember create(Store store, User user, StoreRole role) {
-        return new StoreMember(store, user, role);
+    public static StoreMember create(
+        Store store,
+        User user,
+        StoreRole role
+    ) {
+        return new StoreMember(
+            store,
+            user,
+            role
+        );
+    }
+
+    public void changeDisplayOrder(int displayOrder) {
+        if (displayOrder < 0) {
+            throw new IllegalArgumentException(
+                "displayOrder must be greater than or equal to 0."
+            );
+        }
+
+        this.displayOrder = displayOrder;
     }
 }

@@ -432,23 +432,67 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
     return stores;
   }
 
+  List<String> _statusesForCurrentView() {
+    final current = _tabController.index == 0;
+    final filter = current ? _currentFilter : _recentFilter;
+
+    if (current) {
+      return switch (filter) {
+        null => _currentStatuses,
+        'PLACED' => const <String>['PLACED'],
+        'ACCEPTED_PREPARING' => const <String>[
+          'ACCEPTED',
+          'PREPARING',
+        ],
+        'READY' => const <String>['READY'],
+        _ => _currentStatuses,
+      };
+    }
+
+    return switch (filter) {
+      null => _recentStatuses,
+      'COMPLETED' => const <String>['COMPLETED'],
+      'CANCELED_FAMILY' => const <String>[
+        'CANCELED',
+        'EXPIRED',
+      ],
+      'REJECTED_FAMILY' => const <String>['REJECTED'],
+      _ => _recentStatuses,
+    };
+  }
+
   Future<List<SellerOrder>> _loadOrders() async {
     final storeId = widget.selectionController.selectedStoreId;
     if (storeId == null) return const [];
+
+    // 이 요청이 시작된 순간의 화면 조건을 고정해서 기억한다.
+    final requestTabIndex = _tabController.index;
+    final requestPastDate = _pastDate;
+    final statuses = _statusesForCurrentView();
     final serial = ++_requestSerial;
-    final current = _tabController.index == 0;
+
+    final current = requestTabIndex == 0;
+
     final orders = await widget.repository.findAll(
       storeId,
-      statuses: current ? _currentStatuses : _recentStatuses,
-      date: current ? null : _pastDate,
+      statuses: statuses,
+      date: current ? null : requestPastDate,
     );
-    if (serial != _requestSerial ||
-        storeId != widget.selectionController.selectedStoreId) {
-      return const [];
+
+    // 요청을 보내는 동안 화면 조건이 바뀌었다면
+    // 이 응답은 더 이상 현재 화면의 응답이 아니다.
+    if (!mounted ||
+        serial != _requestSerial ||
+        storeId != widget.selectionController.selectedStoreId ||
+        requestTabIndex != _tabController.index ||
+        (!current && requestPastDate != _pastDate)) {
+      throw const _StaleOrderRequest();
     }
+
     if (orders.any((order) => order.storeId != storeId)) {
       throw StateError('다른 사업장의 주문 응답이 포함되어 있습니다.');
     }
+
     _orderSnapshot = List<SellerOrder>.unmodifiable(orders);
     return orders;
   }
@@ -498,10 +542,26 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
   }
 
   void _handleTabChanged() {
-    if (!mounted || _loadedTabIndex == _tabController.index) return;
-    _loadedTabIndex = _tabController.index;
-    _orderSnapshot = const <SellerOrder>[];
-    setState(() => _orders = _loadOrders());
+    if (!mounted) return;
+
+    final tabIndex = _tabController.index;
+
+    // TabController listener는 한 번의 전환 중 여러 번 호출될 수 있으므로
+    // 실제 탭 index가 변경된 경우에만 새로 조회한다.
+    if (_loadedTabIndex == tabIndex) return;
+
+    _loadedTabIndex = tabIndex;
+
+    // 이전 대분류에서 진행 중이던 요청을 무효화한다.
+    _requestSerial++;
+
+    setState(() {
+      // 이전 대분류의 목록이 새 탭에 잠깐 노출되지 않도록 제거한다.
+      _orderSnapshot = const <SellerOrder>[];
+
+      // 현재 대분류 + 해당 대분류의 저장된 소분류 + 날짜로 다시 조회한다.
+      _orders = _loadOrders();
+    });
   }
 
   void _selectFilter(String? filter) {
@@ -511,6 +571,12 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
       } else {
         _recentFilter = filter;
       }
+
+      // 이전 조건으로 조회된 데이터를 잠시 제거한다.
+      _orderSnapshot = const <SellerOrder>[];
+
+      // 변경된 대분류 + 소분류 + 날짜 조건으로 다시 조회한다.
+      _orders = _loadOrders();
     });
   }
 
@@ -855,6 +921,8 @@ class _SellerOrderListScreenState extends State<SellerOrderListScreen>
         );
       });
       unawaited(_refreshDashboardSummariesSilently());
+    } on _StaleOrderRequest {
+      return;
     } catch (error) {
       debugPrint('판매자 주문 목록 REST 동기화 오류: $error');
     }
@@ -1005,4 +1073,8 @@ String sellerWon(int amount) {
     buffer.write(digits[index]);
   }
   return '$buffer원';
+}
+
+class _StaleOrderRequest implements Exception {
+  const _StaleOrderRequest();
 }

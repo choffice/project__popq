@@ -56,13 +56,17 @@ public class SecurityConfig {
             .requestMatchers(
                 HttpMethod.POST,
                 "/api/v1/auth/signup",
+                "/api/v1/auth/email-verification/send",
+                "/api/v1/auth/email-verification/confirm",
                 "/api/v1/auth/login",
+                "/api/v1/auth/refresh",
                 "/api/v1/auth/social/login",
                 "/api/v1/auth/find-id",
                 "/api/v1/auth/password-reset/verify",
                 "/api/v1/auth/password-reset/confirm"
             ).permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/stores/**").permitAll()
+            .requestMatchers(HttpMethod.GET, "/api/v1/public/content/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/api/v1/public/location/**").permitAll()
             .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
             .requestMatchers("/api/v1/qr/**").permitAll()
@@ -114,6 +118,7 @@ public class SecurityConfig {
     UrlBasedCorsConfigurationSource source =
         new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", configuration);
+    source.registerCorsConfiguration("/uploads/**", configuration);
     return source;
   }
 

@@ -145,6 +145,59 @@ describe('판매자 웹 인증', () => {
     )
   })
 
+  it('활성·휴업 사업장이 없으면 Web에서 첫 사업장을 등록한다', async () => {
+    const user = userEvent.setup()
+    const onAuthenticated = vi.fn()
+    const authData = {
+      accessToken: 'first-store-token',
+      tokenType: 'Bearer',
+      expiresIn: 3600,
+      user: {
+        userId: 10,
+        email: 'first@popq.test',
+        name: '첫 판매자',
+        role: 'SELLER',
+        status: 'ACTIVE',
+      },
+    }
+    const createdStore = {
+      storeId: 21,
+      storeType: 'LOCAL_STORE',
+      name: '첫 카페',
+      status: 'ACTIVE',
+      businessStatus: 'PRE_OPEN',
+      myRole: 'OWNER',
+    }
+    const fetchMock = vi.spyOn(window, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: authData }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true, data: createdStore }), { status: 201, headers: { 'Content-Type': 'application/json' } }))
+
+    render(<SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />)
+    await user.type(screen.getByLabelText('이메일'), 'first@popq.test')
+    await user.type(screen.getByLabelText('비밀번호'), 'password1')
+    await user.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '첫 사업장을 등록하세요' })).toBeVisible()
+    await user.type(screen.getByLabelText(/사업장명/), '첫 카페')
+    await user.selectOptions(screen.getByLabelText(/대표 카테고리/), '카페')
+    await user.type(screen.getByLabelText(/^주소/), '서울시 성동구 성수동')
+    await user.type(screen.getByLabelText(/상세 주소/), '1층')
+    await user.type(screen.getByLabelText(/연락처/), '02-1234-5678')
+    await user.click(screen.getByRole('button', { name: '사업장 등록하고 시작하기' }))
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/seller/stores',
+      expect.objectContaining({
+        method: 'POST',
+        body: expect.stringContaining('"representativeCategory":"카페"'),
+      }),
+    )
+    expect(onAuthenticated).toHaveBeenCalledWith(expect.objectContaining({ storeId: 21, storeName: '첫 카페' }))
+  })
+
   it('관리자 로그인은 스토어 선택 없이 관리자 세션을 만든다', async () => {
     const user = userEvent.setup()
     const onAuthenticated = vi.fn()

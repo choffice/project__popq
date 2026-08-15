@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
 
 class SellerCategory {
@@ -71,12 +73,16 @@ class SellerProductOptionGroup {
     required this.required,
     required this.displayOrder,
     required this.options,
+    this.optionGroupId,
+    this.templateId,
+    this.appliedTemplateVersion,
   });
 
   factory SellerProductOptionGroup.fromJson(
       Map<String, Object?> json,
       ) {
     return SellerProductOptionGroup(
+      optionGroupId: (json['optionGroupId'] as num?)?.toInt(),
       name: json['name'] as String,
       minSelect:
       (json['minSelect'] as num).toInt(),
@@ -85,6 +91,9 @@ class SellerProductOptionGroup {
       required: json['required'] as bool,
       displayOrder:
       (json['displayOrder'] as num).toInt(),
+      templateId: (json['templateId'] as num?)?.toInt(),
+      appliedTemplateVersion:
+      (json['appliedTemplateVersion'] as num?)?.toInt(),
       options: (json['options'] as List<Object?>)
           .map(
             (Object? item) =>
@@ -99,11 +108,14 @@ class SellerProductOptionGroup {
   }
 
   final String name;
+  final int? optionGroupId;
   final int minSelect;
   final int maxSelect;
   final bool required;
   final int displayOrder;
   final List<SellerProductOption> options;
+  final int? templateId;
+  final int? appliedTemplateVersion;
 
   Map<String, Object?> toJson() {
     return {
@@ -112,6 +124,8 @@ class SellerProductOptionGroup {
       'maxSelect': maxSelect,
       'required': required,
       'displayOrder': displayOrder,
+      'templateId': templateId,
+      'appliedTemplateVersion': appliedTemplateVersion,
       'options': options
           .map(
             (SellerProductOption item) =>
@@ -120,6 +134,83 @@ class SellerProductOptionGroup {
           .toList(),
     };
   }
+}
+
+class SellerStoreOptionTemplate {
+  const SellerStoreOptionTemplate({
+    required this.templateId,
+    required this.storeId,
+    required this.name,
+    required this.minSelect,
+    required this.maxSelect,
+    required this.required,
+    required this.version,
+    required this.options,
+  });
+
+  factory SellerStoreOptionTemplate.fromJson(Map<String, Object?> json) {
+    return SellerStoreOptionTemplate(
+      templateId: (json['templateId'] as num).toInt(),
+      storeId: (json['storeId'] as num).toInt(),
+      name: json['name'] as String,
+      minSelect: (json['minSelect'] as num).toInt(),
+      maxSelect: (json['maxSelect'] as num).toInt(),
+      required: json['required'] as bool,
+      version: (json['version'] as num).toInt(),
+      options: (json['options'] as List<Object?>)
+          .map((item) => SellerProductOption.fromJson(
+                Map<String, Object?>.from(item as Map),
+              ))
+          .toList(),
+    );
+  }
+
+  final int templateId;
+  final int storeId;
+  final String name;
+  final int minSelect;
+  final int maxSelect;
+  final bool required;
+  final int version;
+  final List<SellerProductOption> options;
+}
+
+class SellerOptionTemplateUsage {
+  const SellerOptionTemplateUsage({
+    required this.templateId,
+    required this.totalCount,
+    required this.products,
+  });
+
+  factory SellerOptionTemplateUsage.fromJson(Map<String, Object?> json) {
+    return SellerOptionTemplateUsage(
+      templateId: (json['templateId'] as num).toInt(),
+      totalCount: (json['totalCount'] as num).toInt(),
+      products: (json['products'] as List<Object?>)
+          .map((item) {
+            final value = Map<String, Object?>.from(item as Map);
+            return SellerOptionTemplateProduct(
+              productId: (value['productId'] as num).toInt(),
+              productName: value['productName'] as String,
+            );
+          })
+          .toList(),
+    );
+  }
+
+  final int templateId;
+  final int totalCount;
+  final List<SellerOptionTemplateProduct> products;
+}
+
+class SellerOptionTemplateProduct {
+  const SellerOptionTemplateProduct({
+    required this.productId,
+    required this.productName,
+  });
+
+  final int productId;
+  final String productName;
 }
 
 class SellerProductDetail {
@@ -273,6 +364,15 @@ SellerProductRepository {
       int categoryId,
       );
 
+  Future<String> uploadProductImage(
+      String filePath,
+      );
+
+  Future<String> uploadProductImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  });
+
   Future<List<SellerProduct>> findAll(
       int storeId,
       );
@@ -312,6 +412,26 @@ SellerProductRepository {
       List<SellerProductOptionGroup> groups,
       );
 
+  Future<List<SellerStoreOptionTemplate>> findOptionTemplates(int storeId);
+
+  Future<SellerStoreOptionTemplate> createOptionTemplate(
+    int storeId,
+    SellerProductOptionGroup group,
+  );
+
+  Future<SellerOptionTemplateUsage> findOptionTemplateUsage(
+    int storeId,
+    int templateId,
+  );
+
+  Future<SellerStoreOptionTemplate> applyOptionTemplateToAll(
+    int storeId,
+    SellerProduct product,
+    SellerProductOptionGroup group,
+  );
+
+  Future<void> deleteOptionTemplate(int storeId, int templateId);
+
   Future<SellerProduct> updateAvailability(
       int storeId,
       SellerProduct product, {
@@ -337,6 +457,57 @@ class ApiSellerProductRepository
   String _categoryPath(int storeId) {
     return '/api/v1/seller/stores/'
         '$storeId/categories';
+  }
+
+  @override
+  Future<String> uploadProductImage(
+      String filePath,
+      ) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (Object? value) {
+        final Map<String, Object?> json =
+        Map<String, Object?>.from(
+          value as Map,
+        );
+
+        final Object? imageUrl =
+        json['imageUrl'];
+
+        if (imageUrl is! String ||
+            imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure(
+            '업로드된 이미지 URL이 없습니다.',
+          );
+        }
+
+        return imageUrl;
+      },
+    );
+  }
+
+  @override
+  Future<String> uploadProductImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/seller/store-images',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (Object? value) {
+        final Map<String, Object?> json =
+            Map<String, Object?>.from(value as Map);
+        final Object? imageUrl = json['imageUrl'];
+        if (imageUrl is! String || imageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return imageUrl;
+      },
+    );
   }
 
   @override
@@ -646,6 +817,90 @@ class ApiSellerProductRepository
   }
 
   @override
+  Future<List<SellerStoreOptionTemplate>> findOptionTemplates(int storeId) {
+    return _apiClient.get(
+      '/api/v1/seller/stores/$storeId/option-group-templates',
+      decode: (value) => (value as List<Object?>)
+          .map((item) => SellerStoreOptionTemplate.fromJson(
+                Map<String, Object?>.from(item as Map),
+              ))
+          .toList(),
+    );
+  }
+
+  @override
+  Future<SellerStoreOptionTemplate> createOptionTemplate(
+    int storeId,
+    SellerProductOptionGroup group,
+  ) {
+    return _apiClient.post(
+      '/api/v1/seller/stores/$storeId/option-group-templates',
+      body: _templateBody(group),
+      decode: (value) => SellerStoreOptionTemplate.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerOptionTemplateUsage> findOptionTemplateUsage(
+    int storeId,
+    int templateId,
+  ) {
+    return _apiClient.get(
+      '/api/v1/seller/stores/$storeId/'
+      'option-group-templates/$templateId/products',
+      decode: (value) => SellerOptionTemplateUsage.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerStoreOptionTemplate> applyOptionTemplateToAll(
+    int storeId,
+    SellerProduct product,
+    SellerProductOptionGroup group,
+  ) {
+    _validateProductStore(storeId, product);
+    final templateId = group.templateId;
+    final optionGroupId = group.optionGroupId;
+    if (templateId == null || optionGroupId == null) {
+      throw StateError('saved template option group is required');
+    }
+    return _apiClient.post(
+      '/api/v1/seller/stores/$storeId/'
+      'option-group-templates/$templateId/apply',
+      body: {
+        'sourceProductId': product.productId,
+        'sourceOptionGroupId': optionGroupId,
+        ..._templateBody(group),
+      },
+      decode: (value) => SellerStoreOptionTemplate.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<void> deleteOptionTemplate(int storeId, int templateId) async {
+    await _apiClient.delete<bool>(
+      '/api/v1/seller/stores/$storeId/option-group-templates/$templateId',
+      decode: (value) => value as bool,
+    );
+  }
+
+  Map<String, Object?> _templateBody(SellerProductOptionGroup group) {
+    return {
+      'name': group.name,
+      'minSelect': group.minSelect,
+      'maxSelect': group.maxSelect,
+      'required': group.required,
+      'options': group.options.map((option) => option.toJson()).toList(),
+    };
+  }
+
+  @override
   Future<SellerProduct>
   updateAvailability(
       int storeId,
@@ -717,6 +972,7 @@ class MemorySellerProductRepository
         int,
         List<
             SellerProductOptionGroup>>{},
+    List<SellerStoreOptionTemplate> optionTemplates = const [],
   })  : _products =
   List<SellerProduct>.of(
     products,
@@ -737,7 +993,8 @@ class MemorySellerProductRepository
                   .of(value),
             );
           },
-        ) {
+        ),
+        _optionTemplates = List.of(optionTemplates) {
     for (final SellerProduct product
     in products) {
       final bool categoryExists =
@@ -778,6 +1035,7 @@ class MemorySellerProductRepository
       int,
       List<SellerProductOptionGroup>>
   _optionGroups;
+  final List<SellerStoreOptionTemplate> _optionTemplates;
 
   @override
   Future<List<SellerCategory>>
@@ -931,6 +1189,21 @@ class MemorySellerProductRepository
     }
 
     _categories.removeAt(index);
+  }
+
+  @override
+  Future<String> uploadProductImage(
+      String filePath,
+      ) async {
+    return filePath;
+  }
+
+  @override
+  Future<String> uploadProductImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    return 'memory://product-images/$fileName';
   }
 
   @override
@@ -1150,6 +1423,127 @@ class MemorySellerProductRepository
           SellerProductOptionGroup>.unmodifiable(
         groups,
       ),
+    );
+  }
+
+  @override
+  Future<List<SellerStoreOptionTemplate>> findOptionTemplates(
+    int storeId,
+  ) async {
+    final result = _optionTemplates
+        .where((template) => template.storeId == storeId)
+        .toList()
+      ..sort((left, right) => left.name.compareTo(right.name));
+    return List.unmodifiable(result);
+  }
+
+  @override
+  Future<SellerStoreOptionTemplate> createOptionTemplate(
+    int storeId,
+    SellerProductOptionGroup group,
+  ) async {
+    if (_optionTemplates.any(
+      (template) => template.storeId == storeId &&
+          template.name.toLowerCase() == group.name.toLowerCase(),
+    )) {
+      throw StateError('option template already exists');
+    }
+    final nextId = _optionTemplates.fold<int>(
+          0,
+          (value, template) =>
+              template.templateId > value ? template.templateId : value,
+        ) +
+        1;
+    final created = SellerStoreOptionTemplate(
+      templateId: nextId,
+      storeId: storeId,
+      name: group.name,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      required: group.required,
+      version: 1,
+      options: List.of(group.options),
+    );
+    _optionTemplates.add(created);
+    return created;
+  }
+
+  @override
+  Future<SellerOptionTemplateUsage> findOptionTemplateUsage(
+    int storeId,
+    int templateId,
+  ) async {
+    final products = <SellerOptionTemplateProduct>[];
+    for (final product in _products.where((item) => item.storeId == storeId)) {
+      final usesTemplate = (_optionGroups[product.productId] ?? const [])
+          .any((group) => group.templateId == templateId);
+      if (usesTemplate) {
+        products.add(SellerOptionTemplateProduct(
+          productId: product.productId,
+          productName: product.name,
+        ));
+      }
+    }
+    return SellerOptionTemplateUsage(
+      templateId: templateId,
+      totalCount: products.length,
+      products: products,
+    );
+  }
+
+  @override
+  Future<SellerStoreOptionTemplate> applyOptionTemplateToAll(
+    int storeId,
+    SellerProduct product,
+    SellerProductOptionGroup group,
+  ) async {
+    final templateId = group.templateId;
+    if (templateId == null) throw StateError('template is required');
+    final index = _optionTemplates.indexWhere(
+      (template) =>
+          template.storeId == storeId && template.templateId == templateId,
+    );
+    if (index < 0) throw StateError('option template not found');
+    final nextVersion = _optionTemplates[index].version + 1;
+    final updatedTemplate = SellerStoreOptionTemplate(
+      templateId: templateId,
+      storeId: storeId,
+      name: group.name,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      required: group.required,
+      version: nextVersion,
+      options: List.of(group.options),
+    );
+    _optionTemplates[index] = updatedTemplate;
+    for (final productId in _optionGroups.keys.toList()) {
+      _optionGroups[productId] = _optionGroups[productId]!.map((candidate) {
+        if (candidate.templateId != templateId) return candidate;
+        return SellerProductOptionGroup(
+          optionGroupId: candidate.optionGroupId,
+          name: group.name,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          required: group.required,
+          displayOrder: candidate.displayOrder,
+          templateId: templateId,
+          appliedTemplateVersion: nextVersion,
+          options: List.of(group.options),
+        );
+      }).toList();
+    }
+    return updatedTemplate;
+  }
+
+  @override
+  Future<void> deleteOptionTemplate(int storeId, int templateId) async {
+    final usage = await findOptionTemplateUsage(storeId, templateId);
+    if (usage.totalCount > 0) {
+      throw StateError('option template is still in use');
+    }
+    _optionTemplates.removeWhere(
+      (template) =>
+          template.storeId == storeId && template.templateId == templateId,
     );
   }
 

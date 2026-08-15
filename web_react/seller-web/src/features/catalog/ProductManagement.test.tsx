@@ -104,11 +104,19 @@ describe('판매자 상품 관리', () => {
       screen.getByLabelText('1번 그룹 3번 추가 금액'),
       '500',
     )
+    const minimum = screen.getAllByLabelText('최소 선택')[0]
+    const maximum = screen.getAllByLabelText('최대 선택')[0]
+    await user.clear(minimum)
+    await user.type(minimum, '1')
+    await user.clear(maximum)
+    await user.type(maximum, '2')
     await user.click(screen.getByRole('button', { name: '옵션 저장' }))
 
     expect(screen.queryByText('OPTION BUILDER')).not.toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: '옵션 편집' })[0])
     expect(screen.getByDisplayValue('휘핑 추가')).toBeVisible()
+    expect(screen.getAllByLabelText('최소 선택')[0]).toHaveValue('1')
+    expect(screen.getAllByLabelText('최대 선택')[0]).toHaveValue('2')
   })
 })

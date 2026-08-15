@@ -18,6 +18,9 @@ public record CreateStoreRequest(
         @NotNull
         StoreType storeType,
 
+        @Size(max = 150)
+        String eventName,
+
         @NotBlank
         @Size(max = 150)
         String name,

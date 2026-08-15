@@ -26,6 +26,7 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
+import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
 import java.util.Objects;
@@ -44,6 +45,7 @@ public class PaymentService {
     private final PaymentProviderRegistry paymentProviderRegistry;
     private final OrderDomainEventPublisher orderEventPublisher;
     private final PaymentProperties paymentProperties;
+    private final CustomerPointService customerPointService;
 
     @Transactional(noRollbackFor = PaymentProcessingException.class)
     public PaymentResponse confirm(
@@ -324,6 +326,8 @@ public class PaymentService {
             );
         }
 
+        ensureOrderPayable(payment.getOrder());
+
         return approve(
             payment,
             payment.getOrder(),
@@ -450,6 +454,7 @@ public class PaymentService {
             result.providerPaymentKey(),
             processedAt
         );
+        customerPointService.rewardPayment(payment, processedAt);
 
         payment.addTransaction(
             PaymentTransaction.succeeded(
@@ -528,6 +533,12 @@ public class PaymentService {
                     lookupResult.approvedAt() == null
                         ? now
                         : lookupResult.approvedAt()
+                );
+                customerPointService.rewardPayment(
+                        payment,
+                        lookupResult.approvedAt() == null
+                                ? now
+                                : lookupResult.approvedAt()
                 );
 
                 ensureOrderPlacedAfterPayment(
@@ -678,6 +689,12 @@ public class PaymentService {
         if (order.getStatus() != OrderStatus.CREATED) {
             throw new BusinessException(
                 ErrorCode.INVALID_ORDER_STATUS
+            );
+        }
+
+        if (!order.getStore().isOrderAccepting()) {
+            throw new BusinessException(
+                ErrorCode.STORE_NOT_OPEN
             );
         }
     }

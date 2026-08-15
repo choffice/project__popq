@@ -1,4 +1,9 @@
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
 import 'seller_announcement_repository.dart';
@@ -49,76 +54,102 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: CustomScrollView(
-        key: const Key('announcement-list'),
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: <Widget>[
-          SliverToBoxAdapter(child: _buildHeader(context)),
-          if (_loading)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.'),
-            )
-          else if (_error != null || _announcements == null)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: PopqErrorView(
-                message: '공지사항을 불러오지 못했습니다.',
-                onRetry: _load,
+    return Column(
+      children: <Widget>[
+        _buildHeader(context),
+        Expanded(child: _buildBody()),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const PopqLoadingView(message: '사업장 공지사항을 불러오고 있어요.');
+    }
+    if (_error != null || _announcements == null) {
+      return PopqErrorView(message: '공지사항을 불러오지 못했습니다.', onRetry: _load);
+    }
+    if (_announcements!.isEmpty) {
+      return Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(PopqSpacing.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const PopqEmptyView(
+                icon: Icons.campaign_outlined,
+                title: '등록된 공지사항이 없어요.',
+                description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
               ),
-            )
-          else if (_announcements!.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.all(PopqSpacing.lg),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    const PopqEmptyView(
-                      icon: Icons.campaign_outlined,
-                      title: '등록된 공지사항이 없어요.',
-                      description: '사업장 운영 소식을 작성하고 게시 상태를 관리하세요.',
-                    ),
-                    if (widget.canManage) ...<Widget>[
-                      const SizedBox(height: PopqSpacing.md),
-                      FilledButton.icon(
-                        key: const Key('add-first-announcement'),
-                        onPressed: () => _edit(),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('첫 공지 작성'),
-                      ),
-                    ],
-                  ],
+              if (widget.canManage) ...<Widget>[
+                const SizedBox(height: PopqSpacing.md),
+                FilledButton.icon(
+                  key: const Key('add-first-announcement'),
+                  onPressed: () => _edit(),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('첫 공지 작성'),
                 ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.all(PopqSpacing.md),
-              sliver: SliverList.builder(
-                itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
-                itemBuilder: (BuildContext context, int index) {
-                  if (index == _announcements!.length) {
-                    return const Padding(
-                      padding: EdgeInsets.only(top: PopqSpacing.sm),
-                      child: Text(
-                        'STAFF는 공지사항을 조회할 수 있으며 작성·수정·게시 권한은 없습니다.',
-                        textAlign: TextAlign.center,
-                      ),
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
-                    child: _announcementCard(_announcements![index]),
-                  );
-                },
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        if (widget.canManage)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              PopqSpacing.md,
+              0,
+              PopqSpacing.md,
+              PopqSpacing.sm,
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const Key('add-another-announcement'),
+                onPressed: () => _edit(),
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('새 공지 작성'),
               ),
             ),
-        ],
-      ),
+          ),
+
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _load,
+            child: ListView.separated(
+              key: const Key('announcement-list'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                PopqSpacing.md,
+                0,
+                PopqSpacing.md,
+                PopqSpacing.md,
+              ),
+              itemCount: _announcements!.length + (widget.canManage ? 0 : 1),
+              separatorBuilder: (_, _) =>
+                  const SizedBox(height: PopqSpacing.sm),
+              itemBuilder: (BuildContext context, int index) {
+                if (index == _announcements!.length) {
+                  return const Padding(
+                    padding: EdgeInsets.only(top: PopqSpacing.sm),
+                    child: Text(
+                      'STAFF는 공지사항을 조회할 수 있으며 '
+                      '작성·수정·게시 권한은 없습니다.',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
+                return _announcementCard(_announcements![index]);
+              },
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -138,7 +169,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
           ),
-          if (widget.canManage)
+          if (widget.canManage && (_announcements?.isNotEmpty ?? false))
             FilledButton.icon(
               key: const Key('add-announcement'),
               onPressed: () => _edit(),
@@ -170,13 +201,49 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                     ),
                   ),
                 ),
+                if (announcement.pinned) ...<Widget>[
+                  const _PinnedBadge(),
+                  const SizedBox(width: PopqSpacing.xs),
+                ],
                 Chip(
                   label: Text(_statusLabel(announcement.status)),
                   backgroundColor: _statusColor(announcement.status),
                 ),
               ],
             ),
+
+            if (announcement.imageUrl != null &&
+                announcement.imageUrl!.trim().isNotEmpty) ...[
+              const SizedBox(height: PopqSpacing.sm),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  announcement.imageUrl!,
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (
+                        BuildContext context,
+                        Object error,
+                        StackTrace? stackTrace,
+                      ) {
+                        return Container(
+                          height: 100,
+                          alignment: Alignment.center,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.broken_image_outlined),
+                        );
+                      },
+                ),
+              ),
+            ],
+
             const SizedBox(height: PopqSpacing.xs),
+
             Text(announcement.content),
             if (announcement.publishedAt != null) ...[
               const SizedBox(height: PopqSpacing.xs),
@@ -198,6 +265,22 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('수정'),
                   ),
+                  if (announcement.status == 'PUBLISHED')
+                    TextButton.icon(
+                      key: Key(
+                        'pin-announcement-${announcement.announcementId}',
+                      ),
+                      onPressed: updating
+                          ? null
+                          : () =>
+                                _changePin(announcement, !announcement.pinned),
+                      icon: Icon(
+                        announcement.pinned
+                            ? Icons.push_pin_outlined
+                            : Icons.push_pin_rounded,
+                      ),
+                      label: Text(announcement.pinned ? '고정 해제' : '고정'),
+                    ),
                   TextButton.icon(
                     key: Key(
                       'toggle-announcement-${announcement.announcementId}',
@@ -268,11 +351,44 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     );
     if (draft == null) return;
     try {
+      String? imageUrl = draft.removeImage ? null : draft.imageUrl;
+
+      final Uint8List? imageBytes = draft.imageBytes;
+      final String? imageFileName = draft.imageFileName;
+      final String? imageFilePath = draft.imageFilePath;
+      final bool hasNewImageSelection =
+          imageBytes != null || imageFileName != null;
+
+      if (hasNewImageSelection &&
+          (imageBytes == null ||
+              imageBytes.isEmpty ||
+              imageFileName == null ||
+              imageFileName.trim().isEmpty)) {
+        throw StateError('선택한 공지 이미지 데이터를 읽지 못했습니다.');
+      }
+
+      if (kIsWeb) {
+        if (imageBytes != null &&
+            imageBytes.isNotEmpty &&
+            imageFileName != null &&
+            imageFileName.trim().isNotEmpty) {
+          imageUrl = await widget.repository.uploadAnnouncementImageBytes(
+            imageBytes,
+            fileName: imageFileName,
+          );
+        }
+      } else if (imageFilePath != null && imageFilePath.trim().isNotEmpty) {
+        imageUrl = await widget.repository.uploadAnnouncementImage(
+          imageFilePath,
+        );
+      }
+
       final saved = announcement == null
           ? await widget.repository.create(
               storeId,
               title: draft.title,
               content: draft.content,
+              imageUrl: imageUrl,
               notifyInterestedCustomers: draft.notifyInterestedCustomers,
             )
           : await widget.repository.update(
@@ -280,6 +396,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
               announcement,
               title: draft.title,
               content: draft.content,
+              imageUrl: imageUrl,
               notifyInterestedCustomers: draft.notifyInterestedCustomers,
             );
       if (!mounted || widget.storeId != storeId) return;
@@ -293,6 +410,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
         } else {
           announcements[index] = saved;
         }
+        announcements.sort(_compareAnnouncements);
         _announcements = announcements;
         _error = null;
       });
@@ -320,6 +438,7 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
           (item) => item.announcementId == saved.announcementId,
         );
         if (index >= 0) _announcements![index] = saved;
+        _announcements!.sort(_compareAnnouncements);
         _updatingIds.remove(announcement.announcementId);
       });
       _showMessage('${saved.title} 공지를 ${_statusLabel(status)} 상태로 변경했습니다.');
@@ -327,6 +446,43 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
       if (!mounted) return;
       setState(() => _updatingIds.remove(announcement.announcementId));
       _showMessage('공지 게시 상태를 변경하지 못했습니다.');
+    }
+  }
+
+  Future<void> _changePin(SellerAnnouncement announcement, bool pinned) async {
+    setState(() => _updatingIds.add(announcement.announcementId));
+    try {
+      final saved = await widget.repository.changePin(
+        widget.storeId,
+        announcement,
+        pinned,
+      );
+      if (!mounted) return;
+      setState(() {
+        final index = _announcements!.indexWhere(
+          (item) => item.announcementId == saved.announcementId,
+        );
+        if (index >= 0) _announcements![index] = saved;
+        _announcements!.sort(_compareAnnouncements);
+        _updatingIds.remove(announcement.announcementId);
+      });
+      _showMessage(
+        pinned ? '${saved.title} 공지를 상단에 고정했습니다.' : '공지 고정을 해제했습니다.',
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _updatingIds.remove(announcement.announcementId));
+      if (error is ApiRequestFailure &&
+          error.code == 'ANNOUNCEMENT_PIN_LIMIT_EXCEEDED') {
+        _showMessage('고정 공지는 최대 3개까지 설정할 수 있습니다.');
+        return;
+      }
+      if (error is ApiRequestFailure &&
+          error.code == 'ANNOUNCEMENT_PIN_REQUIRES_PUBLISHED') {
+        _showMessage('게시 중인 공지만 고정할 수 있습니다.');
+        return;
+      }
+      _showMessage('공지 고정 상태를 변경하지 못했습니다.');
     }
   }
 
@@ -355,15 +511,63 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
   }
 }
 
+class _PinnedBadge extends StatelessWidget {
+  const _PinnedBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '고정',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colors.onPrimaryContainer,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+int _compareAnnouncements(SellerAnnouncement left, SellerAnnouncement right) {
+  if (left.pinned != right.pinned) return left.pinned ? -1 : 1;
+  if (left.pinned) {
+    final publishedOrder = (right.publishedAt ?? right.createdAt).compareTo(
+      left.publishedAt ?? left.createdAt,
+    );
+    if (publishedOrder != 0) return publishedOrder;
+  }
+  final createdOrder = right.createdAt.compareTo(left.createdAt);
+  if (createdOrder != 0) return createdOrder;
+  return right.announcementId.compareTo(left.announcementId);
+}
+
 class _AnnouncementDraft {
   const _AnnouncementDraft({
     required this.title,
     required this.content,
     required this.notifyInterestedCustomers,
+    this.imageUrl,
+    this.imageBytes,
+    this.imageFileName,
+    this.imageFilePath,
+    this.removeImage = false,
   });
 
   final String title;
   final String content;
+
+  final String? imageUrl;
+  final Uint8List? imageBytes;
+  final String? imageFileName;
+  final String? imageFilePath;
+  final bool removeImage;
+
   final bool notifyInterestedCustomers;
 }
 
@@ -380,6 +584,13 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   late final TextEditingController _title;
   late final TextEditingController _content;
   bool _notifyInterestedCustomers = false;
+
+  final ImagePicker _imagePicker = ImagePicker();
+
+  XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
+
+  bool _removeImage = false;
 
   @override
   void initState() {
@@ -412,6 +623,42 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                 maxLength: 200,
                 decoration: const InputDecoration(labelText: '제목'),
               ),
+              const SizedBox(height: PopqSpacing.sm),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildImagePreview(),
+              ),
+
+              const SizedBox(height: PopqSpacing.sm),
+
+              Wrap(
+                spacing: PopqSpacing.sm,
+                runSpacing: PopqSpacing.xs,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.camera),
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('사진 촬영'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () => _pickImage(ImageSource.gallery),
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: const Text('앨범 선택'),
+                  ),
+                  if (_pickedImage != null ||
+                      (!_removeImage &&
+                          (widget.announcement?.imageUrl?.trim().isNotEmpty ??
+                              false)))
+                    TextButton.icon(
+                      onPressed: _clearImage,
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('사진 삭제'),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: PopqSpacing.sm),
               TextField(
                 key: const Key('announcement-content'),
                 controller: _content,
@@ -451,6 +698,11 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
               _AnnouncementDraft(
                 title: title,
                 content: content,
+                imageUrl: _removeImage ? null : widget.announcement?.imageUrl,
+                imageBytes: _pickedImageBytes,
+                imageFileName: _pickedImage?.name,
+                imageFilePath: _pickedImage?.path,
+                removeImage: _removeImage,
                 notifyInterestedCustomers: _notifyInterestedCustomers,
               ),
             );
@@ -458,6 +710,85 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
           child: const Text('저장'),
         ),
       ],
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 85,
+    );
+
+    if (picked == null) {
+      return;
+    }
+
+    final bytes = await picked.readAsBytes();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _pickedImage = picked;
+      _pickedImageBytes = bytes;
+      _removeImage = false;
+    });
+  }
+
+  void _clearImage() {
+    setState(() {
+      _pickedImage = null;
+      _pickedImageBytes = null;
+      _removeImage = true;
+    });
+  }
+
+  Widget _buildImagePreview() {
+    if (_pickedImageBytes != null) {
+      return Image.memory(
+        _pickedImageBytes!,
+        width: double.infinity,
+        height: 180,
+        fit: BoxFit.cover,
+      );
+    }
+
+    final existingUrl = widget.announcement?.imageUrl;
+
+    if (!_removeImage && existingUrl != null && existingUrl.trim().isNotEmpty) {
+      return Image.network(
+        existingUrl,
+        width: double.infinity,
+        height: 180,
+        fit: BoxFit.cover,
+        errorBuilder:
+            (BuildContext context, Object error, StackTrace? stackTrace) {
+              return _emptyImagePreview();
+            },
+      );
+    }
+
+    return _emptyImagePreview();
+  }
+
+  Widget _emptyImagePreview() {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.image_outlined, size: 40),
+          SizedBox(height: 6),
+          Text('첨부된 사진이 없습니다.'),
+        ],
+      ),
     );
   }
 }

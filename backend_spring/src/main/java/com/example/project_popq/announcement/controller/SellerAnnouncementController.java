@@ -2,6 +2,7 @@ package com.example.project_popq.announcement.controller;
 
 import com.example.project_popq.announcement.dto.AnnouncementResponse;
 import com.example.project_popq.announcement.dto.ChangeAnnouncementStatusRequest;
+import com.example.project_popq.announcement.dto.ChangeAnnouncementPinRequest;
 import com.example.project_popq.announcement.dto.SaveAnnouncementRequest;
 import com.example.project_popq.announcement.service.AnnouncementService;
 import com.example.project_popq.auth.service.CurrentUserService;
@@ -92,5 +93,21 @@ public class SellerAnnouncementController {
                 )
         );
     }
-}
 
+    @PatchMapping("/{announcementId}/pin")
+    public ApiResponse<AnnouncementResponse> changePin(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long announcementId,
+            @Valid @RequestBody ChangeAnnouncementPinRequest request
+    ) {
+        return ApiResponse.success(
+                announcementService.changePin(
+                        currentUserService.getRequired(jwt),
+                        storeId,
+                        announcementId,
+                        request
+                )
+        );
+    }
+}

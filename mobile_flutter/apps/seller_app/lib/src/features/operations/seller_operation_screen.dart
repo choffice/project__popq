@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -246,8 +247,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     final theme = Theme.of(context);
     final bool canManage = _canManage(store);
     final bool canChangeType = store.isOwner;
-    final bool operationEnded =
-        store.businessStatus == 'CLOSED' || store.status != 'ACTIVE';
+    final bool operationUnavailable = store.status != 'ACTIVE';
 
     return ListView(
       padding: const EdgeInsets.all(PopqSpacing.lg),
@@ -273,14 +273,14 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    operationEnded ? '운영 종료' : '영업 준비',
+                    operationUnavailable ? '운영 중지' : '영업 상태',
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 Switch(
-                  value: store.businessStatus == 'OPEN' && !operationEnded,
+                  value: store.businessStatus == 'OPEN' && !operationUnavailable,
                   onChanged: !canManage ||
-                          operationEnded ||
+                          operationUnavailable ||
                           _changingStatus ||
                           _savingQuickEdit
                       ? null
@@ -290,11 +290,11 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 ),
                 const SizedBox(width: PopqSpacing.xs),
                 Text(
-                  operationEnded
-                      ? '종료됨'
+                  operationUnavailable
+                      ? '중지됨'
                       : store.businessStatus == 'OPEN'
                           ? '영업 중'
-                          : '준비 중',
+                          : '준비중',
                   style: theme.textTheme.titleMedium,
                 ),
               ],
@@ -336,7 +336,23 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                 title: '사업장 유형',
                 value: _typeLabel(store.storeType),
                 canEdit: canManage && canChangeType,
-                onTap: _editStoreType,
+                onTap: _editStore,
+              ),
+              const Divider(height: 1),
+              if (store.storeType == 'EVENT_COMMERCE') ...<Widget>[
+                ListTile(
+                  key: const Key('operation-event-name'),
+                  leading: const Icon(Icons.celebration_outlined),
+                  title: const Text('행사명'),
+                  subtitle: Text(_displayValue(store.eventName)),
+                ),
+                const Divider(height: 1),
+              ],
+              ListTile(
+                key: const Key('operation-period'),
+                leading: const Icon(Icons.date_range_outlined),
+                title: const Text('운영 기간'),
+                subtitle: Text(_operationPeriodLabel(store)),
               ),
               const Divider(height: 1),
               ListTile(
@@ -688,6 +704,22 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
     return text.isEmpty ? '등록되지 않음' : text;
   }
 
+  String _operationPeriodLabel(SellerStore store) {
+    final String start = store.operationStartDate == null
+        ? '미설정'
+        : _formatOperationDate(store.operationStartDate!);
+    final String end = store.operationEndDate == null
+        ? '종료일 없음'
+        : _formatOperationDate(store.operationEndDate!);
+    return '$start ~ $end';
+  }
+
+  String _formatOperationDate(DateTime value) {
+    final String month = value.month.toString().padLeft(2, '0');
+    final String day = value.day.toString().padLeft(2, '0');
+    return '${value.year}.$month.$day';
+  }
+
   void _showMessage(String message) {
     if (!mounted) {
       return;
@@ -849,8 +881,12 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       if (image == null || !mounted) {
         return;
       }
-      final String uploadedUrl = await widget.storeRepository
-          .uploadRepresentativeImage(image.path);
+      final String uploadedUrl = kIsWeb
+          ? await widget.storeRepository.uploadRepresentativeImageBytes(
+              await image.readAsBytes(),
+              fileName: image.name,
+            )
+          : await widget.storeRepository.uploadRepresentativeImage(image.path);
       if (!mounted) {
         return;
       }
@@ -1066,74 +1102,6 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       representativeCategory: value,
       successMessage: '대표 카테고리를 수정했습니다.',
     );
-  }
-
-  Future<void> _editStoreType() async {
-    final SellerStore store = _store!;
-    String selected = store.storeType;
-    final String? value = await showDialog<String>(
-      context: context,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
-          title: const Text('사업장 유형 수정'),
-          content: RadioGroup<String>(
-            groupValue: selected,
-            onChanged: (String? next) {
-              if (next != null) {
-                setDialogState(() => selected = next);
-              }
-            },
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                RadioListTile<String>(
-                  value: 'LOCAL_STORE',
-                  title: Text('일반 매장'),
-                ),
-                RadioListTile<String>(
-                  value: 'EVENT_COMMERCE',
-                  title: Text('행사·팝업 판매점'),
-                ),
-              ],
-            ),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(selected),
-              child: const Text('다음'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (value == null || value == store.storeType || !mounted) {
-      return;
-    }
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: const Text('사업장 유형을 변경할까요?'),
-        content: const Text('사업장 유형만 변경되며 다른 사업장 정보는 그대로 유지됩니다.'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('유형 변경'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) {
-      return;
-    }
-    await _saveQuickEdit(storeType: value, successMessage: '사업장 유형을 수정했습니다.');
   }
 
   Future<void> _editAddress() async {
@@ -1429,6 +1397,9 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
                         ),
                         const SizedBox(width: PopqSpacing.sm),
                         FilledButton(
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size(0, 44),
+                          ),
                           onPressed: searching ? null : submit,
                           child: const Text('저장'),
                         ),
@@ -1729,7 +1700,7 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       return;
     }
 
-    final updated = await Navigator.of(context).push<SellerStore>(
+    final saved = await Navigator.of(context).push<SellerStore>(
       MaterialPageRoute<SellerStore>(
         builder: (context) {
           return SellerStoreEditScreen(
@@ -1741,13 +1712,14 @@ class _SellerOperationScreenState extends State<SellerOperationScreen> {
       ),
     );
 
-    if (updated == null || !mounted) {
+    if (saved == null || !mounted) {
       return;
     }
 
-    setState(() {
-      _store = updated;
-    });
+    await _load();
+    if (!mounted || _error != null) {
+      return;
+    }
 
     ScaffoldMessenger.of(context)
       ..hideCurrentTopSnackBar()

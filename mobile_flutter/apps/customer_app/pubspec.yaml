@@ -55,6 +55,8 @@ dependencies:
   naver_login_sdk: ^3.2.1
   firebase_messaging: ^16.5.0
   flutter_local_notifications: ^22.2.0
+  app_badge_plus: ^1.3.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -81,6 +83,7 @@ flutter:
     - assets/images/naver_n.png
     - assets/images/google_g.png
     - assets/images/kakao_k.png
+    - assets/images/badges/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

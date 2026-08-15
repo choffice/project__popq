@@ -3,15 +3,20 @@ package com.example.project_popq.product.controller;
 import com.example.project_popq.auth.service.CurrentUserService;
 import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.product.dto.CategoryResponse;
+import com.example.project_popq.product.dto.BulkApplyStoreOptionTemplateRequest;
 import com.example.project_popq.product.dto.CreateCategoryRequest;
 import com.example.project_popq.product.dto.CreateProductRequest;
 import com.example.project_popq.product.dto.ProductDetailResponse;
 import com.example.project_popq.product.dto.ProductSummaryResponse;
 import com.example.project_popq.product.dto.ReplaceProductOptionsRequest;
+import com.example.project_popq.product.dto.StoreOptionTemplateRequest;
+import com.example.project_popq.product.dto.StoreOptionTemplateResponse;
+import com.example.project_popq.product.dto.StoreOptionTemplateUsageResponse;
 import com.example.project_popq.product.dto.UpdateAvailabilityRequest;
 import com.example.project_popq.product.dto.UpdateCategoryRequest;
 import com.example.project_popq.product.dto.UpdateProductRequest;
 import com.example.project_popq.product.service.CatalogService;
+import com.example.project_popq.product.service.StoreOptionTemplateService;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +43,77 @@ public class SellerCatalogController {
 
     private final CurrentUserService currentUserService;
     private final CatalogService catalogService;
+    private final StoreOptionTemplateService optionTemplateService;
+
+    @GetMapping("/option-group-templates")
+    public ApiResponse<List<StoreOptionTemplateResponse>> findOptionTemplates(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId
+    ) {
+        return ApiResponse.success(optionTemplateService.findAll(
+                currentUserService.getRequired(jwt), storeId
+        ));
+    }
+
+    @GetMapping("/option-group-templates/{templateId}")
+    public ApiResponse<StoreOptionTemplateResponse> findOptionTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId
+    ) {
+        return ApiResponse.success(optionTemplateService.findOne(
+                currentUserService.getRequired(jwt), storeId, templateId
+        ));
+    }
+
+    @PostMapping("/option-group-templates")
+    public ResponseEntity<ApiResponse<StoreOptionTemplateResponse>>
+    createOptionTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @Valid @RequestBody StoreOptionTemplateRequest request
+    ) {
+        StoreOptionTemplateResponse created = optionTemplateService.create(
+                currentUserService.getRequired(jwt), storeId, request
+        );
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(created));
+    }
+
+    @GetMapping("/option-group-templates/{templateId}/products")
+    public ApiResponse<StoreOptionTemplateUsageResponse> findOptionTemplateUsage(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId
+    ) {
+        return ApiResponse.success(optionTemplateService.findUsage(
+                currentUserService.getRequired(jwt), storeId, templateId
+        ));
+    }
+
+    @PostMapping("/option-group-templates/{templateId}/apply")
+    public ApiResponse<StoreOptionTemplateResponse> applyOptionTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId,
+            @Valid @RequestBody BulkApplyStoreOptionTemplateRequest request
+    ) {
+        return ApiResponse.success(optionTemplateService.applyToAll(
+                currentUserService.getRequired(jwt), storeId, templateId, request
+        ));
+    }
+
+    @DeleteMapping("/option-group-templates/{templateId}")
+    public ApiResponse<Boolean> deleteOptionTemplate(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long storeId,
+            @PathVariable Long templateId
+    ) {
+        optionTemplateService.deleteIfUnused(
+                currentUserService.getRequired(jwt), storeId, templateId
+        );
+        return ApiResponse.success(true);
+    }
 
     @GetMapping("/categories")
     public ApiResponse<List<CategoryResponse>> findCategories(

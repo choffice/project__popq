@@ -1,5 +1,6 @@
 package com.example.project_popq.engagement.service;
 
+import com.example.project_popq.activity.service.CustomerActivityService;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.engagement.domain.Review;
@@ -33,6 +34,7 @@ public class ReviewService {
     private final StoreAuthorizationService storeAuthorizationService;
     private final StoreRepository storeRepository;
     private final SellerReviewReplyTemplateRepository replyTemplateRepository;
+    private final CustomerActivityService customerActivityService;
 
     @Transactional
     public ReviewResponse create(
@@ -55,11 +57,12 @@ public class ReviewService {
                         order,
                         user,
                         request.rating(),
-                        normalize(request.content())
+                        normalize(request.content()),
+                        normalize(request.imageUrl())
                 )
         );
         reviewRepository.flush();
-        return ReviewResponse.from(review);
+        return toResponse(review);
     }
 
     @Transactional
@@ -69,9 +72,13 @@ public class ReviewService {
             UpsertReviewRequest request
     ) {
         Review review = requireOwnedActive(user, reviewId);
-        review.update(request.rating(), normalize(request.content()));
+        review.update(
+                request.rating(),
+                normalize(request.content()),
+                normalize(request.imageUrl())
+        );
         reviewRepository.flush();
-        return ReviewResponse.from(review);
+        return toResponse(review);
     }
 
     @Transactional
@@ -79,7 +86,7 @@ public class ReviewService {
         Review review = requireOwnedActive(user, reviewId);
         review.delete();
         reviewRepository.flush();
-        return ReviewResponse.from(review);
+        return toResponse(review);
     }
 
     @Transactional(readOnly = true)
@@ -88,7 +95,7 @@ public class ReviewService {
         return reviewRepository
                 .findAllByUserIdOrderByCreatedAtDesc(user.getId())
                 .stream()
-                .map(ReviewResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -100,7 +107,7 @@ public class ReviewService {
                         ReviewStatus.ACTIVE
                 )
                 .stream()
-                .map(ReviewResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -130,7 +137,7 @@ public class ReviewService {
                 .filter(review -> rating == null || review.getRating() == rating)
                 .filter(review -> !Boolean.TRUE.equals(unanswered)
                         || review.getSellerReply() == null)
-                .map(ReviewResponse::from)
+                .map(this::toResponse)
                 .toList();
     }
 
@@ -152,7 +159,7 @@ public class ReviewService {
                         storeId,
                         ReviewStatus.ACTIVE
                 )
-                .map(ReviewResponse::from)
+                .map(this::toResponse)
                 .orElse(null);
     }
 
@@ -167,7 +174,7 @@ public class ReviewService {
         Review review = requireActiveStoreReview(reviewId, storeId);
         review.reply(reply.trim(), user.getId(), Instant.now());
         reviewRepository.flush();
-        return ReviewResponse.from(review);
+        return toResponse(review);
     }
 
     @Transactional
@@ -180,7 +187,7 @@ public class ReviewService {
         Review review = requireActiveStoreReview(reviewId, storeId);
         review.deleteReply();
         reviewRepository.flush();
-        return ReviewResponse.from(review);
+        return toResponse(review);
     }
 
     @Transactional(readOnly = true)
@@ -282,6 +289,13 @@ public class ReviewService {
         if (!user.hasRole(PlatformRole.CUSTOMER)) {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
+    }
+
+    private ReviewResponse toResponse(Review review) {
+        return ReviewResponse.from(
+                review,
+                customerActivityService.getPublicBadgeTier(review.getUser())
+        );
     }
 
     private String normalize(String value) {

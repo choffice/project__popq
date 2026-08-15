@@ -11,6 +11,7 @@ class CustomerStore {
     required this.businessStatus,
     required this.tags,
     this.description,
+    this.eventName,
     this.address,
     this.detailAddress,
     this.representativeCategory,
@@ -38,6 +39,7 @@ class CustomerStore {
       storeId: (json['storeId'] as num).toInt(),
       storeType: json['storeType'] as String,
       name: json['name'] as String,
+      eventName: json['eventName'] as String?,
       description: json['description'] as String?,
       businessStatus: json['businessStatus'] as String,
       address: json['address'] as String?,
@@ -79,6 +81,7 @@ class CustomerStore {
   final int storeId;
   final String storeType;
   final String name;
+  final String? eventName;
   final String? description;
   final String businessStatus;
   final String? address;
@@ -106,6 +109,10 @@ class CustomerStore {
         closeTime: closeTime,
         closedDays: closedDays,
       );
+
+  bool isOrderAccepting() {
+    return businessStatus == 'OPEN' && orderAcceptingEnabled;
+  }
 
   String get fullAddress {
     return <String?>[address, detailAddress]
@@ -310,6 +317,7 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
       storeId: 2,
       storeType: 'EVENT_COMMERCE',
       name: '주말 디저트 마켓',
+      eventName: '성수 디저트 페스타',
       description: '이번 주말에만 만나는 디저트 셀렉션',
       businessStatus: 'OPEN',
       address: '서울 성동구 성수이로',
@@ -334,6 +342,7 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
       storeId: 4,
       storeType: 'EVENT_COMMERCE',
       name: '성수 야외 플리마켓',
+      eventName: '성수 주말 플리마켓',
       description: '소품과 디저트 브랜드가 함께하는 주말 야외 행사',
       businessStatus: 'OPEN',
       address: '서울 성동구 아차산로',
@@ -381,6 +390,7 @@ class MemoryStoreDiscoveryRepository implements StoreDiscoveryRepository {
           normalizedQuery == null ||
           normalizedQuery.isEmpty ||
           store.name.toLowerCase().contains(normalizedQuery) ||
+          (store.eventName?.toLowerCase().contains(normalizedQuery) ?? false) ||
           (store.representativeCategory
                   ?.toLowerCase()
                   .contains(normalizedQuery) ??

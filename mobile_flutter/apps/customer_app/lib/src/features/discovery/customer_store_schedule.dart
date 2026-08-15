@@ -52,6 +52,7 @@ class CustomerStoreScheduleException {
   const CustomerStoreScheduleException({
     required this.startDate,
     required this.endDate,
+    required this.exceptionType,
     this.memo,
   });
 
@@ -59,11 +60,13 @@ class CustomerStoreScheduleException {
       CustomerStoreScheduleException(
         startDate: DateTime.parse(json['startDate'] as String),
         endDate: DateTime.parse(json['endDate'] as String),
+        exceptionType: json['exceptionType'] as String? ?? 'CLOSED',
         memo: json['memo'] as String?,
       );
 
   final DateTime startDate;
   final DateTime endDate;
+  final String exceptionType;
   final String? memo;
 }
 
@@ -142,6 +145,63 @@ class CustomerStoreSchedule {
   final List<CustomerStoreClosureRule> closureRules;
   final List<CustomerStoreScheduleException> scheduleExceptions;
   final bool publicHolidayAutoCalculationAvailable;
+
+  bool isOpenAt({DateTime? now}) {
+    final koreaNow = (now ?? DateTime.now()).toUtc().add(
+          const Duration(hours: 9),
+        );
+    final today = _dateOnly(koreaNow);
+    final currentMinutes = koreaNow.hour * 60 + koreaNow.minute;
+
+    if (_isClosedOn(today)) return false;
+
+    final todayHours = businessHours
+        .where((value) => value.dayOfWeek == _weekdayFor(today.weekday))
+        .firstOrNull;
+    if (todayHours != null && !todayHours.closed) {
+      if (todayHours.open24Hours) return true;
+      final openMinutes = _minutes(todayHours.openTime);
+      final closeMinutes = _minutes(todayHours.closeTime);
+      if (todayHours.openTime != null && todayHours.closeTime != null) {
+        if (openMinutes < closeMinutes &&
+            currentMinutes >= openMinutes &&
+            currentMinutes < closeMinutes) {
+          return true;
+        }
+        if (openMinutes > closeMinutes && currentMinutes >= openMinutes) {
+          return true;
+        }
+      }
+    }
+
+    final yesterday = today.subtract(const Duration(days: 1));
+    if (_isClosedOn(yesterday)) return false;
+    final yesterdayHours = businessHours
+        .where((value) => value.dayOfWeek == _weekdayFor(yesterday.weekday))
+        .firstOrNull;
+    return yesterdayHours != null &&
+        !yesterdayHours.closed &&
+        !yesterdayHours.open24Hours &&
+        yesterdayHours.openTime != null &&
+        yesterdayHours.closeTime != null &&
+        _minutes(yesterdayHours.openTime) > _minutes(yesterdayHours.closeTime) &&
+        currentMinutes < _minutes(yesterdayHours.closeTime);
+  }
+
+  bool _isClosedOn(DateTime date) {
+    final exceptionClosed = scheduleExceptions.any((value) =>
+        value.exceptionType == 'CLOSED' &&
+        !date.isBefore(_dateOnly(value.startDate)) &&
+        !date.isAfter(_dateOnly(value.endDate)));
+    if (exceptionClosed) return true;
+
+    final day = _weekdayFor(date.weekday);
+    final week = ((date.day - 1) ~/ 7) + 1;
+    return closureRules.any((value) =>
+        value.ruleType == 'NTH_WEEKDAY' &&
+        value.dayOfWeek == day &&
+        value.weekOfMonth == week);
+  }
 
   String todayLabel({DateTime? now}) {
     final koreaNow = now ??

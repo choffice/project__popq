@@ -80,6 +80,9 @@ public class User extends BaseTimeEntity {
     @Column(name = "marketing_opt_in", nullable = false)
     private boolean marketingOptIn = false;
 
+    @Column(name = "emblem_visible", nullable = false)
+    private boolean emblemVisible = true;
+
     private static final Duration WITHDRAWAL_GRACE_PERIOD = Duration.ofDays(7);
     private static final String WITHDRAWN_NAME_PLACEHOLDER = "탈퇴한 회원";
 
@@ -145,6 +148,10 @@ public class User extends BaseTimeEntity {
     ) {
         this.pushNotificationEnabled = pushNotificationEnabled;
         this.marketingOptIn = marketingOptIn;
+    }
+
+    public void changeEmblemVisibility(boolean emblemVisible) {
+        this.emblemVisible = emblemVisible;
     }
     public boolean hasRole(PlatformRole role) {
         return roles.contains(role);

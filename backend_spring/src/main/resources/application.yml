@@ -22,6 +22,19 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+  mail:
+    host: ${POPQ_MAIL_HOST:smtp.gmail.com}
+    port: ${POPQ_MAIL_PORT:587}
+    username: ${POPQ_MAIL_USERNAME:}
+    password: ${POPQ_MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
   servlet:
     multipart:
       enabled: true
@@ -57,9 +70,16 @@ popq:
       issuer: ${POPQ_JWT_ISSUER:popq}
       secret: ${POPQ_JWT_SECRET}
       access-token-expiration: ${POPQ_ACCESS_TOKEN_EXPIRATION:PT1H}
+      refresh-token-expiration: ${POPQ_REFRESH_TOKEN_EXPIRATION:P14D}
 
   auth:
     dev-login-enabled: ${POPQ_DEV_LOGIN_ENABLED:false}
+    email-verification:
+      required: ${POPQ_EMAIL_VERIFICATION_REQUIRED:true}
+      from: ${POPQ_MAIL_FROM:${POPQ_MAIL_USERNAME:}}
+      code-ttl: ${POPQ_EMAIL_VERIFICATION_CODE_TTL:PT10M}
+      resend-interval: ${POPQ_EMAIL_VERIFICATION_RESEND_INTERVAL:PT1M}
+      max-attempts: ${POPQ_EMAIL_VERIFICATION_MAX_ATTEMPTS:5}
 
   social:
     google:

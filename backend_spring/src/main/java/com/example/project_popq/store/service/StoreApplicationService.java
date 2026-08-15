@@ -17,6 +17,7 @@ import com.example.project_popq.store.domain.StoreType;
 import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
+import com.example.project_popq.store.dto.ReorderStoresRequest;
 import com.example.project_popq.store.dto.SellerStoreDetailResponse;
 import com.example.project_popq.store.dto.SellerDashboardSummaryResponse;
 import com.example.project_popq.engagement.domain.ReviewStatus;
@@ -42,7 +43,10 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.HashMap;
@@ -50,6 +54,8 @@ import java.util.HashMap;
 @Service
 @RequiredArgsConstructor
 public class StoreApplicationService {
+
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
@@ -84,18 +90,34 @@ public class StoreApplicationService {
             request.closeTime()
         );
 
-        validateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+        StoreType storeType = request.storeType();
+        String eventName = normalizeOptionalText(request.eventName());
+        LocalDate operationStartDate = request.operationStartDate();
+        LocalDate operationEndDate = request.operationEndDate();
+
+        if (storeType == StoreType.LOCAL_STORE) {
+            eventName = null;
+            if (operationStartDate == null) {
+                operationStartDate = LocalDate.now(SEOUL_ZONE);
+            }
+        }
+
+        validateEventInformation(
+            storeType,
+            eventName,
+            operationStartDate,
+            operationEndDate
         );
 
         Store store = Store.create(
-            request.storeType(),
+            storeType,
             request.name().trim(),
             normalizeOptionalText(
                 request.description()
             )
         );
+
+        store.updateEventName(eventName);
 
         store.updateDiscoveryProfile(
             normalizeOptionalText(
@@ -138,8 +160,8 @@ public class StoreApplicationService {
         );
 
         store.updateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+            operationStartDate,
+            operationEndDate
         );
 
         storeRepository.save(store);
@@ -157,6 +179,12 @@ public class StoreApplicationService {
             StoreRole.OWNER
         );
 
+        int nextDisplayOrder = storeMemberRepository
+            .findMaxDisplayOrderByUserId(currentUser.getId())
+            + 1;
+
+        owner.changeDisplayOrder(nextDisplayOrder);
+
         storeMemberRepository.save(owner);
 
         return StoreSummaryResponse.of(
@@ -172,7 +200,7 @@ public class StoreApplicationService {
         User currentUser
     ) {
         return storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )
@@ -190,10 +218,89 @@ public class StoreApplicationService {
             .toList();
     }
 
+    @Transactional
+    public void reorderStores(
+        User currentUser,
+        ReorderStoresRequest request
+    ) {
+        List<StoreMember> memberships = storeMemberRepository
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
+                currentUser.getId(),
+                StoreMemberStatus.ACTIVE
+            );
+
+        List<StoreMember> activeStoreMemberships = memberships
+            .stream()
+            .filter(member -> member.getStore().isActive())
+            .toList();
+
+        List<Long> requestedStoreIds = request.storeIds();
+
+        if (requestedStoreIds.size() != activeStoreMemberships.size()) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "현재 표시 중인 모든 가게 ID를 순서대로 전달해야 합니다."
+            );
+        }
+
+        Set<Long> requestedStoreIdSet = new HashSet<>(requestedStoreIds);
+
+        if (requestedStoreIdSet.size() != requestedStoreIds.size()) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "가게 순서 목록에 중복된 가게 ID가 있습니다."
+            );
+        }
+
+        Set<Long> activeStoreIds = activeStoreMemberships
+            .stream()
+            .map(member -> member.getStore().getId())
+            .collect(Collectors.toSet());
+
+        if (!activeStoreIds.containsAll(requestedStoreIdSet)) {
+            throw new BusinessException(
+                ErrorCode.STORE_ACCESS_DENIED
+            );
+        }
+
+        if (!requestedStoreIdSet.containsAll(activeStoreIds)) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST,
+                "현재 표시 중인 모든 가게 ID를 순서대로 전달해야 합니다."
+            );
+        }
+
+        Map<Long, StoreMember> membershipByStoreId =
+            activeStoreMemberships
+                .stream()
+                .collect(Collectors.toMap(
+                    member -> member.getStore().getId(),
+                    member -> member
+                ));
+
+        for (int index = 0; index < requestedStoreIds.size(); index++) {
+            Long storeId = requestedStoreIds.get(index);
+            membershipByStoreId
+                .get(storeId)
+                .changeDisplayOrder(index);
+        }
+
+        int nextDisplayOrder = requestedStoreIds.size();
+
+        for (StoreMember membership : memberships) {
+            if (!membership.getStore().isActive()) {
+                membership.changeDisplayOrder(nextDisplayOrder);
+                nextDisplayOrder++;
+            }
+        }
+
+        storeMemberRepository.saveAll(memberships);
+    }
+
     @Transactional(readOnly = true)
     public List<StoreSummaryResponse> findMyInactiveStores(User currentUser) {
         return storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )
@@ -212,7 +319,7 @@ public class StoreApplicationService {
         User currentUser
     ) {
         List<Store> stores = storeMemberRepository
-            .findAllByUserIdAndStatusOrderByIdAsc(
+            .findAllByUserIdAndStatusOrderByDisplayOrderAscIdAsc(
                 currentUser.getId(),
                 StoreMemberStatus.ACTIVE
             )
@@ -304,9 +411,54 @@ public class StoreApplicationService {
 
         Store store = member.getStore();
 
-        if (request.storeType() != null) {
-            store.changeStoreType(request.storeType());
+        StoreType targetStoreType = request.storeType() == null
+            ? store.getStoreType()
+            : request.storeType();
+
+        String eventName = targetStoreType == StoreType.LOCAL_STORE
+            ? null
+            : resolveOptionalText(store.getEventName(), request.eventName());
+
+        LocalDate operationStartDate = request.operationStartDate() == null
+            ? store.getOperationStartDate()
+            : request.operationStartDate();
+
+        boolean clearOperationEndDate = Boolean.TRUE.equals(
+            request.clearOperationEndDate()
+        );
+
+        if (clearOperationEndDate
+            && request.operationEndDate() != null) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
         }
+
+        if (clearOperationEndDate
+            && targetStoreType == StoreType.EVENT_COMMERCE) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
+        }
+
+        LocalDate operationEndDate = clearOperationEndDate
+            ? null
+            : request.operationEndDate() == null
+                ? store.getOperationEndDate()
+                : request.operationEndDate();
+
+        validateEventInformation(
+            targetStoreType,
+            eventName,
+            operationStartDate,
+            operationEndDate
+        );
+
+        if (request.storeType() != null) {
+            store.changeStoreType(targetStoreType);
+        }
+
+        store.updateEventName(eventName);
 
         LocalTime openTime =
             request.openTime() == null
@@ -321,11 +473,6 @@ public class StoreApplicationService {
         validateOperatingHours(
             openTime,
             closeTime
-        );
-
-        validateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
         );
 
         store.updateSellerProfile(
@@ -379,8 +526,8 @@ public class StoreApplicationService {
         );
 
         store.updateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+            operationStartDate,
+            operationEndDate
         );
 
         storeScheduleService.replace(store, request.schedule());
@@ -420,7 +567,7 @@ public class StoreApplicationService {
         }
 
         store.changeBusinessStatus(
-            BusinessStatus.CLOSED
+            BusinessStatus.PRE_OPEN
         );
 
         store.updateOperatingPolicy(
@@ -637,6 +784,27 @@ public class StoreApplicationService {
                 ErrorCode.INVALID_REQUEST
             );
         }
+    }
+
+    private void validateEventInformation(
+        StoreType storeType,
+        String eventName,
+        LocalDate operationStartDate,
+        LocalDate operationEndDate
+    ) {
+        if (storeType == StoreType.EVENT_COMMERCE
+            && (eventName == null
+                || operationStartDate == null
+                || operationEndDate == null)) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
+        }
+
+        validateOperationPeriod(
+            operationStartDate,
+            operationEndDate
+        );
     }
 
     private boolean defaultTrue(

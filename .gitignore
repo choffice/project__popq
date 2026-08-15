@@ -11,5 +11,6 @@
 uploads/
 .env.intellij
 .env.example
+*-firebase-adminsdk-*.json
 .idea/workspace.xml
 .idea/libraries/Dart_SDK.xml

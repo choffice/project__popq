@@ -62,7 +62,7 @@ describe('판매자 주문 API 계약', () => {
     )
   })
 
-  it('주문 상태 변경 경로와 공통 reason 본문을 사용한다', async () => {
+  it('주문 접수 시 준비시간과 사업장 기본값 본문을 사용한다', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -80,14 +80,22 @@ describe('판매자 주문 API 계약', () => {
       connection,
       'order-1',
       'accept',
-      '주문 접수',
+      {
+        reason: '주문 접수',
+        preparationMinutes: 15,
+        applyAsStoreDefault: true,
+      },
     )
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/v1/seller/stores/7/orders/order-1/accept',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ reason: '주문 접수' }),
+        body: JSON.stringify({
+          preparationMinutes: 15,
+          applyAsStoreDefault: true,
+          reason: '주문 접수',
+        }),
       }),
     )
   })
@@ -449,7 +457,7 @@ describe('판매자 주문 API 계약', () => {
         ),
     )
 
-    await changeStoreBusinessStatus(connection, 'CLOSED')
+    await changeStoreBusinessStatus(connection, 'PRE_OPEN')
     await createStoreTable(connection, 'WINDOW-08', 'Window 08')
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -457,7 +465,7 @@ describe('판매자 주문 API 계약', () => {
       '/api/v1/seller/stores/7/business-status',
       expect.objectContaining({
         method: 'PATCH',
-        body: JSON.stringify({ businessStatus: 'CLOSED' }),
+        body: JSON.stringify({ businessStatus: 'PRE_OPEN' }),
       }),
     )
     expect(fetchMock).toHaveBeenNthCalledWith(

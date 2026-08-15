@@ -366,13 +366,16 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
           ? DateTime(now.year, now.month, now.day)
           : DateTime(now.year, now.month);
 
+      debugPrint('[SELLER SALES] store START');
       final store = await widget.storeRepository.findOne(selectedStoreId);
+      debugPrint('[SELLER SALES] store SUCCESS');
 
       final summary = await widget.analyticsRepository.findSales(
         selectedStoreId,
         from: from,
         to: now,
       );
+      debugPrint('[SELLER SALES] analytics SUCCESS');
 
       if (!mounted ||
           widget.selectionController.selectedStoreId != selectedStoreId) {
@@ -384,6 +387,7 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
         _loading = false;
       });
     } catch (error) {
+      debugPrint('[SELLER SALES] ERROR: $error');
       if (!mounted ||
           widget.selectionController.selectedStoreId != selectedStoreId) {
         return;
@@ -512,8 +516,7 @@ String _storeTypeLabel(String storeType) {
 String _businessStatusLabel(String status) {
   return switch (status) {
     'OPEN' => '영업 중',
-    'PRE_OPEN' => '영업 준비',
-    'CLOSED' => '영업 종료',
+    'PRE_OPEN' => '준비중',
     _ => status,
   };
 }

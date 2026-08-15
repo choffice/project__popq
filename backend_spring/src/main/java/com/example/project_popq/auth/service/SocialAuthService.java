@@ -25,6 +25,7 @@ import com.example.project_popq.auth.social.KakaoAccessTokenVerifier;
 import com.example.project_popq.auth.social.KakaoIdentity;
 import com.example.project_popq.auth.social.NaverAccessTokenVerifier;
 import com.example.project_popq.auth.social.NaverIdentity;
+import com.example.project_popq.auth.service.JwtTokenService.IssuedRefreshToken;
 
 @Service
 @RequiredArgsConstructor
@@ -394,11 +395,21 @@ public class SocialAuthService {
             activeRole
         );
 
+    IssuedRefreshToken refreshToken =
+        jwtTokenService.issueRefreshToken(
+            user,
+            activeRole
+        );
+
     return new AuthTokenResponse(
         accessToken.value(),
+        refreshToken.value(),
         "Bearer",
         accessToken.expiresInSeconds(),
-        AuthUserResponse.from(user,activeRole)
+        AuthUserResponse.from(
+            user,
+            activeRole
+        )
     );
   }
 }

@@ -19,7 +19,6 @@ import com.example.project_popq.product.repository.ProductOptionRepository;
 import com.example.project_popq.product.repository.ProductRepository;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.repository.StoreRepository;
-import com.example.project_popq.store.service.StoreOperatingHoursPolicy;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
@@ -43,7 +42,6 @@ public class CustomerOrderService {
     private final OrderRepository orderRepository;
     private final OrderRequestHasher orderRequestHasher;
     private final OrderProperties properties;
-    private final StoreOperatingHoursPolicy operatingHoursPolicy;
 
     @Transactional
     public OrderResponse create(
@@ -67,7 +65,7 @@ public class CustomerOrderService {
 
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
-        if (!operatingHoursPolicy.isEffectivelyOrderAccepting(store, Instant.now())) {
+        if (!store.isOrderAccepting()) {
             throw new BusinessException(ErrorCode.STORE_NOT_OPEN);
         }
 

@@ -6,6 +6,7 @@ import com.example.project_popq.product.domain.CatalogStatus;
 import com.example.project_popq.product.domain.Product;
 import com.example.project_popq.product.domain.ProductCategory;
 import com.example.project_popq.product.domain.ProductOptionGroup;
+import com.example.project_popq.product.domain.StoreOptionGroupTemplate;
 import com.example.project_popq.product.dto.CategoryResponse;
 import com.example.project_popq.product.dto.CreateCategoryRequest;
 import com.example.project_popq.product.dto.CreateProductRequest;
@@ -19,6 +20,8 @@ import com.example.project_popq.product.dto.UpdateCategoryRequest;
 import com.example.project_popq.product.dto.UpdateProductRequest;
 import com.example.project_popq.product.repository.ProductCategoryRepository;
 import com.example.project_popq.product.repository.ProductRepository;
+import com.example.project_popq.product.repository.StoreOptionGroupTemplateRepository;
+import com.example.project_popq.store.domain.BusinessStatus;
 import com.example.project_popq.store.domain.Store;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.repository.StoreRepository;
@@ -41,6 +44,7 @@ public class CatalogService {
     private final ProductCategoryRepository categoryRepository;
     private final ProductRepository productRepository;
     private final StoreAuthorizationService storeAuthorizationService;
+    private final StoreOptionGroupTemplateRepository optionTemplateRepository;
 
     @Transactional
     public CategoryResponse createCategory(
@@ -450,7 +454,7 @@ public class CatalogService {
     public List<ProductSummaryResponse> findCustomerProducts(
         Long storeId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Instant now = Instant.now();
 
@@ -482,7 +486,7 @@ public class CatalogService {
         Long storeId,
         Long productId
     ) {
-        requirePublicOpenStore(storeId);
+        requirePublicVisibleStore(storeId);
 
         Product product =
             getActiveDetailedProduct(
@@ -509,15 +513,42 @@ public class CatalogService {
         Product product,
         OptionGroupRequest request
     ) {
-        ProductOptionGroup group =
-            ProductOptionGroup.create(
-                product,
-                request.name().trim(),
-                request.minSelect(),
-                request.maxSelect(),
-                request.required(),
-                request.displayOrder()
-            );
+        StoreOptionGroupTemplate template = request.templateId() == null
+                ? null
+                : optionTemplateRepository
+                    .findByIdAndStoreId(
+                            request.templateId(),
+                            product.getStore().getId()
+                    )
+                    .orElseThrow(() -> new BusinessException(
+                            ErrorCode.INVALID_PRODUCT_OPTION
+                    ));
+
+        Long appliedVersion = template == null
+                ? null
+                : request.appliedTemplateVersion() == null
+                    ? template.getVersion()
+                    : request.appliedTemplateVersion();
+
+        ProductOptionGroup group = template == null
+                ? ProductOptionGroup.create(
+                    product,
+                    request.name().trim(),
+                    request.minSelect(),
+                    request.maxSelect(),
+                    request.required(),
+                    request.displayOrder()
+                )
+                : ProductOptionGroup.createFromTemplate(
+                    product,
+                    request.name().trim(),
+                    request.minSelect(),
+                    request.maxSelect(),
+                    request.required(),
+                    request.displayOrder(),
+                    template,
+                    appliedVersion
+                );
 
         for (OptionRequest option
             : request.options()) {
@@ -637,12 +668,14 @@ public class CatalogService {
             );
     }
 
-    private void requirePublicOpenStore(
+    private void requirePublicVisibleStore(
         Long storeId
     ) {
         Store store = getStore(storeId);
 
-        if (!store.isOpen()) {
+        if (!store.isActive()
+            || (store.getBusinessStatus() != BusinessStatus.OPEN
+            && store.getBusinessStatus() != BusinessStatus.PRE_OPEN)) {
             throw new BusinessException(
                 ErrorCode.STORE_NOT_FOUND
             );

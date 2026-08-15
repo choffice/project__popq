@@ -114,8 +114,29 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                                     PopqSpacing.sm,
                                   ),
                                   child: ListTile(
-                                    title: Text(
-                                      '${review.authorName} · ${review.rating}점',
+                                    title: Row(
+                                      children: <Widget>[
+                                        if (review.authorEmblemAssetPath !=
+                                            null) ...<Widget>[
+                                          Image.asset(
+                                            review.authorEmblemAssetPath!,
+                                            width: 36,
+                                            height: 36,
+                                            fit: BoxFit.contain,
+                                            semanticLabel:
+                                                review.authorEmblemLabel,
+                                          ),
+                                          const SizedBox(width: PopqSpacing.xs),
+                                        ],
+                                        Expanded(
+                                          child: Text(
+                                            review.authorBadgeTier == 'NONE'
+                                                ? review.authorName
+                                                : '${review.authorName} · ${review.authorEmblemLabel}',
+                                          ),
+                                        ),
+                                        Text('${review.rating}점'),
+                                      ],
                                     ),
                                     subtitle: Column(
                                       crossAxisAlignment:
@@ -124,6 +145,14 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                                         if (review.content?.trim().isNotEmpty ==
                                             true)
                                           Text(review.content!),
+                                        if (review.imageUrl != null) ...[
+                                          const SizedBox(
+                                            height: PopqSpacing.sm,
+                                          ),
+                                          _ReviewImage(
+                                            imageUrl: review.imageUrl!,
+                                          ),
+                                        ],
                                         if (review.sellerReply
                                                 ?.trim()
                                                 .isNotEmpty ==
@@ -149,6 +178,31 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
                 },
           );
         },
+      ),
+    );
+  }
+}
+
+class _ReviewImage extends StatelessWidget {
+  const _ReviewImage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
       ),
     );
   }

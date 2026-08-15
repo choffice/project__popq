@@ -234,19 +234,18 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                       children: [
                         Text(
                           '요청사항',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: PopqSpacing.xs),
                         Text(
                           requestMessage ?? '요청사항 없음',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: requestMessage == null
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant
                                     : null,
                               ),
                         ),
@@ -401,10 +400,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               ),
               const SizedBox(height: PopqSpacing.xs),
               for (var index = 0; index < payment.refunds.length; index++)
-                _refundHistoryCard(
-                  payment.refunds[index],
-                  index + 1,
-                ),
+                _refundHistoryCard(payment.refunds[index], index + 1),
             ],
             if (canRequestRefund) ...[
               const SizedBox(height: PopqSpacing.sm),
@@ -1024,18 +1020,15 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             Row(
               children: [
                 Icon(
-                  isRejected
-                      ? Icons.block_rounded
-                      : Icons.cancel_outlined,
+                  isRejected ? Icons.block_rounded : Icons.cancel_outlined,
                   color: Theme.of(context).colorScheme.error,
                 ),
                 const SizedBox(width: PopqSpacing.sm),
                 Text(
                   isRejected ? '주문 거절 정보' : '주문 취소 정보',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w800),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ],
             ),
@@ -1057,8 +1050,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               Text(
                 '결제된 주문은 아래 결제·환불 영역에서 환불 처리 결과를 확인할 수 있습니다.',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -1077,9 +1070,7 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1090,8 +1081,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
                 succeeded
                     ? Icons.check_circle_outline_rounded
                     : failed
-                        ? Icons.error_outline_rounded
-                        : Icons.schedule_rounded,
+                    ? Icons.error_outline_rounded
+                    : Icons.schedule_rounded,
                 size: 20,
               ),
               const SizedBox(width: PopqSpacing.xs),
@@ -1120,12 +1111,8 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
               label: '완료 시간',
               value: _formatDateTime(refund.completedAt!),
             ),
-          if (failed &&
-              (refund.failureMessage?.trim().isNotEmpty ?? false))
-            _PaymentRow(
-              label: '실패 사유',
-              value: refund.failureMessage!.trim(),
-            ),
+          if (failed && (refund.failureMessage?.trim().isNotEmpty ?? false))
+            _PaymentRow(label: '실패 사유', value: refund.failureMessage!.trim()),
         ],
       ),
     );
@@ -1187,13 +1174,52 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '고객 리뷰 ${List.filled(review.rating, '★').join()}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      if (review.authorEmblemAssetPath != null) ...[
+                        Image.asset(
+                          review.authorEmblemAssetPath!,
+                          width: 40,
+                          height: 40,
+                          fit: BoxFit.contain,
+                          semanticLabel: review.authorEmblemLabel,
+                        ),
+                        const SizedBox(width: PopqSpacing.xs),
+                      ],
+                      Expanded(
+                        child: Text(
+                          review.authorBadgeTier == 'NONE'
+                              ? review.authorName
+                              : '${review.authorName} · ${review.authorEmblemLabel}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Text(List.filled(review.rating, '★').join()),
+                    ],
                   ),
                   if (review.content?.isNotEmpty ?? false) ...[
                     const SizedBox(height: PopqSpacing.sm),
                     Text(review.content!),
+                  ],
+                  if (review.imageUrl != null) ...[
+                    const SizedBox(height: PopqSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: AspectRatio(
+                        aspectRatio: 16 / 9,
+                        child: Image.network(
+                          review.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            alignment: Alignment.center,
+                            child: const Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                   if (review.sellerReply?.isNotEmpty ?? false) ...[
                     const Divider(),
@@ -1317,8 +1343,11 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
     controller.dispose();
     if (value == null || !mounted) return;
     try {
-      final saved =
-          await widget.reviewRepository.reply(_storeId, review.reviewId, value);
+      final saved = await widget.reviewRepository.reply(
+        _storeId,
+        review.reviewId,
+        value,
+      );
       if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 저장하지 못했습니다.');
@@ -1344,8 +1373,10 @@ class _SellerOrderDetailScreenState extends State<SellerOrderDetailScreen>
     );
     if (confirmed != true) return;
     try {
-      final saved =
-          await widget.reviewRepository.deleteReply(_storeId, review.reviewId);
+      final saved = await widget.reviewRepository.deleteReply(
+        _storeId,
+        review.reviewId,
+      );
       if (mounted) setState(() => _review = saved);
     } catch (_) {
       if (mounted) _showMessage('답글을 삭제하지 못했습니다.');

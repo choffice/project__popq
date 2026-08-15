@@ -17,6 +17,9 @@ import java.util.List;
 public record UpdateStoreRequest(
         StoreType storeType,
 
+        @Size(max = 150)
+        String eventName,
+
         @NotBlank
         @Size(max = 150)
         String name,
@@ -54,6 +57,8 @@ public record UpdateStoreRequest(
         LocalDate operationStartDate,
 
         LocalDate operationEndDate,
+
+        Boolean clearOperationEndDate,
 
         @Size(max = 7)
         List<@NotNull DayOfWeek> closedDays,

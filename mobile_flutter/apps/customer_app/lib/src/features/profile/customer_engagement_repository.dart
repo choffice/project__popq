@@ -1,4 +1,165 @@
+import 'dart:typed_data';
+
 import 'package:popq_app_core/popq_app_core.dart';
+
+String customerEmblemLabel(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => '브론즈',
+    'SILVER' => '실버',
+    'GOLD' => '골드',
+    'DIAMOND' => '다이아',
+    _ => '첫 엠블럼 준비',
+  };
+}
+
+String? customerEmblemAssetPath(String badgeTier) {
+  return switch (badgeTier) {
+    'BRONZE' => 'assets/images/badges/badge_bronze.png',
+    'SILVER' => 'assets/images/badges/badge_silver.png',
+    'GOLD' => 'assets/images/badges/badge_gold.png',
+    'DIAMOND' => 'assets/images/badges/badge_diamond.png',
+    _ => null,
+  };
+}
+
+class CustomerActivitySummary {
+  const CustomerActivitySummary({
+    required this.totalCount,
+    required this.badgeTier,
+    required this.currentCheckpoint,
+    required this.nextCheckpoint,
+    required this.remainingCount,
+    required this.checkpointProgress,
+  });
+
+  factory CustomerActivitySummary.fromJson(Map<String, Object?> json) {
+    return CustomerActivitySummary(
+      totalCount: (json['totalCount'] as num).toInt(),
+      badgeTier: json['badgeTier'] as String,
+      currentCheckpoint: (json['currentCheckpoint'] as num).toInt(),
+      nextCheckpoint: (json['nextCheckpoint'] as num?)?.toInt(),
+      remainingCount: (json['remainingCount'] as num).toInt(),
+      checkpointProgress: (json['checkpointProgress'] as num).toDouble(),
+    );
+  }
+
+  factory CustomerActivitySummary.fromTotalCount(int totalCount) {
+    const checkpoints = <int>[10, 25, 50, 100, 200, 300, 500, 750, 1000];
+    final current = checkpoints
+        .where((checkpoint) => checkpoint <= totalCount)
+        .fold(0, (_, checkpoint) => checkpoint);
+    int? next;
+    for (final checkpoint in checkpoints) {
+      if (checkpoint > totalCount) {
+        next = checkpoint;
+        break;
+      }
+    }
+    final remaining = next == null ? 0 : next - totalCount;
+    final progress = next == null
+        ? 1.0
+        : (totalCount - current) / (next - current);
+    final badgeTier = switch (totalCount) {
+      >= 1000 => 'DIAMOND',
+      >= 500 => 'GOLD',
+      >= 100 => 'SILVER',
+      >= 10 => 'BRONZE',
+      _ => 'NONE',
+    };
+
+    return CustomerActivitySummary(
+      totalCount: totalCount,
+      badgeTier: badgeTier,
+      currentCheckpoint: current,
+      nextCheckpoint: next,
+      remainingCount: remaining,
+      checkpointProgress: progress,
+    );
+  }
+
+  final int totalCount;
+  final String badgeTier;
+  final int currentCheckpoint;
+  final int? nextCheckpoint;
+  final int remainingCount;
+  final double checkpointProgress;
+
+  String get badgeLabel {
+    return customerEmblemLabel(badgeTier);
+  }
+
+  String? get badgeAssetPath {
+    return customerEmblemAssetPath(badgeTier);
+  }
+}
+
+class CustomerAttendance {
+  const CustomerAttendance({
+    required this.today,
+    required this.checkedDates,
+    required this.checkedToday,
+    required this.newlyChecked,
+    required this.activitySummary,
+  });
+
+  factory CustomerAttendance.fromJson(Map<String, Object?> json) {
+    return CustomerAttendance(
+      today: DateTime.parse(json['today'] as String),
+      checkedDates: (json['checkedDates'] as List<Object?>)
+          .map((value) => DateTime.parse(value as String))
+          .toList(growable: false),
+      checkedToday: json['checkedToday'] as bool,
+      newlyChecked: json['newlyChecked'] as bool,
+      activitySummary: CustomerActivitySummary.fromJson(
+        Map<String, Object?>.from(json['activitySummary'] as Map),
+      ),
+    );
+  }
+
+  final DateTime today;
+  final List<DateTime> checkedDates;
+  final bool checkedToday;
+  final bool newlyChecked;
+  final CustomerActivitySummary activitySummary;
+}
+
+class MonthlyRaffleStatus {
+  const MonthlyRaffleStatus({
+    required this.pointBalance,
+    required this.ticketPrice,
+    required this.purchaseRound,
+    required this.nextDrawDate,
+    required this.purchasedTicketCount,
+    required this.canPurchase,
+    this.resultRound,
+    this.result,
+  });
+
+  factory MonthlyRaffleStatus.fromJson(Map<String, Object?> json) {
+    return MonthlyRaffleStatus(
+      pointBalance: (json['pointBalance'] as num).toInt(),
+      ticketPrice: (json['ticketPrice'] as num).toInt(),
+      purchaseRound: json['purchaseRound'] as String,
+      nextDrawDate: DateTime.parse(json['nextDrawDate'] as String),
+      purchasedTicketCount: (json['purchasedTicketCount'] as num).toInt(),
+      canPurchase: json['canPurchase'] as bool,
+      resultRound: json['resultRound'] as String?,
+      result: json['result'] as String?,
+    );
+  }
+
+  final int pointBalance;
+  final int ticketPrice;
+  final String purchaseRound;
+  final DateTime nextDrawDate;
+  final int purchasedTicketCount;
+  final bool canPurchase;
+  final String? resultRound;
+  final String? result;
+
+  bool get hasResult => result != null;
+  bool get won => result == 'WON';
+}
 
 class CustomerProfile {
   const CustomerProfile({
@@ -8,6 +169,15 @@ class CustomerProfile {
     required this.interestCount,
     required this.reviewCount,
     required this.orderCount,
+    this.emblemVisible = true,
+    this.activitySummary = const CustomerActivitySummary(
+      totalCount: 0,
+      badgeTier: 'NONE',
+      currentCheckpoint: 0,
+      nextCheckpoint: 10,
+      remainingCount: 10,
+      checkpointProgress: 0,
+    ),
     this.profileImageUrl,
     this.phone,
     this.joinedAt,
@@ -25,6 +195,19 @@ class CustomerProfile {
       interestCount: (json['interestCount'] as num).toInt(),
       reviewCount: (json['reviewCount'] as num).toInt(),
       orderCount: (json['orderCount'] as num).toInt(),
+      emblemVisible: json['emblemVisible'] as bool? ?? true,
+      activitySummary: json['activitySummary'] == null
+          ? const CustomerActivitySummary(
+              totalCount: 0,
+              badgeTier: 'NONE',
+              currentCheckpoint: 0,
+              nextCheckpoint: 10,
+              remainingCount: 10,
+              checkpointProgress: 0,
+            )
+          : CustomerActivitySummary.fromJson(
+              Map<String, Object?>.from(json['activitySummary'] as Map),
+            ),
       profileImageUrl: _resolveImageUrl(
         user['profileImageUrl'] as String?,
         imageBaseUrl,
@@ -42,6 +225,8 @@ class CustomerProfile {
   final int interestCount;
   final int reviewCount;
   final int orderCount;
+  final bool emblemVisible;
+  final CustomerActivitySummary activitySummary;
   final String? profileImageUrl;
   final String? phone;
   final DateTime? joinedAt;
@@ -63,6 +248,8 @@ class CustomerProfile {
     int? interestCount,
     int? reviewCount,
     int? orderCount,
+    bool? emblemVisible,
+    CustomerActivitySummary? activitySummary,
     String? profileImageUrl,
     String? phone,
   }) {
@@ -73,6 +260,8 @@ class CustomerProfile {
       interestCount: interestCount ?? this.interestCount,
       reviewCount: reviewCount ?? this.reviewCount,
       orderCount: orderCount ?? this.orderCount,
+      emblemVisible: emblemVisible ?? this.emblemVisible,
+      activitySummary: activitySummary ?? this.activitySummary,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phone: phone ?? this.phone,
       joinedAt: joinedAt,
@@ -95,6 +284,66 @@ class NotificationPreference {
 
   final bool pushNotificationEnabled;
   final bool marketingOptIn;
+}
+
+class CustomerPointHistory {
+  const CustomerPointHistory({
+    required this.transactionId,
+    required this.type,
+    required this.points,
+    required this.orderPublicId,
+    required this.storeName,
+    required this.paymentAmount,
+    required this.occurredAt,
+  });
+
+  factory CustomerPointHistory.fromJson(Map<String, Object?> json) {
+    return CustomerPointHistory(
+      transactionId: (json['transactionId'] as num).toInt(),
+      type: json['type'] as String,
+      points: (json['points'] as num).toInt(),
+      orderPublicId: json['orderPublicId'] as String,
+      storeName: json['storeName'] as String,
+      paymentAmount: (json['paymentAmount'] as num).toInt(),
+      occurredAt: DateTime.parse(json['occurredAt'] as String),
+    );
+  }
+
+  final int transactionId;
+  final String type;
+  final int points;
+  final String orderPublicId;
+  final String storeName;
+  final int paymentAmount;
+  final DateTime occurredAt;
+
+  bool get isReward => type == 'PAYMENT_REWARD';
+}
+
+class CustomerPointSummary {
+  const CustomerPointSummary({
+    required this.balance,
+    required this.rewardRatePercent,
+    required this.histories,
+  });
+
+  factory CustomerPointSummary.fromJson(Map<String, Object?> json) {
+    return CustomerPointSummary(
+      balance: (json['balance'] as num).toInt(),
+      rewardRatePercent: (json['rewardRatePercent'] as num).toDouble(),
+      histories: (json['histories'] as List<Object?>)
+          .map(
+            (item) => CustomerPointHistory.fromJson(
+              Map<String, Object?>.from(item as Map),
+            ),
+          )
+          .toList(growable: false),
+    );
+  }
+
+  final int balance;
+  final double rewardRatePercent;
+  final List<CustomerPointHistory> histories;
 }
 
 class VisitedStore {
@@ -155,10 +404,7 @@ class InterestedStore {
       address: json['address'] as String?,
       detailAddress: json['detailAddress'] as String?,
       representativeCategory: json['representativeCategory'] as String?,
-      imageUrl: _resolveImageUrl(
-        json['imageUrl'] as String?,
-        imageBaseUrl,
-      ),
+      imageUrl: _resolveImageUrl(json['imageUrl'] as String?, imageBaseUrl),
     );
   }
 
@@ -192,12 +438,17 @@ class CustomerReview {
     required this.status,
     required this.createdAt,
     this.content,
+    this.imageUrl,
     this.storeCategory,
     this.sellerReply,
     this.sellerRepliedAt,
+    this.authorBadgeTier = 'NONE',
   });
 
-  factory CustomerReview.fromJson(Map<String, Object?> json) {
+  factory CustomerReview.fromJson(
+    Map<String, Object?> json, {
+    String? imageBaseUrl,
+  }) {
     return CustomerReview(
       reviewId: (json['reviewId'] as num).toInt(),
       orderPublicId: json['orderPublicId'] as String,
@@ -205,8 +456,10 @@ class CustomerReview {
       storeName: json['storeName'] as String,
       storeCategory: json['storeCategory'] as String?,
       authorName: json['authorName'] as String,
+      authorBadgeTier: json['authorBadgeTier'] as String? ?? 'NONE',
       rating: (json['rating'] as num).toInt(),
       content: json['content'] as String?,
+      imageUrl: _resolveImageUrl(json['imageUrl'] as String?, imageBaseUrl),
       status: json['status'] as String,
       createdAt: DateTime.parse(json['createdAt'] as String),
       sellerReply: json['sellerReply'] as String?,
@@ -222,16 +475,26 @@ class CustomerReview {
   final String storeName;
   final String? storeCategory;
   final String authorName;
+  final String authorBadgeTier;
   final int rating;
   final String? content;
+  final String? imageUrl;
   final String status;
   final DateTime createdAt;
   final String? sellerReply;
   final DateTime? sellerRepliedAt;
 
   bool get isActive => status == 'ACTIVE';
+  String get authorEmblemLabel => customerEmblemLabel(authorBadgeTier);
+  String? get authorEmblemAssetPath => customerEmblemAssetPath(authorBadgeTier);
 
-  CustomerReview copyWith({int? rating, String? content, String? status}) {
+  CustomerReview copyWith({
+    int? rating,
+    String? content,
+    String? imageUrl,
+    bool clearImage = false,
+    String? status,
+  }) {
     return CustomerReview(
       reviewId: reviewId,
       orderPublicId: orderPublicId,
@@ -239,8 +502,10 @@ class CustomerReview {
       storeName: storeName,
       storeCategory: storeCategory,
       authorName: authorName,
+      authorBadgeTier: authorBadgeTier,
       rating: rating ?? this.rating,
       content: content ?? this.content,
+      imageUrl: clearImage ? null : imageUrl ?? this.imageUrl,
       status: status ?? this.status,
       createdAt: createdAt,
       sellerReply: sellerReply,
@@ -252,9 +517,32 @@ class CustomerReview {
 abstract interface class CustomerEngagementRepository {
   Future<CustomerProfile> getProfile();
 
+  Future<CustomerPointSummary> getPointSummary();
+
+  Future<CustomerAttendance> getAttendance();
+
+  Future<CustomerAttendance> checkAttendance();
+
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus();
+
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket();
+
+  Future<bool> recordQrVisit(String qrToken);
+
   Future<String> uploadProfileImage(String filePath);
 
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  });
+
+  Future<String> uploadReviewImage(Uint8List bytes, {required String fileName});
+
+  Future<String> uploadReviewImageFile(String filePath);
+
   Future<bool> updateName(String name);
+
+  Future<bool> updateEmblemVisibility(bool emblemVisible);
 
   Future<bool> updatePhone(String phone);
 
@@ -290,12 +578,14 @@ abstract interface class CustomerEngagementRepository {
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   });
 
   Future<CustomerReview> updateReview({
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   });
 
   Future<CustomerReview> deleteReview(int reviewId);
@@ -322,6 +612,64 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }
 
   @override
+  Future<CustomerPointSummary> getPointSummary() {
+    return _apiClient.get(
+      '/api/v1/customer/points',
+      decode: (value) => CustomerPointSummary.fromJson(
+        Map<String, Object?>.from(value as Map),
+      ),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() {
+    return _apiClient.get(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() {
+    return _apiClient.post(
+      '/api/v1/customer/activities/attendance',
+      decode: (value) =>
+          CustomerAttendance.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus() {
+    return _apiClient.get(
+      '/api/v1/customer/monthly-raffle',
+      decode: (value) =>
+          MonthlyRaffleStatus.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket() {
+    return _apiClient.post(
+      '/api/v1/customer/monthly-raffle/tickets',
+      decode: (value) =>
+          MonthlyRaffleStatus.fromJson(Map<String, Object?>.from(value as Map)),
+    );
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) {
+    return _apiClient.post(
+      '/api/v1/customer/activities/visits',
+      body: {'qrToken': qrToken},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['counted'] as bool;
+      },
+    );
+  }
+
+  @override
   Future<String> uploadProfileImage(String filePath) {
     return _apiClient.postMultipartFile<String>(
       '/api/v1/users/me/profile-image',
@@ -335,11 +683,40 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }
 
   @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/users/me/profile-image',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['imageUrl'] as String;
+      },
+    );
+  }
+
+  @override
   Future<bool> updateName(String name) {
     return _apiClient.patch<bool>(
       '/api/v1/users/me/name',
       body: {'name': name},
       decode: _decodeAck,
+    );
+  }
+
+  @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) {
+    return _apiClient.patch<bool>(
+      '/api/v1/users/me/emblem-visibility',
+      body: {'emblemVisible': emblemVisible},
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        return json['emblemVisible'] as bool;
+      },
     );
   }
 
@@ -359,10 +736,7 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }) {
     return _apiClient.post<bool>(
       '/api/v1/users/me/password',
-      body: {
-        'currentPassword': currentPassword,
-        'newPassword': newPassword,
-      },
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
       decode: _decodeAck,
     );
   }
@@ -484,10 +858,11 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) {
     return _apiClient.post(
       '/api/v1/customer/reviews/orders/$orderPublicId',
-      body: {'rating': rating, 'content': content},
+      body: {'rating': rating, 'content': content, 'imageUrl': imageUrl},
       decode: _decodeReview,
     );
   }
@@ -497,10 +872,11 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) {
     return _apiClient.put(
       '/api/v1/customer/reviews/$reviewId',
-      body: {'rating': rating, 'content': content},
+      body: {'rating': rating, 'content': content, 'imageUrl': imageUrl},
       decode: _decodeReview,
     );
   }
@@ -519,16 +895,59 @@ class ApiCustomerEngagementRepository implements CustomerEngagementRepository {
   }
 
   CustomerReview _decodeReview(Object? value) {
-    return CustomerReview.fromJson(Map<String, Object?>.from(value as Map));
+    return CustomerReview.fromJson(
+      Map<String, Object?>.from(value as Map),
+      imageBaseUrl: _imageBaseUrl,
+    );
   }
 
   List<CustomerReview> _decodeReviews(Object? value) {
     return (value as List<Object?>)
         .map(
-          (item) =>
-              CustomerReview.fromJson(Map<String, Object?>.from(item as Map)),
+          (item) => CustomerReview.fromJson(
+            Map<String, Object?>.from(item as Map),
+            imageBaseUrl: _imageBaseUrl,
+          ),
         )
         .toList();
+  }
+
+  @override
+  Future<String> uploadReviewImage(
+    Uint8List bytes, {
+    required String fileName,
+  }) {
+    return _apiClient.postMultipartBytes<String>(
+      '/api/v1/customer/review-images',
+      fieldName: 'file',
+      bytes: bytes,
+      fileName: fileName,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        final rawImageUrl = json['imageUrl'];
+        if (rawImageUrl is! String || rawImageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return _resolveImageUrl(rawImageUrl, _imageBaseUrl)!;
+      },
+    );
+  }
+
+  @override
+  Future<String> uploadReviewImageFile(String filePath) {
+    return _apiClient.postMultipartFile<String>(
+      '/api/v1/customer/review-images',
+      fieldName: 'file',
+      filePath: filePath,
+      decode: (value) {
+        final json = Map<String, Object?>.from(value as Map);
+        final rawImageUrl = json['imageUrl'];
+        if (rawImageUrl is! String || rawImageUrl.trim().isEmpty) {
+          throw const InvalidResponseFailure('업로드된 이미지 URL이 없습니다.');
+        }
+        return _resolveImageUrl(rawImageUrl, _imageBaseUrl)!;
+      },
+    );
   }
 }
 
@@ -573,10 +992,13 @@ class MemoryCustomerEngagementRepository
   CustomerProfile _profile;
   final List<InterestedStore> _interests;
   final List<CustomerReview> _reviews;
+  final Set<String> _attendanceDates = <String>{};
   NotificationPreference _notificationPreference = const NotificationPreference(
     pushNotificationEnabled: true,
     marketingOptIn: false,
   );
+  int _pointBalance = 3000;
+  int _raffleTicketCount = 0;
 
   @override
   Future<CustomerProfile> getProfile() async {
@@ -588,6 +1010,94 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<CustomerPointSummary> getPointSummary() async {
+    return const CustomerPointSummary(
+      balance: 0,
+      rewardRatePercent: 2.5,
+      histories: [],
+    );
+  }
+
+  @override
+  Future<CustomerAttendance> getAttendance() async {
+    return _attendance(newlyChecked: false);
+  }
+
+  @override
+  Future<CustomerAttendance> checkAttendance() async {
+    final today = DateTime.now();
+    final newlyChecked = _attendanceDates.add(_dateKey(today));
+    if (newlyChecked) {
+      _profile = _profile.copyWith(
+        activitySummary: CustomerActivitySummary.fromTotalCount(
+          _profile.activitySummary.totalCount + 1,
+        ),
+      );
+    }
+    return _attendance(newlyChecked: newlyChecked);
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> getMonthlyRaffleStatus() async {
+    return _memoryRaffleStatus();
+  }
+
+  @override
+  Future<MonthlyRaffleStatus> purchaseMonthlyRaffleTicket() async {
+    if (_pointBalance >= 1000) {
+      _pointBalance -= 1000;
+      _raffleTicketCount++;
+    }
+    return _memoryRaffleStatus();
+  }
+
+  MonthlyRaffleStatus _memoryRaffleStatus() {
+    final now = DateTime.now();
+    final drawDate = now.day < 10
+        ? DateTime(now.year, now.month, 10)
+        : DateTime(now.year, now.month + 1, 10);
+    return MonthlyRaffleStatus(
+      pointBalance: _pointBalance,
+      ticketPrice: 1000,
+      purchaseRound:
+          '${drawDate.year}-${drawDate.month.toString().padLeft(2, '0')}',
+      nextDrawDate: drawDate,
+      purchasedTicketCount: _raffleTicketCount,
+      canPurchase: _pointBalance >= 1000,
+    );
+  }
+
+  CustomerAttendance _attendance({required bool newlyChecked}) {
+    final today = DateTime.now();
+    final checkedDates =
+        _attendanceDates
+            .map(DateTime.parse)
+            .where(
+              (date) => date.year == today.year && date.month == today.month,
+            )
+            .toList()
+          ..sort();
+    return CustomerAttendance(
+      today: DateTime(today.year, today.month, today.day),
+      checkedDates: checkedDates,
+      checkedToday: _attendanceDates.contains(_dateKey(today)),
+      newlyChecked: newlyChecked,
+      activitySummary: _profile.activitySummary,
+    );
+  }
+
+  String _dateKey(DateTime date) {
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
+
+  @override
+  Future<bool> recordQrVisit(String qrToken) async {
+    return false;
+  }
+
+  @override
   Future<String> uploadProfileImage(String filePath) async {
     final imageUrl = Uri.file(filePath).toString();
     _profile = _profile.copyWith(profileImageUrl: imageUrl);
@@ -595,9 +1105,38 @@ class MemoryCustomerEngagementRepository
   }
 
   @override
+  Future<String> uploadProfileImageBytes(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    final imageUrl = 'memory://profile-images/$fileName';
+    _profile = _profile.copyWith(profileImageUrl: imageUrl);
+    return imageUrl;
+  }
+
+  @override
+  Future<String> uploadReviewImage(
+    Uint8List bytes, {
+    required String fileName,
+  }) async {
+    return 'memory://review-images/$fileName';
+  }
+
+  @override
+  Future<String> uploadReviewImageFile(String filePath) async {
+    return Uri.file(filePath).toString();
+  }
+
+  @override
   Future<bool> updateName(String name) async {
     _profile = _profile.copyWith(name: name);
     return true;
+  }
+
+  @override
+  Future<bool> updateEmblemVisibility(bool emblemVisible) async {
+    _profile = _profile.copyWith(emblemVisible: emblemVisible);
+    return emblemVisible;
   }
 
   @override
@@ -689,6 +1228,7 @@ class MemoryCustomerEngagementRepository
     required String orderPublicId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) async {
     final review = CustomerReview(
       reviewId: _reviews.length + 1,
@@ -696,8 +1236,12 @@ class MemoryCustomerEngagementRepository
       storeId: 1,
       storeName: 'POPQ 스토어',
       authorName: _profile.name,
+      authorBadgeTier: _profile.emblemVisible
+          ? _profile.activitySummary.badgeTier
+          : 'NONE',
       rating: rating,
       content: content,
+      imageUrl: imageUrl,
       status: 'ACTIVE',
       createdAt: DateTime.now(),
     );
@@ -710,9 +1254,15 @@ class MemoryCustomerEngagementRepository
     required int reviewId,
     required int rating,
     required String content,
+    String? imageUrl,
   }) async {
     final index = _reviews.indexWhere((review) => review.reviewId == reviewId);
-    final updated = _reviews[index].copyWith(rating: rating, content: content);
+    final updated = _reviews[index].copyWith(
+      rating: rating,
+      content: content,
+      imageUrl: imageUrl,
+      clearImage: imageUrl == null,
+    );
     _reviews[index] = updated;
     return updated;
   }

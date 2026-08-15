@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../routing/customer_router.dart';
 import '../announcements/public_announcement_repository.dart';
+import '../announcements/announcement_pinned_badge.dart';
 import '../catalog/catalog_repository.dart';
 import '../profile/customer_engagement_repository.dart';
 import 'store_discovery_repository.dart';
@@ -88,6 +89,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
           final store = snapshot.requireData;
           final schedule = store.resolvedSchedule;
           final orderPaused = !store.orderAcceptingEnabled;
+          final String eventName = store.eventName?.trim() ?? '';
           return Column(
             children: <Widget>[
               StoreSectionTopBar(store: store, selected: StoreSection.info),
@@ -134,10 +136,22 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ],
+                    if (store.storeType == 'EVENT_COMMERCE' &&
+                        eventName.isNotEmpty) ...[
+                      const SizedBox(height: PopqSpacing.sm),
+                      ListTile(
+                        key: const Key('store-detail-event-name'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.celebration_outlined),
+                        title: const Text('행사명'),
+                        subtitle: Text(eventName),
+                      ),
+                    ],
                     if (store.operationStartDate != null ||
                         store.operationEndDate != null) ...[
                       const SizedBox(height: PopqSpacing.sm),
                       ListTile(
+                        key: const Key('store-detail-operation-period'),
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.event_outlined),
                         title: Text(
@@ -543,8 +557,44 @@ class _LatestAnnouncementPreview extends StatelessWidget {
                 final PublicAnnouncement latest = items.first;
                 return Card(
                   child: ListTile(
-                    leading: const Icon(Icons.campaign_outlined),
-                    title: Text(latest.title),
+                    leading: latest.imageUrl?.trim().isNotEmpty == true
+                        ? SizedBox(
+                            width: 56,
+                            height: 56,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: Image.network(
+                                latest.imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder:
+                                    (
+                                      BuildContext context,
+                                      Object error,
+                                      StackTrace? stackTrace,
+                                    ) {
+                                      return Container(
+                                        alignment: Alignment.center,
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.surfaceContainerHighest,
+                                        child: const Icon(
+                                          Icons.campaign_outlined,
+                                        ),
+                                      );
+                                    },
+                              ),
+                            ),
+                          )
+                        : const Icon(Icons.campaign_outlined),
+                    title: Row(
+                      children: <Widget>[
+                        if (latest.pinned) ...<Widget>[
+                          const AnnouncementPinnedBadge(),
+                          const SizedBox(width: PopqSpacing.xs),
+                        ],
+                        Expanded(child: Text(latest.title)),
+                      ],
+                    ),
                     subtitle: Text(_announcementDateLabel(latest.publishedAt)),
                     trailing: const Icon(Icons.chevron_right_rounded),
                     onTap: () => context.push(
@@ -686,8 +736,7 @@ String _storeTypeLabel(String storeType) {
 String _businessStatusLabel(String status) {
   return switch (status) {
     'OPEN' => '영업 중',
-    'PRE_OPEN' => '영업 준비',
-    'CLOSED' => '영업 종료',
+    'PRE_OPEN' => '준비중',
     _ => status,
   };
 }
@@ -781,6 +830,10 @@ class _StoreReviewSection extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (review.content != null) Text(review.content!),
+                      if (review.imageUrl != null) ...[
+                        const SizedBox(height: PopqSpacing.sm),
+                        _ReviewImage(imageUrl: review.imageUrl!),
+                      ],
                       if (review.sellerReply?.isNotEmpty ?? false) ...[
                         const SizedBox(height: PopqSpacing.sm),
                         Container(
@@ -802,6 +855,31 @@ class _StoreReviewSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _ReviewImage extends StatelessWidget {
+  const _ReviewImage({required this.imageUrl});
+
+  final String imageUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: AspectRatio(
+        aspectRatio: 16 / 9,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
+          ),
+        ),
+      ),
     );
   }
 }

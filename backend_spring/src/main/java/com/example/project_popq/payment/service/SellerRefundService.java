@@ -1,5 +1,6 @@
 package com.example.project_popq.payment.service;
 
+import com.example.project_popq.activity.service.CustomerActivityService;
 import com.example.project_popq.common.error.BusinessException;
 import com.example.project_popq.common.error.ErrorCode;
 import com.example.project_popq.order.domain.Order;
@@ -19,6 +20,7 @@ import com.example.project_popq.payment.provider.PaymentCancellationResult;
 import com.example.project_popq.payment.provider.PaymentProvider;
 import com.example.project_popq.payment.provider.PaymentProviderRegistry;
 import com.example.project_popq.payment.repository.PaymentRepository;
+import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
@@ -35,6 +37,8 @@ public class SellerRefundService {
   private final OrderRepository orderRepository;
   private final PaymentRepository paymentRepository;
   private final PaymentProviderRegistry paymentProviderRegistry;
+  private final CustomerActivityService customerActivityService;
+  private final CustomerPointService customerPointService;
 
   @Transactional(readOnly = true)
   public SellerPaymentSummaryResponse findSummary(
@@ -200,6 +204,13 @@ public class SellerRefundService {
     } else {
       payment.markPartiallyRefunded();
     }
+
+    customerPointService.reclaimRefund(payment, refund, processedAt);
+
+    customerActivityService.revokeOrderPurchase(
+        order.getOrderPublicId(),
+        processedAt
+    );
 
     payment.addTransaction(
         PaymentTransaction.succeeded(

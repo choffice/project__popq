@@ -3,6 +3,10 @@ package com.example.project_popq.auth.controller;
 import com.example.project_popq.auth.dto.AckResponse;
 import com.example.project_popq.auth.dto.AuthTokenResponse;
 import com.example.project_popq.auth.dto.AuthUserResponse;
+import com.example.project_popq.auth.dto.EmailVerificationConfirmRequest;
+import com.example.project_popq.auth.dto.EmailVerificationConfirmResponse;
+import com.example.project_popq.auth.dto.EmailVerificationSendRequest;
+import com.example.project_popq.auth.dto.EmailVerificationSendResponse;
 import com.example.project_popq.auth.dto.FindIdRequest;
 import com.example.project_popq.auth.dto.FindIdResponse;
 import com.example.project_popq.auth.dto.LoginRequest;
@@ -13,6 +17,7 @@ import com.example.project_popq.auth.dto.SocialLoginRequest;
 import com.example.project_popq.auth.dto.WithdrawRequest;
 import com.example.project_popq.auth.service.AuthService;
 import com.example.project_popq.auth.service.CurrentUserService;
+import com.example.project_popq.auth.service.EmailVerificationService;
 import com.example.project_popq.auth.service.SocialAuthService;
 import com.example.project_popq.common.api.ApiResponse;
 import jakarta.validation.Valid;
@@ -27,6 +32,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.example.project_popq.user.domain.PlatformRole;
+import com.example.project_popq.auth.dto.RefreshTokenRequest;
+
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -36,6 +43,7 @@ public class AuthController {
     private final CurrentUserService currentUserService;
     private final AuthService authService;
     private final SocialAuthService socialAuthService;
+    private final EmailVerificationService emailVerificationService;
 
     @GetMapping("/me")
     public ApiResponse<AuthUserResponse> me(
@@ -61,6 +69,20 @@ public class AuthController {
                 .body(ApiResponse.success(authService.signup(request)));
     }
 
+    @PostMapping("/email-verification/send")
+    public ApiResponse<EmailVerificationSendResponse> sendEmailVerification(
+            @Valid @RequestBody EmailVerificationSendRequest request
+    ) {
+        return ApiResponse.success(emailVerificationService.sendSignupCode(request));
+    }
+
+    @PostMapping("/email-verification/confirm")
+    public ApiResponse<EmailVerificationConfirmResponse> confirmEmailVerification(
+            @Valid @RequestBody EmailVerificationConfirmRequest request
+    ) {
+        return ApiResponse.success(emailVerificationService.verifySignupCode(request));
+    }
+
     @PostMapping("/login")
     public ApiResponse<AuthTokenResponse> login(
             @Valid @RequestBody LoginRequest request
@@ -80,6 +102,15 @@ public class AuthController {
     ) {
         return ApiResponse.success(
             socialAuthService.login(request)
+        );
+    }
+
+    @PostMapping("/refresh")
+    public ApiResponse<AuthTokenResponse> refresh(
+        @RequestBody RefreshTokenRequest request
+    ) {
+        return ApiResponse.success(
+            authService.refresh(request)
         );
     }
 

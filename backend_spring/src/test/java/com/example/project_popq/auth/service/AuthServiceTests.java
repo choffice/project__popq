@@ -30,6 +30,9 @@ class AuthServiceTests {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private EmailVerificationService emailVerificationService;
+
     @InjectMocks
     private AuthService authService;
 
@@ -40,7 +43,8 @@ class AuthServiceTests {
                 "password1",
                 "공개 관리자",
                 "010-1234-9876",
-                PlatformRole.ADMIN
+                PlatformRole.ADMIN,
+                null
         );
 
         assertThatThrownBy(() -> authService.signup(request))

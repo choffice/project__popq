@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.example.project_popq.order.domain.Order;
+import com.example.project_popq.order.domain.OrderStatus;
 import com.example.project_popq.order.domain.OrderTransition;
 import com.example.project_popq.order.repository.OrderRepository;
 import com.example.project_popq.order.service.GuestOrderService;
@@ -24,6 +25,8 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
+import com.example.project_popq.point.service.CustomerPointService;
+import com.example.project_popq.store.domain.Store;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -45,9 +48,13 @@ class PaymentServiceTests {
         OrderDomainEventPublisher eventPublisher = mock(
             OrderDomainEventPublisher.class
         );
+        CustomerPointService customerPointService = mock(
+            CustomerPointService.class
+        );
 
         Payment payment = mock(Payment.class);
         Order order = mock(Order.class);
+        Store store = mock(Store.class);
 
         AtomicReference<PaymentStatus> status = new AtomicReference<>(
             PaymentStatus.IN_PROGRESS
@@ -86,6 +93,14 @@ class PaymentServiceTests {
         when(order.getTotalAmount())
             .thenReturn(6800L);
 
+        when(order.getStatus())
+            .thenReturn(OrderStatus.CREATED);
+
+        when(order.getStore())
+            .thenReturn(store);
+
+        when(store.isOrderAccepting()).thenReturn(true);
+
         when(
             order.transitionTo(
                 any(),
@@ -106,7 +121,7 @@ class PaymentServiceTests {
             paymentProvider.approve(any())
         ).thenReturn(
             PaymentApprovalResult.success(
-                "toss-provider-payment-key",
+                "toss-client-payment-key",
                 6800
             )
         );
@@ -129,7 +144,8 @@ class PaymentServiceTests {
             eventPublisher,
             new PaymentProperties(
                 PaymentProviderType.TOSS_PAYMENTS
-            )
+            ),
+            customerPointService
         );
 
         service.confirm(
@@ -150,6 +166,8 @@ class PaymentServiceTests {
         verify(paymentProvider)
             .approve(command.capture());
 
+        verify(customerPointService).rewardPayment(eq(payment), any());
+
         assertThat(
             command.getValue().idempotencyKey()
         ).isEqualTo("payment-key");
@@ -160,7 +178,7 @@ class PaymentServiceTests {
 
         verify(payment).markPaid(
             eq(6800L),
-            eq("toss-provider-payment-key"),
+            eq("toss-client-payment-key"),
             any()
         );
 

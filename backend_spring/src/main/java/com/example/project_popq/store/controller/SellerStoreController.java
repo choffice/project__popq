@@ -5,8 +5,9 @@ import com.example.project_popq.common.api.ApiResponse;
 import com.example.project_popq.store.dto.ChangeBusinessStatusRequest;
 import com.example.project_popq.store.dto.CreateStoreRequest;
 import com.example.project_popq.store.dto.CreateStoreTableRequest;
-import com.example.project_popq.store.dto.SellerStoreDetailResponse;
+import com.example.project_popq.store.dto.ReorderStoresRequest;
 import com.example.project_popq.store.dto.SellerDashboardSummaryResponse;
+import com.example.project_popq.store.dto.SellerStoreDetailResponse;
 import com.example.project_popq.store.dto.StoreSummaryResponse;
 import com.example.project_popq.store.dto.StoreTableResponse;
 import com.example.project_popq.store.dto.UpdateStoreRequest;
@@ -68,6 +69,19 @@ public class SellerStoreController {
                 currentUserService.getRequired(jwt)
             )
         );
+    }
+
+    @PatchMapping("/reorder")
+    public ApiResponse<Boolean> reorderStores(
+        @AuthenticationPrincipal Jwt jwt,
+        @Valid @RequestBody ReorderStoresRequest request
+    ) {
+        storeApplicationService.reorderStores(
+            currentUserService.getRequired(jwt),
+            request
+        );
+
+        return ApiResponse.success(true);
     }
 
     @GetMapping("/{storeId}")

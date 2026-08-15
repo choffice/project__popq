@@ -25,8 +25,11 @@ import 'features/onboarding/onboarding_store.dart';
 import 'features/orders/customer_order_repository.dart';
 import 'features/orders/pending_payment_recovery_service.dart';
 import 'features/permissions/customer_permission_gateway.dart';
+import 'features/profile/customer_attendance_dialog.dart';
 import 'features/profile/customer_engagement_repository.dart';
+import 'features/support/customer_support_repository.dart';
 import 'notifications/customer_push_notification_service.dart';
+import 'notifications/customer_app_badge_service.dart';
 import 'realtime/customer_realtime_scope.dart';
 import 'routing/customer_router.dart';
 
@@ -38,9 +41,11 @@ class PopqCustomerApp extends StatefulWidget {
     this.storeDiscoveryRepository,
     this.catalogRepository,
     this.announcementRepository,
+    this.platformAnnouncementRepository,
     this.orderRepository,
     this.orderMessageRepository,
     this.engagementRepository,
+    this.supportRepository,
     this.notificationRepository,
     this.locationRepository,
     this.cartController,
@@ -58,9 +63,11 @@ class PopqCustomerApp extends StatefulWidget {
   final StoreDiscoveryRepository? storeDiscoveryRepository;
   final CatalogRepository? catalogRepository;
   final PublicAnnouncementRepository? announcementRepository;
+  final PlatformAnnouncementRepository? platformAnnouncementRepository;
   final CustomerOrderRepository? orderRepository;
   final CustomerOrderMessageRepository? orderMessageRepository;
   final CustomerEngagementRepository? engagementRepository;
+  final CustomerSupportRepository? supportRepository;
   final CustomerNotificationRepository? notificationRepository;
   final CustomerLocationRepository? locationRepository;
   final CartController? cartController;
@@ -84,6 +91,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     with WidgetsBindingObserver {
   final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
       GlobalKey<ScaffoldMessengerState>();
+  final GlobalKey<NavigatorState> _rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+  final ValueNotifier<CustomerActivitySummary?> _activitySummaryNotifier =
+      ValueNotifier<CustomerActivitySummary?>(null);
 
   late final SessionController _sessionController;
   late final OnboardingController _onboardingController;
@@ -91,6 +102,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final PopqApiClient _apiClient;
   late final CustomerNotificationRepository _notificationRepository;
   late final CustomerOrderRepository _orderRepository;
+  late final CustomerEngagementRepository _engagementRepository;
+  late final CustomerSupportRepository _supportRepository;
   late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
@@ -109,8 +122,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
 
   bool _isAppActive = true;
   bool _isRecoveringPendingPayment = false;
+  bool _attendanceDialogScheduled = false;
   String? _pendingPushDeepLink;
   String? _lastPaymentRecoveryNotice;
+
+  bool get _isWebDevelopment =>
+      kIsWeb &&
+          widget.environment.flavor ==
+              AppFlavor.development;
 
   @override
   void initState() {
@@ -139,22 +158,43 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       accessTokenReader: () async {
         return (await _sessionStore.read())?.accessToken;
       },
+      refreshTokenReader: () async {
+        return (await _sessionStore.read())?.refreshToken;
+      },
+      authSessionUpdater: ({
+        required String accessToken,
+        required String refreshToken,
+        required int expiresInSeconds,
+      }) async {
+        await _sessionController.save(
+          AuthSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: DateTime.now().toUtc().add(
+              Duration(seconds: expiresInSeconds),
+            ),
+          ),
+        );
+      },
     );
-
     _realtimeClient = PopqRealtimeClient(
       webSocketUri: widget.environment.realtimeWebSocketUri,
       accessTokenReader: () async {
         return _sessionController.accessToken;
       },
+      accessTokenRefresher: _apiClient.refreshAccessToken,
       enableLogs: widget.environment.enableNetworkLogs,
     );
 
     _sessionController.addListener(_handleSessionChanged);
 
-    _googleAuthService = GoogleAuthService(
-      webClientId:
-          '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
-    );
+
+    if (!_isWebDevelopment) {
+      _googleAuthService = GoogleAuthService(
+        webClientId:
+        '977349461588-b8tqabapb8k86gkok0qd6lem7jjd5r8i.apps.googleusercontent.com',
+      );
+    }
 
     _authRepository =
         widget.authRepository ?? ApiCustomerAuthRepository(_apiClient);
@@ -181,6 +221,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final announcementRepository = widget.announcementRepository ??
         ApiPublicAnnouncementRepository(_apiClient);
 
+    final platformAnnouncementRepository =
+        widget.platformAnnouncementRepository ??
+        ApiPlatformAnnouncementRepository(
+          _apiClient,
+          audience: PlatformAnnouncementAudience.customerApp,
+        );
+
     _orderRepository =
         widget.orderRepository ?? ApiCustomerOrderRepository(_apiClient);
 
@@ -192,12 +239,16 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         widget.orderMessageRepository ??
         ApiCustomerOrderMessageRepository(_apiClient);
 
-    final engagementRepository =
+    _engagementRepository =
         widget.engagementRepository ??
         ApiCustomerEngagementRepository(
           _apiClient,
           imageBaseUrl: widget.environment.apiBaseUrl,
         );
+
+    _supportRepository =
+        widget.supportRepository ??
+            ApiCustomerSupportRepository(_apiClient);
 
     _notificationRepository =
         widget.notificationRepository ??
@@ -219,6 +270,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _router = createCustomerRouter(
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onSendEmailVerificationCode: _sendEmailVerificationCode,
+      onVerifyEmailCode: _verifyEmailCode,
       onFindId: _findId,
       onVerifyForPasswordReset: _verifyForPasswordReset,
       onResetPassword: _resetPassword,
@@ -229,9 +282,12 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       storeDiscoveryRepository: storeDiscoveryRepository,
       catalogRepository: catalogRepository,
       announcementRepository: announcementRepository,
+      platformAnnouncementRepository: platformAnnouncementRepository,
       orderRepository: _orderRepository,
       orderMessageRepository: orderMessageRepository,
-      engagementRepository: engagementRepository,
+      engagementRepository: _engagementRepository,
+      supportRepository: _supportRepository,
+      activitySummaryListenable: _activitySummaryNotifier,
       notificationRepository: _notificationRepository,
       locationRepository: locationRepository,
       cartController: _cartController,
@@ -241,15 +297,22 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       apiBaseUrl: widget.environment.apiBaseUrl,
       tossClientKey: widget.environment.tossClientKey,
       themeController: _themeController,
+      navigatorKey: _rootNavigatorKey,
       onDevelopmentSignIn: widget.environment.flavor == AppFlavor.development
           ? _developmentSignIn
           : null,
-      onGoogleSignIn: _googleSignIn,
-      onKakaoSignIn: _kakaoSignIn,
-      onNaverSignIn: _naverSignIn,
-      onGoogleLink: _googleLink,
-      onKakaoLink: _kakaoLink,
-      onNaverLink: _naverLink,
+      onGoogleSignIn:
+      _isWebDevelopment ? null : _googleSignIn,
+      onKakaoSignIn:
+      _isWebDevelopment ? null : _kakaoSignIn,
+      onNaverSignIn:
+      _isWebDevelopment ? null : _naverSignIn,
+      onGoogleLink:
+      _isWebDevelopment ? null : _googleLink,
+      onKakaoLink:
+      _isWebDevelopment ? null : _kakaoLink,
+      onNaverLink:
+      _isWebDevelopment ? null : _naverLink,
     );
 
     PushNotificationService.setDeepLinkHandler(_handlePushDeepLink);
@@ -301,10 +364,13 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     await _sessionController.save(
       AuthSession(
         accessToken: response['accessToken'] as String,
-        refreshToken: '',
-        expiresAt: DateTime.now().toUtc().add(Duration(seconds: expiresIn)),
+        refreshToken: response['refreshToken'] as String,
+        expiresAt: DateTime.now()
+            .toUtc()
+            .add(Duration(seconds: expiresIn)),
       ),
     );
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _signIn(String email, String password) async {
@@ -314,6 +380,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _signUp({
@@ -321,13 +388,23 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
+      emailVerificationToken: emailVerificationToken,
     );
+  }
+
+  Future<void> _sendEmailVerificationCode(String email) {
+    return _authRepository.sendEmailVerificationCode(email: email);
+  }
+
+  Future<String> _verifyEmailCode(String email, String code) {
+    return _authRepository.verifyEmailCode(email: email, code: code);
   }
 
   Future<String> _findId(String name, String phone) {
@@ -366,6 +443,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _kakaoSignIn() async {
@@ -382,6 +460,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
   }
 
   Future<void> _naverSignIn() async {
@@ -398,6 +477,37 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     );
 
     await _sessionController.save(session);
+    _scheduleAttendanceDialog();
+  }
+
+  void _scheduleAttendanceDialog() {
+    if (_attendanceDialogScheduled) return;
+    _attendanceDialogScheduled = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_sessionController.isSignedIn) {
+        _attendanceDialogScheduled = false;
+        return;
+      }
+
+      final dialogContext = _rootNavigatorKey.currentContext;
+      if (dialogContext == null) {
+        _attendanceDialogScheduled = false;
+        return;
+      }
+
+      unawaited(
+        showCustomerAttendanceDialog(
+          context: dialogContext,
+          repository: _engagementRepository,
+          onSummaryChanged: (summary) {
+            _activitySummaryNotifier.value = summary;
+          },
+        ).whenComplete(() {
+          _attendanceDialogScheduled = false;
+        }),
+      );
+    });
   }
 
   Future<void> _googleLink() async {
@@ -474,17 +584,48 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     });
   }
 
+  Future<void> _syncAppBadge() async {
+    if (!_sessionController.isSignedIn) {
+      await CustomerAppBadgeService.clearBadge();
+      return;
+    }
+
+    try {
+      final unreadCount =
+      await _notificationRepository.badgeCount();
+
+      if (!_sessionController.isSignedIn) {
+        return;
+      }
+
+      await CustomerAppBadgeService.updateBadge(
+        unreadCount,
+      );
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Customer 앱 아이콘 배지 동기화 실패: '
+            '$error',
+      );
+      debugPrintStack(
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   void _handleSessionChanged() {
     if (_sessionController.status == SessionStatus.restoring) {
       return;
     }
 
     if (!_sessionController.isSignedIn) {
+      _activitySummaryNotifier.value = null;
       _realtimeClient.disconnect(clearSubscriptions: true);
+      unawaited(_syncAppBadge());
       return;
     }
 
     unawaited(_registerPushDevice());
+    unawaited(_syncAppBadge());
 
     final pendingPushDeepLink = _pendingPushDeepLink;
 
@@ -622,6 +763,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   Future<void> _registerPushDevice() async {
+    if (kIsWeb &&
+        widget.environment.flavor == AppFlavor.development) {
+      debugPrint(
+        'Customer Web development: FCM 기기 등록을 건너뜁니다.',
+      );
+      return;
+    }
+
     try {
       final messaging = FirebaseMessaging.instance;
 
@@ -678,6 +827,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         if (_sessionController.isSignedIn) {
           unawaited(_realtimeClient.connect());
           unawaited(_recoverPendingPaymentIfNeeded());
+          unawaited(_syncAppBadge());
         }
 
         return;
@@ -708,6 +858,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _homeController.dispose();
     _onboardingController.dispose();
     _sessionController.dispose();
+    _activitySummaryNotifier.dispose();
 
     if (_ownsThemeController) {
       _themeController.dispose();

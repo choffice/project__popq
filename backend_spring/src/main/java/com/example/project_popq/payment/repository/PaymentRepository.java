@@ -45,7 +45,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             """)
     Optional<Payment> findForUpdateByOrderId(@Param("orderId") Long orderId);
 
-    @EntityGraph(attributePaths = {"order", "order.items", "refunds"})
+    @EntityGraph(attributePaths = {"order", "refunds"})
     @Query("""
             select distinct p
             from Payment p
