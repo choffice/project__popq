@@ -50,6 +50,55 @@ class _CustomerPointHistoryScreenState
 
           final summary = snapshot.requireData;
 
+          if (summary.histories.isEmpty) {
+            return RefreshIndicator(
+              onRefresh: () async => _reload(),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      PopqSpacing.lg,
+                      PopqSpacing.lg,
+                      PopqSpacing.lg,
+                      0,
+                    ),
+                    sliver: SliverToBoxAdapter(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _PointBalanceCard(
+                            summary: summary,
+                          ),
+                          const SizedBox(
+                            height: PopqSpacing.lg,
+                          ),
+                          Text(
+                            '포인트 내역',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: PopqEmptyView(
+                      icon: Icons.savings_outlined,
+                      title: '아직 적립된 포인트가 없어요.',
+                      description: 'POPQ에서 주문하면 적립된 포인트가 이곳에 표시됩니다.',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           return RefreshIndicator(
             onRefresh: () async => _reload(),
             child: ListView(
@@ -68,24 +117,21 @@ class _CustomerPointHistoryScreenState
                       .textTheme
                       .titleMedium
                       ?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
                 const SizedBox(
                   height: PopqSpacing.sm,
                 ),
-                if (summary.histories.isEmpty)
-                  const _EmptyPointHistory()
-                else
-                  for (final history in summary.histories)
-                    Padding(
-                      padding: const EdgeInsets.only(
-                        bottom: PopqSpacing.sm,
-                      ),
-                      child: _PointHistoryCard(
-                        history: history,
-                      ),
+                for (final history in summary.histories)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      bottom: PopqSpacing.sm,
                     ),
+                    child: _PointHistoryCard(
+                      history: history,
+                    ),
+                  ),
               ],
             ),
           );
@@ -131,16 +177,16 @@ class _PointBalanceCard extends StatelessWidget {
                   .textTheme
                   .headlineMedium
                   ?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
             const SizedBox(
               height: PopqSpacing.sm,
             ),
             Text(
               '결제 금액의 '
-                  '${summary.rewardRatePercent.toStringAsFixed(1)}%가 '
-                  '포인트로 적립돼요. 소수점은 제외됩니다.',
+              '${summary.rewardRatePercent.toStringAsFixed(1)}%가 '
+              '포인트로 적립돼요. 소수점은 제외됩니다.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -160,9 +206,7 @@ class _PointHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isReward = history.isReward;
-    final isRaffle =
-        history.type == 'RAFFLE_TICKET_PURCHASE';
-
+    final isRaffle = history.type == 'RAFFLE_TICKET_PURCHASE';
     final pointColor = isReward
         ? const Color(0xFF16805B)
         : Theme.of(context).colorScheme.error;
@@ -175,8 +219,9 @@ class _PointHistoryCard extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              backgroundColor:
-              pointColor.withValues(alpha: 0.12),
+              backgroundColor: pointColor.withValues(
+                alpha: 0.12,
+              ),
               foregroundColor: pointColor,
               child: Icon(
                 isReward
@@ -189,8 +234,7 @@ class _PointHistoryCard extends StatelessWidget {
             ),
             Expanded(
               child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     history.storeName,
@@ -200,8 +244,8 @@ class _PointHistoryCard extends StatelessWidget {
                         .textTheme
                         .titleSmall
                         ?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
+                          fontWeight: FontWeight.w700,
+                        ),
                   ),
                   const SizedBox(
                     height: 2,
@@ -210,17 +254,15 @@ class _PointHistoryCard extends StatelessWidget {
                     isReward
                         ? '${_formatNumber(history.paymentAmount)}원 결제 적립'
                         : isRaffle
-                        ? '월간 응모권 구매'
-                        : '${_formatNumber(history.paymentAmount)}원 환불 회수',
-                    style:
-                    Theme.of(context).textTheme.bodySmall,
+                            ? '월간 응모권 구매'
+                            : '${_formatNumber(history.paymentAmount)}원 환불 회수',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
                     _formatDateTime(
                       history.occurredAt,
                     ),
-                    style:
-                    Theme.of(context).textTheme.bodySmall,
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
@@ -230,14 +272,14 @@ class _PointHistoryCard extends StatelessWidget {
             ),
             Text(
               '${history.points > 0 ? '+' : ''}'
-                  '${_formatNumber(history.points)} P',
+              '${_formatNumber(history.points)} P',
               style: Theme.of(context)
                   .textTheme
                   .titleSmall
                   ?.copyWith(
-                color: pointColor,
-                fontWeight: FontWeight.w800,
-              ),
+                    color: pointColor,
+                    fontWeight: FontWeight.w800,
+                  ),
             ),
           ],
         ),
@@ -246,44 +288,13 @@ class _PointHistoryCard extends StatelessWidget {
   }
 }
 
-class _EmptyPointHistory extends StatelessWidget {
-  const _EmptyPointHistory();
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-        vertical: PopqSpacing.xl,
-      ),
-      child: Column(
-        children: [
-          Icon(
-            Icons.savings_outlined,
-            size: 48,
-            color:
-            Theme.of(context).colorScheme.outline,
-          ),
-          const SizedBox(
-            height: PopqSpacing.sm,
-          ),
-          const Text(
-            '아직 적립된 포인트가 없어요.',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 String _formatNumber(int value) {
   final negative = value < 0;
   final digits = value.abs().toString();
-
   final buffer = StringBuffer();
 
   for (var index = 0; index < digits.length; index++) {
-    if (index > 0 &&
-        (digits.length - index) % 3 == 0) {
+    if (index > 0 && (digits.length - index) % 3 == 0) {
       buffer.write(',');
     }
 
@@ -299,18 +310,10 @@ String _formatNumber(int value) {
 
 String _formatDateTime(DateTime value) {
   final local = value.toLocal();
-
-  final month =
-  local.month.toString().padLeft(2, '0');
-
-  final day =
-  local.day.toString().padLeft(2, '0');
-
-  final hour =
-  local.hour.toString().padLeft(2, '0');
-
-  final minute =
-  local.minute.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final day = local.day.toString().padLeft(2, '0');
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
 
   return '${local.year}.$month.$day $hour:$minute';
 }
