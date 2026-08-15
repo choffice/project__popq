@@ -302,6 +302,19 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
                       announcement.status == 'PUBLISHED' ? '숨김' : '게시',
                     ),
                   ),
+                  TextButton.icon(
+                    key: Key(
+                      'delete-announcement-${announcement.announcementId}',
+                    ),
+                    onPressed: updating
+                        ? null
+                        : () => _deleteAnnouncement(announcement),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('삭제'),
+                  ),
                 ],
               ),
             ],
@@ -418,6 +431,70 @@ class _SellerAnnouncementScreenState extends State<SellerAnnouncementScreen> {
     } catch (_) {
       if (!mounted) return;
       _showMessage('공지사항을 저장하지 못했습니다.');
+    }
+  }
+
+  Future<void> _deleteAnnouncement(
+    SellerAnnouncement announcement,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('공지를 삭제할까요?'),
+          content: Text(
+            '「${announcement.title}」 공지를 삭제합니다.\n'
+            '삭제한 공지는 복구할 수 없습니다.',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('취소'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+              ),
+              child: const Text('삭제'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _updatingIds.add(announcement.announcementId));
+
+    try {
+      await widget.repository.delete(
+        widget.storeId,
+        announcement,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _announcements?.removeWhere(
+          (item) => item.announcementId == announcement.announcementId,
+        );
+        _updatingIds.remove(announcement.announcementId);
+      });
+
+      _showMessage('${announcement.title} 공지를 삭제했습니다.');
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _updatingIds.remove(announcement.announcementId));
+      _showMessage('공지사항을 삭제하지 못했습니다.');
     }
   }
 
