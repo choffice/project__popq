@@ -102,6 +102,11 @@ class CustomerOrderApiIntegrationTests {
                 .andExpect(jsonPath("$.data.status").value("PAID"))
                 .andExpect(jsonPath("$.data.orderStatus").value("PLACED"));
 
+        mockMvc.perform(get("/api/v1/customer/points")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.balance").value(0));
+
         mockMvc.perform(get("/api/v1/customer/orders")
                         .header("Authorization", "Bearer " + customerToken))
                 .andExpect(status().isOk())
@@ -128,6 +133,38 @@ class CustomerOrderApiIntegrationTests {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.refreshRequired").value(true))
                 .andExpect(jsonPath("$.data.order.status").value("PREPARING"));
+
+        mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/orders/{orderId}/ready",
+                        storeId,
+                        orderPublicId
+                )
+                        .header("Authorization", "Bearer " + sellerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("READY"));
+
+        mockMvc.perform(get("/api/v1/customer/points")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.balance").value(0));
+
+        mockMvc.perform(post(
+                        "/api/v1/seller/stores/{storeId}/orders/{orderId}/complete",
+                        storeId,
+                        orderPublicId
+                )
+                        .header("Authorization", "Bearer " + sellerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("COMPLETED"));
+
+        mockMvc.perform(get("/api/v1/customer/points")
+                        .header("Authorization", "Bearer " + customerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.balance").value(275));
     }
 
     @Test
