@@ -4,6 +4,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../routing/customer_router.dart';
 import '../cart/cart_controller.dart';
+import '../common/customer_count_badge.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../discovery/store_section_widgets.dart';
 import 'catalog_repository.dart';
@@ -49,11 +50,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         leading: const StoreBackButton(),
         title: const Text('상품 선택'),
         actions: [
-          IconButton(
-            tooltip: '장바구니',
-            onPressed: () => context.push(CustomerRoutes.cart),
-            icon: const Icon(Icons.shopping_bag_outlined),
-          ),
+          _CartButton(cartController: widget.cartController),
         ],
       ),
       body: FutureBuilder<CatalogProduct>(
@@ -417,6 +414,61 @@ class _StoreStatusError extends StatelessWidget {
             TextButton(onPressed: onRetry, child: const Text('다시 확인')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CartButton extends StatefulWidget {
+  const _CartButton({required this.cartController});
+
+  final CartController cartController;
+
+  @override
+  State<_CartButton> createState() => _CartButtonState();
+}
+
+class _CartButtonState extends State<_CartButton> {
+  @override
+  void initState() {
+    super.initState();
+    widget.cartController.addListener(_changed);
+  }
+
+  @override
+  void didUpdateWidget(covariant _CartButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (identical(oldWidget.cartController, widget.cartController)) {
+      return;
+    }
+
+    oldWidget.cartController.removeListener(_changed);
+    widget.cartController.addListener(_changed);
+  }
+
+  @override
+  void dispose() {
+    widget.cartController.removeListener(_changed);
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final itemCount = widget.cartController.itemCount;
+
+    return CustomerCountBadge(
+      count: itemCount,
+      child: IconButton(
+        tooltip: '장바구니',
+        onPressed: () => context.push(CustomerRoutes.cart),
+        icon: const Icon(Icons.shopping_bag_outlined),
       ),
     );
   }

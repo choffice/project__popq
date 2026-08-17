@@ -52,12 +52,12 @@ public class AnnouncementService {
         Store store = storeRepository.findById(storeId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.STORE_NOT_FOUND));
         Announcement announcement = announcementRepository.save(
-            Announcement.create(
-                store,
-                request.title().trim(),
-                request.content().trim(),
-                normalizeImageUrl(request.imageUrl())
-            )
+                Announcement.create(
+                        store,
+                        request.title().trim(),
+                        request.content().trim(),
+                        normalizeImageUrl(request.imageUrl())
+                )
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -73,9 +73,9 @@ public class AnnouncementService {
         requireManager(user, storeId);
         Announcement announcement = findOneForUpdate(storeId, announcementId);
         announcement.update(
-            request.title().trim(),
-            request.content().trim(),
-            normalizeImageUrl(request.imageUrl())
+                request.title().trim(),
+                request.content().trim(),
+                normalizeImageUrl(request.imageUrl())
         );
         publishAndNotifyIfRequested(announcement, request);
         return AnnouncementResponse.from(announcement);
@@ -129,6 +129,17 @@ public class AnnouncementService {
         return AnnouncementResponse.from(announcement);
     }
 
+    @Transactional
+    public void delete(
+            User user,
+            Long storeId,
+            Long announcementId
+    ) {
+        requireManager(user, storeId);
+        Announcement announcement = findOneForUpdate(storeId, announcementId);
+        announcementRepository.delete(announcement);
+    }
+
     private Announcement findOneForUpdate(Long storeId, Long announcementId) {
         return announcementRepository
                 .findForUpdateByIdAndStoreId(announcementId, storeId)
@@ -167,7 +178,7 @@ public class AnnouncementService {
     }
 
     private String normalizeImageUrl(
-        String imageUrl
+            String imageUrl
     ) {
         if (imageUrl == null) {
             return null;
@@ -176,8 +187,8 @@ public class AnnouncementService {
         String normalized = imageUrl.trim();
 
         return normalized.isEmpty()
-            ? null
-            : normalized;
+                ? null
+                : normalized;
     }
 
     private void requireManager(User user, Long storeId) {

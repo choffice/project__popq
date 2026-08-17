@@ -66,7 +66,7 @@ class SellerSupportMessage {
   final DateTime? readAt;
 
   bool get sentBySeller {
-    return senderType == SellerSupportSenderType.seller;
+    return senderType == SellerSupportSenderType.requester;
   }
 
   bool get sentByAdmin {

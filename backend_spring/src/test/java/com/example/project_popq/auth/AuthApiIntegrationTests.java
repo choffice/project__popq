@@ -1,5 +1,6 @@
 package com.example.project_popq.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -8,12 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.jayway.jsonpath.JsonPath;
 import com.example.project_popq.store.domain.StoreMember;
 import com.example.project_popq.store.domain.StoreRole;
 import com.example.project_popq.store.repository.StoreMemberRepository;
 import com.example.project_popq.store.repository.StoreRepository;
+import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.repository.UserRepository;
+import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -99,96 +101,246 @@ class AuthApiIntegrationTests {
     @Test
     void ownerCanUpdateStoreDetailAndOtherSellerCannotAccessIt()
             throws Exception {
+
         String ownerToken = login(
                 "store-detail-owner@popq.test",
                 "사업장 소유자",
                 "SELLER"
         );
-        Long storeId = createStore(ownerToken, "수정 전 사업장");
 
-        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "storeType": "EVENT_COMMERCE",
-                                  "name": "수정된 성수 사업장",
-                                  "description": "운영정보 수정 완료",
-                                  "address": "서울 성동구 연무장길 1",
-                                  "latitude": 37.5445000,
-                                  "longitude": 127.0560000,
-                                  "tags": ["Coffee", "Dessert", "coffee"]
-                                }
-                                """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
-                .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
-                .andExpect(jsonPath("$.data.address")
-                        .value("서울 성동구 연무장길 1"))
-                .andExpect(jsonPath("$.data.latitude").value(37.5445))
-                .andExpect(jsonPath("$.data.longitude").value(127.056))
-                .andExpect(jsonPath("$.data.tags.length()").value(2))
-                .andExpect(jsonPath("$.data.tags[0]").value("coffee"))
-                .andExpect(jsonPath("$.data.tags[1]").value("dessert"))
-                .andExpect(jsonPath("$.data.myRole").value("OWNER"));
+        Long storeId = createStore(
+                ownerToken,
+                "수정 전 사업장"
+        );
 
-        mockMvc.perform(get("/api/v1/seller/stores/{storeId}", storeId)
-                        .header("Authorization", "Bearer " + ownerToken))
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "storeType": "EVENT_COMMERCE",
+                                          "eventName": "성수 POPQ 페스타",
+                                          "name": "수정된 성수 사업장",
+                                          "description": "운영정보 수정 완료",
+                                          "address": "서울 성동구 연무장길 1",
+                                          "latitude": 37.5445000,
+                                          "longitude": 127.0560000,
+                                          "operationStartDate": "2099-08-15",
+                                          "operationEndDate": "2099-08-31",
+                                          "tags": [
+                                            "Coffee",
+                                            "Dessert",
+                                            "coffee"
+                                          ]
+                                        }
+                                        """)
+                )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
-                .andExpect(jsonPath("$.data.name").value("수정된 성수 사업장"))
-                .andExpect(jsonPath("$.data.tags.length()").value(2));
+                .andExpect(
+                        jsonPath("$.data.storeType")
+                                .value("EVENT_COMMERCE")
+                )
+                .andExpect(
+                        jsonPath("$.data.eventName")
+                                .value("성수 POPQ 페스타")
+                )
+                .andExpect(
+                        jsonPath("$.data.operationStartDate")
+                                .value("2099-08-15")
+                )
+                .andExpect(
+                        jsonPath("$.data.operationEndDate")
+                                .value("2099-08-31")
+                )
+                .andExpect(
+                        jsonPath("$.data.name")
+                                .value("수정된 성수 사업장")
+                )
+                .andExpect(
+                        jsonPath("$.data.address")
+                                .value("서울 성동구 연무장길 1")
+                )
+                .andExpect(
+                        jsonPath("$.data.latitude")
+                                .value(37.5445)
+                )
+                .andExpect(
+                        jsonPath("$.data.longitude")
+                                .value(127.056)
+                )
+                .andExpect(
+                        jsonPath("$.data.tags.length()")
+                                .value(2)
+                )
+                .andExpect(
+                        jsonPath("$.data.tags[0]")
+                                .value("coffee")
+                )
+                .andExpect(
+                        jsonPath("$.data.tags[1]")
+                                .value("dessert")
+                )
+                .andExpect(
+                        jsonPath("$.data.myRole")
+                                .value("OWNER")
+                );
 
-        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "name": "유형 유지 사업장",
-                                  "tags": ["coffee", "dessert"]
-                                }
-                                """))
+        mockMvc.perform(
+                        get(
+                                "/api/v1/seller/stores/{storeId}",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.storeType").value("EVENT_COMMERCE"))
-                .andExpect(jsonPath("$.data.name").value("유형 유지 사업장"));
+                .andExpect(
+                        jsonPath("$.data.storeType")
+                                .value("EVENT_COMMERCE")
+                )
+                .andExpect(
+                        jsonPath("$.data.eventName")
+                                .value("성수 POPQ 페스타")
+                )
+                .andExpect(
+                        jsonPath("$.data.operationStartDate")
+                                .value("2099-08-15")
+                )
+                .andExpect(
+                        jsonPath("$.data.operationEndDate")
+                                .value("2099-08-31")
+                )
+                .andExpect(
+                        jsonPath("$.data.name")
+                                .value("수정된 성수 사업장")
+                )
+                .andExpect(
+                        jsonPath("$.data.tags.length()")
+                                .value(2)
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "name": "유형 유지 사업장",
+                                          "tags": [
+                                            "coffee",
+                                            "dessert"
+                                          ]
+                                        }
+                                        """)
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.data.storeType")
+                                .value("EVENT_COMMERCE")
+                )
+                .andExpect(
+                        jsonPath("$.data.eventName")
+                                .value("성수 POPQ 페스타")
+                )
+                .andExpect(
+                        jsonPath("$.data.name")
+                                .value("유형 유지 사업장")
+                );
 
         String otherToken = login(
                 "store-detail-other@popq.test",
                 "다른 판매자",
                 "SELLER"
         );
-        mockMvc.perform(get("/api/v1/seller/stores/{storeId}", storeId)
-                        .header("Authorization", "Bearer " + otherToken))
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/seller/stores/{storeId}",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + otherToken
+                                )
+                )
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code")
-                        .value("STORE_ACCESS_DENIED"));
-        mockMvc.perform(patch("/api/v1/seller/stores/{storeId}", storeId)
-                        .header("Authorization", "Bearer " + otherToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "name": "침범 시도",
-                                  "tags": []
-                                }
-                                """))
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("STORE_ACCESS_DENIED")
+                );
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + otherToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "name": "침범 시도",
+                                          "tags": []
+                                        }
+                                        """)
+                )
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code")
-                        .value("STORE_ACCESS_DENIED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("STORE_ACCESS_DENIED")
+                );
     }
 
     @Test
-    void ownerCanUpdateCategoryAndProductInsideOwnStore() throws Exception {
+    void ownerCanUpdateCategoryAndProductInsideOwnStore()
+            throws Exception {
+
         String ownerToken = login(
                 "catalog-editor@popq.test",
                 "Catalog Editor",
                 "SELLER"
         );
-        Long storeId = createStore(ownerToken, "Catalog Store");
+
+        Long storeId = createStore(
+                ownerToken,
+                "Catalog Store"
+        );
 
         String categoryResponse = mockMvc.perform(
-                        post("/api/v1/seller/stores/{storeId}/categories", storeId)
-                                .header("Authorization", "Bearer " + ownerToken)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        post(
+                                "/api/v1/seller/stores/{storeId}/categories",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content("""
                                         {
                                           "name": "Coffee",
@@ -200,15 +352,24 @@ class AuthApiIntegrationTests {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+
         Long categoryId = ((Number) JsonPath.read(
                 categoryResponse,
                 "$.data.categoryId"
         )).longValue();
 
         String productResponse = mockMvc.perform(
-                        post("/api/v1/seller/stores/{storeId}/products", storeId)
-                                .header("Authorization", "Bearer " + ownerToken)
-                                .contentType(MediaType.APPLICATION_JSON)
+                        post(
+                                "/api/v1/seller/stores/{storeId}/products",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
                                 .content("""
                                         {
                                           "categoryId": %d,
@@ -223,350 +384,611 @@ class AuthApiIntegrationTests {
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+
         Long productId = ((Number) JsonPath.read(
                 productResponse,
                 "$.data.product.productId"
         )).longValue();
 
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/categories/{categoryId}",
-                        storeId,
-                        categoryId
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/categories/{categoryId}",
+                                storeId,
+                                categoryId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "name": "Signature Coffee",
+                                          "displayOrder": 2
+                                        }
+                                        """)
                 )
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "name": "Signature Coffee",
-                                  "displayOrder": 2
-                                }
-                                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.name").value("Signature Coffee"))
-                .andExpect(jsonPath("$.data.displayOrder").value(2));
+                .andExpect(
+                        jsonPath("$.data.name")
+                                .value("Signature Coffee")
+                )
+                .andExpect(
+                        jsonPath("$.data.displayOrder")
+                                .value(2)
+                );
 
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/products/{productId}",
-                        storeId,
-                        productId
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/products/{productId}",
+                                storeId,
+                                productId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "categoryId": %d,
+                                          "name": "Cream Americano",
+                                          "description": "Updated",
+                                          "imageUrl": "https://example.test/menu.jpg",
+                                          "basePrice": 6000
+                                        }
+                                        """.formatted(categoryId))
                 )
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "categoryId": %d,
-                                  "name": "Cream Americano",
-                                  "description": "Updated",
-                                  "imageUrl": "https://example.test/menu.jpg",
-                                  "basePrice": 6000
-                                }
-                                """.formatted(categoryId)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.product.name")
-                        .value("Cream Americano"))
-                .andExpect(jsonPath("$.data.product.categoryName")
-                        .value("Signature Coffee"))
-                .andExpect(jsonPath("$.data.product.basePrice").value(6000));
+                .andExpect(
+                        jsonPath("$.data.product.name")
+                                .value("Cream Americano")
+                )
+                .andExpect(
+                        jsonPath("$.data.product.categoryName")
+                                .value("Signature Coffee")
+                )
+                .andExpect(
+                        jsonPath("$.data.product.basePrice")
+                                .value(6000)
+                );
 
         String otherToken = login(
                 "catalog-intruder@popq.test",
                 "Catalog Intruder",
                 "SELLER"
         );
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/products/{productId}",
-                        storeId,
-                        productId
+
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/products/{productId}",
+                                storeId,
+                                productId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + otherToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "categoryId": %d,
+                                          "name": "Intrusion",
+                                          "basePrice": 0
+                                        }
+                                        """.formatted(categoryId))
                 )
-                        .header("Authorization", "Bearer " + otherToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "categoryId": %d,
-                                  "name": "Intrusion",
-                                  "basePrice": 0
-                                }
-                                """.formatted(categoryId)))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code")
-                        .value("STORE_ACCESS_DENIED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("STORE_ACCESS_DENIED")
+                );
     }
 
     @Test
-    void ownerManagesAnnouncementsWhileStaffCanOnlyRead() throws Exception {
+    void ownerManagesAnnouncementsWhileStaffCanOnlyRead()
+            throws Exception {
+
         String ownerToken = login(
                 "announcement-owner@popq.test",
                 "Announcement Owner",
                 "SELLER"
         );
-        Long storeId = createStore(ownerToken, "Announcement Store");
 
-        String createResponse = mockMvc.perform(post(
-                        "/api/v1/seller/stores/{storeId}/announcements",
-                        storeId
+        Long storeId = createStore(
+                ownerToken,
+                "Announcement Store"
+        );
+
+        String createResponse = mockMvc.perform(
+                        post(
+                                "/api/v1/seller/stores/{storeId}/announcements",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "title": "Holiday hours",
+                                          "content": "We close at 6 PM.",
+                                          "imageUrl": null,
+                                          "notifyInterestedCustomers": false
+                                        }
+                                        """)
                 )
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "title": "Holiday hours",
-                                  "content": "We close at 6 PM."
-                                }
-                                """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(
+                        jsonPath("$.data.status")
+                                .value("DRAFT")
+                )
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+
         Long announcementId = ((Number) JsonPath.read(
                 createResponse,
                 "$.data.announcementId"
         )).longValue();
 
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}",
-                        storeId,
-                        announcementId
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/announcements/{announcementId}",
+                                storeId,
+                                announcementId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "title": "Updated holiday hours",
+                                          "content": "We close at 5 PM.",
+                                          "imageUrl": null,
+                                          "notifyInterestedCustomers": false
+                                        }
+                                        """)
                 )
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "title": "Updated holiday hours",
-                                  "content": "We close at 5 PM."
-                                }
-                                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.title")
-                        .value("Updated holiday hours"));
+                .andExpect(
+                        jsonPath("$.data.title")
+                                .value("Updated holiday hours")
+                );
 
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
-                        storeId,
-                        announcementId
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
+                                storeId,
+                                announcementId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + ownerToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "status": "PUBLISHED"
+                                        }
+                                        """)
                 )
-                        .header("Authorization", "Bearer " + ownerToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "status": "PUBLISHED"
-                                }
-                                """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
-                .andExpect(jsonPath("$.data.publishedAt").isNotEmpty());
+                .andExpect(
+                        jsonPath("$.data.status")
+                                .value("PUBLISHED")
+                )
+                .andExpect(
+                        jsonPath("$.data.publishedAt")
+                                .isNotEmpty()
+                );
 
-        String staffEmail = "announcement-staff@popq.test";
+        String staffEmail =
+                "announcement-staff@popq.test";
+
         String staffToken = login(
                 staffEmail,
                 "Announcement Staff",
                 "SELLER"
         );
+
         storeMemberRepository.save(
                 StoreMember.create(
-                        storeRepository.findById(storeId).orElseThrow(),
-                        userRepository.findByEmailIgnoreCase(staffEmail)
+                        storeRepository
+                                .findById(storeId)
+                                .orElseThrow(),
+                        userRepository
+                                .findByEmailIgnoreCase(staffEmail)
                                 .orElseThrow(),
                         StoreRole.STAFF
                 )
         );
 
-        mockMvc.perform(get(
-                        "/api/v1/seller/stores/{storeId}/announcements",
-                        storeId
+        mockMvc.perform(
+                        get(
+                                "/api/v1/seller/stores/{storeId}/announcements",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + staffToken
+                                )
                 )
-                        .header("Authorization", "Bearer " + staffToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"));
+                .andExpect(
+                        jsonPath("$.data[0].status")
+                                .value("PUBLISHED")
+                );
 
-        mockMvc.perform(patch(
-                        "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
-                        storeId,
-                        announcementId
+        mockMvc.perform(
+                        patch(
+                                "/api/v1/seller/stores/{storeId}/announcements/{announcementId}/status",
+                                storeId,
+                                announcementId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + staffToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "status": "HIDDEN"
+                                        }
+                                        """)
                 )
-                        .header("Authorization", "Bearer " + staffToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "status": "HIDDEN"
-                                }
-                                """))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code")
-                        .value("STORE_ACCESS_DENIED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("STORE_ACCESS_DENIED")
+                );
 
         String otherToken = login(
                 "announcement-other@popq.test",
                 "Announcement Other",
                 "SELLER"
         );
-        mockMvc.perform(get(
-                        "/api/v1/seller/stores/{storeId}/announcements",
-                        storeId
+
+        mockMvc.perform(
+                        get(
+                                "/api/v1/seller/stores/{storeId}/announcements",
+                                storeId
+                        )
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + otherToken
+                                )
                 )
-                        .header("Authorization", "Bearer " + otherToken))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error.code")
-                        .value("STORE_ACCESS_DENIED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("STORE_ACCESS_DENIED")
+                );
     }
 
     @Test
-    void sameEmailCannotSwitchBetweenSellerAndCustomerRoles()
+    void sameEmailCanUseSellerAndCustomerRoles()
             throws Exception {
-        String accessToken = login(
-                "role-boundary@popq.test",
+
+        String email = "role-boundary@popq.test";
+
+        String sellerToken = login(
+                email,
                 "역할 경계 판매자",
                 "SELLER"
         );
 
-        mockMvc.perform(post("/api/v1/dev/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "ROLE-BOUNDARY@POPQ.TEST",
-                                  "name": "역할 변경 시도",
-                                  "role": "CUSTOMER"
-                                }
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("DUPLICATE_USER"));
+        String customerToken = login(
+                "ROLE-BOUNDARY@POPQ.TEST",
+                "역할 추가 고객",
+                "CUSTOMER"
+        );
 
-        mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + accessToken))
+        mockMvc.perform(
+                        get("/api/v1/auth/me")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + sellerToken
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.email")
-                        .value("role-boundary@popq.test"))
-                .andExpect(jsonPath("$.data.role").value("SELLER"));
+                .andExpect(
+                        jsonPath("$.data.email")
+                                .value(email)
+                )
+                .andExpect(
+                        jsonPath("$.data.role")
+                                .value("SELLER")
+                );
+
+        mockMvc.perform(
+                        get("/api/v1/auth/me")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + customerToken
+                                )
+                )
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.data.email")
+                                .value(email)
+                )
+                .andExpect(
+                        jsonPath("$.data.role")
+                                .value("CUSTOMER")
+                );
+
+        var user = userRepository
+                .findByEmailIgnoreCase(email)
+                .orElseThrow();
+
+        assertThat(
+                user.hasRole(
+                        PlatformRole.SELLER
+                )
+        ).isTrue();
+
+        assertThat(
+                user.hasRole(
+                        PlatformRole.CUSTOMER
+                )
+        ).isTrue();
     }
 
     @Test
     void devLoginRejectsAdminRole() throws Exception {
-        mockMvc.perform(post("/api/v1/dev/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "admin-api@popq.test",
-                                  "name": "관리자 테스트",
-                                  "role": "ADMIN"
-                                }
-                                """))
+        mockMvc.perform(
+                        post("/api/v1/dev/auth/login")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "email": "admin-api@popq.test",
+                                          "name": "관리자 테스트",
+                                          "role": "ADMIN"
+                                        }
+                                        """)
+                )
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("INVALID_DEV_ROLE"));
+                .andExpect(
+                        jsonPath("$.success")
+                                .value(false)
+                )
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_DEV_ROLE")
+                );
     }
 
     @Test
-    void configuredWebOriginsCanUseCredentialedCors() throws Exception {
-        mockMvc.perform(options("/api/v1/qr/stores/1/products")
-                        .header("Origin", "http://localhost:5174")
-                        .header("Access-Control-Request-Method", "GET")
-                        .header(
-                                "Access-Control-Request-Headers",
-                                "Authorization,Content-Type"
-                        ))
+    void configuredWebOriginsCanUseCredentialedCors()
+            throws Exception {
+
+        mockMvc.perform(
+                        options("/api/v1/qr/stores/1/products")
+                                .header(
+                                        "Origin",
+                                        "http://localhost:5174"
+                                )
+                                .header(
+                                        "Access-Control-Request-Method",
+                                        "GET"
+                                )
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "Authorization,Content-Type"
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(header().string(
-                        "Access-Control-Allow-Origin",
-                        "http://localhost:5174"
-                ))
-                .andExpect(header().string(
-                        "Access-Control-Allow-Credentials",
-                        "true"
-                ));
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Origin",
+                                "http://localhost:5174"
+                        )
+                )
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Credentials",
+                                "true"
+                        )
+                );
     }
 
     @Test
-    void androidEmulatorQrOriginCanUseCredentialedCors() throws Exception {
-        mockMvc.perform(options("/api/v1/qr/qr-token/sessions")
-                        .header("Origin", "http://10.0.2.2:5173")
-                        .header("Access-Control-Request-Method", "POST")
-                        .header(
-                                "Access-Control-Request-Headers",
-                                "Content-Type"
-                        ))
+    void androidEmulatorQrOriginCanUseCredentialedCors()
+            throws Exception {
+
+        mockMvc.perform(
+                        options("/api/v1/qr/qr-token/sessions")
+                                .header(
+                                        "Origin",
+                                        "http://10.0.2.2:5173"
+                                )
+                                .header(
+                                        "Access-Control-Request-Method",
+                                        "POST"
+                                )
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "Content-Type"
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(header().string(
-                        "Access-Control-Allow-Origin",
-                        "http://10.0.2.2:5173"
-                ))
-                .andExpect(header().string(
-                        "Access-Control-Allow-Credentials",
-                        "true"
-                ));
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Origin",
+                                "http://10.0.2.2:5173"
+                        )
+                )
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Credentials",
+                                "true"
+                        )
+                );
     }
 
     @Test
-    void configuredQrPublicOriginIsAlwaysAllowedByCors() throws Exception {
-        mockMvc.perform(options("/api/v1/qr/qr-token/sessions")
-                        .header("Origin", "https://order.popq.test")
-                        .header("Access-Control-Request-Method", "POST")
-                        .header(
-                                "Access-Control-Request-Headers",
-                                "Content-Type"
-                        ))
+    void configuredQrPublicOriginIsAlwaysAllowedByCors()
+            throws Exception {
+
+        mockMvc.perform(
+                        options("/api/v1/qr/qr-token/sessions")
+                                .header(
+                                        "Origin",
+                                        "https://order.popq.test"
+                                )
+                                .header(
+                                        "Access-Control-Request-Method",
+                                        "POST"
+                                )
+                                .header(
+                                        "Access-Control-Request-Headers",
+                                        "Content-Type"
+                                )
+                )
                 .andExpect(status().isOk())
-                .andExpect(header().string(
-                        "Access-Control-Allow-Origin",
-                        "https://order.popq.test"
-                ))
-                .andExpect(header().string(
-                        "Access-Control-Allow-Credentials",
-                        "true"
-                ));
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Origin",
+                                "https://order.popq.test"
+                        )
+                )
+                .andExpect(
+                        header().string(
+                                "Access-Control-Allow-Credentials",
+                                "true"
+                        )
+                );
     }
 
     @Test
-    void unknownWebOriginIsRejected() throws Exception {
-        mockMvc.perform(options("/api/v1/qr/stores/1/products")
-                        .header("Origin", "https://malicious.example")
-                        .header("Access-Control-Request-Method", "GET"))
+    void unknownWebOriginIsRejected()
+            throws Exception {
+
+        mockMvc.perform(
+                        options("/api/v1/qr/stores/1/products")
+                                .header(
+                                        "Origin",
+                                        "https://malicious.example"
+                                )
+                                .header(
+                                        "Access-Control-Request-Method",
+                                        "GET"
+                                )
+                )
                 .andExpect(status().isForbidden())
-                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+                .andExpect(
+                        header().doesNotExist(
+                                "Access-Control-Allow-Origin"
+                        )
+                );
     }
 
     @Test
-    void healthEndpointIsPublic() throws Exception {
-        mockMvc.perform(get("/actuator/health"))
+    void healthEndpointIsPublic()
+            throws Exception {
+
+        mockMvc.perform(
+                        get("/actuator/health")
+                )
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("UP"));
+                .andExpect(
+                        jsonPath("$.status")
+                                .value("UP")
+                );
     }
 
-    private String login(String email, String name, String role) throws Exception {
-        String response = mockMvc.perform(post("/api/v1/dev/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "email": "%s",
-                                  "name": "%s",
-                                  "role": "%s"
-                                }
-                                """.formatted(email, name, role)))
+    private String login(
+            String email,
+            String name,
+            String role
+    ) throws Exception {
+
+        String response = mockMvc.perform(
+                        post("/api/v1/dev/auth/login")
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "email": "%s",
+                                          "name": "%s",
+                                          "role": "%s"
+                                        }
+                                        """.formatted(
+                                        email,
+                                        name,
+                                        role
+                                ))
+                )
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(
+                        jsonPath("$.success")
+                                .value(true)
+                )
+                .andExpect(
+                        jsonPath("$.data.tokenType")
+                                .value("Bearer")
+                )
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
 
-        return JsonPath.read(response, "$.data.accessToken");
+        return JsonPath.read(
+                response,
+                "$.data.accessToken"
+        );
     }
 
-    private Long createStore(String accessToken, String name) throws Exception {
-        String response = mockMvc.perform(post("/api/v1/seller/stores")
-                        .header("Authorization", "Bearer " + accessToken)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "storeType": "LOCAL_STORE",
-                                  "name": "%s",
-                                  "tags": ["initial"]
-                                }
-                                """.formatted(name)))
+    private Long createStore(
+            String accessToken,
+            String name
+    ) throws Exception {
+
+        String response = mockMvc.perform(
+                        post("/api/v1/seller/stores")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + accessToken
+                                )
+                                .contentType(
+                                        MediaType.APPLICATION_JSON
+                                )
+                                .content("""
+                                        {
+                                          "storeType": "LOCAL_STORE",
+                                          "name": "%s",
+                                          "tags": ["initial"]
+                                        }
+                                        """.formatted(name))
+                )
                 .andExpect(status().isCreated())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
-        return ((Number) JsonPath.read(response, "$.data.storeId")).longValue();
+
+        return ((Number) JsonPath.read(
+                response,
+                "$.data.storeId"
+        )).longValue();
     }
 }

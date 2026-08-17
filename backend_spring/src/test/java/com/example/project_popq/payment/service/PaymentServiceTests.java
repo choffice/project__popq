@@ -25,7 +25,6 @@ import com.example.project_popq.payment.repository.PaymentRepository;
 import com.example.project_popq.qr.service.GuestQrService;
 import com.example.project_popq.qr.service.GuestQrService.ResolvedGuestSession;
 import com.example.project_popq.realtime.event.OrderDomainEventPublisher;
-import com.example.project_popq.point.service.CustomerPointService;
 import com.example.project_popq.store.domain.Store;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -43,149 +42,142 @@ class PaymentServiceTests {
 
         PaymentProvider paymentProvider = mock(PaymentProvider.class);
         PaymentProviderRegistry paymentProviderRegistry =
-            mock(PaymentProviderRegistry.class);
+                mock(PaymentProviderRegistry.class);
 
         OrderDomainEventPublisher eventPublisher = mock(
-            OrderDomainEventPublisher.class
+                OrderDomainEventPublisher.class
         );
-        CustomerPointService customerPointService = mock(
-            CustomerPointService.class
-        );
-
         Payment payment = mock(Payment.class);
         Order order = mock(Order.class);
         Store store = mock(Store.class);
 
         AtomicReference<PaymentStatus> status = new AtomicReference<>(
-            PaymentStatus.IN_PROGRESS
+                PaymentStatus.IN_PROGRESS
         );
 
         when(guestQrService.resolve("guest-session"))
-            .thenReturn(
-                new ResolvedGuestSession(
-                    7L,
-                    1L,
-                    null
-                )
-            );
+                .thenReturn(
+                        new ResolvedGuestSession(
+                                7L,
+                                1L,
+                                null
+                        )
+                );
 
         when(
-            paymentRepository.findForUpdateByIdempotencyKey(
-                "payment-key"
-            )
+                paymentRepository.findForUpdateByIdempotencyKey(
+                        "payment-key"
+                )
         ).thenReturn(Optional.of(payment));
 
         when(payment.getStatus())
-            .thenAnswer(ignored -> status.get());
+                .thenAnswer(ignored -> status.get());
 
         when(payment.getOrder())
-            .thenReturn(order);
+                .thenReturn(order);
 
         when(payment.getProvider())
-            .thenReturn(PaymentProviderType.TOSS_PAYMENTS);
+                .thenReturn(PaymentProviderType.TOSS_PAYMENTS);
 
         when(payment.getProviderPaymentKey())
-            .thenReturn("toss-client-payment-key");
+                .thenReturn("toss-client-payment-key");
 
         when(order.getOrderPublicId())
-            .thenReturn("order-123456");
+                .thenReturn("order-123456");
 
         when(order.getTotalAmount())
-            .thenReturn(6800L);
+                .thenReturn(6800L);
 
         when(order.getStatus())
-            .thenReturn(OrderStatus.CREATED);
+                .thenReturn(OrderStatus.CREATED);
 
         when(order.getStore())
-            .thenReturn(store);
+                .thenReturn(store);
 
         when(store.isOrderAccepting()).thenReturn(true);
 
         when(
-            order.transitionTo(
-                any(),
-                any(),
-                any(),
-                any(),
-                any()
-            )
+                order.transitionTo(
+                        any(),
+                        any(),
+                        any(),
+                        any(),
+                        any()
+                )
         ).thenReturn(mock(OrderTransition.class));
 
         when(
-            paymentProviderRegistry.get(
-                PaymentProviderType.TOSS_PAYMENTS
-            )
+                paymentProviderRegistry.get(
+                        PaymentProviderType.TOSS_PAYMENTS
+                )
         ).thenReturn(paymentProvider);
 
         when(
-            paymentProvider.approve(any())
+                paymentProvider.approve(any())
         ).thenReturn(
-            PaymentApprovalResult.success(
-                "toss-client-payment-key",
-                6800
-            )
+                PaymentApprovalResult.success(
+                        "toss-client-payment-key",
+                        6800
+                )
         );
 
         org.mockito.Mockito.doAnswer(invocation -> {
             status.set(PaymentStatus.PAID);
             return null;
         }).when(payment).markPaid(
-            any(Long.class),
-            any(),
-            any()
+                any(Long.class),
+                any(),
+                any()
         );
 
         PaymentService service = new PaymentService(
-            guestQrService,
-            guestOrderService,
-            orderRepository,
-            paymentRepository,
-            paymentProviderRegistry,
-            eventPublisher,
-            new PaymentProperties(
-                PaymentProviderType.TOSS_PAYMENTS
-            ),
-            customerPointService
+                guestQrService,
+                guestOrderService,
+                orderRepository,
+                paymentRepository,
+                paymentProviderRegistry,
+                eventPublisher,
+                new PaymentProperties(
+                        PaymentProviderType.TOSS_PAYMENTS
+                )
         );
 
         service.confirm(
-            "guest-session",
-            "order-123456",
-            new ConfirmPaymentRequest(
-                "payment-key",
-                false,
-                "toss-client-payment-key"
-            )
+                "guest-session",
+                "order-123456",
+                new ConfirmPaymentRequest(
+                        "payment-key",
+                        false,
+                        "toss-client-payment-key"
+                )
         );
 
         ArgumentCaptor<PaymentApprovalCommand> command =
-            ArgumentCaptor.forClass(
-                PaymentApprovalCommand.class
-            );
+                ArgumentCaptor.forClass(
+                        PaymentApprovalCommand.class
+                );
 
         verify(paymentProvider)
-            .approve(command.capture());
-
-        verify(customerPointService).rewardPayment(eq(payment), any());
+                .approve(command.capture());
 
         assertThat(
-            command.getValue().idempotencyKey()
+                command.getValue().idempotencyKey()
         ).isEqualTo("payment-key");
 
         assertThat(
-            command.getValue().paymentKey()
+                command.getValue().paymentKey()
         ).isEqualTo("toss-client-payment-key");
 
         verify(payment).markPaid(
-            eq(6800L),
-            eq("toss-client-payment-key"),
-            any()
+                eq(6800L),
+                eq("toss-client-payment-key"),
+                any()
         );
 
         verify(guestOrderService)
-            .requireGuestOwnership(
-                order,
-                7L
-            );
+                .requireGuestOwnership(
+                        order,
+                        7L
+                );
     }
 }

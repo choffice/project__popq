@@ -2,7 +2,6 @@ package com.example.project_popq.realtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -20,6 +19,7 @@ import com.example.project_popq.store.service.StoreAuthorizationService;
 import com.example.project_popq.user.domain.User;
 import com.example.project_popq.user.repository.UserRepository;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,14 +42,37 @@ class RealtimeSecurityTests {
     @Test
     void sellerJwtIsAuthenticatedOnConnect() {
         Dependencies dependencies = dependencies();
+
         Jwt jwt = sellerJwt();
-        when(dependencies.jwtDecoder().decode("seller-token")).thenReturn(jwt);
+
+        when(
+                dependencies.jwtDecoder()
+                        .decode("seller-token")
+        ).thenReturn(jwt);
+
         User user = mock(User.class);
+
         when(user.isActive()).thenReturn(true);
-        when(dependencies.userRepository().findById(7L))
-                .thenReturn(Optional.of(user));
-        StompHeaderAccessor accessor = accessor(StompCommand.CONNECT);
-        accessor.setNativeHeader("Authorization", "Bearer seller-token");
+
+        when(
+                dependencies.userRepository()
+                        .findById(7L)
+        ).thenReturn(Optional.of(user));
+
+        Map<String, Object> sessionAttributes =
+                new HashMap<>();
+
+        StompHeaderAccessor accessor =
+                accessor(StompCommand.CONNECT);
+
+        accessor.setSessionAttributes(
+                sessionAttributes
+        );
+
+        accessor.setNativeHeader(
+                "Authorization",
+                "Bearer seller-token"
+        );
 
         dependencies.interceptor().preSend(
                 message(accessor),
@@ -57,8 +80,14 @@ class RealtimeSecurityTests {
         );
 
         assertThat(accessor.getUser())
-                .isInstanceOf(JwtAuthenticationToken.class);
-        assertThat(((Authentication) accessor.getUser()).getAuthorities())
+                .isInstanceOf(
+                        JwtAuthenticationToken.class
+                );
+
+        assertThat(
+                ((Authentication) accessor.getUser())
+                        .getAuthorities()
+        )
                 .extracting(Object::toString)
                 .containsExactly("ROLE_SELLER");
     }
@@ -66,57 +95,161 @@ class RealtimeSecurityTests {
     @Test
     void guestCookieSessionIsAuthenticatedOnConnect() {
         Dependencies dependencies = dependencies();
-        when(dependencies.guestQrService().resolve("guest-token"))
-                .thenReturn(new ResolvedGuestSession(42L, 1L, null));
-        StompHeaderAccessor accessor = accessor(StompCommand.CONNECT);
-        accessor.setSessionAttributes(Map.of(
-                GuestSessionHandshakeInterceptor.GUEST_SESSION_ATTRIBUTE,
+
+        when(
+                dependencies.guestQrService()
+                        .resolve("guest-token")
+        ).thenReturn(
+                new ResolvedGuestSession(
+                        42L,
+                        1L,
+                        null
+                )
+        );
+
+        Map<String, Object> sessionAttributes =
+                new HashMap<>();
+
+        sessionAttributes.put(
+                GuestSessionHandshakeInterceptor
+                        .GUEST_SESSION_ATTRIBUTE,
                 "guest-token"
-        ));
+        );
+
+        StompHeaderAccessor accessor =
+                accessor(StompCommand.CONNECT);
+
+        accessor.setSessionAttributes(
+                sessionAttributes
+        );
 
         dependencies.interceptor().preSend(
                 message(accessor),
                 mock(MessageChannel.class)
         );
 
-        assertThat(accessor.getUser()).isInstanceOf(Authentication.class);
-        Authentication authentication = (Authentication) accessor.getUser();
-        assertThat(authentication.getPrincipal())
-                .isEqualTo(new GuestRealtimePrincipal(42L));
+        assertThat(accessor.getUser())
+                .isInstanceOf(Authentication.class);
+
+        Authentication authentication =
+                (Authentication) accessor.getUser();
+
+        assertThat(
+                authentication.getPrincipal()
+        ).isEqualTo(
+                new GuestRealtimePrincipal(42L)
+        );
     }
 
     @Test
     void clientSendIsDelegatedAndUnknownSubscriptionsAreDenied() {
         Dependencies dependencies = dependencies();
-        StompHeaderAccessor send = accessor(StompCommand.SEND);
-        send.setDestination("/app/orders");
+
+        /*
+         * 실제 STOMP 흐름과 동일하게
+         * CONNECT에서 인증한 뒤 동일한 세션 attributes를
+         * SEND 프레임에서 재사용한다.
+         */
+        when(
+                dependencies.guestQrService()
+                        .resolve("guest-token")
+        ).thenReturn(
+                new ResolvedGuestSession(
+                        42L,
+                        1L,
+                        null
+                )
+        );
+
+        Map<String, Object> sessionAttributes =
+                new HashMap<>();
+
+        sessionAttributes.put(
+                GuestSessionHandshakeInterceptor
+                        .GUEST_SESSION_ATTRIBUTE,
+                "guest-token"
+        );
+
+        StompHeaderAccessor connect =
+                accessor(StompCommand.CONNECT);
+
+        connect.setSessionAttributes(
+                sessionAttributes
+        );
+
+        dependencies.interceptor().preSend(
+                message(connect),
+                mock(MessageChannel.class)
+        );
+
+        assertThat(connect.getUser())
+                .isInstanceOf(Authentication.class);
+
+        StompHeaderAccessor send =
+                accessor(StompCommand.SEND);
+
+        send.setSessionAttributes(
+                sessionAttributes
+        );
+
+        send.setDestination(
+                "/app/orders"
+        );
+
         dependencies.interceptor().preSend(
                 message(send),
                 mock(MessageChannel.class)
         );
-        verify(dependencies.subscriptionAuthorizer()).authorizeSend(
-                null,
+
+        assertThat(send.getUser())
+                .isInstanceOf(Authentication.class);
+
+        Authentication sendAuthentication =
+                (Authentication) send.getUser();
+
+        verify(
+                dependencies.subscriptionAuthorizer()
+        ).authorizeSend(
+                sendAuthentication,
                 "/app/orders"
         );
 
+        /*
+         * 알 수 없는 SUBSCRIBE destination은
+         * 계속 거부되어야 한다.
+         */
         RealtimeSubscriptionAuthorizer authorizer =
                 new RealtimeSubscriptionAuthorizer(
-                        mock(StoreAuthorizationService.class),
+                        mock(
+                                StoreAuthorizationService.class
+                        ),
                         mock(OrderRepository.class)
                 );
-        Authentication guest = guestAuthentication(42L);
-        assertThatThrownBy(() -> authorizer.authorizeSubscription(
-                guest,
-                "/topic/anything"
-        )).isInstanceOf(AccessDeniedException.class);
+
+        Authentication guest =
+                guestAuthentication(42L);
+
+        assertThatThrownBy(
+                () -> authorizer.authorizeSubscription(
+                        guest,
+                        "/topic/anything"
+                )
+        ).isInstanceOf(
+                AccessDeniedException.class
+        );
     }
 
     @Test
     void sellerStoreAndGuestOrderSubscriptionsAreScoped() {
-        StoreAuthorizationService storeAuthorizationService = mock(
-                StoreAuthorizationService.class
-        );
-        OrderRepository orderRepository = mock(OrderRepository.class);
+        StoreAuthorizationService
+                storeAuthorizationService =
+                mock(
+                        StoreAuthorizationService.class
+                );
+
+        OrderRepository orderRepository =
+                mock(OrderRepository.class);
+
         RealtimeSubscriptionAuthorizer authorizer =
                 new RealtimeSubscriptionAuthorizer(
                         storeAuthorizationService,
@@ -126,11 +259,18 @@ class RealtimeSecurityTests {
         authorizer.authorizeSubscription(
                 new JwtAuthenticationToken(
                         sellerJwt(),
-                        List.of(new SimpleGrantedAuthority("ROLE_SELLER"))
+                        List.of(
+                                new SimpleGrantedAuthority(
+                                        "ROLE_SELLER"
+                                )
+                        )
                 ),
                 "/topic/stores/15/orders"
         );
-        verify(storeAuthorizationService).requireAnyRole(
+
+        verify(
+                storeAuthorizationService
+        ).requireAnyRole(
                 7L,
                 15L,
                 StoreRole.OWNER,
@@ -138,29 +278,55 @@ class RealtimeSecurityTests {
                 StoreRole.STAFF
         );
 
-        Order ownedOrder = mock(Order.class);
-        when(ownedOrder.belongsToGuestSession(42L)).thenReturn(true);
-        when(orderRepository.findByOrderPublicId("owned-order"))
-                .thenReturn(Optional.of(ownedOrder));
+        Order ownedOrder =
+                mock(Order.class);
+
+        when(
+                ownedOrder.belongsToGuestSession(42L)
+        ).thenReturn(true);
+
+        when(
+                orderRepository.findByOrderPublicId(
+                        "owned-order"
+                )
+        ).thenReturn(
+                Optional.of(ownedOrder)
+        );
+
         authorizer.authorizeSubscription(
                 guestAuthentication(42L),
                 "/user/queue/orders/owned-order"
         );
 
-        when(ownedOrder.belongsToGuestSession(99L)).thenReturn(false);
-        assertThatThrownBy(() -> authorizer.authorizeSubscription(
-                guestAuthentication(99L),
-                "/user/queue/orders/owned-order"
-        )).isInstanceOf(AccessDeniedException.class);
+        when(
+                ownedOrder.belongsToGuestSession(99L)
+        ).thenReturn(false);
+
+        assertThatThrownBy(
+                () -> authorizer.authorizeSubscription(
+                        guestAuthentication(99L),
+                        "/user/queue/orders/owned-order"
+                )
+        ).isInstanceOf(
+                AccessDeniedException.class
+        );
     }
 
     private Dependencies dependencies() {
-        JwtDecoder jwtDecoder = mock(JwtDecoder.class);
-        UserRepository userRepository = mock(UserRepository.class);
-        GuestQrService guestQrService = mock(GuestQrService.class);
-        RealtimeSubscriptionAuthorizer authorizer = mock(
-                RealtimeSubscriptionAuthorizer.class
-        );
+        JwtDecoder jwtDecoder =
+                mock(JwtDecoder.class);
+
+        UserRepository userRepository =
+                mock(UserRepository.class);
+
+        GuestQrService guestQrService =
+                mock(GuestQrService.class);
+
+        RealtimeSubscriptionAuthorizer authorizer =
+                mock(
+                        RealtimeSubscriptionAuthorizer.class
+                );
+
         return new Dependencies(
                 jwtDecoder,
                 userRepository,
@@ -176,30 +342,62 @@ class RealtimeSecurityTests {
     }
 
     private Jwt sellerJwt() {
-        return Jwt.withTokenValue("seller-token")
-                .header("alg", "HS256")
+        return Jwt.withTokenValue(
+                        "seller-token"
+                )
+                .header(
+                        "alg",
+                        "HS256"
+                )
                 .subject("7")
-                .issuedAt(Instant.parse("2026-07-29T00:00:00Z"))
-                .expiresAt(Instant.parse("2027-07-29T00:00:00Z"))
-                .claim("role", "SELLER")
+                .issuedAt(
+                        Instant.parse(
+                                "2026-07-29T00:00:00Z"
+                        )
+                )
+                .expiresAt(
+                        Instant.parse(
+                                "2027-07-29T00:00:00Z"
+                        )
+                )
+                .claim(
+                        "role",
+                        "SELLER"
+                )
                 .build();
     }
 
-    private Authentication guestAuthentication(Long guestSessionId) {
-        return UsernamePasswordAuthenticationToken.authenticated(
-                new GuestRealtimePrincipal(guestSessionId),
-                "",
-                List.of(new SimpleGrantedAuthority("ROLE_GUEST"))
-        );
+    private Authentication guestAuthentication(
+            Long guestSessionId
+    ) {
+        return UsernamePasswordAuthenticationToken
+                .authenticated(
+                        new GuestRealtimePrincipal(
+                                guestSessionId
+                        ),
+                        "",
+                        List.of(
+                                new SimpleGrantedAuthority(
+                                        "ROLE_GUEST"
+                                )
+                        )
+                );
     }
 
-    private StompHeaderAccessor accessor(StompCommand command) {
-        StompHeaderAccessor accessor = StompHeaderAccessor.create(command);
+    private StompHeaderAccessor accessor(
+            StompCommand command
+    ) {
+        StompHeaderAccessor accessor =
+                StompHeaderAccessor.create(command);
+
         accessor.setLeaveMutable(true);
+
         return accessor;
     }
 
-    private Message<byte[]> message(StompHeaderAccessor accessor) {
+    private Message<byte[]> message(
+            StompHeaderAccessor accessor
+    ) {
         return MessageBuilder.createMessage(
                 new byte[0],
                 accessor.getMessageHeaders()
@@ -210,7 +408,8 @@ class RealtimeSecurityTests {
             JwtDecoder jwtDecoder,
             UserRepository userRepository,
             GuestQrService guestQrService,
-            RealtimeSubscriptionAuthorizer subscriptionAuthorizer,
+            RealtimeSubscriptionAuthorizer
+            subscriptionAuthorizer,
             StompSecurityInterceptor interceptor
     ) {
     }

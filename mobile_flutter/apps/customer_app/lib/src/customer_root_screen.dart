@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 import 'package:popq_design_system/popq_design_system.dart';
 
+import 'features/cart/cart_controller.dart';
+import 'features/cart/customer_cart_action.dart';
 import 'features/common/theme_mode_toggle.dart';
 import 'features/inquiry/customer_order_message_repository.dart';
 import 'features/notifications/customer_notification_repository.dart';
@@ -18,6 +20,7 @@ class CustomerRootScreen extends StatefulWidget {
     required this.child,
     required this.notificationRepository,
     required this.orderMessageRepository,
+    required this.cartController,
     required this.sessionController,
     this.themeController,
     super.key,
@@ -27,6 +30,7 @@ class CustomerRootScreen extends StatefulWidget {
   final Widget child;
   final CustomerNotificationRepository notificationRepository;
   final CustomerOrderMessageRepository orderMessageRepository;
+  final CartController cartController;
   final SessionController sessionController;
   final PopqThemeController? themeController;
 
@@ -249,6 +253,9 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
         NotificationAction(
           repository: widget.notificationRepository,
           sessionController: widget.sessionController,
+        ),
+        CustomerCartAction(
+          controller: widget.cartController,
         ),
       ],
       selectedIndex: selectedIndex,
@@ -529,6 +536,8 @@ class _CustomerRootScreenState extends State<CustomerRootScreen>
   // "마이" 탭 안에서 열리는 하위 화면들입니다.
   // 이 화면들에 있을 때도 하단 탭은 "마이"로 유지되어야 합니다.
   static const List<String> _profileSubRoutes = <String>[
+    CustomerRoutes.orders,
+    CustomerRoutes.platformAnnouncements,
     CustomerRoutes.myInfo,
     CustomerRoutes.myReviews,
     CustomerRoutes.pointHistory,

@@ -33,149 +33,101 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
 
   void _reload() {
     _store = widget.storeRepository.findDetail(widget.storeId);
-    _reviews = widget.engagementRepository.findPublicReviews(widget.storeId);
+    _reviews = widget.engagementRepository.findPublicReviews(
+      widget.storeId,
+    );
+  }
+
+  Future<void> _refresh() async {
+    setState(_reload);
+
+    try {
+      await Future.wait<Object?>(
+        <Future<Object?>>[
+          _store,
+          _reviews,
+        ],
+      );
+    } catch (_) {
+      // FutureBuilder에서 오류 상태를 표시합니다.
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(leading: const StoreBackButton(), title: const Text('리뷰')),
+      appBar: AppBar(
+        leading: const StoreBackButton(),
+        title: const Text('리뷰'),
+      ),
       body: FutureBuilder<CustomerStore>(
         future: _store,
-        builder: (BuildContext context, AsyncSnapshot<CustomerStore> storeSnap) {
+        builder: (
+            BuildContext context,
+            AsyncSnapshot<CustomerStore> storeSnap,
+            ) {
           return FutureBuilder<List<CustomerReview>>(
             future: _reviews,
-            builder:
-                (
-                  BuildContext context,
-                  AsyncSnapshot<List<CustomerReview>> reviewSnap,
+            builder: (
+                BuildContext context,
+                AsyncSnapshot<List<CustomerReview>> reviewSnap,
                 ) {
-                  if (storeSnap.connectionState != ConnectionState.done ||
-                      reviewSnap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (!storeSnap.hasData || reviewSnap.hasError) {
-                    return Center(
-                      child: FilledButton.icon(
-                        onPressed: () => setState(_reload),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('리뷰 다시 불러오기'),
-                      ),
-                    );
-                  }
-                  final List<CustomerReview> items =
-                      reviewSnap.data ?? const [];
-                  final double? average = items.isEmpty
-                      ? null
-                      : items
-                                .map((CustomerReview item) => item.rating)
-                                .reduce((int left, int right) => left + right) /
-                            items.length;
-                  return Column(
-                    children: <Widget>[
-                      StoreSectionTopBar(
-                        store: storeSnap.requireData,
-                        selected: StoreSection.reviews,
-                      ),
-                      Expanded(
-                        child: RefreshIndicator(
-                          onRefresh: () async {
-                            setState(_reload);
-                            try {
-                              await Future.wait<Object?>(<Future<Object?>>[
-                                _store,
-                                _reviews,
-                              ]);
-                            } catch (_) {
-                              // FutureBuilder가 오류 상태와 재시도 버튼을 표시한다.
-                            }
-                          },
-                          child: ListView(
-                            physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(
-                              bottom: PopqSpacing.lg,
+              if (storeSnap.connectionState != ConnectionState.done ||
+                  reviewSnap.connectionState != ConnectionState.done) {
+                return const PopqLoadingView(
+                  message: '리뷰를 불러오고 있어요.',
+                );
+              }
+
+              if (!storeSnap.hasData || reviewSnap.hasError) {
+                return PopqErrorView(
+                  message: '리뷰를 불러오지 못했어요.',
+                  onRetry: () {
+                    setState(_reload);
+                  },
+                );
+              }
+
+              final List<CustomerReview> items =
+                  reviewSnap.data ?? const <CustomerReview>[];
+
+              final CustomerStore store = storeSnap.requireData;
+
+              return Column(
+                children: <Widget>[
+                  StoreSectionTopBar(
+                    store: store,
+                    selected: StoreSection.reviews,
+                  ),
+                  Expanded(
+                    child: items.isEmpty
+                        ? RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: const CustomScrollView(
+                        physics:
+                        AlwaysScrollableScrollPhysics(),
+                        slivers: <Widget>[
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: PopqEmptyView(
+                              icon: Icons.reviews_outlined,
+                              title: '등록된 리뷰가 없습니다.',
+                              description:
+                              '고객이 작성한 리뷰가 '
+                                  '등록되면 이곳에서 확인할 수 있어요.',
                             ),
-                            children: <Widget>[
-                              Padding(
-                                padding: const EdgeInsets.all(PopqSpacing.lg),
-                                child: Text(
-                                  average == null
-                                      ? '아직 등록된 리뷰가 없습니다.'
-                                      : '전체 평점 ${average.toStringAsFixed(1)} · 리뷰 ${items.length}개',
-                                  style: Theme.of(context).textTheme.titleLarge,
-                                ),
-                              ),
-                              for (final CustomerReview review in items)
-                                Card(
-                                  margin: const EdgeInsets.fromLTRB(
-                                    PopqSpacing.md,
-                                    0,
-                                    PopqSpacing.md,
-                                    PopqSpacing.sm,
-                                  ),
-                                  child: ListTile(
-                                    title: Row(
-                                      children: <Widget>[
-                                        if (review.authorEmblemAssetPath !=
-                                            null) ...<Widget>[
-                                          Image.asset(
-                                            review.authorEmblemAssetPath!,
-                                            width: 36,
-                                            height: 36,
-                                            fit: BoxFit.contain,
-                                            semanticLabel:
-                                                review.authorEmblemLabel,
-                                          ),
-                                          const SizedBox(width: PopqSpacing.xs),
-                                        ],
-                                        Expanded(
-                                          child: Text(
-                                            review.authorBadgeTier == 'NONE'
-                                                ? review.authorName
-                                                : '${review.authorName} · ${review.authorEmblemLabel}',
-                                          ),
-                                        ),
-                                        Text('${review.rating}점'),
-                                      ],
-                                    ),
-                                    subtitle: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: <Widget>[
-                                        if (review.content?.trim().isNotEmpty ==
-                                            true)
-                                          Text(review.content!),
-                                        if (review.imageUrl != null) ...[
-                                          const SizedBox(
-                                            height: PopqSpacing.sm,
-                                          ),
-                                          _ReviewImage(
-                                            imageUrl: review.imageUrl!,
-                                          ),
-                                        ],
-                                        if (review.sellerReply
-                                                ?.trim()
-                                                .isNotEmpty ==
-                                            true)
-                                          Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: PopqSpacing.sm,
-                                            ),
-                                            child: Text(
-                                              '판매자 답글: ${review.sellerReply!}',
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                            ],
                           ),
-                        ),
+                        ],
                       ),
-                    ],
-                  );
-                },
+                    )
+                        : _ReviewList(
+                      items: items,
+                      onRefresh: _refresh,
+                    ),
+                  ),
+                ],
+              );
+            },
           );
         },
       ),
@@ -183,8 +135,130 @@ class _StoreReviewScreenState extends State<StoreReviewScreen> {
   }
 }
 
+class _ReviewList extends StatelessWidget {
+  const _ReviewList({
+    required this.items,
+    required this.onRefresh,
+  });
+
+  final List<CustomerReview> items;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final double average =
+        items
+            .map(
+              (CustomerReview item) => item.rating,
+        )
+            .reduce(
+              (int left, int right) => left + right,
+        ) /
+            items.length;
+
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(
+          bottom: PopqSpacing.lg,
+        ),
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.all(
+              PopqSpacing.lg,
+            ),
+            child: Text(
+              '전체 평점 ${average.toStringAsFixed(1)} '
+                  '· 리뷰 ${items.length}개',
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge,
+            ),
+          ),
+          for (final CustomerReview review in items)
+            Card(
+              margin: const EdgeInsets.fromLTRB(
+                PopqSpacing.md,
+                0,
+                PopqSpacing.md,
+                PopqSpacing.sm,
+              ),
+              child: ListTile(
+                title: Row(
+                  children: <Widget>[
+                    if (review.authorEmblemAssetPath != null) ...<Widget>[
+                      Image.asset(
+                        review.authorEmblemAssetPath!,
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.contain,
+                        semanticLabel:
+                        review.authorEmblemLabel,
+                      ),
+                      const SizedBox(
+                        width: PopqSpacing.xs,
+                      ),
+                    ],
+                    Expanded(
+                      child: Text(
+                        review.authorBadgeTier == 'NONE'
+                            ? review.authorName
+                            : '${review.authorName} '
+                            '· ${review.authorEmblemLabel}',
+                      ),
+                    ),
+                    Text(
+                      '${review.rating}점',
+                    ),
+                  ],
+                ),
+                subtitle: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: <Widget>[
+                    if (review.content
+                        ?.trim()
+                        .isNotEmpty ==
+                        true)
+                      Text(
+                        review.content!,
+                      ),
+                    if (review.imageUrl != null) ...<Widget>[
+                      const SizedBox(
+                        height: PopqSpacing.sm,
+                      ),
+                      _ReviewImage(
+                        imageUrl: review.imageUrl!,
+                      ),
+                    ],
+                    if (review.sellerReply
+                        ?.trim()
+                        .isNotEmpty ==
+                        true)
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: PopqSpacing.sm,
+                        ),
+                        child: Text(
+                          '판매자 답글: '
+                              '${review.sellerReply!}',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ReviewImage extends StatelessWidget {
-  const _ReviewImage({required this.imageUrl});
+  const _ReviewImage({
+    required this.imageUrl,
+  });
 
   final String imageUrl;
 
@@ -197,11 +271,17 @@ class _ReviewImage extends StatelessWidget {
         child: Image.network(
           imageUrl,
           fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Container(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            alignment: Alignment.center,
-            child: const Icon(Icons.broken_image_outlined),
-          ),
+          errorBuilder: (_, _, _) {
+            return Container(
+              color: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.broken_image_outlined,
+              ),
+            );
+          },
         ),
       ),
     );

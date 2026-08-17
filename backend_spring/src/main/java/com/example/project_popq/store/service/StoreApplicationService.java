@@ -43,6 +43,7 @@ import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Set;
@@ -53,6 +54,8 @@ import java.util.HashMap;
 @Service
 @RequiredArgsConstructor
 public class StoreApplicationService {
+
+    private static final ZoneId SEOUL_ZONE = ZoneId.of("Asia/Seoul");
 
     private final StoreRepository storeRepository;
     private final StoreMemberRepository storeMemberRepository;
@@ -87,18 +90,34 @@ public class StoreApplicationService {
             request.closeTime()
         );
 
-        validateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+        StoreType storeType = request.storeType();
+        String eventName = normalizeOptionalText(request.eventName());
+        LocalDate operationStartDate = request.operationStartDate();
+        LocalDate operationEndDate = request.operationEndDate();
+
+        if (storeType == StoreType.LOCAL_STORE) {
+            eventName = null;
+            if (operationStartDate == null) {
+                operationStartDate = LocalDate.now(SEOUL_ZONE);
+            }
+        }
+
+        validateEventInformation(
+            storeType,
+            eventName,
+            operationStartDate,
+            operationEndDate
         );
 
         Store store = Store.create(
-            request.storeType(),
+            storeType,
             request.name().trim(),
             normalizeOptionalText(
                 request.description()
             )
         );
+
+        store.updateEventName(eventName);
 
         store.updateDiscoveryProfile(
             normalizeOptionalText(
@@ -141,8 +160,8 @@ public class StoreApplicationService {
         );
 
         store.updateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+            operationStartDate,
+            operationEndDate
         );
 
         storeRepository.save(store);
@@ -392,9 +411,54 @@ public class StoreApplicationService {
 
         Store store = member.getStore();
 
-        if (request.storeType() != null) {
-            store.changeStoreType(request.storeType());
+        StoreType targetStoreType = request.storeType() == null
+            ? store.getStoreType()
+            : request.storeType();
+
+        String eventName = targetStoreType == StoreType.LOCAL_STORE
+            ? null
+            : resolveOptionalText(store.getEventName(), request.eventName());
+
+        LocalDate operationStartDate = request.operationStartDate() == null
+            ? store.getOperationStartDate()
+            : request.operationStartDate();
+
+        boolean clearOperationEndDate = Boolean.TRUE.equals(
+            request.clearOperationEndDate()
+        );
+
+        if (clearOperationEndDate
+            && request.operationEndDate() != null) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
         }
+
+        if (clearOperationEndDate
+            && targetStoreType == StoreType.EVENT_COMMERCE) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
+        }
+
+        LocalDate operationEndDate = clearOperationEndDate
+            ? null
+            : request.operationEndDate() == null
+                ? store.getOperationEndDate()
+                : request.operationEndDate();
+
+        validateEventInformation(
+            targetStoreType,
+            eventName,
+            operationStartDate,
+            operationEndDate
+        );
+
+        if (request.storeType() != null) {
+            store.changeStoreType(targetStoreType);
+        }
+
+        store.updateEventName(eventName);
 
         LocalTime openTime =
             request.openTime() == null
@@ -409,11 +473,6 @@ public class StoreApplicationService {
         validateOperatingHours(
             openTime,
             closeTime
-        );
-
-        validateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
         );
 
         store.updateSellerProfile(
@@ -467,8 +526,8 @@ public class StoreApplicationService {
         );
 
         store.updateOperationPeriod(
-            request.operationStartDate(),
-            request.operationEndDate()
+            operationStartDate,
+            operationEndDate
         );
 
         storeScheduleService.replace(store, request.schedule());
@@ -725,6 +784,27 @@ public class StoreApplicationService {
                 ErrorCode.INVALID_REQUEST
             );
         }
+    }
+
+    private void validateEventInformation(
+        StoreType storeType,
+        String eventName,
+        LocalDate operationStartDate,
+        LocalDate operationEndDate
+    ) {
+        if (storeType == StoreType.EVENT_COMMERCE
+            && (eventName == null
+                || operationStartDate == null
+                || operationEndDate == null)) {
+            throw new BusinessException(
+                ErrorCode.INVALID_REQUEST
+            );
+        }
+
+        validateOperationPeriod(
+            operationStartDate,
+            operationEndDate
+        );
     }
 
     private boolean defaultTrue(

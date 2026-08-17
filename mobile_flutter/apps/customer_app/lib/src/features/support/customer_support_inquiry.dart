@@ -9,27 +9,26 @@ class CustomerSupportInquirySummary {
     required this.category,
     required this.title,
     required this.status,
-    required this.unreadMessageCount,
+    required this.lastMessageAt,
     required this.createdAt,
-    required this.updatedAt,
-    this.answeredAt,
-    this.closedAt,
+    this.unreadMessageCount = 0,
   });
 
-  factory CustomerSupportInquirySummary.fromJson(Map<String, Object?> json) {
+  factory CustomerSupportInquirySummary.fromJson(
+      Map<String, Object?> json,
+      ) {
     return CustomerSupportInquirySummary(
-      supportInquiryId: (json['supportInquiryId'] as num).toInt(),
-      customerUserId: (json['customerUserId'] as num).toInt(),
-      customerName: json['customerName'] as String,
-      customerEmail: json['customerEmail'] as String,
+      supportInquiryId: (json['supportTicketId'] as num).toInt(),
+      customerUserId: (json['requesterUserId'] as num).toInt(),
+      customerName: json['requesterName'] as String,
+      customerEmail: (json['requesterEmail'] as String?) ?? '',
       category: CustomerSupportCategory.fromJson(json['category']),
-      title: json['title'] as String,
+      title: json['subject'] as String,
       status: CustomerSupportStatus.fromJson(json['status']),
-      unreadMessageCount: (json['unreadMessageCount'] as num).toInt(),
-      answeredAt: _parseDateTime(json['answeredAt']),
-      closedAt: _parseDateTime(json['closedAt']),
+      lastMessageAt: DateTime.parse(json['lastMessageAt'] as String),
       createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      unreadMessageCount:
+      (json['unreadMessageCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -40,11 +39,11 @@ class CustomerSupportInquirySummary {
   final CustomerSupportCategory category;
   final String title;
   final CustomerSupportStatus status;
-  final int unreadMessageCount;
-  final DateTime? answeredAt;
-  final DateTime? closedAt;
+  final DateTime lastMessageAt;
   final DateTime createdAt;
-  final DateTime updatedAt;
+  final int unreadMessageCount;
+
+  bool get hasUnreadMessages => unreadMessageCount > 0;
 }
 
 class CustomerSupportInquiryMessage {
@@ -54,20 +53,21 @@ class CustomerSupportInquiryMessage {
     required this.senderName,
     required this.senderType,
     required this.content,
-    required this.read,
     required this.createdAt,
-    this.readAt,
   });
 
-  factory CustomerSupportInquiryMessage.fromJson(Map<String, Object?> json) {
+  factory CustomerSupportInquiryMessage.fromJson(
+      Map<String, Object?> json,
+      ) {
     return CustomerSupportInquiryMessage(
-      supportInquiryMessageId: (json['supportInquiryMessageId'] as num).toInt(),
+      supportInquiryMessageId:
+      (json['supportMessageId'] as num).toInt(),
       senderUserId: (json['senderUserId'] as num).toInt(),
       senderName: json['senderName'] as String,
-      senderType: CustomerSupportSenderType.fromJson(json['senderType']),
+      senderType: CustomerSupportSenderType.fromJson(
+        json['senderType'],
+      ),
       content: json['content'] as String,
-      read: json['read'] as bool,
-      readAt: _parseDateTime(json['readAt']),
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
@@ -77,12 +77,10 @@ class CustomerSupportInquiryMessage {
   final String senderName;
   final CustomerSupportSenderType senderType;
   final String content;
-  final bool read;
-  final DateTime? readAt;
   final DateTime createdAt;
 
   bool get sentByCustomer {
-    return senderType == CustomerSupportSenderType.customer;
+    return senderType == CustomerSupportSenderType.requester;
   }
 
   bool get sentByAdmin {
@@ -96,29 +94,23 @@ class CustomerSupportInquiryDetail {
     required this.messages,
   });
 
-  factory CustomerSupportInquiryDetail.fromJson(Map<String, Object?> json) {
+  factory CustomerSupportInquiryDetail.fromJson(
+      Map<String, Object?> json,
+      ) {
     return CustomerSupportInquiryDetail(
       inquiry: CustomerSupportInquirySummary.fromJson(
-        Map<String, Object?>.from(json['inquiry'] as Map),
+        Map<String, Object?>.from(json['ticket'] as Map),
       ),
       messages: (json['messages'] as List<Object?>)
           .map(
             (item) => CustomerSupportInquiryMessage.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
+          Map<String, Object?>.from(item as Map),
+        ),
+      )
           .toList(growable: false),
     );
   }
 
   final CustomerSupportInquirySummary inquiry;
   final List<CustomerSupportInquiryMessage> messages;
-}
-
-DateTime? _parseDateTime(Object? value) {
-  if (value == null) {
-    return null;
-  }
-
-  return DateTime.tryParse(value.toString());
 }

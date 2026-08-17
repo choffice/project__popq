@@ -30,69 +30,108 @@ class _CustomerMyReviewsScreenState extends State<CustomerMyReviewsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<CustomerReview>>(
-      future: _reviews,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const PopqLoadingView(message: '내 리뷰를 불러오고 있어요.');
-        }
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('내 리뷰'),
+      ),
+      body: FutureBuilder<List<CustomerReview>>(
+        future: _reviews,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const PopqLoadingView(message: '내 리뷰를 불러오고 있어요.');
+          }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return PopqErrorView(message: '내 리뷰를 불러오지 못했어요.', onRetry: _reload);
-        }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return PopqErrorView(
+              message: '내 리뷰를 불러오지 못했어요.',
+              onRetry: _reload,
+            );
+          }
 
-        final allReviews = snapshot.requireData
-            .where((review) => review.isActive)
-            .toList();
+          final allReviews = snapshot.requireData
+              .where((review) => review.isActive)
+              .toList();
 
-        final selectedLabel = popqStoreCategoryLabels[_selectedCategoryIndex];
-        final reviews = allReviews
-            .where(
-              (review) => matchesStoreCategoryLabel(
-                review.storeCategory,
-                selectedLabel,
-              ),
-            )
-            .toList();
+          final selectedLabel = popqStoreCategoryLabels[_selectedCategoryIndex];
+          final reviews = allReviews
+              .where(
+                (review) => matchesStoreCategoryLabel(
+                  review.storeCategory,
+                  selectedLabel,
+                ),
+              )
+              .toList();
 
-        return RefreshIndicator(
-          onRefresh: () async => _reload(),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(PopqSpacing.lg),
+          return Column(
             children: [
-              PopqCategoryTabsRow(
-                selectedIndex: _selectedCategoryIndex,
-                onSelected: (index) {
-                  setState(() => _selectedCategoryIndex = index);
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PopqSpacing.lg,
+                  PopqSpacing.lg,
+                  PopqSpacing.lg,
+                  0,
+                ),
+                child: PopqCategoryTabsRow(
+                  selectedIndex: _selectedCategoryIndex,
+                  onSelected: (index) {
+                    setState(() => _selectedCategoryIndex = index);
+                  },
+                ),
               ),
               const SizedBox(height: PopqSpacing.md),
-              if (allReviews.isEmpty)
-                const _EmptyReviews()
-              else if (reviews.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: PopqSpacing.xl),
-                  child: Text(
-                    '$selectedLabel 카테고리의 리뷰가 없어요.',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                )
-              else
-                for (final review in reviews)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
-                    child: _ReviewCard(
-                      review: review,
-                      onEdit: () => _editReview(review),
-                      onDelete: () => _deleteReview(review),
-                    ),
-                  ),
+              Expanded(
+                child: _buildReviewBody(
+                  allReviews: allReviews,
+                  reviews: reviews,
+                  selectedLabel: selectedLabel,
+                ),
+              ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReviewBody({
+    required List<CustomerReview> allReviews,
+    required List<CustomerReview> reviews,
+    required String selectedLabel,
+  }) {
+    if (allReviews.isEmpty) {
+      return const _EmptyReviews();
+    }
+
+    if (reviews.isEmpty) {
+      return PopqEmptyView(
+        icon: Icons.filter_alt_off_outlined,
+        title: '$selectedLabel 카테고리의 리뷰가 없어요.',
+        description: '다른 카테고리를 선택해 보세요.',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async => _reload(),
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          PopqSpacing.lg,
+          0,
+          PopqSpacing.lg,
+          PopqSpacing.lg,
+        ),
+        children: [
+          for (final review in reviews)
+            Padding(
+              padding: const EdgeInsets.only(bottom: PopqSpacing.sm),
+              child: _ReviewCard(
+                review: review,
+                onEdit: () => _editReview(review),
+                onDelete: () => _deleteReview(review),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -463,11 +502,10 @@ class _EmptyReviews extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(PopqSpacing.lg),
-        child: Text('작성한 리뷰가 없어요.', textAlign: TextAlign.center),
-      ),
+    return const PopqEmptyView(
+      icon: Icons.reviews_outlined,
+      title: '작성한 리뷰가 없어요.',
+      description: '주문 후 작성한 리뷰가 이곳에 표시됩니다.',
     );
   }
 }

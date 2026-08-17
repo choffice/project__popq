@@ -86,11 +86,30 @@ class _CustomerFavoriteStoreScreenState
       );
     }
 
+    if (_stores.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _load,
+        child: const CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.favorite_border_rounded,
+                title: '아직 찜한 매장이 없어요.',
+                description: '관심 있는 매장의 하트를 누르면\n'
+                    '이곳에서 빠르게 다시 찾을 수 있어요.',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        physics:
-        const AlwaysScrollableScrollPhysics(),
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(
           PopqSpacing.md,
           PopqSpacing.sm,
@@ -118,49 +137,38 @@ class _CustomerFavoriteStoreScreenState
               height: PopqSpacing.md,
             ),
           ],
-          if (_stores.isEmpty)
-            _FavoriteEmptyView(
-              onDiscoverPressed: () {
-                context.go(
-                  CustomerRoutes.discover,
-                );
-              },
-            )
-          else ...[
-            Text(
-              '총 ${_stores.length}곳',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(
-                fontWeight: FontWeight.w800,
+          Text(
+            '총 ${_stores.length}곳',
+            style: Theme.of(context)
+                .textTheme
+                .labelLarge
+                ?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(
+            height: PopqSpacing.sm,
+          ),
+          for (final store in _stores)
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: PopqSpacing.sm,
+              ),
+              child: _FavoriteStoreCard(
+                store: store,
+                isRemoving: _removingStoreIds.contains(
+                  store.storeId,
+                ),
+                onTap: () {
+                  context.push(
+                    '${CustomerRoutes.stores}/${store.storeId}',
+                  );
+                },
+                onRemovePressed: () {
+                  _removeInterest(store);
+                },
               ),
             ),
-            const SizedBox(
-              height: PopqSpacing.sm,
-            ),
-            for (final store in _stores)
-              Padding(
-                padding: const EdgeInsets.only(
-                  bottom: PopqSpacing.sm,
-                ),
-                child: _FavoriteStoreCard(
-                  store: store,
-                  isRemoving:
-                  _removingStoreIds.contains(
-                    store.storeId,
-                  ),
-                  onTap: () {
-                    context.push(
-                      '${CustomerRoutes.stores}/${store.storeId}',
-                    );
-                  },
-                  onRemovePressed: () {
-                    _removeInterest(store);
-                  },
-                ),
-              ),
-          ],
         ],
       ),
     );
@@ -476,107 +484,6 @@ class _FavoriteLoadNotice
             onPressed: onRetry,
             child: const Text(
               '재시도',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FavoriteEmptyView
-    extends StatelessWidget {
-  const _FavoriteEmptyView({
-    required this.onDiscoverPressed,
-  });
-
-  final VoidCallback onDiscoverPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: PopqSpacing.lg,
-        vertical: 48,
-      ),
-      decoration: BoxDecoration(
-        color: isDark
-            ? PopqPalette.nightCard
-            : PopqPalette.lightCard,
-        borderRadius: BorderRadius.circular(
-          26,
-        ),
-        border: Border.all(
-          color: isDark
-              ? PopqPalette.nightBorder
-              : PopqPalette.lightBorder,
-        ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(
-              color: isDark
-                  ? PopqPalette.purple.withValues(
-                alpha: 0.2,
-              )
-                  : PopqPalette.coral.withValues(
-                alpha: 0.12,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.favorite_border_rounded,
-              size: 40,
-              color: isDark
-                  ? PopqPalette.lime
-                  : PopqPalette.coral,
-            ),
-          ),
-          const SizedBox(
-            height: PopqSpacing.md,
-          ),
-          Text(
-            '아직 찜한 매장이 없어요.',
-            style: theme
-                .textTheme
-                .titleLarge
-                ?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(
-            height: PopqSpacing.sm,
-          ),
-          Text(
-            '관심 있는 매장의 하트를 누르면\n이곳에서 빠르게 다시 찾을 수 있어요.',
-            textAlign: TextAlign.center,
-            style: theme
-                .textTheme
-                .bodyMedium
-                ?.copyWith(
-              color: isDark
-                  ? PopqPalette.nightMutedText
-                  : PopqPalette.lightMutedText,
-            ),
-          ),
-          const SizedBox(
-            height: PopqSpacing.lg,
-          ),
-          FilledButton.icon(
-            onPressed: onDiscoverPressed,
-            icon: const Icon(
-              Icons.search_rounded,
-            ),
-            label: const Text(
-              '매장 둘러보기',
             ),
           ),
         ],

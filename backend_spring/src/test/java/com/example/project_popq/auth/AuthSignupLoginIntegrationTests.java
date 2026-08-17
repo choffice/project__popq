@@ -52,7 +52,10 @@ class AuthSignupLoginIntegrationTests {
         Long userId = userRepository.findByEmailIgnoreCase("signup-seller@popq.test")
                 .orElseThrow()
                 .getId();
-        assertThat(sellerProfileRepository.findByUserId(userId)).isPresent();
+
+        assertThat(
+                sellerProfileRepository.findByUserId(userId)
+        ).isPresent();
 
         String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -68,12 +71,22 @@ class AuthSignupLoginIntegrationTests {
                 .getResponse()
                 .getContentAsString();
 
-        String accessToken = com.jayway.jsonpath.JsonPath.read(loginResponse, "$.data.accessToken");
+        String accessToken =
+                com.jayway.jsonpath.JsonPath.read(
+                        loginResponse,
+                        "$.data.accessToken"
+                );
 
         mockMvc.perform(get("/api/v1/auth/me")
-                        .header("Authorization", "Bearer " + accessToken))
+                        .header(
+                                "Authorization",
+                                "Bearer " + accessToken
+                        ))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.email").value("signup-seller@popq.test"));
+                .andExpect(
+                        jsonPath("$.data.email")
+                                .value("signup-seller@popq.test")
+                );
     }
 
     @Test
@@ -91,10 +104,16 @@ class AuthSignupLoginIntegrationTests {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("INVALID_SIGNUP_ROLE"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_SIGNUP_ROLE")
+                );
 
-        assertThat(userRepository.findByEmailIgnoreCase("public-admin@popq.test"))
-                .isEmpty();
+        assertThat(
+                userRepository.findByEmailIgnoreCase(
+                        "public-admin@popq.test"
+                )
+        ).isEmpty();
     }
 
     @Test
@@ -118,13 +137,17 @@ class AuthSignupLoginIntegrationTests {
                                 {
                                   "email": "DUPLICATE-SELLER@popq.test",
                                   "password": "password2",
-                                  "name": "중복 판매자2",
+                                  "name": "중복판매자2",
+                                  "phone": "010-1111-2222",
                                   "role": "SELLER"
                                 }
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error.code").value("DUPLICATE_USER"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("DUPLICATE_USER")
+                );
     }
 
     @Test
@@ -135,13 +158,16 @@ class AuthSignupLoginIntegrationTests {
                                 {
                                   "email": "weak-password@popq.test",
                                   "password": "abcdefgh",
-                                  "name": "약한 비밀번호",
+                                  "name": "약한 비번",
                                   "phone": "010-2222-2222",
                                   "role": "SELLER"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_REQUEST")
+                );
     }
 
     @Test
@@ -152,7 +178,7 @@ class AuthSignupLoginIntegrationTests {
                                 {
                                   "email": "wrong-password@popq.test",
                                   "password": "password1",
-                                  "name": "비밀번호 테스트",
+                                  "name": "비번테스트",
                                   "phone": "010-3333-3333",
                                   "role": "SELLER"
                                 }
@@ -168,7 +194,10 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_CREDENTIALS")
+                );
     }
 
     @Test
@@ -182,17 +211,22 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_CREDENTIALS")
+                );
     }
 
     @Test
-    void devLoginUserCannotLoginWithPasswordUntilPasswordIsSet() throws Exception {
+    void devLoginUserCannotLoginWithPasswordUntilPasswordIsSet()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/dev/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "email": "dev-only@popq.test",
-                                  "name": "개발 로그인 전용",
+                                  "name": "개발 로그인",
                                   "role": "SELLER"
                                 }
                                 """))
@@ -207,7 +241,10 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_CREDENTIALS")
+                );
     }
 
     @Test
@@ -237,7 +274,10 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").value("DUPLICATE_PHONE"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("DUPLICATE_PHONE")
+                );
     }
 
     @Test
@@ -248,12 +288,15 @@ class AuthSignupLoginIntegrationTests {
                                 {
                                   "email": "no-phone@popq.test",
                                   "password": "password1",
-                                  "name": "전화번호 없음",
+                                  "name": "전화없음",
                                   "role": "SELLER"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_REQUEST")
+                );
     }
 
     @Test
@@ -264,24 +307,29 @@ class AuthSignupLoginIntegrationTests {
                                 {
                                   "email": "bad-phone@popq.test",
                                   "password": "password1",
-                                  "name": "전화번호 형식 오류",
+                                  "name": "전화오류",
                                   "phone": "not-a-phone",
                                   "role": "SELLER"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_REQUEST")
+                );
     }
 
     @Test
-    void findIdReturnsMaskedEmailForMatchingNameAndPhone() throws Exception {
+    void findIdReturnsMaskedEmailForMatchingNameAndPhone()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "email": "find-id-target@popq.test",
                                   "password": "password1",
-                                  "name": "아이디찾기대상",
+                                  "name": "아이디대상",
                                   "phone": "010-4444-4444",
                                   "role": "CUSTOMER"
                                 }
@@ -292,38 +340,48 @@ class AuthSignupLoginIntegrationTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "name": "아이디찾기대상",
+                                  "name": "아이디대상",
                                   "phone": "010-4444-4444"
                                 }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.maskedEmail").value("fi***@popq.test"));
+                .andExpect(
+                        jsonPath("$.data.maskedEmail")
+                                .value("fi***@popq.test")
+                );
     }
 
     @Test
-    void findIdRejectsMismatchedNameAndPhone() throws Exception {
+    void findIdRejectsMismatchedNameAndPhone()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/find-id")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "name": "존재하지않는사용자",
+                                  "name": "없는사용자",
                                   "phone": "010-9999-9999"
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("IDENTITY_VERIFICATION_FAILED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("IDENTITY_VERIFICATION_FAILED")
+                );
     }
 
     @Test
-    void passwordResetVerifyAndConfirmChangesPassword() throws Exception {
+    void passwordResetVerifyAndConfirmChangesPassword()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "email": "reset-target@popq.test",
                                   "password": "oldpassword1",
-                                  "name": "비번찾기대상",
+                                  "name": "비번대상",
                                   "phone": "010-5555-5555",
                                   "role": "CUSTOMER"
                                 }
@@ -339,7 +397,10 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.success").value(true));
+                .andExpect(
+                        jsonPath("$.data.success")
+                                .value(true)
+                );
 
         mockMvc.perform(post("/api/v1/auth/password-reset/confirm")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -351,7 +412,10 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.success").value(true));
+                .andExpect(
+                        jsonPath("$.data.success")
+                                .value(true)
+                );
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -373,18 +437,23 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("INVALID_CREDENTIALS")
+                );
     }
 
     @Test
-    void passwordResetVerifyRejectsMismatchedPhone() throws Exception {
+    void passwordResetVerifyRejectsMismatchedPhone()
+            throws Exception {
+
         mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "email": "reset-mismatch@popq.test",
                                   "password": "password1",
-                                  "name": "불일치 테스트",
+                                  "name": "불일치",
                                   "phone": "010-6666-6666",
                                   "role": "CUSTOMER"
                                 }
@@ -400,6 +469,9 @@ class AuthSignupLoginIntegrationTests {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("IDENTITY_VERIFICATION_FAILED"));
+                .andExpect(
+                        jsonPath("$.error.code")
+                                .value("IDENTITY_VERIFICATION_FAILED")
+                );
     }
 }

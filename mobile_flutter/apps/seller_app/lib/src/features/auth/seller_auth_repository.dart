@@ -13,11 +13,19 @@ class SellerAuthResult {
 }
 
 abstract interface class SellerAuthRepository {
+  Future<void> sendEmailVerificationCode({required String email});
+
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  });
+
   Future<SellerAuthResult> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   });
 
   Future<SellerAuthResult> logIn({
@@ -70,11 +78,23 @@ class MemorySellerAuthRepository implements SellerAuthRepository {
   final SellerIdentity identity;
 
   @override
+  Future<void> sendEmailVerificationCode({required String email}) async {}
+
+  @override
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    return 'memory-email-verification-token';
+  }
+
+  @override
   Future<SellerAuthResult> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     return _result();
   }
@@ -142,11 +162,34 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
   final PopqApiClient _apiClient;
 
   @override
+  Future<void> sendEmailVerificationCode({required String email}) async {
+    await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/email-verification/send',
+      body: {'email': email},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+  }
+
+  @override
+  Future<String> verifyEmailCode({
+    required String email,
+    required String code,
+  }) async {
+    final response = await _apiClient.post<Map<String, Object?>>(
+      '/api/v1/auth/email-verification/confirm',
+      body: {'email': email, 'code': code},
+      decode: (value) => Map<String, Object?>.from(value as Map),
+    );
+    return response['verificationToken'] as String;
+  }
+
+  @override
   Future<SellerAuthResult> signUp({
     required String email,
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) {
     return _submit(
       '/api/v1/auth/signup',
@@ -156,6 +199,7 @@ class ApiSellerAuthRepository implements SellerAuthRepository {
         'name': name,
         'phone': phone,
         'role': 'SELLER',
+        'emailVerificationToken': emailVerificationToken,
       },
     );
   }

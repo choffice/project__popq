@@ -15,6 +15,7 @@ import 'features/auth/naver_auth_service.dart';
 import 'features/cart/cart_controller.dart';
 import 'features/catalog/catalog_repository.dart';
 import 'features/announcements/public_announcement_repository.dart';
+import 'features/discovery/customer_search_location_controller.dart';
 import 'features/discovery/store_discovery_repository.dart';
 import 'features/home/customer_home_controller.dart';
 import 'features/home/customer_location_repository.dart';
@@ -107,6 +108,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   late final PendingPaymentRecoveryService _pendingPaymentRecoveryService;
   late final PopqRealtimeClient _realtimeClient;
   late final CartController _cartController;
+  late final CustomerSearchLocationController _searchLocationController;
   late final CustomerHomeController _homeController;
   late final PopqThemeController _themeController;
   late final bool _ownsThemeController;
@@ -257,6 +259,11 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     final locationRepository =
         widget.locationRepository ?? ApiCustomerLocationRepository(_apiClient);
 
+    _searchLocationController = CustomerSearchLocationController(
+      permissionGateway: permissionGateway,
+      locationRepository: locationRepository,
+    );
+
     _cartController = widget.cartController ?? CartController();
 
     _homeController = CustomerHomeController(
@@ -265,11 +272,14 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       _sessionController,
       permissionGateway,
       locationRepository,
+      searchLocationController: _searchLocationController,
     );
 
     _router = createCustomerRouter(
       onSignIn: _signIn,
       onSignUp: _signUp,
+      onSendEmailVerificationCode: _sendEmailVerificationCode,
+      onVerifyEmailCode: _verifyEmailCode,
       onFindId: _findId,
       onVerifyForPasswordReset: _verifyForPasswordReset,
       onResetPassword: _resetPassword,
@@ -278,6 +288,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
       sessionController: _sessionController,
       onboardingController: _onboardingController,
       storeDiscoveryRepository: storeDiscoveryRepository,
+      searchLocationController: _searchLocationController,
       catalogRepository: catalogRepository,
       announcementRepository: announcementRepository,
       platformAnnouncementRepository: platformAnnouncementRepository,
@@ -342,6 +353,10 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     } catch (_) {
       // 일시적인 네트워크 오류 등은 세션을 로그아웃시키지 않고 그대로 둡니다.
     }
+
+    if (_sessionController.isSignedIn) {
+      _scheduleAttendanceDialog();
+    }
   }
 
   Future<void> _developmentSignIn() async {
@@ -386,13 +401,23 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   }) async {
     await _authRepository.signUp(
       email: email,
       password: password,
       name: name,
       phone: phone,
+      emailVerificationToken: emailVerificationToken,
     );
+  }
+
+  Future<void> _sendEmailVerificationCode(String email) {
+    return _authRepository.sendEmailVerificationCode(email: email);
+  }
+
+  Future<String> _verifyEmailCode(String email, String code) {
+    return _authRepository.verifyEmailCode(email: email, code: code);
   }
 
   Future<String> _findId(String name, String phone) {
@@ -469,32 +494,72 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
   }
 
   void _scheduleAttendanceDialog() {
-    if (_attendanceDialogScheduled) return;
+    if (_attendanceDialogScheduled || !_sessionController.isSignedIn) {
+      return;
+    }
+
     _attendanceDialogScheduled = true;
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || !_sessionController.isSignedIn) {
         _attendanceDialogScheduled = false;
         return;
       }
 
-      final dialogContext = _rootNavigatorKey.currentContext;
-      if (dialogContext == null) {
-        _attendanceDialogScheduled = false;
-        return;
-      }
+      try {
+        // 출석 여부는 기기 날짜가 아니라 서버 응답을 기준으로 판단합니다.
+        // 이미 오늘 출석한 사용자는 팝업을 다시 띄우지 않습니다.
+        final attendance = await _engagementRepository.getAttendance();
 
-      unawaited(
-        showCustomerAttendanceDialog(
+        if (!mounted || !_sessionController.isSignedIn) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        _activitySummaryNotifier.value = attendance.activitySummary;
+
+        if (attendance.checkedToday) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        final hideForToday =
+            await shouldHideCustomerAttendanceDialogForDate(
+          attendance.today,
+        );
+
+        if (!mounted || !_sessionController.isSignedIn) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        if (hideForToday) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        final dialogContext = _rootNavigatorKey.currentContext;
+        if (dialogContext == null) {
+          _attendanceDialogScheduled = false;
+          return;
+        }
+
+        await showCustomerAttendanceDialog(
           context: dialogContext,
           repository: _engagementRepository,
+          initialAttendance: attendance,
           onSummaryChanged: (summary) {
             _activitySummaryNotifier.value = summary;
           },
-        ).whenComplete(() {
-          _attendanceDialogScheduled = false;
-        }),
-      );
+        );
+      } catch (error, stackTrace) {
+        // 네트워크가 잠시 불안정하면 팝업을 억지로 띄우지 않고,
+        // 다음 앱 실행/복귀 시 다시 확인합니다.
+        debugPrint('Customer 출석 상태 확인 실패: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      } finally {
+        _attendanceDialogScheduled = false;
+      }
     });
   }
 
@@ -816,6 +881,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
           unawaited(_realtimeClient.connect());
           unawaited(_recoverPendingPaymentIfNeeded());
           unawaited(_syncAppBadge());
+          _scheduleAttendanceDialog();
         }
 
         return;
@@ -843,6 +909,7 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
     _router.dispose();
     _apiClient.close();
     _cartController.dispose();
+    _searchLocationController.dispose();
     _homeController.dispose();
     _onboardingController.dispose();
     _sessionController.dispose();

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:popq_app_core/popq_app_core.dart';
 
+import '../discovery/customer_search_location_controller.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
@@ -41,18 +42,21 @@ class CustomerHomeSnapshot {
   /// 실제 Store API에서 가져온 홈 홍보 매장입니다.
   final CustomerStore? featuredStore;
 
-  /// 실제 Store API에서 가져온 EVENT_COMMERCE 매장입니다.
+  /// 현재 탐색 좌표 주변의 EVENT_COMMERCE 매장입니다.
   final List<CustomerStore> eventStores;
 
-  /// 홈 홍보 매장을 제외한 실제 LOCAL_STORE 추천 목록입니다.
+  /// 홈 홍보 매장을 제외한 현재 탐색 좌표 주변 LOCAL_STORE 목록입니다.
   final List<CustomerStore> recommendedStores;
 
-  /// 아직 API가 없는 기간 한정 팝업·부스 임시 콘텐츠입니다.
+  /// 아직 API가 없는 부산 임시 팝업·부스 콘텐츠입니다.
+  ///
+  /// 탐색 위치가 부산이 아닌 경우에는 빈 목록으로 내려갑니다.
   final List<CustomerHomePopupItem> temporaryPopups;
 
-  /// 실제 추천 매장이 부족할 때 사용하는 임시 콘텐츠입니다.
-  final List<CustomerHomeRecommendedItem>
-  temporaryRecommendations;
+  /// 실제 추천 매장이 부족할 때 사용하는 부산 임시 콘텐츠입니다.
+  ///
+  /// 탐색 위치가 부산이 아닌 경우에는 빈 목록으로 내려갑니다.
+  final List<CustomerHomeRecommendedItem> temporaryRecommendations;
 
   /// 이번 주 추천 이벤트 캐러셀에 사용하는 임시 콘텐츠입니다.
   final List<CustomerHomeFeatureBanner> featureBanners;
@@ -60,18 +64,15 @@ class CustomerHomeSnapshot {
   /// 회원 혜택 또는 서비스 안내 배너입니다.
   final List<CustomerHomeBenefitBanner> benefitBanners;
 
-  /// 인기 랭킹·진행 중인 이벤트가 기준으로 삼는 권역입니다.
+  /// 기존 홈 UI와의 호환을 위해 유지하는 임시 콘텐츠 권역입니다.
   ///
-  /// 현재 서비스는 부산 지역만 지원합니다.
+  /// 실제 업체 조회 범위는 이 값이 아니라 공통 탐색 위치의 위도/경도로 결정됩니다.
   final CustomerHomeRegion region;
 
-  /// [region]을 화면에 보여줄 한글 이름입니다.
+  /// 홈 섹션에 표시할 탐색 위치 라벨입니다.
   final String regionLabel;
 
-  /// 홈 상단에 보여줄 현재 위치 라벨입니다.
-  ///
-  /// 위치 권한을 허용하고 역지오코딩까지 성공하면 "부산 해운대구"처럼
-  /// 상세 주소를, 그렇지 않으면 [regionLabel]을 사용합니다.
+  /// 홈 상단에 표시할 탐색 위치 라벨입니다.
   final String currentLocationLabel;
 
   /// Store API 조회 실패 여부입니다.
@@ -83,20 +84,31 @@ class CustomerHomeSnapshot {
 
 class CustomerHomeController extends ChangeNotifier {
   CustomerHomeController(
-      this._storeDiscoveryRepository,
-      this._orderRepository,
-      this._sessionController,
-      this._permissionGateway,
-      this._locationRepository,
-      ) : _lastSignedIn = _sessionController.isSignedIn {
-    _sessionController.addListener(
-      _handleSessionChanged,
-    );
+    this._storeDiscoveryRepository,
+    this._orderRepository,
+    this._sessionController,
+    CustomerPermissionGateway permissionGateway,
+    CustomerLocationRepository locationRepository, {
+    CustomerSearchLocationController? searchLocationController,
+  })  : _locationRepository = locationRepository,
+        _searchLocationController = searchLocationController ??
+            CustomerSearchLocationController(
+              permissionGateway: permissionGateway,
+              locationRepository: locationRepository,
+            ),
+        _ownsSearchLocationController = searchLocationController == null,
+        _lastSignedIn = _sessionController.isSignedIn {
+    _sessionController.addListener(_handleSessionChanged);
+    _searchLocationController.addListener(_handleSearchLocationChanged);
+
+    _lastSearchLatitude = _searchLocationController.searchCenter.latitude;
+    _lastSearchLongitude = _searchLocationController.searchCenter.longitude;
+    _lastSearchRadiusKm = _searchLocationController.searchRadiusKm;
+    _lastLocationLabel = _searchLocationController.displayLabel;
   }
 
   /// 홈 화면이 열려 있는 동안 주문 상태를 다시 확인하는 주기입니다.
-  static const Duration _orderRefreshInterval =
-  Duration(seconds: 15);
+  static const Duration _orderRefreshInterval = Duration(seconds: 15);
 
   /// 홈에서 진행 중 주문으로 취급하는 상태입니다.
   static const Set<String> _activeOrderStatuses = {
@@ -106,27 +118,28 @@ class CustomerHomeController extends ChangeNotifier {
     'READY',
   };
 
-  final StoreDiscoveryRepository
-  _storeDiscoveryRepository;
+  /// 이전 부산 구·군 선택 UI와의 컴파일 호환용입니다.
+  ///
+  /// 새 UI에서는 직접 주소/지역 검색을 사용하므로 목록을 제공하지 않습니다.
+  static const List<String> supportedLocationLabels = <String>[];
 
+  final StoreDiscoveryRepository _storeDiscoveryRepository;
   final CustomerOrderRepository _orderRepository;
-
   final SessionController _sessionController;
-
-  final CustomerPermissionGateway _permissionGateway;
-
   final CustomerLocationRepository _locationRepository;
+  final CustomerSearchLocationController _searchLocationController;
+  final bool _ownsSearchLocationController;
 
-  bool _locationResolved = false;
-
-  String? _cachedLocationLabel;
-
-  CustomerHomeStatus status =
-      CustomerHomeStatus.initial;
-
+  CustomerHomeStatus status = CustomerHomeStatus.initial;
   CustomerHomeSnapshot? snapshot;
 
-  List<CustomerStore> _stores = const [];
+  bool _isApplyingRegionSelection = false;
+  String? regionSelectionError;
+
+  bool get isApplyingRegionSelection => _isApplyingRegionSelection;
+
+  List<CustomerStore> _stores = const <CustomerStore>[];
+  List<CustomerOrder> _orders = const <CustomerOrder>[];
 
   Timer? _orderRefreshTimer;
 
@@ -135,239 +148,356 @@ class CustomerHomeController extends ChangeNotifier {
   bool _disposed = false;
 
   int _requestVersion = 0;
+  int _storeLocationRequestVersion = 0;
+
+  late double _lastSearchLatitude;
+  late double _lastSearchLongitude;
+  late double _lastSearchRadiusKm;
+  late String _lastLocationLabel;
 
   /// 앱을 켠 뒤 첫 [load] 호출이 끝났는지 여부입니다.
-  ///
-  /// 이후 pull-to-refresh 등으로 [status]가 다시 [CustomerHomeStatus.loading]로
-  /// 바뀌어도 되돌리지 않습니다 — 스플래시 화면은 앱 최초 부팅 때만
-  /// 이 값을 기다리면 되고, 화면 안에서의 새로고침에는 반응하면 안 되기 때문입니다.
   bool hasCompletedInitialLoad = false;
 
+  CustomerSearchLocationController get searchLocationController =>
+      _searchLocationController;
+
+  /// 이전 최근 지역 UI와의 호환용입니다.
+  /// 새 구조에서는 소비자 주소를 저장하지 않고 탐색 위치만 관리합니다.
+  List<String> get recentLocationLabels => const <String>[];
+
   /// 홈의 매장 정보와 주문 정보를 함께 조회합니다.
+  ///
+  /// 업체는 공통 탐색 위치의 위도/경도와 검색 반경을 기준으로 조회합니다.
   Future<void> load() async {
-    final requestVersion = ++_requestVersion;
-    final signedIn = _sessionController.isSignedIn;
+    final int requestVersion = ++_requestVersion;
+    final bool signedIn = _sessionController.isSignedIn;
 
     status = CustomerHomeStatus.loading;
     _notifySafely();
 
-    final storeFuture = _loadStores();
+    final Future<_HomeLoadResult<List<CustomerStore>>> storeFuture =
+        _loadStoresAtCurrentSearchLocation();
+    final Future<_HomeLoadResult<List<CustomerOrder>>> orderFuture =
+        _loadOrders(signedIn: signedIn);
 
-    final orderFuture = _loadOrders(
-      signedIn: signedIn,
-    );
+    final _HomeLoadResult<List<CustomerStore>> storeResult = await storeFuture;
+    final _HomeLoadResult<List<CustomerOrder>> orderResult = await orderFuture;
 
-    final locationLabelFuture =
-        _resolveLocationLabel();
-
-    final storeResult = await storeFuture;
-    final orderResult = await orderFuture;
-    final locationLabel = await locationLabelFuture;
-
-    if (_disposed ||
-        requestVersion != _requestVersion) {
+    if (_disposed || requestVersion != _requestVersion) {
       return;
     }
 
-    final stores = storeResult.value;
-    final orders = orderResult.value;
+    _stores = List<CustomerStore>.unmodifiable(storeResult.value);
+    _orders = List<CustomerOrder>.unmodifiable(orderResult.value);
 
-    _stores = List.unmodifiable(stores);
+    _rememberCurrentSearchState();
 
     snapshot = _createSnapshot(
-      stores: stores,
-      orders: orders,
-      region: CustomerHomeRegion.busan,
-      currentLocationLabel: locationLabel,
-      storeLoadFailed:
-      storeResult.error != null,
-      orderLoadFailed:
-      orderResult.error != null,
+      stores: _stores,
+      orders: _orders,
+      storeLoadFailed: storeResult.error != null,
+      orderLoadFailed: orderResult.error != null,
     );
 
     status = CustomerHomeStatus.data;
     hasCompletedInitialLoad = true;
 
-    _syncOrderRefreshTimer(
-      signedIn: signedIn,
-    );
-
+    _syncOrderRefreshTimer(signedIn: signedIn);
     _notifySafely();
   }
 
   /// 사용자가 홈 화면을 아래로 당겼을 때 전체 데이터를 다시 조회합니다.
-  Future<void> refresh() {
-    return load();
+  Future<void> refresh() => load();
+
+  /// 홈에서 현재 GPS 위치를 업체 탐색 기준으로 사용합니다.
+  ///
+  /// GPS 좌표가 확보되면 역지오코딩 성공 여부와 무관하게 true를 반환합니다.
+  Future<bool> useCurrentLocation() async {
+    final LocationRequestResult result =
+        await _searchLocationController.useCurrentLocation();
+
+    return result.location != null;
+  }
+
+  /// 위치 권한을 사용하지 않는 기본 부산 탐색 위치로 돌아갑니다.
+  void returnToBusan() {
+    _searchLocationController.returnToBusan();
+  }
+
+  /// 드롭다운에서 고른 시/도 + 구/군을 업체 탐색 기준 위치로 적용합니다.
+  ///
+  /// 소비자 주소를 저장하는 기능이 아니라, 선택 지역의 대표 좌표를 받아
+  /// 홈과 탐색 탭이 함께 사용할 공통 탐색 위치를 변경합니다.
+  Future<bool> selectRegion({
+    required String province,
+    required String district,
+  }) async {
+    if (_isApplyingRegionSelection) {
+      return false;
+    }
+
+    final String normalizedProvince = province.trim();
+    final String normalizedDistrict =
+        district.trim().isEmpty ? '전체' : district.trim();
+
+    if (normalizedProvince.isEmpty) {
+      regionSelectionError = '시/도를 선택해 주세요.';
+      _notifySafely();
+      return false;
+    }
+
+    _isApplyingRegionSelection = true;
+    regionSelectionError = null;
+    _notifySafely();
+
+    try {
+      final CustomerRegionCenter center =
+          await _locationRepository.getRegionCenter(
+        province: normalizedProvince,
+        district: normalizedDistrict,
+      );
+
+      await _searchLocationController.setAddressSearchLocation(
+        location: center.location,
+        label: center.label,
+      );
+
+      return true;
+    } catch (_) {
+      regionSelectionError = '선택한 지역의 위치를 불러오지 못했어요.';
+      return false;
+    } finally {
+      _isApplyingRegionSelection = false;
+      _notifySafely();
+    }
+  }
+
+  /// 이전 검색형 화면과 다음 화면 교체 사이의 컴파일 호환용입니다.
+  /// 새 드롭다운 UI에서는 사용하지 않습니다.
+  @Deprecated('selectRegion()을 사용하세요.')
+  Future<List<CustomerLocationSearchResult>> searchLocations(
+    String query,
+  ) {
+    return _locationRepository.searchAddresses(query);
+  }
+
+  /// 이전 검색형 화면과 다음 화면 교체 사이의 컴파일 호환용입니다.
+  @Deprecated('selectRegion()을 사용하세요.')
+  Future<void> selectSearchLocation(
+    CustomerLocationSearchResult result,
+  ) {
+    return _searchLocationController.setAddressSearchLocation(
+      location: result.location,
+      label: result.displayLabel,
+    );
+  }
+
+  /// 아주 오래된 부산 구·군 선택 UI와의 컴파일 호환용입니다.
+  /// 새 화면에서는 사용하지 않습니다.
+  @Deprecated('selectRegion()을 사용하세요.')
+  Future<void> selectLocationLabel(String locationLabel) async {
+    final String normalized = locationLabel.trim();
+    if (normalized == '부산' || normalized == '부산광역시') {
+      returnToBusan();
+    }
   }
 
   CustomerHomeSnapshot _createSnapshot({
     required List<CustomerStore> stores,
     required List<CustomerOrder> orders,
-    required CustomerHomeRegion region,
-    required String? currentLocationLabel,
     required bool storeLoadFailed,
     required bool orderLoadFailed,
   }) {
-    final activeOrder =
-    _findActiveOrder(orders);
+    final CustomerOrder? activeOrder = _findActiveOrder(orders);
 
-    final featuredStore = _findFeaturedStore(
+    final CustomerStore? featuredStore = _findFeaturedStore(
       stores: stores,
       orders: orders,
       activeOrder: activeOrder,
     );
 
-    final eventStores = stores
-        .where(
-          (store) =>
-      store.storeType ==
-          'EVENT_COMMERCE' &&
-          _matchesRegion(store),
-    )
-        .toList(
-      growable: false,
-    );
+    final List<CustomerStore> eventStores = stores
+        .where((CustomerStore store) => store.storeType == 'EVENT_COMMERCE')
+        .toList(growable: false);
 
-    final recommendedStores = stores
+    final List<CustomerStore> recommendedStores = stores
         .where(
-          (store) =>
-      store.storeType ==
-          'LOCAL_STORE' &&
-          store.storeId !=
-              featuredStore?.storeId &&
-          _matchesRegion(store),
-    )
+          (CustomerStore store) =>
+              store.storeType == 'LOCAL_STORE' &&
+              store.storeId != featuredStore?.storeId,
+        )
         .take(5)
-        .toList(
-      growable: false,
-    );
+        .toList(growable: false);
+
+    final bool useBusanTemporaryContent = _shouldUseBusanTemporaryContent();
+    final String locationLabel = _searchLocationController.displayLabel.trim();
+    final String effectiveLabel = locationLabel.isEmpty ? '부산' : locationLabel;
 
     return CustomerHomeSnapshot(
       activeOrder: activeOrder,
       featuredStore: featuredStore,
-      eventStores: List.unmodifiable(
-        eventStores,
-      ),
-      recommendedStores: List.unmodifiable(
-        recommendedStores,
-      ),
-
-      // 임시 콘텐츠는 customer_home_content.dart에서 가져옵니다.
-      temporaryPopups:
-      CustomerHomeTemporaryContent
-          .popupItemsFor(region),
-      temporaryRecommendations:
-      CustomerHomeTemporaryContent
-          .recommendedItemsFor(region),
-      featureBanners:
-      CustomerHomeTemporaryContent
-          .featureBanners,
-      benefitBanners:
-      CustomerHomeTemporaryContent
-          .benefitBanners,
-      region: region,
-      regionLabel:
-      CustomerHomeTemporaryContent
-          .regionLabel(region),
-      currentLocationLabel:
-      currentLocationLabel ??
-          CustomerHomeTemporaryContent
-              .regionLabel(region),
-
+      eventStores: List<CustomerStore>.unmodifiable(eventStores),
+      recommendedStores: List<CustomerStore>.unmodifiable(recommendedStores),
+      temporaryPopups: useBusanTemporaryContent
+          ? CustomerHomeTemporaryContent.popupItemsFor(CustomerHomeRegion.busan)
+          : const <CustomerHomePopupItem>[],
+      temporaryRecommendations: useBusanTemporaryContent
+          ? CustomerHomeTemporaryContent.recommendedItemsFor(
+              CustomerHomeRegion.busan,
+            )
+          : const <CustomerHomeRecommendedItem>[],
+      featureBanners: useBusanTemporaryContent
+          ? CustomerHomeTemporaryContent.featureBanners
+          : const <CustomerHomeFeatureBanner>[],
+      benefitBanners: CustomerHomeTemporaryContent.benefitBanners,
+      region: CustomerHomeRegion.busan,
+      regionLabel: effectiveLabel,
+      currentLocationLabel: effectiveLabel,
       storeLoadFailed: storeLoadFailed,
       orderLoadFailed: orderLoadFailed,
     );
   }
 
-  /// 위치 권한을 허용하고 역지오코딩까지 성공하면 상세 주소 라벨을 가져옵니다.
+  /// 공통 탐색 위치 변경을 홈에 반영합니다.
   ///
-  /// 허용하지 않았거나 위치를 가져오지 못하면 null을 반환해
-  /// 상위에서 [CustomerHomeRegion]의 기본 라벨로 대체하도록 합니다.
-  /// 한 번 확인한 값은 세션 동안 다시 위치 권한을 묻지 않도록 캐시합니다.
-  Future<String?> _resolveLocationLabel() async {
-    if (_locationResolved) {
-      return _cachedLocationLabel;
+  /// - 위도/경도/반경 변경: 주변 업체를 다시 조회합니다.
+  /// - 역지오코딩으로 라벨만 변경: 기존 업체를 유지하고 화면 라벨만 갱신합니다.
+  void _handleSearchLocationChanged() {
+    if (_disposed) {
+      return;
     }
 
-    String? locationLabel;
+    final double latitude = _searchLocationController.searchCenter.latitude;
+    final double longitude = _searchLocationController.searchCenter.longitude;
+    final double radiusKm = _searchLocationController.searchRadiusKm;
+    final String label = _searchLocationController.displayLabel;
 
-    try {
-      final result =
-      await _permissionGateway
-          .requestLocation();
+    final bool searchAreaChanged =
+        latitude != _lastSearchLatitude ||
+            longitude != _lastSearchLongitude ||
+            radiusKm != _lastSearchRadiusKm;
+    final bool labelChanged = label != _lastLocationLabel;
 
-      final location = result.location;
+    _lastSearchLatitude = latitude;
+    _lastSearchLongitude = longitude;
+    _lastSearchRadiusKm = radiusKm;
+    _lastLocationLabel = label;
 
-      if (result.decision ==
-          PermissionDecision.granted &&
-          location != null) {
-        locationLabel = await _locationRepository
-            .reverseGeocode(location);
-      }
-    } catch (_) {
-      // 위치 조회에 실패하면 지역 기본 라벨을 그대로 사용합니다.
+    if (searchAreaChanged) {
+      unawaited(_refreshStoresForSearchLocation());
+      return;
     }
 
-    _locationResolved = true;
-    _cachedLocationLabel = locationLabel;
-
-    return locationLabel;
+    if (labelChanged) {
+      _rebuildSnapshotFromCachedData();
+    }
   }
 
-  /// 실제 매장의 주소가 부산 지역인지 확인합니다.
-  ///
-  /// 매장에 시/도 구분 필드가 없어 주소 문자열로 대략 판단합니다.
-  bool _matchesRegion(
-      CustomerStore store,
-      ) {
-    final address = store.address ?? '';
+  Future<void> _refreshStoresForSearchLocation() async {
+    if (_disposed) {
+      return;
+    }
 
-    return address.contains('부산');
+    final int requestVersion = ++_storeLocationRequestVersion;
+    final _HomeLoadResult<List<CustomerStore>> result =
+        await _loadStoresAtCurrentSearchLocation();
+
+    if (_disposed || requestVersion != _storeLocationRequestVersion) {
+      return;
+    }
+
+    _stores = List<CustomerStore>.unmodifiable(result.value);
+
+    final CustomerHomeSnapshot? currentSnapshot = snapshot;
+    if (currentSnapshot == null) {
+      return;
+    }
+
+    snapshot = _createSnapshot(
+      stores: _stores,
+      orders: _orders,
+      storeLoadFailed: result.error != null,
+      orderLoadFailed: currentSnapshot.orderLoadFailed,
+    );
+
+    _notifySafely();
+  }
+
+  void _rebuildSnapshotFromCachedData() {
+    final CustomerHomeSnapshot? currentSnapshot = snapshot;
+
+    if (currentSnapshot == null) {
+      return;
+    }
+
+    snapshot = _createSnapshot(
+      stores: _stores,
+      orders: _orders,
+      storeLoadFailed: currentSnapshot.storeLoadFailed,
+      orderLoadFailed: currentSnapshot.orderLoadFailed,
+    );
+
+    _notifySafely();
+  }
+
+  void _rememberCurrentSearchState() {
+    _lastSearchLatitude = _searchLocationController.searchCenter.latitude;
+    _lastSearchLongitude = _searchLocationController.searchCenter.longitude;
+    _lastSearchRadiusKm = _searchLocationController.searchRadiusKm;
+    _lastLocationLabel = _searchLocationController.displayLabel;
+  }
+
+  bool _shouldUseBusanTemporaryContent() {
+    final CustomerSearchLocationSource source = _searchLocationController.source;
+
+    if (source == CustomerSearchLocationSource.busanDefault) {
+      return true;
+    }
+
+    final String label = _searchLocationController.displayLabel
+        .replaceAll('부산광역시', '부산')
+        .trim();
+
+    return label.startsWith('부산');
   }
 
   Future<_HomeLoadResult<List<CustomerStore>>>
-  _loadStores() async {
+      _loadStoresAtCurrentSearchLocation() async {
     try {
-      final stores =
-      await _storeDiscoveryRepository
-          .search();
+      final List<CustomerStore> stores = await _storeDiscoveryRepository.search(
+        location: _searchLocationController.searchCenter,
+        radiusKm: _searchLocationController.searchRadiusKm,
+      );
 
-      return _HomeLoadResult<
-          List<CustomerStore>>(
-        value: List.unmodifiable(stores),
+      return _HomeLoadResult<List<CustomerStore>>(
+        value: List<CustomerStore>.unmodifiable(stores),
       );
     } catch (error) {
-      return _HomeLoadResult<
-          List<CustomerStore>>(
-        value: const [],
+      return _HomeLoadResult<List<CustomerStore>>(
+        value: const <CustomerStore>[],
         error: error,
       );
     }
   }
 
-  Future<_HomeLoadResult<List<CustomerOrder>>>
-  _loadOrders({
+  Future<_HomeLoadResult<List<CustomerOrder>>> _loadOrders({
     required bool signedIn,
   }) async {
     if (!signedIn) {
-      return const _HomeLoadResult<
-          List<CustomerOrder>>(
-        value: [],
+      return const _HomeLoadResult<List<CustomerOrder>>(
+        value: <CustomerOrder>[],
       );
     }
 
     try {
-      final orders =
-      await _orderRepository.findAll();
+      final List<CustomerOrder> orders = await _orderRepository.findAll();
 
-      return _HomeLoadResult<
-          List<CustomerOrder>>(
-        value: List.unmodifiable(orders),
+      return _HomeLoadResult<List<CustomerOrder>>(
+        value: List<CustomerOrder>.unmodifiable(orders),
       );
     } catch (error) {
-      return _HomeLoadResult<
-          List<CustomerOrder>>(
-        value: const [],
+      return _HomeLoadResult<List<CustomerOrder>>(
+        value: const <CustomerOrder>[],
         error: error,
       );
     }
@@ -387,10 +517,8 @@ class CustomerHomeController extends ChangeNotifier {
 
     _orderRefreshTimer = Timer.periodic(
       _orderRefreshInterval,
-          (_) {
-        unawaited(
-          _refreshOrdersSilently(),
-        );
+      (_) {
+        unawaited(_refreshOrdersSilently());
       },
     );
   }
@@ -412,27 +540,23 @@ class CustomerHomeController extends ChangeNotifier {
     _isRefreshingOrders = true;
 
     try {
-      final orders =
-      await _orderRepository.findAll();
+      final List<CustomerOrder> orders = await _orderRepository.findAll();
 
       if (_disposed) {
         return;
       }
 
-      final currentSnapshot = snapshot;
+      _orders = List<CustomerOrder>.unmodifiable(orders);
 
+      final CustomerHomeSnapshot? currentSnapshot = snapshot;
       if (currentSnapshot == null) {
         return;
       }
 
       snapshot = _createSnapshot(
         stores: _stores,
-        orders: orders,
-        region: currentSnapshot.region,
-        currentLocationLabel:
-        currentSnapshot.currentLocationLabel,
-        storeLoadFailed:
-        currentSnapshot.storeLoadFailed,
+        orders: _orders,
+        storeLoadFailed: currentSnapshot.storeLoadFailed,
         orderLoadFailed: false,
       );
 
@@ -442,38 +566,24 @@ class CustomerHomeController extends ChangeNotifier {
         return;
       }
 
-      final currentSnapshot = snapshot;
-
+      final CustomerHomeSnapshot? currentSnapshot = snapshot;
       if (currentSnapshot == null) {
         return;
       }
 
-      // 주문 갱신이 실패해도 기존 홈 데이터는 유지합니다.
       snapshot = CustomerHomeSnapshot(
-        activeOrder:
-        currentSnapshot.activeOrder,
-        featuredStore:
-        currentSnapshot.featuredStore,
-        eventStores:
-        currentSnapshot.eventStores,
-        recommendedStores:
-        currentSnapshot.recommendedStores,
-        temporaryPopups:
-        currentSnapshot.temporaryPopups,
-        temporaryRecommendations:
-        currentSnapshot
-            .temporaryRecommendations,
-        featureBanners:
-        currentSnapshot.featureBanners,
-        benefitBanners:
-        currentSnapshot.benefitBanners,
+        activeOrder: currentSnapshot.activeOrder,
+        featuredStore: currentSnapshot.featuredStore,
+        eventStores: currentSnapshot.eventStores,
+        recommendedStores: currentSnapshot.recommendedStores,
+        temporaryPopups: currentSnapshot.temporaryPopups,
+        temporaryRecommendations: currentSnapshot.temporaryRecommendations,
+        featureBanners: currentSnapshot.featureBanners,
+        benefitBanners: currentSnapshot.benefitBanners,
         region: currentSnapshot.region,
-        regionLabel:
-        currentSnapshot.regionLabel,
-        currentLocationLabel:
-        currentSnapshot.currentLocationLabel,
-        storeLoadFailed:
-        currentSnapshot.storeLoadFailed,
+        regionLabel: currentSnapshot.regionLabel,
+        currentLocationLabel: currentSnapshot.currentLocationLabel,
+        storeLoadFailed: currentSnapshot.storeLoadFailed,
         orderLoadFailed: true,
       );
 
@@ -483,13 +593,9 @@ class CustomerHomeController extends ChangeNotifier {
     }
   }
 
-  CustomerOrder? _findActiveOrder(
-      List<CustomerOrder> orders,
-      ) {
-    for (final order in orders) {
-      if (_activeOrderStatuses.contains(
-        order.status,
-      )) {
+  CustomerOrder? _findActiveOrder(List<CustomerOrder> orders) {
+    for (final CustomerOrder order in orders) {
+      if (_activeOrderStatuses.contains(order.status)) {
         return order;
       }
     }
@@ -506,49 +612,40 @@ class CustomerHomeController extends ChangeNotifier {
       return null;
     }
 
-    // 진행 중 주문이 있으면 해당 주문의 매장을 우선 표시합니다.
+    // 진행 중 주문 매장이 현재 탐색 결과에도 있으면 우선 표시합니다.
     if (activeOrder != null) {
-      final activeOrderStore =
-      _findStoreById(
-        stores,
-        activeOrder.storeId,
-      );
+      final CustomerStore? activeOrderStore =
+          _findStoreById(stores, activeOrder.storeId);
 
       if (activeOrderStore != null) {
         return activeOrderStore;
       }
     }
 
-    // 진행 중 주문이 없으면 최근 주문에 사용한 매장을 찾습니다.
-    for (final order in orders) {
-      final orderedStore =
-      _findStoreById(
-        stores,
-        order.storeId,
-      );
+    // 최근 주문 매장이 현재 탐색 결과 안에 있으면 우선 표시합니다.
+    for (final CustomerOrder order in orders) {
+      final CustomerStore? orderedStore = _findStoreById(stores, order.storeId);
 
       if (orderedStore != null) {
         return orderedStore;
       }
     }
 
-    // 주문 기록이 없으면 공개된 LOCAL_STORE를 우선 사용합니다.
-    for (final store in stores) {
-      if (store.storeType ==
-          'LOCAL_STORE') {
+    // 주문 기록과 관계없이 현재 탐색 위치 주변 LOCAL_STORE를 우선 사용합니다.
+    for (final CustomerStore store in stores) {
+      if (store.storeType == 'LOCAL_STORE') {
         return store;
       }
     }
 
-    // LOCAL_STORE도 없다면 공개 매장 중 첫 번째 매장을 사용합니다.
     return stores.first;
   }
 
   CustomerStore? _findStoreById(
-      List<CustomerStore> stores,
-      int storeId,
-      ) {
-    for (final store in stores) {
+    List<CustomerStore> stores,
+    int storeId,
+  ) {
+    for (final CustomerStore store in stores) {
       if (store.storeId == storeId) {
         return store;
       }
@@ -558,8 +655,7 @@ class CustomerHomeController extends ChangeNotifier {
   }
 
   void _handleSessionChanged() {
-    final signedIn =
-        _sessionController.isSignedIn;
+    final bool signedIn = _sessionController.isSignedIn;
 
     if (_lastSignedIn == signedIn) {
       return;
@@ -584,12 +680,16 @@ class CustomerHomeController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _requestVersion++;
+    _storeLocationRequestVersion++;
 
     _cancelOrderRefreshTimer();
 
-    _sessionController.removeListener(
-      _handleSessionChanged,
-    );
+    _sessionController.removeListener(_handleSessionChanged);
+    _searchLocationController.removeListener(_handleSearchLocationChanged);
+
+    if (_ownsSearchLocationController) {
+      _searchLocationController.dispose();
+    }
 
     super.dispose();
   }

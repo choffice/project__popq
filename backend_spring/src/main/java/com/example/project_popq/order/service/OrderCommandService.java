@@ -252,13 +252,22 @@ public class OrderCommandService {
                     transition
             );
         } else {
+            Instant transitionedAt = Instant.now();
+
             OrderTransition transition = order.transitionTo(
                     targetStatus,
                     OrderActorType.SELLER,
                     user.getId(),
                     reason,
-                    Instant.now()
+                    transitionedAt
             );
+
+            if (targetStatus == OrderStatus.COMPLETED) {
+                rewardCompletedCustomerOrder(
+                        order,
+                        transitionedAt
+                );
+            }
 
             flushAndPublish(
                     order,
@@ -267,6 +276,23 @@ public class OrderCommandService {
         }
 
         return OrderResponse.from(order);
+    }
+
+    private void rewardCompletedCustomerOrder(
+            Order order,
+            Instant completedAt
+    ) {
+        if (order.getUser() == null) {
+            return;
+        }
+
+        paymentRepository
+                .findForUpdateByOrderId(order.getId())
+                .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
+                .ifPresent(payment -> customerPointService.rewardPayment(
+                        payment,
+                        completedAt
+                ));
     }
 
     private Order lockedSellerOrder(

@@ -86,15 +86,16 @@ class _SellerSalesScreenState extends State<SellerSalesScreen> {
     if (storeSales == null) {
       return RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(PopqSpacing.lg),
-          children: const [
-            SizedBox(height: 120),
-            PopqEmptyView(
-              icon: Icons.storefront_outlined,
-              title: '선택된 사업장이 없어요.',
-              description: '대시보드에서 사업장을 선택한 뒤 다시 확인해 주세요.',
+        child: const CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.storefront_outlined,
+                title: '선택된 사업장이 없어요.',
+                description: '대시보드에서 사업장을 선택한 뒤 다시 확인해 주세요.',
+              ),
             ),
           ],
         ),

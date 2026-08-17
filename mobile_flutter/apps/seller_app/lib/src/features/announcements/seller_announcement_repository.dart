@@ -107,6 +107,11 @@ abstract interface class SellerAnnouncementRepository {
     SellerAnnouncement announcement,
     bool pinned,
   );
+
+  Future<void> delete(
+    int storeId,
+    SellerAnnouncement announcement,
+  );
 }
 
 class ApiSellerAnnouncementRepository implements SellerAnnouncementRepository {
@@ -206,6 +211,23 @@ class ApiSellerAnnouncementRepository implements SellerAnnouncementRepository {
   }
 
   @override
+  Future<void> delete(
+    int storeId,
+    SellerAnnouncement announcement,
+  ) async {
+    _requireStore(storeId, announcement);
+
+    final bool deleted = await _apiClient.delete<bool>(
+      '${_basePath(storeId)}/${announcement.announcementId}',
+      decode: (Object? value) => value as bool,
+    );
+
+    if (!deleted) {
+      throw StateError('announcement delete failed');
+    }
+  }
+
+  @override
   Future<String> uploadAnnouncementImage(
     String filePath,
   ) {
@@ -269,6 +291,15 @@ class MemorySellerAnnouncementRepository
         _announcements.where((item) => item.storeId == storeId).toList()
           ..sort(_compareAnnouncements);
     return List.unmodifiable(result);
+  }
+
+  @override
+  Future<void> delete(
+    int storeId,
+    SellerAnnouncement announcement,
+  ) async {
+    final index = _findIndex(storeId, announcement);
+    _announcements.removeAt(index);
   }
 
   @override

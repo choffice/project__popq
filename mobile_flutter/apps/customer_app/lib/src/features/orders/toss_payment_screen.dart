@@ -682,7 +682,7 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
     if (kIsWeb) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('토스 결제'),
+          title: const Text('결제하기'),
         ),
         body: TossPaymentWeb(
           clientKey: widget.clientKey,
@@ -741,7 +741,7 @@ class _TossPaymentScreenState extends State<TossPaymentScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('토스 결제'),
+        title: const Text('결제하기'),
       ),
       body: Stack(
         children: [

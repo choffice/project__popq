@@ -5,6 +5,8 @@ import 'package:popq_design_system/popq_design_system.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../routing/customer_router.dart';
+import '../cart/cart_controller.dart';
+import '../cart/customer_cart_action.dart';
 import '../announcements/public_announcement_repository.dart';
 import '../announcements/announcement_pinned_badge.dart';
 import '../catalog/catalog_repository.dart';
@@ -20,6 +22,7 @@ class StoreDetailScreen extends StatefulWidget {
     required this.sessionController,
     required this.catalogRepository,
     required this.announcementRepository,
+    required this.cartController,
     super.key,
   });
 
@@ -29,6 +32,7 @@ class StoreDetailScreen extends StatefulWidget {
   final SessionController sessionController;
   final CatalogRepository catalogRepository;
   final PublicAnnouncementRepository announcementRepository;
+  final CartController cartController;
 
   @override
   State<StoreDetailScreen> createState() => _StoreDetailScreenState();
@@ -70,6 +74,9 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                   : Icons.favorite_border_rounded,
             ),
           ),
+          CustomerCartAction(
+            controller: widget.cartController,
+          ),
         ],
       ),
       body: FutureBuilder<CustomerStore>(
@@ -89,6 +96,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
           final store = snapshot.requireData;
           final schedule = store.resolvedSchedule;
           final orderPaused = !store.orderAcceptingEnabled;
+          final String eventName = store.eventName?.trim() ?? '';
           return Column(
             children: <Widget>[
               StoreSectionTopBar(store: store, selected: StoreSection.info),
@@ -135,10 +143,22 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                     ],
+                    if (store.storeType == 'EVENT_COMMERCE' &&
+                        eventName.isNotEmpty) ...[
+                      const SizedBox(height: PopqSpacing.sm),
+                      ListTile(
+                        key: const Key('store-detail-event-name'),
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.celebration_outlined),
+                        title: const Text('행사명'),
+                        subtitle: Text(eventName),
+                      ),
+                    ],
                     if (store.operationStartDate != null ||
                         store.operationEndDate != null) ...[
                       const SizedBox(height: PopqSpacing.sm),
                       ListTile(
+                        key: const Key('store-detail-operation-period'),
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.event_outlined),
                         title: Text(
@@ -266,11 +286,14 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                     ),
                     const SizedBox(height: PopqSpacing.xl),
                     FilledButton.icon(
-                      onPressed: () => openStoreSection(
-                        context,
-                        store.storeId,
-                        StoreSection.products,
-                      ),
+                      onPressed: () {
+                        context.push(
+                          storeSectionPath(
+                            store.storeId,
+                            StoreSection.products,
+                          ),
+                        );
+                      },
                       icon: const Icon(Icons.shopping_bag_outlined),
                       label: const Text('상품 보기'),
                     ),

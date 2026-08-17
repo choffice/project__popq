@@ -1,8 +1,14 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../realtime/seller_realtime_scope.dart';
 import 'seller_support_repository.dart';
 import 'seller_support_ticket.dart';
 import 'seller_support_types.dart';
+
 
 class SellerSupportTicketListScreen extends StatefulWidget {
   const SellerSupportTicketListScreen({
@@ -24,7 +30,10 @@ class _SellerSupportTicketListScreenState
     extends State<SellerSupportTicketListScreen> {
   List<SellerSupportTicketSummary> _tickets = const [];
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void initState() {
@@ -32,9 +41,50 @@ class _SellerSupportTicketListScreenState
     _loadTickets();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = SellerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.requesterType != 'SELLER') {
+          return;
+        }
+
+        unawaited(_loadTickets());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    super.dispose();
+  }
+
   Future<void> _loadTickets() async {
+    final showInitialLoading = !_hasLoadedOnce;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -48,6 +98,7 @@ class _SellerSupportTicketListScreenState
       setState(() {
         _tickets = tickets;
         _loading = false;
+        _hasLoadedOnce = true;
       });
     } catch (_) {
       if (!mounted) {
@@ -56,6 +107,7 @@ class _SellerSupportTicketListScreenState
 
       setState(() {
         _loading = false;
+        _hasLoadedOnce = true;
         _errorMessage = '문의 내역을 불러오지 못했어요.';
       });
     }
@@ -74,8 +126,8 @@ class _SellerSupportTicketListScreenState
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_errorMessage != null) {
-      return _TicketListMessage(
+    if (_errorMessage != null && _tickets.isEmpty) {
+        return _TicketListMessage(
         icon: Icons.error_outline_rounded,
         message: _errorMessage!,
         actionLabel: '다시 시도',
@@ -84,9 +136,21 @@ class _SellerSupportTicketListScreenState
     }
 
     if (_tickets.isEmpty) {
-      return const _TicketListMessage(
-        icon: Icons.forum_outlined,
-        message: '아직 등록한 문의가 없어요.',
+      return RefreshIndicator(
+        onRefresh: _loadTickets,
+        child: const CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.forum_outlined,
+                title: '아직 등록한 문의가 없어요.',
+                description: '문의가 등록되면 이곳에서 진행 상태와 답변을 확인할 수 있어요.',
+              ),
+            ),
+          ],
+        ),
       );
     }
 

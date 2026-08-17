@@ -24,10 +24,12 @@ class CustomerSupportInquiryFormScreen extends StatefulWidget {
 
 class _CustomerSupportInquiryFormScreenState
     extends State<CustomerSupportInquiryFormScreen> {
+  static const int _maxTitleLength = 200;
   static const int _maxContentLength = 1000;
 
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  final TextEditingController _titleController = TextEditingController();
   final TextEditingController _contentController = TextEditingController();
 
   CustomerSupportCategory? _category;
@@ -43,6 +45,7 @@ class _CustomerSupportInquiryFormScreenState
   @override
   void dispose() {
     _contentController.removeListener(_onContentChanged);
+    _titleController.dispose();
     _contentController.dispose();
     super.dispose();
   }
@@ -76,7 +79,7 @@ class _CustomerSupportInquiryFormScreenState
     try {
       final created = await widget.repository.createInquiry(
         category: category,
-        title: '${category.label} 문의',
+        title: _titleController.text,
         content: _contentController.text,
       );
 
@@ -157,6 +160,36 @@ class _CustomerSupportInquiryFormScreenState
                 validator: (value) {
                   if (value == null) {
                     return '문의 유형을 선택해 주세요.';
+                  }
+
+                  return null;
+                },
+              ),
+              Text(
+                '문의 제목',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _titleController,
+                enabled: !_submitting,
+                maxLength: _maxTitleLength,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  hintText: '문의 제목을 입력해 주세요',
+                  prefixIcon: Icon(Icons.title_rounded),
+                ),
+                validator: (value) {
+                  final normalized = value?.trim() ?? '';
+
+                  if (normalized.isEmpty) {
+                    return '문의 제목을 입력해 주세요.';
+                  }
+
+                  if (normalized.length > _maxTitleLength) {
+                    return '문의 제목은 200자 이하로 입력해 주세요.';
                   }
 
                   return null;

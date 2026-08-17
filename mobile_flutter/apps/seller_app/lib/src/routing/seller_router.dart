@@ -25,6 +25,7 @@ import '../features/orders/seller_order_repository.dart';
 import '../features/products/seller_product_repository.dart';
 import '../features/reviews/seller_review_repository.dart';
 import '../features/profile/seller_my_screen.dart';
+import '../features/stores/seller_inactive_store_screen.dart';
 import '../features/profile/seller_profile_screen.dart';
 import '../features/settings/seller_settings_screen.dart';
 import '../features/stores/seller_store_registration_screen.dart';
@@ -55,6 +56,7 @@ abstract final class SellerRoutes {
   static const platformAnnouncements = '/announcements';
   static const my = '/my';
   static const myProfile = '/my/profile';
+  static const inactiveStores = '/my/inactive-stores';
   static const support = '/support';
   static const supportTicketForm = '/support/tickets/new';
   static const supportTickets = '/support/tickets';
@@ -96,8 +98,11 @@ GoRouter createSellerRouter({
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   })
   onSignUp,
+  required Future<void> Function(String email) onSendEmailVerificationCode,
+  required Future<String> Function(String email, String code) onVerifyEmailCode,
   required Future<String> Function(String name, String phone) onFindId,
   required Future<void> Function(String email, String phone)
   onVerifyForPasswordReset,
@@ -176,6 +181,7 @@ GoRouter createSellerRouter({
           location != SellerRoutes.dashboard &&
           location != SellerRoutes.customers &&
           location != SellerRoutes.my &&
+          location != SellerRoutes.inactiveStores &&
           location != SellerRoutes.settings &&
           location != SellerRoutes.notifications &&
           !isStoreRegistration &&
@@ -227,7 +233,11 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.signUp,
         builder: (context, state) {
-          return SellerSignUpScreen(onSignUp: onSignUp);
+          return SellerSignUpScreen(
+            onSignUp: onSignUp,
+            onSendEmailVerificationCode: onSendEmailVerificationCode,
+            onVerifyEmailCode: onVerifyEmailCode,
+          );
         },
       ),
       GoRoute(
@@ -250,6 +260,15 @@ GoRouter createSellerRouter({
         builder: (context, state) {
           return SellerProfileScreen(
             identityRepository: bootstrapController.identityRepository,
+          );
+        },
+      ),
+      GoRoute(
+        path: SellerRoutes.inactiveStores,
+        builder: (context, state) {
+          return SellerInactiveStoreScreen(
+            repository: storeRepository,
+            selectionController: storeSelectionController,
           );
         },
       ),

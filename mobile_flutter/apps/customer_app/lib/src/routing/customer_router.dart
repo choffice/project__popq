@@ -19,6 +19,7 @@ import '../features/announcements/public_announcement_screens.dart';
 import '../features/announcements/customer_platform_announcement_screens.dart';
 import '../features/catalog/product_detail_screen.dart';
 import '../features/catalog/product_list_screen.dart';
+import '../features/discovery/customer_search_location_controller.dart';
 import '../features/discovery/store_detail_screen.dart';
 import '../features/discovery/store_discovery_repository.dart';
 import '../features/discovery/store_discovery_screen.dart';
@@ -101,6 +102,7 @@ GoRouter createCustomerRouter({
   required SessionController sessionController,
   required OnboardingController onboardingController,
   required StoreDiscoveryRepository storeDiscoveryRepository,
+  CustomerSearchLocationController? searchLocationController,
   required CatalogRepository catalogRepository,
   required PublicAnnouncementRepository announcementRepository,
   required PlatformAnnouncementRepository platformAnnouncementRepository,
@@ -122,8 +124,11 @@ GoRouter createCustomerRouter({
     required String password,
     required String name,
     required String phone,
+    required String emailVerificationToken,
   })
   onSignUp,
+  required Future<void> Function(String email) onSendEmailVerificationCode,
+  required Future<String> Function(String email, String code) onVerifyEmailCode,
   required Future<String> Function(String name, String phone) onFindId,
   required Future<void> Function(String email, String phone)
   onVerifyForPasswordReset,
@@ -310,7 +315,11 @@ GoRouter createCustomerRouter({
       GoRoute(
         path: CustomerRoutes.signUp,
         builder: (context, state) {
-          return CustomerSignUpScreen(onSignUp: onSignUp);
+          return CustomerSignUpScreen(
+            onSignUp: onSignUp,
+            onSendEmailVerificationCode: onSendEmailVerificationCode,
+            onVerifyEmailCode: onVerifyEmailCode,
+          );
         },
       ),
       GoRoute(
@@ -434,6 +443,7 @@ GoRouter createCustomerRouter({
             sessionController: sessionController,
             catalogRepository: catalogRepository,
             announcementRepository: announcementRepository,
+            cartController: cartController,
           );
         },
       ),
@@ -464,29 +474,6 @@ GoRouter createCustomerRouter({
         path: CustomerRoutes.notifications,
         builder: (context, state) {
           return NotificationListScreen(repository: notificationRepository);
-        },
-      ),
-      GoRoute(
-        path: CustomerRoutes.platformAnnouncements,
-        builder: (context, state) {
-          return CustomerPlatformAnnouncementListScreen(
-            repository: platformAnnouncementRepository,
-          );
-        },
-      ),
-      GoRoute(
-        path: '${CustomerRoutes.platformAnnouncements}/:platformAnnouncementId',
-        builder: (context, state) {
-          final id = int.tryParse(
-            state.pathParameters['platformAnnouncementId'] ?? '',
-          );
-          if (id == null || id <= 0) {
-            return const PopqErrorView(message: '공지사항 번호가 올바르지 않습니다.');
-          }
-          return CustomerPlatformAnnouncementDetailScreen(
-            platformAnnouncementId: id,
-            repository: platformAnnouncementRepository,
-          );
         },
       ),
       GoRoute(
@@ -531,6 +518,7 @@ GoRouter createCustomerRouter({
             location: state.uri.path,
             notificationRepository: notificationRepository,
             orderMessageRepository: orderMessageRepository,
+            cartController: cartController,
             sessionController: sessionController,
             themeController: themeController,
             child: child,
@@ -546,6 +534,7 @@ GoRouter createCustomerRouter({
                 sessionController: sessionController,
                 permissionGateway: permissionGateway,
                 locationRepository: locationRepository,
+                cartController: cartController,
                 preloadedController: homeController,
               );
             },
@@ -556,6 +545,7 @@ GoRouter createCustomerRouter({
               return StoreDiscoveryScreen(
                 repository: storeDiscoveryRepository,
                 permissionGateway: permissionGateway,
+                searchLocationController: searchLocationController,
                 engagementRepository: engagementRepository,
                 sessionController: sessionController,
               );
@@ -626,6 +616,34 @@ GoRouter createCustomerRouter({
             builder: (context, state) {
               return CustomerNotificationSettingsScreen(
                 repository: engagementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path: CustomerRoutes.platformAnnouncements,
+            builder: (context, state) {
+              return CustomerPlatformAnnouncementListScreen(
+                repository: platformAnnouncementRepository,
+              );
+            },
+          ),
+          GoRoute(
+            path:
+                '${CustomerRoutes.platformAnnouncements}/:platformAnnouncementId',
+            builder: (context, state) {
+              final id = int.tryParse(
+                state.pathParameters['platformAnnouncementId'] ?? '',
+              );
+
+              if (id == null || id <= 0) {
+                return const PopqErrorView(
+                  message: '공지사항 번호가 올바르지 않습니다.',
+                );
+              }
+
+              return CustomerPlatformAnnouncementDetailScreen(
+                platformAnnouncementId: id,
+                repository: platformAnnouncementRepository,
               );
             },
           ),

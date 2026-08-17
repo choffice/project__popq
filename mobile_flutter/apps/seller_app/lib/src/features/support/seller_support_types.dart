@@ -2,7 +2,6 @@ enum SellerSupportCategory {
   account('ACCOUNT', '계정'),
   storeVisibility('STORE_VISIBILITY', '매장 관리·노출'),
   orderPayment('ORDER_PAYMENT', '주문·결제'),
-  app('APP', '앱 이용'),
   other('OTHER', '기타');
 
   const SellerSupportCategory(this.apiValue, this.label);
@@ -38,7 +37,7 @@ enum SellerSupportStatus {
 }
 
 enum SellerSupportSenderType {
-  seller('SELLER'),
+  requester('REQUESTER'),
   admin('ADMIN');
 
   const SellerSupportSenderType(this.apiValue);
@@ -51,7 +50,7 @@ enum SellerSupportSenderType {
     }
     return SellerSupportSenderType.values.firstWhere(
       (type) => type.apiValue == value,
-      orElse: () => SellerSupportSenderType.seller,
+      orElse: () => SellerSupportSenderType.requester,
     );
   }
 }

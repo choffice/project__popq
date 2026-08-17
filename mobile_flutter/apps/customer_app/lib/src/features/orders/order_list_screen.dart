@@ -170,8 +170,42 @@ class _OrderListScreenState extends State<OrderListScreen>
     super.dispose();
   }
 
+  void _goBackToProfile() {
+    context.go(CustomerRoutes.profile);
+  }
+
   @override
   Widget build(BuildContext context) {
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (
+        bool didPop,
+        Object? result,
+      ) {
+        if (didPop) {
+          return;
+        }
+
+        _goBackToProfile();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            tooltip: '마이로 돌아가기',
+            onPressed: _goBackToProfile,
+            icon: const Icon(
+              Icons.arrow_back_rounded,
+            ),
+          ),
+          title: const Text('주문 내역'),
+        ),
+        body: _buildBody(context),
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
     if (_initialLoading && _data == null) {
       return const PopqLoadingView(
         message: '주문 내역을 불러오고 있어요.',

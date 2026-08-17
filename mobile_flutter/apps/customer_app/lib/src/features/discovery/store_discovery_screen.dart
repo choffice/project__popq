@@ -20,13 +20,206 @@ import '../profile/customer_engagement_repository.dart';
 import 'kakao_store_map.dart';
 import 'kakao_store_map_web_stub.dart'
 if (dart.library.js_interop) 'kakao_store_map_web.dart';
+import 'customer_search_location_controller.dart';
 import 'store_discovery_controller.dart';
 import 'store_discovery_repository.dart';
+
+@visibleForTesting
+class StoreSearchSuggestionController extends ChangeNotifier {
+  StoreSearchSuggestionController({
+    required this.repository,
+    this.debounceDuration = const Duration(milliseconds: 300),
+  });
+
+  final StoreDiscoveryRepository repository;
+  final Duration debounceDuration;
+
+  Timer? _debounce;
+  int _requestSerial = 0;
+  bool _disposed = false;
+  String _query = '';
+
+  List<CustomerStore> results = const <CustomerStore>[];
+  bool loading = false;
+  Object? error;
+
+  void schedule({
+    required String query,
+    required CustomerLocation location,
+    required double radiusKm,
+    String? tag,
+  }) {
+    _debounce?.cancel();
+
+    final String normalizedQuery = query.trim();
+    final int requestId = ++_requestSerial;
+    _query = normalizedQuery;
+
+    if (normalizedQuery.isEmpty) {
+      results = const <CustomerStore>[];
+      loading = false;
+      error = null;
+      notifyListeners();
+      return;
+    }
+
+    results = const <CustomerStore>[];
+    loading = true;
+    error = null;
+    notifyListeners();
+
+    void load() {
+      unawaited(
+        _load(
+          requestId: requestId,
+          query: normalizedQuery,
+          tag: tag,
+          location: location,
+          radiusKm: radiusKm,
+        ),
+      );
+    }
+
+    if (debounceDuration == Duration.zero) {
+      load();
+    } else {
+      _debounce = Timer(debounceDuration, load);
+    }
+  }
+
+  Future<void> _load({
+    required int requestId,
+    required String query,
+    required CustomerLocation location,
+    required double radiusKm,
+    String? tag,
+  }) async {
+    try {
+      final List<CustomerStore> searchedStores = await repository.search(
+        query: query,
+        tag: tag,
+        location: location,
+        radiusKm: radiusKm,
+      );
+
+      if (_isStale(requestId, query)) {
+        return;
+      }
+
+      results = searchedStores;
+      loading = false;
+      error = null;
+      notifyListeners();
+    } catch (caught) {
+      if (_isStale(requestId, query)) {
+        return;
+      }
+
+      results = const <CustomerStore>[];
+      loading = false;
+      error = caught;
+      notifyListeners();
+    }
+  }
+
+  bool _isStale(int requestId, String query) {
+    return _disposed || requestId != _requestSerial || query != _query;
+  }
+
+  void clear() {
+    _debounce?.cancel();
+    _requestSerial += 1;
+    _query = '';
+    results = const <CustomerStore>[];
+    loading = false;
+    error = null;
+
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _debounce?.cancel();
+    _requestSerial += 1;
+    super.dispose();
+  }
+}
+
+@visibleForTesting
+List<CustomerStore> filterStoreSearchSuggestions({
+  required Iterable<CustomerStore> stores,
+  String? storeType,
+  bool favoritesOnly = false,
+  Set<int> favoriteStoreIds = const <int>{},
+  bool openOnly = false,
+  int limit = 5,
+}) {
+  final Iterable<CustomerStore> filtered = stores.where((store) {
+    if (storeType != null && store.storeType != storeType) {
+      return false;
+    }
+    if (favoritesOnly && !favoriteStoreIds.contains(store.storeId)) {
+      return false;
+    }
+    if (openOnly && store.businessStatus != 'OPEN') {
+      return false;
+    }
+    return true;
+  });
+
+  final Iterable<CustomerStore> openStores = filtered.where(
+    (store) => store.businessStatus == 'OPEN',
+  );
+  final Iterable<CustomerStore> preparingStores = filtered.where(
+    (store) => store.businessStatus == 'PRE_OPEN',
+  );
+  final Iterable<CustomerStore> otherStores = filtered.where(
+    (store) =>
+        store.businessStatus != 'OPEN' && store.businessStatus != 'PRE_OPEN',
+  );
+
+  return <CustomerStore>[
+    ...openStores,
+    ...preparingStores,
+    ...otherStores,
+  ].take(limit).toList(growable: false);
+}
+
+@visibleForTesting
+Widget buildSelectedStoreCardForTest(CustomerStore store) {
+  return _SelectedStoreCard(
+    store: store,
+    favorite: false,
+    favoriteUpdating: false,
+    walkingRoute: null,
+    walkingRouteLoading: false,
+    walkingRouteError: null,
+    onWalkingRouteRetry: () {},
+    onStoreLocationPressed: () {},
+    onFavoritePressed: () {},
+    onDetailsPressed: () {},
+    onClose: () {},
+  );
+}
+
+@visibleForTesting
+Widget buildSearchSuggestionPanelForTest(List<CustomerStore> stores) {
+  return _SearchSuggestionPanel(
+    suggestions: stores,
+    loading: false,
+    failed: false,
+    onSelected: (_) {},
+  );
+}
 
 class StoreDiscoveryScreen extends StatefulWidget {
   const StoreDiscoveryScreen({
     required this.repository,
     required this.permissionGateway,
+    this.searchLocationController,
     this.engagementRepository,
     this.sessionController,
     super.key,
@@ -34,6 +227,12 @@ class StoreDiscoveryScreen extends StatefulWidget {
 
   final StoreDiscoveryRepository repository;
   final CustomerPermissionGateway permissionGateway;
+
+  /// 홈과 탐색 탭이 공유하는 업체 탐색 기준 위치입니다.
+  ///
+  /// 소비자 배송지/거주지 주소와는 별개이며, null이면 기존 탐색 화면처럼
+  /// 자체 위치 상태만 사용합니다.
+  final CustomerSearchLocationController? searchLocationController;
 
   /// 다음 단계에서 라우터가 전달합니다.
   ///
@@ -71,6 +270,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   ];
 
   late final StoreDiscoveryController _controller;
+
+  late final StoreSearchSuggestionController _searchSuggestionController;
 
   late final KakaoStoreMapController _mapController;
 
@@ -118,7 +319,12 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     _controller = StoreDiscoveryController(
       repository: widget.repository,
       permissionGateway: widget.permissionGateway,
+      searchLocationController: widget.searchLocationController,
     )..addListener(_onControllerChanged);
+
+    _searchSuggestionController = StoreSearchSuggestionController(
+      repository: widget.repository,
+    )..addListener(_onSearchSuggestionChanged);
 
     _createInterestController();
     _initializeDiscovery();
@@ -207,9 +413,19 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
   }
 
+  void _onSearchSuggestionChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _mapSearchDebounce?.cancel();
+
+    _searchSuggestionController
+      ..removeListener(_onSearchSuggestionChanged)
+      ..dispose();
 
     _controller
       ..removeListener(_onControllerChanged)
@@ -381,76 +597,23 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   List<CustomerStore> get _searchSuggestions {
-    final query = _queryController.text.trim().toLowerCase();
-
-    if (query.isEmpty) {
+    if (_queryController.text.trim().isEmpty) {
       return const [];
     }
 
-    /*
-   * 현재 지도 영역의 업체 중 검색어와 일치하는 업체를 찾습니다.
-   *
-   * _filteredStores는 서버에서 받은 거리순을 그대로 유지하므로,
-   * 여기서는 별도의 거리 계산이나 API 호출을 하지 않습니다.
-   */
-    final matchedStores = _filteredStores
-        .where((store) {
-      final nameMatches =
-      store.name.toLowerCase().contains(query);
+    final String? storeType = switch (_selectedFilter) {
+      _StoreFilterType.localStore => 'LOCAL_STORE',
+      _StoreFilterType.eventCommerce => 'EVENT_COMMERCE',
+      _ => null,
+    };
 
-      final addressMatches =
-          store.address?.toLowerCase().contains(query) ?? false;
-
-      final categoryMatches =
-          store.representativeCategory
-              ?.toLowerCase()
-              .contains(query) ??
-              false;
-
-      final tagMatches = store.tags.any(
-            (tag) => tag.toLowerCase().contains(query),
-      );
-
-      return nameMatches ||
-          categoryMatches ||
-          addressMatches ||
-          tagMatches;
-    })
-        .toList(growable: false);
-
-    /*
-   * 검색 드롭다운에서는 영업 상태를 거리보다 우선합니다.
-   *
-   * 1. OPEN
-   * 2. PRE_OPEN
-   *
-   * 각 그룹 내부에서는 matchedStores의 기존 순서를 그대로
-   * 유지하므로 결과적으로 거리 가까운 순이 유지됩니다.
-   */
-    final openStores = matchedStores.where(
-          (store) => store.businessStatus == 'OPEN',
+    return filterStoreSearchSuggestions(
+      stores: _searchSuggestionController.results,
+      storeType: storeType,
+      favoritesOnly: _selectedFilter == _StoreFilterType.favorites,
+      favoriteStoreIds: _favoriteStoreIds,
+      openOnly: _openOnly,
     );
-
-    final preparingStores = matchedStores.where(
-          (store) => store.businessStatus == 'PRE_OPEN',
-    );
-
-    /*
-   * 현재 공개 탐색 API는 OPEN / PRE_OPEN만 내려주지만,
-   * 예상하지 못한 상태가 들어오더라도 검색 결과 자체가
-   * 사라지지는 않도록 마지막에 보존합니다.
-   */
-    final otherStores = matchedStores.where(
-          (store) =>
-      store.businessStatus != 'OPEN' &&
-          store.businessStatus != 'PRE_OPEN',
-    );
-
-    return <CustomerStore>[
-      ...openStores,
-      ...preparingStores,
-      ...otherStores,
-    ].take(5).toList(growable: false);
   }
 
   @override
@@ -557,7 +720,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         SearchBar(
           controller: _queryController,
           focusNode: _searchFocusNode,
-          hintText: '업체명, 업종, 주소, 태그 검색',
+          hintText: '업체·메뉴·행사 검색',
           leading: const Icon(Icons.search_rounded),
           trailing: [
             if (_queryController.text.isNotEmpty)
@@ -567,20 +730,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
                 icon: const Icon(Icons.close_rounded),
               ),
           ],
-          onTap: () {
-            if (_queryController.text.trim().isEmpty) {
-              return;
-            }
-
-            setState(() {
-              _showSuggestions = true;
-            });
-          },
-          onChanged: (value) {
-            setState(() {
-              _showSuggestions = value.trim().isNotEmpty;
-            });
-          },
+          onTap: _showSearchSuggestions,
+          onChanged: _onSearchQueryChanged,
           onSubmitted: _submitSearch,
         ),
 
@@ -589,6 +740,8 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
         if (_showSuggestions && _queryController.text.trim().isNotEmpty)
           _SearchSuggestionPanel(
             suggestions: _searchSuggestions,
+            loading: _searchSuggestionController.loading,
+            failed: _searchSuggestionController.error != null,
             onSelected: _selectSearchSuggestion,
           )
         else
@@ -771,8 +924,50 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     });
   }
 
+  void _showSearchSuggestions() {
+    final String query = _queryController.text.trim();
+    if (query.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _showSuggestions = true;
+    });
+    _scheduleSearchSuggestions(query);
+  }
+
+  void _onSearchQueryChanged(String value) {
+    final String query = value.trim();
+
+    setState(() {
+      _showSuggestions = query.isNotEmpty;
+      if (query.isEmpty) {
+        _lastSearchWasMapMove = false;
+        _clearSelectedStoreState();
+      }
+    });
+
+    if (query.isEmpty) {
+      _searchSuggestionController.clear();
+      unawaited(_controller.search());
+      return;
+    }
+
+    _scheduleSearchSuggestions(query);
+  }
+
+  void _scheduleSearchSuggestions(String query) {
+    _searchSuggestionController.schedule(
+      query: query,
+      tag: _controller.selectedTag,
+      location: _controller.searchCenter,
+      radiusKm: _controller.searchRadiusKm,
+    );
+  }
+
   Future<void> _submitSearch(String value) async {
     _searchFocusNode.unfocus();
+    _searchSuggestionController.clear();
 
     setState(() {
       _lastSearchWasMapMove = false;
@@ -833,6 +1028,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   void _clearSearch() {
     _queryController.clear();
     _searchFocusNode.unfocus();
+    _searchSuggestionController.clear();
 
     setState(() {
       _lastSearchWasMapMove = false;
@@ -844,6 +1040,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
   }
 
   void _selectSearchSuggestion(CustomerStore store) {
+    _searchSuggestionController.clear();
     _queryController
       ..text = store.name
       ..selection = TextSelection.collapsed(offset: store.name.length);
@@ -1454,10 +1651,14 @@ class _StoreFilterBar extends StatelessWidget {
 class _SearchSuggestionPanel extends StatelessWidget {
   const _SearchSuggestionPanel({
     required this.suggestions,
+    required this.loading,
+    required this.failed,
     required this.onSelected,
   });
 
   final List<CustomerStore> suggestions;
+  final bool loading;
+  final bool failed;
   final ValueChanged<CustomerStore> onSelected;
 
   @override
@@ -1469,14 +1670,40 @@ class _SearchSuggestionPanel extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 260),
-        child: suggestions.isEmpty
+        child: loading
+            ? const Padding(
+                padding: EdgeInsets.all(PopqSpacing.md),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: PopqSpacing.sm),
+                    Expanded(child: Text('검색 추천을 불러오고 있어요.')),
+                  ],
+                ),
+              )
+            : failed
+            ? const Padding(
+                padding: EdgeInsets.all(PopqSpacing.md),
+                child: Row(
+                  children: [
+                    Icon(Icons.cloud_off_outlined),
+                    SizedBox(width: PopqSpacing.sm),
+                    Expanded(child: Text('검색 추천을 불러오지 못했습니다.')),
+                  ],
+                ),
+              )
+            : suggestions.isEmpty
             ? const Padding(
                 padding: EdgeInsets.all(PopqSpacing.md),
                 child: Row(
                   children: [
                     Icon(Icons.search_off_rounded),
                     SizedBox(width: PopqSpacing.sm),
-                    Expanded(child: Text('현재 목록에서 일치하는 업체가 없습니다.')),
+                    Expanded(child: Text('검색 결과가 없습니다.')),
                   ],
                 ),
               )
@@ -1512,14 +1739,7 @@ class _SearchSuggestionPanel extends StatelessWidget {
                       ],
                     ),
                     subtitle: Text(
-                      [
-                        store.representativeCategory?.trim().isNotEmpty == true
-                            ? store.representativeCategory!
-                            : _storeTypeLabel(store.storeType),
-                        if (store.fullAddress.isNotEmpty) store.fullAddress,
-                        if (store.distanceMeters != null)
-                          _formatDistance(store.distanceMeters!),
-                      ].join(' · '),
+                      _searchSuggestionSubtitle(store),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1676,6 +1896,10 @@ class _SelectedStoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final String eventName = store.eventName?.trim() ?? '';
+    final String? eventPeriod = store.storeType == 'EVENT_COMMERCE'
+        ? _shortEventPeriodLabel(store)
+        : null;
 
     return Card(
       margin: EdgeInsets.zero,
@@ -1742,6 +1966,35 @@ class _SelectedStoreCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (store.storeType == 'EVENT_COMMERCE' &&
+                        eventName.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        eventName,
+                        key: const Key('selected-store-event-name'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    if (eventPeriod != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        eventPeriod,
+                        key: const Key('selected-store-event-period'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                     if (store.representativeCategory?.trim().isNotEmpty ==
                         true) ...[
                       const SizedBox(height: 2),
@@ -2204,8 +2457,24 @@ String _storeTypeLabel(String storeType) {
   };
 }
 
+String _searchSuggestionSubtitle(CustomerStore store) {
+  final String eventName = store.eventName?.trim() ?? '';
+  return <String>[
+    if (store.storeType == 'EVENT_COMMERCE' && eventName.isNotEmpty) ...[
+      eventName,
+      _storeTypeLabel(store.storeType),
+    ] else
+      store.representativeCategory?.trim().isNotEmpty == true
+          ? store.representativeCategory!
+          : _storeTypeLabel(store.storeType),
+    if (store.fullAddress.isNotEmpty) store.fullAddress,
+    if (store.distanceMeters != null) _formatDistance(store.distanceMeters!),
+  ].join(' · ');
+}
+
 String _mapStoreHoursLabel(CustomerStore store) {
   final String hours = store.resolvedSchedule.todayLabel();
+  if (store.storeType == 'EVENT_COMMERCE') return hours;
   final DateTime? start = store.operationStartDate;
   final DateTime? end = store.operationEndDate;
   if (start == null && end == null) return hours;
@@ -2219,6 +2488,19 @@ String _mapStoreHoursLabel(CustomerStore store) {
           ? '${store.storeType == 'EVENT_COMMERCE' ? '행사' : '영업'} $startLabel 시작'
           : '$endLabel까지';
   return '$hours · $period';
+}
+
+String? _shortEventPeriodLabel(CustomerStore store) {
+  final DateTime? start = store.operationStartDate;
+  final DateTime? end = store.operationEndDate;
+  if (start == null && end == null) return null;
+  final String startLabel = start == null
+      ? '미설정'
+      : '${start.month}.${start.day}';
+  final String endLabel = end == null
+      ? '종료일 없음'
+      : '${end.month}.${end.day}';
+  return '$startLabel ~ $endLabel';
 }
 
 IconData _storeTypeIcon(String storeType) {

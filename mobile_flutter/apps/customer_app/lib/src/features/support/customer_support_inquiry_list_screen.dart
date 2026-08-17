@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_design_system/popq_design_system.dart';
+
+import '../../realtime/customer_realtime_scope.dart';
 import 'customer_support_inquiry.dart';
 import 'customer_support_repository.dart';
 import 'customer_support_types.dart';
@@ -25,7 +30,11 @@ class _CustomerSupportInquiryListScreenState
   List<CustomerSupportInquirySummary> _inquiries = const [];
 
   bool _loading = true;
+  bool _hasLoadedOnce = false;
   String? _errorMessage;
+
+  PopqRealtimeClient? _realtimeClient;
+  PopqRealtimeSubscription? _supportSubscription;
 
   @override
   void initState() {
@@ -33,9 +42,50 @@ class _CustomerSupportInquiryListScreenState
     _loadInquiries();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final nextClient = CustomerRealtimeScope.maybeOf(context);
+
+    if (identical(_realtimeClient, nextClient)) {
+      return;
+    }
+
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    _realtimeClient = nextClient;
+
+    if (nextClient == null) {
+      return;
+    }
+
+    _supportSubscription = nextClient.subscribeToSupportTickets(
+      onEvent: (event) {
+        if (event.requesterType != 'CUSTOMER') {
+          return;
+        }
+
+        unawaited(_loadInquiries());
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _supportSubscription?.cancel();
+    _supportSubscription = null;
+    super.dispose();
+  }
+
   Future<void> _loadInquiries() async {
+    final showInitialLoading = !_hasLoadedOnce;
+
     setState(() {
-      _loading = true;
+      if (showInitialLoading) {
+        _loading = true;
+      }
+
       _errorMessage = null;
     });
 
@@ -49,6 +99,7 @@ class _CustomerSupportInquiryListScreenState
       setState(() {
         _inquiries = inquiries;
         _loading = false;
+        _hasLoadedOnce = true;
       });
     } catch (_) {
       if (!mounted) {
@@ -57,6 +108,7 @@ class _CustomerSupportInquiryListScreenState
 
       setState(() {
         _loading = false;
+        _hasLoadedOnce = true;
         _errorMessage = '문의 내역을 불러오지 못했어요.';
       });
     }
@@ -75,7 +127,7 @@ class _CustomerSupportInquiryListScreenState
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_errorMessage != null) {
+    if (_errorMessage != null && _inquiries.isEmpty) {
       return _InquiryListMessage(
         icon: Icons.error_outline_rounded,
         message: _errorMessage!,
@@ -85,9 +137,21 @@ class _CustomerSupportInquiryListScreenState
     }
 
     if (_inquiries.isEmpty) {
-      return const _InquiryListMessage(
-        icon: Icons.forum_outlined,
-        message: '아직 등록한 문의가 없어요.',
+      return RefreshIndicator(
+        onRefresh: _loadInquiries,
+        child: const CustomScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          slivers: <Widget>[
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: PopqEmptyView(
+                icon: Icons.forum_outlined,
+                title: '아직 등록한 문의가 없어요.',
+                description: '문의가 등록되면 이곳에서 진행 상태와 답변을 확인할 수 있어요.',
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -216,20 +280,20 @@ class _StatusChip extends StatelessWidget {
 
     final (backgroundColor, foregroundColor) = switch (status) {
       CustomerSupportStatus.received => (
-        colorScheme.secondaryContainer,
-        colorScheme.onSecondaryContainer,
+      colorScheme.secondaryContainer,
+      colorScheme.onSecondaryContainer,
       ),
-      CustomerSupportStatus.inProgress => (
-        colorScheme.tertiaryContainer,
-        colorScheme.onTertiaryContainer,
+      CustomerSupportStatus.waitingAdmin => (
+      colorScheme.tertiaryContainer,
+      colorScheme.onTertiaryContainer,
       ),
-      CustomerSupportStatus.answered => (
-        colorScheme.primaryContainer,
-        colorScheme.onPrimaryContainer,
+      CustomerSupportStatus.waitingRequester => (
+      colorScheme.primaryContainer,
+      colorScheme.onPrimaryContainer,
       ),
       CustomerSupportStatus.closed => (
-        colorScheme.surfaceContainerHighest,
-        colorScheme.onSurfaceVariant,
+      colorScheme.surfaceContainerHighest,
+      colorScheme.onSurfaceVariant,
       ),
     };
 

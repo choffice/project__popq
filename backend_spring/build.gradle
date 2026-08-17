@@ -19,6 +19,7 @@ repositories {
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+	implementation 'org.springframework.boot:spring-boot-starter-mail'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client'
 	implementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server'
@@ -29,21 +30,28 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'org.springframework.boot:spring-boot-starter-flyway'
 	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.3'
+
 	runtimeOnly 'org.flywaydb:flyway-mysql'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
-	runtimeOnly 'com.mysql:mysql-connector-j'
 	annotationProcessor 'org.projectlombok:lombok'
+
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-client-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-websocket-test'
+
 	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'com.h2database:h2'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+
+	// 통합 테스트는 H2 대신 실제 MySQL Testcontainers를 사용합니다.
+	testImplementation 'org.testcontainers:testcontainers-mysql:2.0.5'
+
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
 	// Querydsl Settings
 	implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
