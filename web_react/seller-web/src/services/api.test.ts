@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   archiveQrCode,
+  applyStoreOptionTemplateToAll,
   changeQrStatus,
   changeStoreBusinessStatus,
   createSellerCategory,
   createSellerProduct,
+  createStoreOptionTemplate,
+  deleteStoreOptionTemplate,
   deleteSellerProduct,
   createStoreTable,
   getSellerPaymentSummary,
   getSellerProductDetail,
+  getStoreOptionTemplates,
+  getStoreOptionTemplateUsage,
   getSalesSummary,
   getSellerOrders,
   getQrCodeDetail,
@@ -363,6 +368,82 @@ describe('판매자 주문 API 계약', () => {
         method: 'PUT',
         body: JSON.stringify({ groups }),
       }),
+    )
+  })
+
+  it('매장 공용 옵션 조회·생성·사용처·일괄 적용·삭제 계약을 사용한다', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: { templateId: 31, storeId: 7, version: 2, products: [] },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    )
+    const group = {
+      name: '온도',
+      minSelect: 1,
+      maxSelect: 1,
+      required: true,
+      displayOrder: 0,
+      options: [
+        { name: 'ICE', additionalPrice: 0, displayOrder: 0 },
+        { name: 'HOT', additionalPrice: 0, displayOrder: 1 },
+      ],
+    }
+
+    await getStoreOptionTemplates(connection)
+    await createStoreOptionTemplate(connection, group)
+    await getStoreOptionTemplateUsage(connection, 31)
+    await applyStoreOptionTemplateToAll(connection, 31, 101, 1001, group)
+    await deleteStoreOptionTemplate(connection, 31)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/seller/stores/7/option-group-templates',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/seller/stores/7/option-group-templates',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          name: group.name,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          required: group.required,
+          options: group.options,
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/v1/seller/stores/7/option-group-templates/31/products',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      '/api/v1/seller/stores/7/option-group-templates/31/apply',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          sourceProductId: 101,
+          sourceOptionGroupId: 1001,
+          name: group.name,
+          minSelect: group.minSelect,
+          maxSelect: group.maxSelect,
+          required: group.required,
+          options: group.options,
+        }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      5,
+      '/api/v1/seller/stores/7/option-group-templates/31',
+      expect.objectContaining({ method: 'DELETE' }),
     )
   })
 

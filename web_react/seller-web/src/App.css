@@ -3023,6 +3023,236 @@ main {
   min-width: 88px;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-option-editor .option-group-list {
+  min-height: 180px;
+}
+
+.option-form-error {
+  margin: 0 28px 15px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8dfd8;
+  color: #8f3f31;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.option-empty {
+  margin: 28px 0;
+  color: #777168;
+  text-align: center;
+}
+
+.app-option-editor .option-group-editor {
+  padding: 18px;
+}
+
+.app-option-editor .option-group-editor > header {
+  justify-content: flex-start;
+  gap: 9px;
+}
+
+.app-option-editor .option-group-editor > header b {
+  flex: 1;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.option-group-number {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #e3edd9;
+  color: #4e683c;
+  font-weight: 900;
+}
+
+.option-section {
+  margin-top: 18px;
+}
+
+.option-section h3 {
+  margin: 0;
+  font-size: 12px;
+}
+
+.option-section > p,
+.option-section-title p {
+  margin: 5px 0 10px;
+  color: #817c72;
+  font-size: 10px;
+}
+
+.option-section > label:not(.required-switch) {
+  display: grid;
+  gap: 6px;
+  color: #716c63;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.option-section > label input:not([type='checkbox']) {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid #d5d2c8;
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.option-section label small {
+  color: #8a857b;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.option-section em,
+.draft-options em {
+  color: #a64737;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.template-apply-button {
+  margin: 9px 0 0 auto;
+  padding: 8px 11px;
+  display: block;
+  border: 1px solid #9caf89;
+  border-radius: 9px;
+  color: #536d40;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.required-switch {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid #d5d2c8;
+  border-radius: 10px;
+}
+
+.required-switch > span {
+  display: grid;
+  gap: 4px;
+}
+
+.required-switch input {
+  width: 34px;
+  height: 20px;
+  accent-color: #6d9950;
+}
+
+.number-with-suffix {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.number-with-suffix input {
+  flex: 1;
+}
+
+.option-section-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.app-option-editor .draft-options > div > label {
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  border: 0;
+}
+
+.app-option-editor .draft-options > div > label input {
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid #d5d2c8;
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.app-option-editor .draft-options > div > .option-price-field {
+  grid-template-columns: auto minmax(55px, 1fr) auto;
+  align-items: center;
+}
+
+.app-option-editor .option-price-field em {
+  grid-column: 1 / -1;
+}
+
+.app-option-editor .add-option {
+  margin-left: 28px;
+}
+
+.nested-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  padding: 20px;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 16, 12, 0.48);
+}
+
+.option-confirm {
+  width: min(470px, 100%);
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--paper);
+  box-shadow: 0 24px 70px rgba(17, 16, 12, 0.3);
+}
+
+.option-confirm h3 {
+  margin: 0 0 12px;
+}
+
+.option-confirm p,
+.option-confirm li {
+  color: #716c63;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.option-confirm footer {
+  margin-top: 18px;
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.option-confirm footer button {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: #ece9df;
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .admin-hero {
   grid-template-columns: minmax(240px, 1fr) auto;
 }

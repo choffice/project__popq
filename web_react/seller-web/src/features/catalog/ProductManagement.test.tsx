@@ -95,7 +95,10 @@ describe('판매자 상품 관리', () => {
     await user.click(screen.getAllByRole('button', { name: '옵션 편집' })[0])
     expect(screen.getByText('OPTION BUILDER')).toBeVisible()
 
-    await user.click(screen.getByRole('button', { name: '+ 옵션 추가' }))
+    expect(screen.queryByText('최소 선택')).not.toBeInTheDocument()
+    expect(screen.getByText('기존 공용 옵션을 선택하거나 새 이름을 입력하세요.')).toBeVisible()
+
+    await user.click(screen.getByRole('button', { name: '+ 옵션 항목 추가' }))
     await user.type(
       screen.getByLabelText('1번 그룹 3번 옵션 이름'),
       '휘핑 추가',
@@ -104,19 +107,63 @@ describe('판매자 상품 관리', () => {
       screen.getByLabelText('1번 그룹 3번 추가 금액'),
       '500',
     )
-    const minimum = screen.getAllByLabelText('최소 선택')[0]
-    const maximum = screen.getAllByLabelText('최대 선택')[0]
-    await user.clear(minimum)
-    await user.type(minimum, '1')
+    const maximum = screen.getByLabelText('1번 그룹 최대 선택 수')
     await user.clear(maximum)
     await user.type(maximum, '2')
-    await user.click(screen.getByRole('button', { name: '옵션 저장' }))
+    await user.click(screen.getByRole('button', { name: '저장' }))
 
     expect(screen.queryByText('OPTION BUILDER')).not.toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: '옵션 편집' })[0])
     expect(screen.getByDisplayValue('휘핑 추가')).toBeVisible()
-    expect(screen.getAllByLabelText('최소 선택')[0]).toHaveValue('1')
-    expect(screen.getAllByLabelText('최대 선택')[0]).toHaveValue('2')
+    expect(screen.getByLabelText('1번 그룹 최대 선택 수')).toHaveValue('2')
+  })
+
+  it('공용 옵션 변경 내용을 연결된 상품에 일괄 적용한다', async () => {
+    const user = userEvent.setup()
+    render(<ProductManagement connection={null} onError={vi.fn()} />)
+
+    await user.click(screen.getAllByRole('button', { name: '옵션 편집' })[0])
+    const firstOption = screen.getByLabelText('1번 그룹 1번 옵션 이름')
+    await user.clear(firstOption)
+    await user.type(firstOption, '차갑게')
+
+    await user.click(
+      screen.getByRole('button', { name: '동일 그룹에 변경사항 일괄 적용' }),
+    )
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: '동일 옵션 그룹을 일괄 변경할까요?',
+    })
+    expect(within(confirmation).getByText(/동일 옵션이 적용된 메뉴들이 4개/)).toBeVisible()
+    await user.click(within(confirmation).getByRole('button', { name: '일괄 적용' }))
+
+    expect(
+      screen.queryByRole('alertdialog', {
+        name: '동일 옵션 그룹을 일괄 변경할까요?',
+      }),
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: '동일 그룹에 변경사항 일괄 적용' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('연결된 공용 옵션은 다른 상품 사용 여부를 확인한 뒤 현재 상품에서만 삭제한다', async () => {
+    const user = userEvent.setup()
+    render(<ProductManagement connection={null} onError={vi.fn()} />)
+
+    await user.click(screen.getAllByRole('button', { name: '옵션 편집' })[0])
+    await user.click(screen.getByRole('button', { name: '옵션 그룹 1 삭제' }))
+
+    const confirmation = await screen.findByRole('alertdialog', {
+      name: '옵션 그룹을 삭제할까요?',
+    })
+    expect(within(confirmation).getByText(/다른 메뉴 3개에서도 사용 중/)).toBeVisible()
+    expect(
+      within(confirmation).queryByRole('button', { name: '공용 옵션도 삭제' }),
+    ).not.toBeInTheDocument()
+    await user.click(
+      within(confirmation).getByRole('button', { name: '현재 메뉴에서만 삭제' }),
+    )
+    expect(screen.getByText('옵션 그룹이 없습니다. 아래 버튼으로 추가하세요.')).toBeVisible()
   })
 })

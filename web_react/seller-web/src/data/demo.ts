@@ -8,6 +8,7 @@ import type {
   SellerCategory,
   SellerProduct,
   SellerOrder,
+  StoreOptionTemplate,
   StoreSummary,
   StoreTable,
 } from '../types'
@@ -282,6 +283,26 @@ export function freshDemoCategories() {
   return structuredClone(demoCategories)
 }
 
+const demoOptionTemplates: StoreOptionTemplate[] = [
+  {
+    templateId: 1,
+    storeId: 1,
+    name: '온도',
+    minSelect: 1,
+    maxSelect: 1,
+    required: true,
+    version: 1,
+    options: [
+      { optionId: 1, name: 'ICE', additionalPrice: 0, displayOrder: 0 },
+      { optionId: 2, name: 'HOT', additionalPrice: 0, displayOrder: 1 },
+    ],
+  },
+]
+
+export function freshDemoOptionTemplates() {
+  return structuredClone(demoOptionTemplates)
+}
+
 export function createDemoProductDetail(product: SellerProduct) {
   const hasTemperature = product.categoryName !== '디저트'
   return {
@@ -302,6 +323,8 @@ export function createDemoProductDetail(product: SellerProduct) {
             maxSelect: 1,
             required: true,
             displayOrder: 0,
+            templateId: 1,
+            appliedTemplateVersion: 1,
             options: [
               {
                 optionId: product.productId * 100 + 1,

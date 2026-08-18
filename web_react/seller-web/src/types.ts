@@ -171,6 +171,8 @@ export type ProductOptionGroup = {
   maxSelect: number;
   required: boolean;
   displayOrder: number;
+  templateId: number | null;
+  appliedTemplateVersion: number | null;
   options: ProductOption[];
 };
 
@@ -180,10 +182,32 @@ export type ProductOptionGroupInput = {
   maxSelect: number;
   required: boolean;
   displayOrder: number;
+  templateId?: number | null;
+  appliedTemplateVersion?: number | null;
   options: {
     name: string;
     additionalPrice: number;
     displayOrder: number;
+  }[];
+};
+
+export type StoreOptionTemplate = {
+  templateId: number;
+  storeId: number;
+  name: string;
+  minSelect: number;
+  maxSelect: number;
+  required: boolean;
+  version: number;
+  options: ProductOption[];
+};
+
+export type StoreOptionTemplateUsage = {
+  templateId: number;
+  totalCount: number;
+  products: {
+    productId: number;
+    productName: string;
   }[];
 };
 

@@ -3,15 +3,21 @@ import type { ChangeEvent } from 'react'
 import {
   createDemoProductDetail,
   freshDemoCategories,
+  freshDemoOptionTemplates,
   freshDemoProducts,
 } from '../../data/demo'
 import {
+  applyStoreOptionTemplateToAll,
+  createStoreOptionTemplate,
   createSellerCategory,
   createSellerProduct,
+  deleteStoreOptionTemplate,
   deleteSellerProduct,
   getSellerCategories,
   getSellerProductDetail,
   getSellerProducts,
+  getStoreOptionTemplates,
+  getStoreOptionTemplateUsage,
   replaceProductOptions,
   updateSellerProduct,
   updateProductAvailability,
@@ -23,32 +29,19 @@ import type {
   SellerCategory,
   SellerConnection,
   SellerProduct,
+  StoreOptionTemplate,
+  StoreOptionTemplateUsage,
   StoreRole,
 } from '../../types'
+import {
+  ProductOptionEditor,
+  type EditableOptionGroup,
+} from './ProductOptionEditor'
 
 type Props = {
   connection: SellerConnection | null
   storeRole?: StoreRole
   onError: (message: string | null) => void
-}
-
-type DraftOption = {
-  key: string
-  name: string
-  additionalPrice: string
-}
-
-type DraftGroup = {
-  key: string
-  name: string
-  required: boolean
-  minSelect: string
-  maxSelect: string
-  options: DraftOption[]
-}
-
-function key() {
-  return crypto.randomUUID()
 }
 
 function money(value: number) {
@@ -65,36 +58,6 @@ function readFileAsDataUrl(file: File) {
     reader.addEventListener('error', () => reject(new Error('이미지를 미리 볼 수 없습니다.')))
     reader.readAsDataURL(file)
   })
-}
-
-function emptyOption(): DraftOption {
-  return { key: key(), name: '', additionalPrice: '0' }
-}
-
-function emptyGroup(): DraftGroup {
-  return {
-    key: key(),
-    name: '',
-    required: false,
-    minSelect: '0',
-    maxSelect: '1',
-    options: [emptyOption()],
-  }
-}
-
-function toDraftGroups(detail: ProductDetail): DraftGroup[] {
-  return detail.optionGroups.map((group) => ({
-    key: String(group.optionGroupId),
-    name: group.name,
-    required: group.required,
-    minSelect: String(group.minSelect),
-    maxSelect: String(group.maxSelect),
-    options: group.options.map((option) => ({
-      key: String(option.optionId),
-      name: option.name,
-      additionalPrice: String(option.additionalPrice),
-    })),
-  }))
 }
 
 export function ProductManagement({ connection, storeRole, onError }: Props) {
@@ -126,7 +89,9 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
   const [removeProductImage, setRemoveProductImage] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [optionProduct, setOptionProduct] = useState<SellerProduct | null>(null)
-  const [draftGroups, setDraftGroups] = useState<DraftGroup[]>([])
+  const [optionTemplates, setOptionTemplates] = useState<StoreOptionTemplate[]>(
+    () => (isDemo ? freshDemoOptionTemplates() : []),
+  )
   const [showOptions, setShowOptions] = useState(false)
 
   useEffect(() => {
@@ -439,12 +404,18 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
   async function openOptionEditor(product: SellerProduct) {
     setUpdatingId(product.productId)
     try {
-      const detail = isDemo
-        ? (details[product.productId] ?? createDemoProductDetail(product))
-        : await getSellerProductDetail(connection, product.productId)
+      const [detail, templates] = isDemo
+        ? [
+            details[product.productId] ?? createDemoProductDetail(product),
+            optionTemplates,
+          ]
+        : await Promise.all([
+            getSellerProductDetail(connection, product.productId),
+            getStoreOptionTemplates(connection),
+          ])
       setDetails((current) => ({ ...current, [product.productId]: detail }))
-      setOptionProduct(product)
-      setDraftGroups(toDraftGroups(detail))
+      setOptionTemplates(templates)
+      setOptionProduct(detail.product)
       setShowOptions(true)
       onError(null)
     } catch (caught) {
@@ -458,70 +429,124 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
     }
   }
 
-  function updateGroup(groupKey: string, patch: Partial<DraftGroup>) {
-    setDraftGroups((current) =>
-      current.map((group) =>
-        group.key === groupKey ? { ...group, ...patch } : group,
-      ),
-    )
-  }
-
-  function updateOption(
-    groupKey: string,
-    optionKey: string,
-    patch: Partial<DraftOption>,
-  ) {
-    setDraftGroups((current) =>
-      current.map((group) =>
-        group.key === groupKey
-          ? {
-              ...group,
-              options: group.options.map((option) =>
-                option.key === optionKey ? { ...option, ...patch } : option,
-              ),
-            }
-          : group,
-      ),
-    )
-  }
-
-  async function saveOptions() {
-    if (!optionProduct) return
-    const groups: ProductOptionGroupInput[] = draftGroups.map(
-      (group, groupIndex) => ({
-        name: group.name.trim(),
-        minSelect: Number(group.minSelect),
-        maxSelect: Number(group.maxSelect),
-        required: group.required,
-        displayOrder: groupIndex,
-        options: group.options.map((option, optionIndex) => ({
-          name: option.name.trim(),
-          additionalPrice: Number(option.additionalPrice),
-          displayOrder: optionIndex,
-        })),
-      }),
-    )
-    const invalid = groups.some(
-      (group) =>
-        !group.name ||
-        !Number.isInteger(group.minSelect) ||
-        !Number.isInteger(group.maxSelect) ||
-        group.minSelect < 0 ||
-        group.maxSelect < group.minSelect ||
-        group.maxSelect > group.options.length ||
-        (group.required && group.minSelect === 0) ||
-        group.options.length === 0 ||
-        group.options.some(
-          (option) =>
-            !option.name ||
-            !Number.isInteger(option.additionalPrice) ||
-            option.additionalPrice < 0,
-        ),
-    )
-    if (invalid) {
-      onError('옵션 그룹 이름, 선택 수, 옵션 이름과 추가 금액을 확인해 주세요.')
-      return
+  async function createOptionTemplateForEditor(group: ProductOptionGroupInput) {
+    if (!isDemo) {
+      const created = await createStoreOptionTemplate(connection, group)
+      setOptionTemplates((current) => [...current, created])
+      return created
     }
+    const created: StoreOptionTemplate = {
+      templateId: Math.max(0, ...optionTemplates.map((item) => item.templateId)) + 1,
+      storeId: 1,
+      name: group.name,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      required: group.required,
+      version: 1,
+      options: group.options.map((option, index) => ({
+        optionId: Date.now() + index,
+        ...option,
+      })),
+    }
+    setOptionTemplates((current) => [...current, created])
+    return created
+  }
+
+  async function findTemplateUsageForEditor(
+    templateId: number,
+  ): Promise<StoreOptionTemplateUsage> {
+    if (!isDemo) return getStoreOptionTemplateUsage(connection, templateId)
+    const usingProducts = products.filter((product) => {
+      const detail = details[product.productId] ?? createDemoProductDetail(product)
+      return detail.optionGroups.some((group) => group.templateId === templateId)
+    })
+    return {
+      templateId,
+      totalCount: usingProducts.length,
+      products: usingProducts.map((product) => ({
+        productId: product.productId,
+        productName: product.name,
+      })),
+    }
+  }
+
+  async function applyTemplateForEditor(group: EditableOptionGroup) {
+    if (!optionProduct || group.templateId == null || group.optionGroupId == null) {
+      throw new Error('일괄 적용할 공용 옵션 연결 정보가 없습니다.')
+    }
+    if (!isDemo) {
+      const updated = await applyStoreOptionTemplateToAll(
+        connection,
+        group.templateId,
+        optionProduct.productId,
+        group.optionGroupId,
+        group,
+      )
+      setOptionTemplates((current) =>
+        current.map((item) =>
+          item.templateId === updated.templateId ? updated : item,
+        ),
+      )
+      return updated
+    }
+
+    const currentTemplate = optionTemplates.find(
+      (item) => item.templateId === group.templateId,
+    )
+    if (!currentTemplate) throw new Error('공용 옵션을 찾지 못했습니다.')
+    const updated: StoreOptionTemplate = {
+      ...currentTemplate,
+      name: group.name,
+      minSelect: group.minSelect,
+      maxSelect: group.maxSelect,
+      required: group.required,
+      version: currentTemplate.version + 1,
+      options: group.options.map((option, index) => ({
+        optionId: currentTemplate.options[index]?.optionId ?? Date.now() + index,
+        ...option,
+      })),
+    }
+    setOptionTemplates((current) =>
+      current.map((item) =>
+        item.templateId === updated.templateId ? updated : item,
+      ),
+    )
+    setDetails((current) => {
+      const next = { ...current }
+      products.forEach((product) => {
+        const detail = next[product.productId] ?? createDemoProductDetail(product)
+        next[product.productId] = {
+          ...detail,
+          optionGroups: detail.optionGroups.map((savedGroup) =>
+            savedGroup.templateId === updated.templateId
+              ? {
+                  ...savedGroup,
+                  name: updated.name,
+                  minSelect: updated.minSelect,
+                  maxSelect: updated.maxSelect,
+                  required: updated.required,
+                  appliedTemplateVersion: updated.version,
+                  options: updated.options.map((option, index) => ({
+                    ...option,
+                    optionId:
+                      savedGroup.options[index]?.optionId ??
+                      product.productId * 10_000 + index,
+                  })),
+                }
+              : savedGroup,
+          ),
+        }
+      })
+      return next
+    })
+    return updated
+  }
+
+  async function saveOptionGroups(
+    groups: ProductOptionGroupInput[],
+    templateIdsToDelete: number[],
+  ) {
+    if (!optionProduct) return
     setUpdatingId(optionProduct.productId)
     try {
       let detail: ProductDetail
@@ -532,6 +557,8 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
           optionGroups: groups.map((group, groupIndex) => ({
             optionGroupId: optionProduct.productId * 100 + groupIndex,
             ...group,
+            templateId: group.templateId ?? null,
+            appliedTemplateVersion: group.appliedTemplateVersion ?? null,
             options: group.options.map((option, optionIndex) => ({
               optionId:
                 optionProduct.productId * 10_000 +
@@ -548,18 +575,28 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
           groups,
         )
       }
+
+      let templateDeleteFailed = false
+      for (const templateId of templateIdsToDelete) {
+        try {
+          if (!isDemo) await deleteStoreOptionTemplate(connection, templateId)
+          setOptionTemplates((current) =>
+            current.filter((template) => template.templateId !== templateId),
+          )
+        } catch {
+          templateDeleteFailed = true
+        }
+      }
       setDetails((current) => ({
         ...current,
         [optionProduct.productId]: detail,
       }))
       setShowOptions(false)
       setOptionProduct(null)
-      onError(null)
-    } catch (caught) {
       onError(
-        caught instanceof Error
-          ? caught.message
-          : '옵션을 저장하지 못했습니다.',
+        templateDeleteFailed
+          ? '현재 상품의 옵션은 저장했지만 일부 공용 옵션은 삭제하지 못했습니다.'
+          : null,
       )
     } finally {
       setUpdatingId(null)
@@ -914,174 +951,22 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
       )}
 
       {showOptions && optionProduct && (
-        <div className="modal-backdrop option-backdrop" role="presentation">
-          <section
-            className="option-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="option-title"
-          >
-            <header>
-              <div>
-                <p className="eyebrow">OPTION BUILDER</p>
-                <h2 id="option-title">{optionProduct.name} 옵션</h2>
-              </div>
-              <button
-                className="modal-close"
-                aria-label="닫기"
-                onClick={() => setShowOptions(false)}
-              >
-                ×
-              </button>
-            </header>
-            <p className="option-help">
-              저장하면 기존 옵션 구성을 아래 내용으로 완전히 교체합니다.
-            </p>
-            <div className="option-group-list">
-              {draftGroups.map((group, groupIndex) => (
-                <article className="option-group-editor" key={group.key}>
-                  <header>
-                    <b>그룹 {groupIndex + 1}</b>
-                    <button
-                      aria-label={`옵션 그룹 ${groupIndex + 1} 삭제`}
-                      onClick={() =>
-                        setDraftGroups((current) =>
-                          current.filter((item) => item.key !== group.key),
-                        )
-                      }
-                    >
-                      삭제
-                    </button>
-                  </header>
-                  <div className="option-group-fields">
-                    <label>
-                      그룹 이름
-                      <input
-                        value={group.name}
-                        onChange={(event) =>
-                          updateGroup(group.key, { name: event.target.value })
-                        }
-                        placeholder="예: 온도"
-                      />
-                    </label>
-                    <label>
-                      최소 선택
-                      <input
-                        inputMode="numeric"
-                        value={group.minSelect}
-                        onChange={(event) =>
-                          updateGroup(group.key, {
-                            minSelect: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      최대 선택
-                      <input
-                        inputMode="numeric"
-                        value={group.maxSelect}
-                        onChange={(event) =>
-                          updateGroup(group.key, {
-                            maxSelect: event.target.value,
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="required-check">
-                      <input
-                        type="checkbox"
-                        checked={group.required}
-                        onChange={(event) =>
-                          updateGroup(group.key, {
-                            required: event.target.checked,
-                          })
-                        }
-                      />
-                      필수 선택
-                    </label>
-                  </div>
-                  <div className="draft-options">
-                    {group.options.map((option, optionIndex) => (
-                      <div key={option.key}>
-                        <span>{optionIndex + 1}</span>
-                        <input
-                          aria-label={`${groupIndex + 1}번 그룹 ${optionIndex + 1}번 옵션 이름`}
-                          value={option.name}
-                          onChange={(event) =>
-                            updateOption(group.key, option.key, {
-                              name: event.target.value,
-                            })
-                          }
-                          placeholder="옵션 이름"
-                        />
-                        <label>
-                          +
-                          <input
-                            aria-label={`${groupIndex + 1}번 그룹 ${optionIndex + 1}번 추가 금액`}
-                            inputMode="numeric"
-                            value={option.additionalPrice}
-                            onChange={(event) =>
-                              updateOption(group.key, option.key, {
-                                additionalPrice: event.target.value,
-                              })
-                            }
-                          />
-                          원
-                        </label>
-                        <button
-                          aria-label={`${groupIndex + 1}번 그룹 ${optionIndex + 1}번 옵션 삭제`}
-                          onClick={() =>
-                            updateGroup(group.key, {
-                              options: group.options.filter(
-                                (item) => item.key !== option.key,
-                              ),
-                            })
-                          }
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      className="add-option"
-                      onClick={() =>
-                        updateGroup(group.key, {
-                          options: [...group.options, emptyOption()],
-                        })
-                      }
-                    >
-                      + 옵션 추가
-                    </button>
-                  </div>
-                </article>
-              ))}
-              <button
-                className="add-option-group"
-                onClick={() =>
-                  setDraftGroups((current) => [...current, emptyGroup()])
-                }
-              >
-                + 옵션 그룹 추가
-              </button>
-            </div>
-            <footer>
-              <button
-                className="secondary-action"
-                onClick={() => setShowOptions(false)}
-              >
-                취소
-              </button>
-              <button
-                className="primary-action"
-                disabled={updatingId === optionProduct.productId}
-                onClick={() => void saveOptions()}
-              >
-                옵션 저장
-              </button>
-            </footer>
-          </section>
-        </div>
+        <ProductOptionEditor
+          product={optionProduct}
+          initialGroups={
+            (details[optionProduct.productId] ??
+              createDemoProductDetail(optionProduct)).optionGroups
+          }
+          initialTemplates={optionTemplates}
+          onCancel={() => {
+            setShowOptions(false)
+            setOptionProduct(null)
+          }}
+          onCreateTemplate={createOptionTemplateForEditor}
+          onFindTemplateUsage={findTemplateUsageForEditor}
+          onApplyTemplateToAll={applyTemplateForEditor}
+          onSave={saveOptionGroups}
+        />
       )}
 
       <p className="source-note">

@@ -35,6 +35,8 @@ import type {
   StoreSavePayload,
   StoreSummary,
   StoreTable,
+  StoreOptionTemplate,
+  StoreOptionTemplateUsage,
   SupportCategory,
   SupportInquiryDetail,
   SupportInquiryStatus,
@@ -725,6 +727,79 @@ export function replaceProductOptions(
       method: "PUT",
       body: JSON.stringify({ groups }),
     },
+  );
+}
+
+export function getStoreOptionTemplates(connection: SellerConnection) {
+  return request<StoreOptionTemplate[]>(
+    `${storePath(connection)}/option-group-templates`,
+    connection,
+  );
+}
+
+export function createStoreOptionTemplate(
+  connection: SellerConnection,
+  group: ProductOptionGroupInput,
+) {
+  return request<StoreOptionTemplate>(
+    `${storePath(connection)}/option-group-templates`,
+    connection,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: group.name,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        required: group.required,
+        options: group.options,
+      }),
+    },
+  );
+}
+
+export function getStoreOptionTemplateUsage(
+  connection: SellerConnection,
+  templateId: number,
+) {
+  return request<StoreOptionTemplateUsage>(
+    `${storePath(connection)}/option-group-templates/${templateId}/products`,
+    connection,
+  );
+}
+
+export function applyStoreOptionTemplateToAll(
+  connection: SellerConnection,
+  templateId: number,
+  sourceProductId: number,
+  sourceOptionGroupId: number,
+  group: ProductOptionGroupInput,
+) {
+  return request<StoreOptionTemplate>(
+    `${storePath(connection)}/option-group-templates/${templateId}/apply`,
+    connection,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        sourceProductId,
+        sourceOptionGroupId,
+        name: group.name,
+        minSelect: group.minSelect,
+        maxSelect: group.maxSelect,
+        required: group.required,
+        options: group.options,
+      }),
+    },
+  );
+}
+
+export function deleteStoreOptionTemplate(
+  connection: SellerConnection,
+  templateId: number,
+) {
+  return request<boolean>(
+    `${storePath(connection)}/option-group-templates/${templateId}`,
+    connection,
+    { method: "DELETE" },
   );
 }
 
