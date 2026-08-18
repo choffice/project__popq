@@ -17,9 +17,7 @@ abstract interface class CustomerSupportRepository {
 
   Future<List<CustomerSupportInquirySummary>> getMyInquiries();
 
-  Future<CustomerSupportInquiryDetail> getMyInquiry(
-      int supportInquiryId,
-      );
+  Future<CustomerSupportInquiryDetail> getMyInquiry(int supportInquiryId);
 
   Future<CustomerSupportInquiryDetail> sendMessage({
     required int supportInquiryId,
@@ -27,38 +25,41 @@ abstract interface class CustomerSupportRepository {
   });
 }
 
-class ApiCustomerSupportRepository
-    implements CustomerSupportRepository {
+class ApiCustomerSupportRepository implements CustomerSupportRepository {
   ApiCustomerSupportRepository(this._apiClient);
 
   static const String _ticketPath = '/api/v1/support/tickets';
-  static const String _faqPath = '/api/v1/customer/support/faqs';
+  static const String _faqPath = '/api/v1/public/content/faqs';
 
   final PopqApiClient _apiClient;
 
   @override
   Future<List<CustomerSupportFaq>> getPopularFaqs() {
-    return _apiClient.get(
-      '$_faqPath/popular',
-      decode: _decodeFaqList,
-    );
+    return getFaqs();
   }
 
   @override
-  Future<List<CustomerSupportFaq>> getFaqs({
-    String? keyword,
-  }) {
-    final normalizedKeyword = keyword?.trim();
-
-    return _apiClient.get(
+  Future<List<CustomerSupportFaq>> getFaqs({String? keyword}) async {
+    final faqs = await _apiClient.get(
       _faqPath,
-      query: <String, Object?>{
-        if (normalizedKeyword != null &&
-            normalizedKeyword.isNotEmpty)
-          'keyword': normalizedKeyword,
-      },
+      query: const <String, Object?>{'audience': 'CUSTOMER_APP'},
       decode: _decodeFaqList,
     );
+
+    final normalizedKeyword = keyword?.trim().toLowerCase();
+
+    if (normalizedKeyword == null || normalizedKeyword.isEmpty) {
+      return faqs;
+    }
+
+    return faqs
+        .where(
+          (faq) =>
+              faq.question.toLowerCase().contains(normalizedKeyword) ||
+              faq.answer.toLowerCase().contains(normalizedKeyword) ||
+              faq.category.toLowerCase().contains(normalizedKeyword),
+        )
+        .toList(growable: false);
   }
 
   @override
@@ -86,39 +87,28 @@ class ApiCustomerSupportRepository
   }
 
   @override
-  Future<List<CustomerSupportInquirySummary>>
-  getMyInquiries() {
+  Future<List<CustomerSupportInquirySummary>> getMyInquiries() {
     return _apiClient.get(
       _ticketPath,
-      query: const <String, Object?>{
-        'page': 0,
-        'size': 100,
-      },
+      query: const <String, Object?>{'page': 0, 'size': 100},
       decode: (Object? value) {
-        final page = Map<String, Object?>.from(
-          value as Map,
-        );
+        final page = Map<String, Object?>.from(value as Map);
 
         final content = page['content'] as List<Object?>;
 
         return content
             .map(
-              (item) =>
-              CustomerSupportInquirySummary.fromJson(
-                Map<String, Object?>.from(
-                  item as Map,
-                ),
+              (item) => CustomerSupportInquirySummary.fromJson(
+                Map<String, Object?>.from(item as Map),
               ),
-        )
+            )
             .toList(growable: false);
       },
     );
   }
 
   @override
-  Future<CustomerSupportInquiryDetail> getMyInquiry(
-      int supportInquiryId,
-      ) {
+  Future<CustomerSupportInquiryDetail> getMyInquiry(int supportInquiryId) {
     _validateInquiryId(supportInquiryId);
 
     return _apiClient.get(
@@ -139,28 +129,22 @@ class ApiCustomerSupportRepository
 
     return _apiClient.post(
       '$_ticketPath/$supportInquiryId/messages',
-      body: <String, Object?>{
-        'content': normalizedContent,
-      },
+      body: <String, Object?>{'content': normalizedContent},
       decode: _decodeInquiryDetail,
     );
   }
 
-  List<CustomerSupportFaq> _decodeFaqList(
-      Object? value,
-      ) {
+  List<CustomerSupportFaq> _decodeFaqList(Object? value) {
     return (value as List<Object?>)
         .map(
           (item) => CustomerSupportFaq.fromJson(
-        Map<String, Object?>.from(item as Map),
-      ),
-    )
+            Map<String, Object?>.from(item as Map),
+          ),
+        )
         .toList(growable: false);
   }
 
-  CustomerSupportInquiryDetail _decodeInquiryDetail(
-      Object? value,
-      ) {
+  CustomerSupportInquiryDetail _decodeInquiryDetail(Object? value) {
     return CustomerSupportInquiryDetail.fromJson(
       Map<String, Object?>.from(value as Map),
     );
@@ -178,29 +162,21 @@ class ApiCustomerSupportRepository
 
   void _validateTitle(String title) {
     if (title.isEmpty) {
-      throw ArgumentError(
-        '문의 제목을 입력해 주세요.',
-      );
+      throw ArgumentError('문의 제목을 입력해 주세요.');
     }
 
     if (title.length > 200) {
-      throw ArgumentError(
-        '문의 제목은 200자 이하로 입력해 주세요.',
-      );
+      throw ArgumentError('문의 제목은 200자 이하로 입력해 주세요.');
     }
   }
 
   void _validateContent(String content) {
     if (content.isEmpty) {
-      throw ArgumentError(
-        '문의 내용을 입력해 주세요.',
-      );
+      throw ArgumentError('문의 내용을 입력해 주세요.');
     }
 
     if (content.length > 4000) {
-      throw ArgumentError(
-        '문의 내용은 4,000자 이하로 입력해 주세요.',
-      );
+      throw ArgumentError('문의 내용은 4,000자 이하로 입력해 주세요.');
     }
   }
 }

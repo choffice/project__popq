@@ -1,28 +1,28 @@
 class CustomerSupportFaq {
   const CustomerSupportFaq({
-    required this.supportFaqId,
+    required this.faqId,
+    required this.audience,
+    required this.category,
     required this.question,
     required this.answer,
     required this.displayOrder,
-    required this.viewCount,
-    required this.popular,
   });
 
   factory CustomerSupportFaq.fromJson(Map<String, Object?> json) {
     return CustomerSupportFaq(
-      supportFaqId: (json['supportFaqId'] as num).toInt(),
+      faqId: (json['faqId'] as num).toInt(),
+      audience: json['audience'] as String,
+      category: json['category'] as String,
       question: json['question'] as String,
       answer: json['answer'] as String,
       displayOrder: (json['displayOrder'] as num).toInt(),
-      viewCount: (json['viewCount'] as num).toInt(),
-      popular: json['popular'] as bool,
     );
   }
 
-  final int supportFaqId;
+  final int faqId;
+  final String audience;
+  final String category;
   final String question;
   final String answer;
   final int displayOrder;
-  final int viewCount;
-  final bool popular;
 }
