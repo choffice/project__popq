@@ -16,13 +16,22 @@ import {
 import type {
   BusinessStatus,
   SellerConnection,
-  StoreClosedDay,
   StoreDetail,
+  StoreSchedule,
   StoreSavePayload,
   StoreSummary,
   StoreTable,
   StoreType,
 } from "../../types";
+import {
+  BusinessScheduleEditor,
+  createDefaultSchedule,
+  legacyFieldsFromSchedule,
+  scheduleForApi,
+  scheduleFromStore,
+  scheduleSummary,
+  scheduleValidationMessage,
+} from "./BusinessScheduleEditor";
 
 type Props = {
   connection: SellerConnection | null;
@@ -44,11 +53,9 @@ type EditorState = {
   phone: string;
   latitude: string;
   longitude: string;
-  openTime: string;
-  closeTime: string;
   operationStartDate: string;
   operationEndDate: string;
-  closedDays: StoreClosedDay[];
+  schedule: StoreSchedule;
   takeoutAvailable: boolean;
   dineInAvailable: boolean;
   orderAcceptingEnabled: boolean;
@@ -76,16 +83,6 @@ const STORE_CATEGORIES = [
 
 const PHONE_PATTERN = /^[0-9+\-()\s]+$/;
 
-const CLOSED_DAYS: { value: StoreClosedDay; label: string }[] = [
-  { value: "MONDAY", label: "월" },
-  { value: "TUESDAY", label: "화" },
-  { value: "WEDNESDAY", label: "수" },
-  { value: "THURSDAY", label: "목" },
-  { value: "FRIDAY", label: "금" },
-  { value: "SATURDAY", label: "토" },
-  { value: "SUNDAY", label: "일" },
-];
-
 const STATUS_LABEL: Record<BusinessStatus, string> = {
   PRE_OPEN: "준비중",
   OPEN: "영업 중",
@@ -104,11 +101,9 @@ function blankEditor(): EditorState {
     phone: "",
     latitude: "",
     longitude: "",
-    openTime: "09:00",
-    closeTime: "21:00",
     operationStartDate: "",
     operationEndDate: "",
-    closedDays: [],
+    schedule: createDefaultSchedule(),
     takeoutAvailable: true,
     dineInAvailable: true,
     orderAcceptingEnabled: true,
@@ -128,11 +123,9 @@ function editorFromStore(store: StoreDetail): EditorState {
     phone: store.phone ?? "",
     latitude: store.latitude?.toString() ?? "",
     longitude: store.longitude?.toString() ?? "",
-    openTime: store.openTime?.slice(0, 5) ?? "",
-    closeTime: store.closeTime?.slice(0, 5) ?? "",
     operationStartDate: store.operationStartDate ?? "",
     operationEndDate: store.operationEndDate ?? "",
-    closedDays: store.closedDays,
+    schedule: scheduleFromStore(store),
     takeoutAvailable: store.takeoutAvailable,
     dineInAvailable: store.dineInAvailable,
     orderAcceptingEnabled: store.orderAcceptingEnabled,
@@ -146,6 +139,7 @@ function optional(value: string) {
 }
 
 function payloadFromEditor(editor: EditorState): StoreSavePayload {
+  const legacySchedule = legacyFieldsFromSchedule(editor.schedule);
   return {
     storeType: editor.storeType,
     name: editor.name.trim(),
@@ -157,11 +151,11 @@ function payloadFromEditor(editor: EditorState): StoreSavePayload {
     phone: optional(editor.phone),
     latitude: editor.latitude ? Number(editor.latitude) : null,
     longitude: editor.longitude ? Number(editor.longitude) : null,
-    openTime: optional(editor.openTime),
-    closeTime: optional(editor.closeTime),
+    openTime: legacySchedule.openTime,
+    closeTime: legacySchedule.closeTime,
     operationStartDate: optional(editor.operationStartDate),
     operationEndDate: optional(editor.operationEndDate),
-    closedDays: editor.closedDays,
+    closedDays: legacySchedule.closedDays,
     takeoutAvailable: editor.takeoutAvailable,
     dineInAvailable: editor.dineInAvailable,
     orderAcceptingEnabled: editor.orderAcceptingEnabled,
@@ -170,6 +164,7 @@ function payloadFromEditor(editor: EditorState): StoreSavePayload {
       .map((tag) => tag.trim())
       .filter(Boolean)
       .slice(0, 10),
+    schedule: scheduleForApi(editor.schedule),
   };
 }
 
@@ -209,6 +204,11 @@ export function StoreSettings({
         .filter(Boolean)
         .join(" · ") || "주문 방식 미설정",
     [store.dineInAvailable, store.takeoutAvailable],
+  );
+  const storeSchedule = useMemo(() => scheduleFromStore(store), [store]);
+  const scheduleLines = useMemo(
+    () => scheduleSummary(storeSchedule),
+    [storeSchedule],
   );
 
   useEffect(() => {
@@ -292,6 +292,11 @@ export function StoreSettings({
       );
       return;
     }
+    const scheduleError = scheduleValidationMessage(editor.schedule);
+    if (scheduleError) {
+      onError(scheduleError);
+      return;
+    }
     if (!PHONE_PATTERN.test(payload.phone)) {
       onError("연락처 형식을 확인해 주세요.");
       return;
@@ -318,7 +323,7 @@ export function StoreSettings({
         onStoreSelected?.(created);
       } else {
         const updated = isDemo
-          ? { ...store, ...payload }
+          ? { ...store, ...payload, schedule: editor.schedule }
           : await updateSellerStore(connection, payload);
         setStore(updated);
         setEditorMode(null);
@@ -607,22 +612,11 @@ export function StoreSettings({
               <dd>{store.phone || "-"}</dd>
             </div>
             <div>
-              <dt>영업시간</dt>
+              <dt>운영 기간</dt>
               <dd>
-                {store.openTime && store.closeTime
-                  ? `${store.openTime.slice(0, 5)}–${store.closeTime.slice(0, 5)}`
-                  : "-"}
-              </dd>
-            </div>
-            <div>
-              <dt>휴무일</dt>
-              <dd>
-                {store.closedDays
-                  .map(
-                    (day) =>
-                      CLOSED_DAYS.find((item) => item.value === day)?.label,
-                  )
-                  .join(", ") || "없음"}
+                {store.operationStartDate || store.operationEndDate
+                  ? `${store.operationStartDate ?? "시작일 미정"} ~ ${store.operationEndDate ?? "종료일 미정"}`
+                  : "상시 운영"}
               </dd>
             </div>
             <div>
@@ -634,6 +628,26 @@ export function StoreSettings({
               <dd>{store.tags.join(", ") || "-"}</dd>
             </div>
           </dl>
+        </article>
+
+        <article className="schedule-overview-card">
+          <header>
+            <div>
+              <p className="eyebrow">BUSINESS SCHEDULE</p>
+              <h3>영업 일정</h3>
+            </div>
+            {canManage && (
+              <button onClick={() => openEditor("edit")}>일정 편집</button>
+            )}
+          </header>
+          <p className="schedule-overview-description">
+            요일별 영업시간과 정기·임시휴무를 고객 안내 일정으로 관리합니다.
+          </p>
+          <div className="schedule-summary-list">
+            {scheduleLines.map((line, index) => (
+              <span key={`${line}-${index}`}>{line}</span>
+            ))}
+          </div>
         </article>
 
         <article className="tables-card">
@@ -673,20 +687,39 @@ export function StoreSettings({
             aria-modal="true"
             aria-labelledby="store-editor-title"
           >
-            <button
-              className="modal-close"
-              aria-label="닫기"
-              onClick={() => setEditorMode(null)}
-            >
-              ×
-            </button>
-            <p className="eyebrow">
-              {editorMode === "create" ? "NEW STORE" : "STORE PROFILE"}
-            </p>
-            <h2 id="store-editor-title">
-              {editorMode === "create" ? "스토어 생성" : "스토어 상세 편집"}
-            </h2>
-            <div className="store-editor-grid">
+            <header className="store-editor-header">
+              <div>
+                <p className="eyebrow">
+                  {editorMode === "create" ? "NEW STORE" : "STORE PROFILE"}
+                </p>
+                <h2 id="store-editor-title">
+                  {editorMode === "create" ? "스토어 생성" : "스토어 상세 편집"}
+                </h2>
+                <p>
+                  기본 운영 정보와 고객에게 안내할 영업 일정을 함께 관리합니다.
+                </p>
+              </div>
+              <button
+                className="modal-close"
+                aria-label="닫기"
+                onClick={() => setEditorMode(null)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="store-editor-workspace">
+              <section
+                className="store-profile-editor-panel"
+                aria-labelledby="store-profile-editor-title"
+              >
+                <div className="store-editor-section-heading">
+                  <div>
+                    <p className="eyebrow">STORE INFORMATION</p>
+                    <h3 id="store-profile-editor-title">기본 운영 정보</h3>
+                  </div>
+                  <p>사업장 정보, 운영 기간과 주문 방식을 설정합니다.</p>
+                </div>
+                <div className="store-editor-grid">
               <label>
                 유형
                 <select
@@ -772,26 +805,6 @@ export function StoreSettings({
                 />
               </label>
               <label>
-                오픈 시간
-                <input
-                  type="time"
-                  value={editor.openTime}
-                  onChange={(event) =>
-                    setEditor({ ...editor, openTime: event.target.value })
-                  }
-                />
-              </label>
-              <label>
-                마감 시간
-                <input
-                  type="time"
-                  value={editor.closeTime}
-                  onChange={(event) =>
-                    setEditor({ ...editor, closeTime: event.target.value })
-                  }
-                />
-              </label>
-              <label>
                 운영 시작일
                 <input
                   type="date"
@@ -858,30 +871,8 @@ export function StoreSettings({
                   }
                 />
               </label>
-            </div>
-            <fieldset className="choice-fieldset">
-              <legend>정기 휴무일</legend>
-              {CLOSED_DAYS.map((day) => (
-                <label key={day.value}>
-                  <input
-                    type="checkbox"
-                    checked={editor.closedDays.includes(day.value)}
-                    onChange={() =>
-                      setEditor({
-                        ...editor,
-                        closedDays: editor.closedDays.includes(day.value)
-                          ? editor.closedDays.filter(
-                              (value) => value !== day.value,
-                            )
-                          : [...editor.closedDays, day.value],
-                      })
-                    }
-                  />
-                  {day.label}
-                </label>
-              ))}
-            </fieldset>
-            <fieldset className="choice-fieldset">
+                </div>
+                <fieldset className="choice-fieldset store-order-settings">
               <legend>주문 설정</legend>
               <label>
                 <input
@@ -922,14 +913,33 @@ export function StoreSettings({
                 />
                 주문 접수
               </label>
-            </fieldset>
-            <button
-              className="primary-action"
-              disabled={processing}
-              onClick={() => void saveStore()}
-            >
-              {processing ? "저장 중…" : "저장"}
-            </button>
+                </fieldset>
+              </section>
+              <BusinessScheduleEditor
+                value={editor.schedule}
+                disabled={processing}
+                onChange={(schedule) => setEditor({ ...editor, schedule })}
+              />
+            </div>
+            <footer className="store-editor-footer">
+              <p>변경한 기본 정보와 영업 일정은 한 번에 저장됩니다.</p>
+              <div>
+                <button
+                  className="secondary-action"
+                  disabled={processing}
+                  onClick={() => setEditorMode(null)}
+                >
+                  취소
+                </button>
+                <button
+                  className="primary-action"
+                  disabled={processing}
+                  onClick={() => void saveStore()}
+                >
+                  {processing ? "저장 중…" : "변경사항 저장"}
+                </button>
+              </div>
+            </footer>
           </section>
         </div>
       )}

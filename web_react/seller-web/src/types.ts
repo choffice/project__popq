@@ -334,6 +334,39 @@ export type StoreClosedDay =
   | "SATURDAY"
   | "SUNDAY";
 
+export type StoreBusinessHour = {
+  dayOfWeek: StoreClosedDay;
+  closed: boolean;
+  open24Hours: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+};
+
+export type StoreClosureRule = {
+  ruleType: "NTH_WEEKDAY" | "PUBLIC_HOLIDAY";
+  weekOfMonth: number | null;
+  dayOfWeek: StoreClosedDay | null;
+};
+
+export type StoreScheduleException = {
+  startDate: string;
+  endDate: string;
+  exceptionType: "CLOSED";
+  memo: string | null;
+};
+
+export type StoreSchedule = {
+  businessHours: StoreBusinessHour[];
+  closureRules: StoreClosureRule[];
+  scheduleExceptions: StoreScheduleException[];
+  publicHolidayAutoCalculationAvailable: boolean;
+};
+
+export type StoreSchedulePayload = Pick<
+  StoreSchedule,
+  "businessHours" | "closureRules" | "scheduleExceptions"
+>;
+
 export type StoreSummary = {
   storeId: number;
   storeType: StoreType;
@@ -358,6 +391,7 @@ export type StoreSummary = {
   status: StoreStatus;
   businessStatus: BusinessStatus;
   myRole: StoreRole;
+  schedule?: StoreSchedule;
 };
 
 export type StoreDetail = StoreSummary & {
@@ -384,6 +418,7 @@ export type StoreSavePayload = {
   dineInAvailable: boolean;
   orderAcceptingEnabled: boolean;
   tags: string[];
+  schedule?: StoreSchedulePayload;
 };
 
 export type AnnouncementStatus = "DRAFT" | "PUBLISHED" | "HIDDEN";
