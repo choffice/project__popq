@@ -88,6 +88,56 @@ describe('판매자 상품 관리', () => {
     expect(screen.queryByText('흑임자 크림 라떼')).not.toBeInTheDocument()
   })
 
+  it('빈 카테고리의 이름을 수정하고 삭제한다', async () => {
+    const user = userEvent.setup()
+    render(<ProductManagement connection={null} onError={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: '+ 카테고리' }))
+    await user.type(screen.getByLabelText('카테고리 이름'), '임시 메뉴')
+    await user.click(screen.getByRole('button', { name: '카테고리 추가하기' }))
+
+    await user.click(
+      screen.getByRole('button', { name: '임시 메뉴 카테고리 수정' }),
+    )
+    expect(screen.getByRole('dialog', { name: '카테고리 수정' })).toBeVisible()
+    const categoryName = screen.getByLabelText('카테고리 이름')
+    await user.clear(categoryName)
+    await user.type(categoryName, '여름 메뉴')
+    await user.click(screen.getByRole('button', { name: '변경사항 저장' }))
+
+    expect(screen.getByRole('button', { name: '여름 메뉴' })).toBeVisible()
+    expect(
+      screen.getByRole('button', { name: '여름 메뉴 카테고리 수정' }),
+    ).toBeVisible()
+
+    await user.click(
+      screen.getByRole('button', { name: '여름 메뉴 카테고리 수정' }),
+    )
+    await user.click(screen.getByRole('button', { name: '카테고리 삭제' }))
+    expect(screen.getByText('“여름 메뉴” 카테고리를 삭제할까요?')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '삭제 확인' }))
+
+    expect(screen.queryByRole('button', { name: '여름 메뉴' })).not.toBeInTheDocument()
+  })
+
+  it('상품이 연결된 카테고리는 삭제를 막고 안내한다', async () => {
+    const user = userEvent.setup()
+    render(<ProductManagement connection={null} onError={vi.fn()} />)
+
+    await user.click(
+      screen.getByRole('button', { name: '시그니처 카테고리 수정' }),
+    )
+
+    expect(
+      screen.getByText(
+        '이 카테고리에 등록된 상품이 있습니다. 상품을 먼저 삭제하거나 다른 카테고리로 옮겨 주세요.',
+      ),
+    ).toBeVisible()
+    expect(
+      screen.queryByRole('button', { name: '카테고리 삭제' }),
+    ).not.toBeInTheDocument()
+  })
+
   it('옵션을 추가해 저장하고 다시 열었을 때 유지한다', async () => {
     const user = userEvent.setup()
     render(<ProductManagement connection={null} onError={vi.fn()} />)

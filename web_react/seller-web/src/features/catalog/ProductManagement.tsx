@@ -11,6 +11,7 @@ import {
   createStoreOptionTemplate,
   createSellerCategory,
   createSellerProduct,
+  deleteSellerCategory,
   deleteStoreOptionTemplate,
   deleteSellerProduct,
   getSellerCategories,
@@ -20,6 +21,7 @@ import {
   getStoreOptionTemplateUsage,
   replaceProductOptions,
   updateSellerProduct,
+  updateSellerCategory,
   updateProductAvailability,
   uploadSellerProductImage,
 } from '../../services/api'
@@ -75,7 +77,10 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
   const [loading, setLoading] = useState(!isDemo)
   const [updatingId, setUpdatingId] = useState<number | null>(null)
   const [showCategoryForm, setShowCategoryForm] = useState(false)
+  const [editingCategory, setEditingCategory] = useState<SellerCategory | null>(null)
   const [newCategoryName, setNewCategoryName] = useState('')
+  const [showCategoryDeleteConfirm, setShowCategoryDeleteConfirm] = useState(false)
+  const [updatingCategoryId, setUpdatingCategoryId] = useState<number | null>(null)
   const [showProductForm, setShowProductForm] = useState(false)
   const [editingProduct, setEditingProduct] = useState<SellerProduct | null>(null)
   const [productCategoryId, setProductCategoryId] = useState(() =>
@@ -131,10 +136,6 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
     return () => window.clearTimeout(timer)
   }, [connection, onError])
 
-  const categoryNames = useMemo(
-    () => ['전체', ...categories.map((item) => item.name)],
-    [categories],
-  )
   const visibleProducts = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('ko-KR')
     return products.filter(
@@ -191,36 +192,134 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
     }
   }
 
-  async function addCategory() {
+  function openCategoryEditor(categoryToEdit: SellerCategory | null = null) {
+    setEditingCategory(categoryToEdit)
+    setNewCategoryName(categoryToEdit?.name ?? '')
+    setShowCategoryDeleteConfirm(false)
+    setShowCategoryForm(true)
+    onError(null)
+  }
+
+  function closeCategoryEditor() {
+    setShowCategoryForm(false)
+    setEditingCategory(null)
+    setNewCategoryName('')
+    setShowCategoryDeleteConfirm(false)
+  }
+
+  async function saveCategory() {
     const name = newCategoryName.trim()
     if (!name) {
       onError('카테고리 이름을 입력해 주세요.')
       return
     }
-    setUpdatingId(-1)
+    const duplicate = categories.some(
+      (item) =>
+        item.categoryId !== editingCategory?.categoryId &&
+        item.name.toLocaleLowerCase('ko-KR') === name.toLocaleLowerCase('ko-KR'),
+    )
+    if (duplicate) {
+      onError('같은 이름의 카테고리가 이미 있습니다.')
+      return
+    }
+
+    const processingId = editingCategory?.categoryId ?? -1
+    setUpdatingCategoryId(processingId)
     try {
-      const created = isDemo
-        ? {
-            categoryId:
-              Math.max(0, ...categories.map((item) => item.categoryId)) + 1,
-            name,
-            displayOrder: categories.length,
-            status: 'ACTIVE' as const,
-          }
-        : await createSellerCategory(connection, name, categories.length)
-      setCategories((current) => [...current, created])
-      setProductCategoryId(String(created.categoryId))
-      setNewCategoryName('')
-      setShowCategoryForm(false)
+      const displayOrder = editingCategory
+        ? editingCategory.displayOrder
+        : Math.max(-1, ...categories.map((item) => item.displayOrder)) + 1
+      const saved = isDemo
+        ? editingCategory
+          ? { ...editingCategory, name }
+          : {
+              categoryId:
+                Math.max(0, ...categories.map((item) => item.categoryId)) + 1,
+              name,
+              displayOrder,
+              status: 'ACTIVE' as const,
+            }
+        : editingCategory
+          ? await updateSellerCategory(
+              connection,
+              editingCategory.categoryId,
+              name,
+              displayOrder,
+            )
+          : await createSellerCategory(connection, name, displayOrder)
+
+      setCategories((current) =>
+        editingCategory
+          ? current
+              .map((item) =>
+                item.categoryId === saved.categoryId ? saved : item,
+              )
+              .sort((left, right) => left.displayOrder - right.displayOrder)
+          : [...current, saved],
+      )
+      if (editingCategory) {
+        setProducts((current) =>
+          current.map((product) =>
+            product.categoryId === saved.categoryId
+              ? { ...product, categoryName: saved.name }
+              : product,
+          ),
+        )
+        setCategory((current) =>
+          current === editingCategory.name ? saved.name : current,
+        )
+      } else {
+        setProductCategoryId(String(saved.categoryId))
+      }
+      closeCategoryEditor()
       onError(null)
     } catch (caught) {
       onError(
         caught instanceof Error
           ? caught.message
-          : '카테고리를 생성하지 못했습니다.',
+          : `카테고리를 ${editingCategory ? '수정' : '생성'}하지 못했습니다.`,
       )
     } finally {
-      setUpdatingId(null)
+      setUpdatingCategoryId(null)
+    }
+  }
+
+  async function removeCategory() {
+    if (!editingCategory) return
+    const hasProducts = products.some(
+      (product) => product.categoryId === editingCategory.categoryId,
+    )
+    if (hasProducts) {
+      onError('이 카테고리에 등록된 상품이 있습니다. 상품을 먼저 삭제해 주세요.')
+      setShowCategoryDeleteConfirm(false)
+      return
+    }
+
+    setUpdatingCategoryId(editingCategory.categoryId)
+    try {
+      if (!isDemo) {
+        await deleteSellerCategory(connection, editingCategory.categoryId)
+      }
+      const deletedId = editingCategory.categoryId
+      const deletedName = editingCategory.name
+      const remaining = categories.filter((item) => item.categoryId !== deletedId)
+      setCategories(remaining)
+      setCategory((current) => (current === deletedName ? '전체' : current))
+      setProductCategoryId((current) =>
+        current === String(deletedId)
+          ? String(remaining[0]?.categoryId ?? '')
+          : current,
+      )
+      closeCategoryEditor()
+      onError(null)
+    } catch (caught) {
+      onError(
+        caught instanceof Error
+          ? caught.message
+          : '카테고리를 삭제하지 못했습니다. 연결된 상품이 없는지 확인해 주세요.',
+      )
+    } finally {
+      setUpdatingCategoryId(null)
     }
   }
 
@@ -636,18 +735,38 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
 
       <section className="catalog-toolbar">
         <div className="category-pills" aria-label="상품 카테고리">
-          {categoryNames.map((item) => (
-            <button
-              key={item}
-              className={item === category ? 'active' : ''}
-              onClick={() => setCategory(item)}
+          <button
+            className={category === '전체' ? 'active' : ''}
+            onClick={() => setCategory('전체')}
+          >
+            전체
+          </button>
+          {categories.map((item) => (
+            <span
+              className={`category-pill-control ${item.name === category ? 'active' : ''}`}
+              key={item.categoryId}
             >
-              {item}
-            </button>
+              <button
+                className="category-filter-button"
+                onClick={() => setCategory(item.name)}
+              >
+                {item.name}
+              </button>
+              {canManage && (
+                <button
+                  className="category-manage-button"
+                  aria-label={`${item.name} 카테고리 수정`}
+                  title="카테고리 수정"
+                  onClick={() => openCategoryEditor(item)}
+                >
+                  수정
+                </button>
+              )}
+            </span>
           ))}
           {canManage && <button
             className="add-category"
-            onClick={() => setShowCategoryForm(true)}
+            onClick={() => openCategoryEditor()}
           >
             + 카테고리
           </button>}
@@ -769,7 +888,7 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
       {showCategoryForm && (
         <div className="modal-backdrop" role="presentation">
           <section
-            className="connection-modal"
+            className="connection-modal category-form-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="category-title"
@@ -777,28 +896,82 @@ export function ProductManagement({ connection, storeRole, onError }: Props) {
             <button
               className="modal-close"
               aria-label="닫기"
-              onClick={() => setShowCategoryForm(false)}
+              onClick={closeCategoryEditor}
             >
               ×
             </button>
-            <p className="eyebrow">NEW CATEGORY</p>
-            <h2 id="category-title">카테고리 추가</h2>
-            <p>새 카테고리는 현재 목록의 마지막 순서에 추가됩니다.</p>
+            <p className="eyebrow">
+              {editingCategory ? 'EDIT CATEGORY' : 'NEW CATEGORY'}
+            </p>
+            <h2 id="category-title">
+              {editingCategory ? '카테고리 수정' : '카테고리 추가'}
+            </h2>
+            <p>
+              {editingCategory
+                ? '카테고리 이름을 변경하면 연결된 상품에도 바로 반영됩니다.'
+                : '새 카테고리는 현재 목록의 마지막 순서에 추가됩니다.'}
+            </p>
             <label>
               카테고리 이름
               <input
                 value={newCategoryName}
+                maxLength={100}
                 onChange={(event) => setNewCategoryName(event.target.value)}
                 placeholder="예: 시즌 메뉴"
               />
             </label>
             <button
               className="primary-action"
-              disabled={updatingId === -1}
-              onClick={() => void addCategory()}
+              disabled={
+                updatingCategoryId === (editingCategory?.categoryId ?? -1)
+              }
+              onClick={() => void saveCategory()}
             >
-              카테고리 추가하기
+              {updatingCategoryId === (editingCategory?.categoryId ?? -1)
+                ? '저장 중…'
+                : editingCategory
+                  ? '변경사항 저장'
+                  : '카테고리 추가하기'}
             </button>
+            {editingCategory && (
+              <div className="category-delete-zone">
+                {products.some(
+                  (product) => product.categoryId === editingCategory.categoryId,
+                ) ? (
+                  <p>
+                    이 카테고리에 등록된 상품이 있습니다. 상품을 먼저 삭제하거나 다른 카테고리로 옮겨 주세요.
+                  </p>
+                ) : showCategoryDeleteConfirm ? (
+                  <div>
+                    <p>“{editingCategory.name}” 카테고리를 삭제할까요?</p>
+                    <small>삭제하면 상품 등록 화면에서 더 이상 표시되지 않습니다.</small>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => setShowCategoryDeleteConfirm(false)}
+                    >
+                      취소
+                    </button>
+                    <button
+                      className="danger-action"
+                      type="button"
+                      disabled={updatingCategoryId === editingCategory.categoryId}
+                      onClick={() => void removeCategory()}
+                    >
+                      삭제 확인
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className="delete-category-button"
+                    type="button"
+                    onClick={() => setShowCategoryDeleteConfirm(true)}
+                  >
+                    카테고리 삭제
+                  </button>
+                )}
+              </div>
+            )}
           </section>
         </div>
       )}

@@ -8,6 +8,7 @@ import {
   createSellerProduct,
   createStoreOptionTemplate,
   deleteStoreOptionTemplate,
+  deleteSellerCategory,
   deleteSellerProduct,
   createStoreTable,
   getSellerPaymentSummary,
@@ -29,6 +30,7 @@ import {
   refundSellerOrder,
   transitionSellerOrder,
   updateProductAvailability,
+  updateSellerCategory,
   updateSellerProduct,
   uploadSellerProductImage,
   updateAdminSellerVerification,
@@ -368,6 +370,36 @@ describe('판매자 주문 API 계약', () => {
         method: 'PUT',
         body: JSON.stringify({ groups }),
       }),
+    )
+  })
+
+  it('카테고리 수정·삭제 계약을 사용한다', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: { categoryId: 9, name: '여름 메뉴', displayOrder: 3 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    )
+
+    await updateSellerCategory(connection, 9, '여름 메뉴', 3)
+    await deleteSellerCategory(connection, 9)
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/seller/stores/7/categories/9',
+      expect.objectContaining({
+        method: 'PATCH',
+        body: JSON.stringify({ name: '여름 메뉴', displayOrder: 3 }),
+      }),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/seller/stores/7/categories/9',
+      expect.objectContaining({ method: 'DELETE' }),
     )
   })
 

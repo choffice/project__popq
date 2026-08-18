@@ -737,6 +737,33 @@ export function getStoreOptionTemplates(connection: SellerConnection) {
   );
 }
 
+export function updateSellerCategory(
+  connection: SellerConnection,
+  categoryId: number,
+  name: string,
+  displayOrder: number,
+) {
+  return request<SellerCategory>(
+    `${storePath(connection)}/categories/${categoryId}`,
+    connection,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ name, displayOrder }),
+    },
+  );
+}
+
+export function deleteSellerCategory(
+  connection: SellerConnection,
+  categoryId: number,
+) {
+  return request<boolean>(
+    `${storePath(connection)}/categories/${categoryId}`,
+    connection,
+    { method: "DELETE" },
+  );
+}
+
 export function createStoreOptionTemplate(
   connection: SellerConnection,
   group: ProductOptionGroupInput,
