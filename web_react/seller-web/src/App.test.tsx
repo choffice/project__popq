@@ -73,6 +73,32 @@ describe('판매자 주문 운영', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('날짜와 상태로 지난 주문을 조회하고 상세를 연다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: '지난 주문 조회' })).toBeVisible()
+    expect(screen.getByLabelText('주문 날짜')).toHaveValue('2026-07-29')
+    await user.selectOptions(screen.getByLabelText('주문 상태'), 'COMPLETED')
+    await user.click(screen.getByRole('button', { name: '주문 조회' }))
+
+    expect(screen.getByText('1건')).toBeVisible()
+    await user.click(screen.getByRole('button', { name: '지난 주문 0037 상세 보기' }))
+    expect(screen.getByRole('heading', { name: '#0037' })).toBeVisible()
+    expect(screen.getByText('결제 완료')).toBeVisible()
+  })
+
+  it('지난 주문 조회 결과가 없을 때 조건 변경 안내를 보여준다', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    await user.selectOptions(screen.getByLabelText('주문 상태'), 'CANCELED')
+    await user.click(screen.getByRole('button', { name: '주문 조회' }))
+
+    expect(screen.getByText('조건에 맞는 지난 주문이 없습니다.')).toBeVisible()
+    expect(screen.getByText('다른 날짜나 상태를 선택해 다시 조회해 보세요.')).toBeVisible()
+  })
+
   it('완료 주문의 결제 정보를 확인하고 전액 환불한다', async () => {
     const user = userEvent.setup()
     render(<App />)

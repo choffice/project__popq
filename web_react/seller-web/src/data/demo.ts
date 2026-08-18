@@ -86,6 +86,7 @@ function order(
     serviceFeeAmount: 0,
     totalAmount,
     expiresAt: new Date(now.getTime() + 15 * 60_000).toISOString(),
+    createdAt: minutesAgo(minutes),
     version: status === 'PLACED' ? 1 : 2,
     items,
     statusHistory: history(status, minutes),

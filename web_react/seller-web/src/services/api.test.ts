@@ -373,6 +373,25 @@ describe('판매자 주문 API 계약', () => {
     )
   })
 
+  it('지난 주문 조회에 날짜와 종료 상태를 전달한다', async () => {
+    const fetchMock = vi.spyOn(window, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ success: true, data: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    await getSellerOrders(connection, {
+      date: '2026-07-29',
+      status: 'COMPLETED',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/seller/stores/7/orders?status=COMPLETED&date=2026-07-29',
+      expect.any(Object),
+    )
+  })
+
   it('카테고리 수정·삭제 계약을 사용한다', async () => {
     const fetchMock = vi.spyOn(window, 'fetch').mockImplementation(
       async () =>

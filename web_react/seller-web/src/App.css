@@ -1033,6 +1033,8 @@ body:has(.store-editor-modal) {
 :root[data-theme='dark'] .auth-store-list > button,
 :root[data-theme='dark'] .account-store-list > button,
 :root[data-theme='dark'] .order-card,
+:root[data-theme='dark'] .past-order-search,
+:root[data-theme='dark'] .past-order-list > button,
 :root[data-theme='dark'] .detail-panel,
 :root[data-theme='dark'] .connection-modal,
 :root[data-theme='dark'] .option-modal,
@@ -1060,6 +1062,8 @@ body:has(.store-editor-modal) {
 :root[data-theme='dark'] .connection-modal input,
 :root[data-theme='dark'] .connection-modal textarea,
 :root[data-theme='dark'] .connection-modal select,
+:root[data-theme='dark'] .past-order-form input,
+:root[data-theme='dark'] .past-order-form select,
 :root[data-theme='dark'] .refund-form textarea,
 :root[data-theme='dark'] .option-group-editor,
 :root[data-theme='dark'] .option-group-fields input:not([type='checkbox']),
@@ -1876,6 +1880,230 @@ main {
 
 .orders-section {
   margin-top: 32px;
+}
+
+.past-order-search {
+  margin-top: 22px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0, rgba(219, 255, 104, 0.15), transparent 32%),
+    var(--paper);
+  box-shadow: 0 8px 30px rgba(45, 43, 35, 0.045);
+}
+
+.past-order-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.past-order-intro h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -0.04em;
+}
+
+.past-order-intro > p {
+  max-width: 410px;
+  margin: 0;
+  color: #77746b;
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: right;
+}
+
+.past-order-form {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(210px, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.past-order-form label {
+  display: grid;
+  gap: 7px;
+  color: #69665d;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.past-order-form input,
+.past-order-form select {
+  width: 100%;
+  height: 42px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #f8f7f1;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
+.past-order-form input:focus,
+.past-order-form select:focus {
+  outline: 2px solid rgba(110, 85, 170, 0.18);
+  border-color: #8068b7;
+}
+
+.past-order-submit {
+  height: 42px;
+  padding: 0 22px;
+  border-radius: 11px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.past-order-submit:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.past-order-results {
+  margin-top: 18px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+
+.past-order-results > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+
+.past-order-results > header div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.past-order-results > header strong {
+  font-size: 15px;
+}
+
+.past-order-results > header span,
+.past-order-results > header b {
+  color: #7c796f;
+  font-size: 10px;
+}
+
+.past-order-list {
+  display: grid;
+  gap: 7px;
+}
+
+.past-order-list > button {
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 13px;
+  display: grid;
+  grid-template-columns: 74px 82px minmax(150px, 1fr) auto 16px;
+  align-items: center;
+  gap: 13px;
+  border: 1px solid #e3e0d5;
+  border-radius: 13px;
+  background: #fbfaf5;
+  color: var(--ink);
+  text-align: left;
+  transition: border-color 150ms ease, transform 150ms ease, background 150ms ease;
+}
+
+.past-order-list > button:hover {
+  transform: translateY(-1px);
+  border-color: #b9b4a6;
+  background: var(--paper);
+}
+
+.past-order-list > button.selected {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(48, 47, 40, 0.07);
+}
+
+.past-order-status {
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #e6f0dc;
+  color: #58733e;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.past-order-status.status-canceled,
+.past-order-status.status-rejected,
+.past-order-status.status-expired {
+  background: #f2e3df;
+  color: #9b5144;
+}
+
+.past-order-number,
+.past-order-items {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.past-order-number strong {
+  font-size: 13px;
+}
+
+.past-order-number time,
+.past-order-items span {
+  color: #8a867c;
+  font-size: 9px;
+}
+
+.past-order-items strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.past-order-amount {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.past-order-chevron {
+  color: #aaa69b;
+  font-size: 22px;
+}
+
+.past-order-empty {
+  min-height: 92px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px dashed #d7d3c7;
+  border-radius: 13px;
+  color: #77746b;
+}
+
+.past-order-empty > span {
+  font-size: 24px;
+}
+
+.past-order-empty strong {
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.past-order-empty p {
+  margin: 4px 0 0;
+  font-size: 9px;
 }
 
 .section-head {
@@ -5881,6 +6109,10 @@ main {
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .past-order-list > button {
+    grid-template-columns: 74px 82px minmax(120px, 1fr) auto 16px;
+  }
+
   .management-hero,
   .qr-hero {
     grid-template-columns: 1fr;
@@ -6012,6 +6244,65 @@ main {
 
   .section-head {
     grid-template-columns: 1fr auto;
+  }
+
+  .past-order-search {
+    padding: 18px;
+  }
+
+  .past-order-intro {
+    align-items: start;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .past-order-intro > p {
+    max-width: none;
+    text-align: left;
+  }
+
+  .past-order-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .past-order-submit {
+    grid-column: 1 / -1;
+  }
+
+  .past-order-list > button {
+    grid-template-columns: 70px minmax(64px, 0.5fr) minmax(110px, 1fr) auto;
+  }
+
+  .past-order-chevron {
+    display: none;
+  }
+
+  .past-order-results > header {
+    align-items: flex-start;
+  }
+
+  .past-order-results > header div {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .past-order-list > button {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px 10px;
+  }
+
+  .past-order-number {
+    grid-column: 2;
+  }
+
+  .past-order-items {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+
+  .past-order-amount {
+    grid-column: 3;
   }
 
   .filters {

@@ -522,9 +522,25 @@ export function changeAdminSupportInquiryStatus(
 
 export function getSellerOrders(
   connection: SellerConnection,
-  status?: OrderStatus,
+  filter?:
+    | OrderStatus
+    | {
+        status?: OrderStatus
+        statuses?: OrderStatus[]
+        date?: string
+      },
 ) {
-  const query = status ? `?status=${status}` : "";
+  const params = new URLSearchParams()
+  if (typeof filter === 'string') {
+    params.set('status', filter)
+  } else if (filter) {
+    if (filter.status) params.set('status', filter.status)
+    if (filter.statuses?.length) {
+      params.set('statuses', filter.statuses.join(','))
+    }
+    if (filter.date) params.set('date', filter.date)
+  }
+  const query = params.size ? `?${params.toString()}` : ''
   return request<SellerOrder[]>(`${orderPath(connection)}${query}`, connection);
 }
 

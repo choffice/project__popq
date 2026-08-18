@@ -22,6 +22,7 @@ import { AnnouncementManagement } from './features/announcements/AnnouncementMan
 import { SellerAuth } from './features/auth/SellerAuth'
 import { MessageManagement } from './features/messages/MessageManagement'
 import { ReviewManagement } from './features/reviews/ReviewManagement'
+import { PastOrderSearch } from './features/orders/PastOrderSearch'
 import type {
   BusinessStatus,
   OrderRealtimeEvent,
@@ -244,6 +245,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(
     () => freshDemoOrders()[0]?.orderPublicId ?? null,
   )
+  const [selectedPastOrder, setSelectedPastOrder] = useState<SellerOrder | null>(null)
   const [filter, setFilter] = useState<OrderFilter>('ACTIVE')
   const [now, setNow] = useState(new Date())
   const [businessStatus, setBusinessStatus] =
@@ -412,7 +414,8 @@ function App() {
   }, [filter, orders])
 
   const selectedOrder =
-    orders.find((order) => order.orderPublicId === selectedId) ?? null
+    orders.find((order) => order.orderPublicId === selectedId) ??
+    (selectedPastOrder?.orderPublicId === selectedId ? selectedPastOrder : null)
 
   useEffect(() => {
     let active = true
@@ -611,6 +614,7 @@ function App() {
     setActiveView(nextConnection.user?.role === 'ADMIN' ? 'admin-customers' : 'orders')
     setOrders([])
     setSelectedId(null)
+    setSelectedPastOrder(null)
     setConnected(false)
     setUnreadMessageCount(0)
     setError(null)
@@ -627,6 +631,7 @@ function App() {
     const demo = freshDemoOrders()
     setOrders(demo)
     setSelectedId(demo[0]?.orderPublicId ?? null)
+    setSelectedPastOrder(null)
     setConnected(false)
     setUnreadMessageCount(0)
     setError(null)
@@ -642,6 +647,7 @@ function App() {
     setActiveView('orders')
     setOrders([])
     setSelectedId(null)
+    setSelectedPastOrder(null)
     setConnected(false)
     setUnreadMessageCount(0)
     setError(null)
@@ -665,6 +671,7 @@ function App() {
     setConnection(nextConnection)
     setOrders([])
     setSelectedId(null)
+    setSelectedPastOrder(null)
     setFilter('ACTIVE')
     setPaymentSummary(null)
     setPaymentLoading(false)
@@ -921,6 +928,17 @@ function App() {
               </div>
             </article>
           </section>
+
+          <PastOrderSearch
+            connection={connection}
+            demoOrders={orders}
+            selectedId={selectedId}
+            onSelect={(order) => {
+              setSelectedPastOrder(order)
+              setSelectedId(order.orderPublicId)
+            }}
+            onError={setError}
+          />
 
           <section className="orders-section">
             <div className="section-head">
