@@ -17,7 +17,7 @@ class SellerSupportFaq {
       question: json['question'] as String,
       answer: json['answer'] as String,
       displayOrder: (json['displayOrder'] as num).toInt(),
-      popular: json['popular'] as bool,
+      popular: (json['popular'] as bool?) ?? false,
     );
   }
 

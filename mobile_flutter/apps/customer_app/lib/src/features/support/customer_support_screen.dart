@@ -27,6 +27,9 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   Timer? _searchTimer;
+  Timer? _faqPollingTimer;
+  bool _faqPollingInProgress = false;
+
   List<CustomerSupportFaq> _faqs = const [];
   bool _loading = true;
   String? _errorMessage;
@@ -36,11 +39,13 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
   void initState() {
     super.initState();
     _loadPopularFaqs();
+    _startFaqPolling();
   }
 
   @override
   void dispose() {
     _searchTimer?.cancel();
+    _faqPollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -71,6 +76,48 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
         _loading = false;
         _errorMessage = '자주 묻는 질문을 불러오지 못했어요.';
       });
+    }
+  }
+
+  void _startFaqPolling() {
+    _faqPollingTimer?.cancel();
+
+    _faqPollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+          (_) => unawaited(_refreshFaqsSilently()),
+    );
+  }
+
+  Future<void> _refreshFaqsSilently() async {
+    if (!mounted || _faqPollingInProgress) {
+      return;
+    }
+
+    _faqPollingInProgress = true;
+
+    try {
+      final keyword = _searchController.text.trim();
+
+      final faqs = keyword.isEmpty
+          ? await widget.repository.getPopularFaqs()
+          : await widget.repository.getFaqs(keyword: keyword);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _faqs = faqs;
+        _errorMessage = null;
+
+        if (_expandedFaqId != null &&
+            !faqs.any((faq) => faq.faqId == _expandedFaqId)) {
+          _expandedFaqId = null;
+        }
+      });
+    } catch (_) {
+    } finally {
+      _faqPollingInProgress = false;
     }
   }
 
@@ -271,8 +318,8 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
               padding: const EdgeInsets.only(bottom: 10),
               child: _FaqCard(
                 faq: faq,
-                expanded: _expandedFaqId == faq.supportFaqId,
-                onTap: () => _toggleFaq(faq.supportFaqId),
+                expanded: _expandedFaqId == faq.faqId,
+                onTap: () => _toggleFaq(faq.faqId),
               ),
             ),
           )
