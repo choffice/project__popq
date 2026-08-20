@@ -10,6 +10,7 @@ import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
+import '../profile/store_category_filter.dart';
 import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
 import 'customer_location_repository.dart';
@@ -53,7 +54,7 @@ class _CustomerHomeScreenState
 
   /// 현재 선택된 카테고리 필터입니다.
   ///
-  /// 백엔드 카테고리 필터 API가 아직 없어 화면 표시 용도로만 사용합니다.
+  /// 홈에서 이미 조회한 주변 매장 목록에 대표 카테고리 기준 필터를 적용합니다.
   int _selectedCategoryIndex = 0;
 
   @override
@@ -169,6 +170,19 @@ class _CustomerHomeScreenState
           );
         }
 
+        final String selectedCategoryLabel =
+            _homeCategoryLabels[_selectedCategoryIndex];
+        final List<CustomerStore> filteredRecommendedStores = snapshot
+            .recommendedStores
+            .where(
+              (CustomerStore store) => matchesStoreCategoryLabel(
+                store.representativeCategory,
+                selectedCategoryLabel,
+              ),
+            )
+            .take(5)
+            .toList(growable: false);
+
         return RefreshIndicator(
           onRefresh: _controller.refresh,
           child: ListView(
@@ -242,40 +256,37 @@ class _CustomerHomeScreenState
 
               SizedBox(
                 height: 216,
-                child: snapshot.recommendedStores.isNotEmpty
+                child: filteredRecommendedStores.isNotEmpty
                     ? ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount:
-                  snapshot.recommendedStores.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    final store =
-                    snapshot
-                        .recommendedStores[index];
+                        scrollDirection: Axis.horizontal,
+                        itemCount: filteredRecommendedStores.length,
+                        separatorBuilder: (context, index) {
+                          return const SizedBox(
+                            width: PopqSpacing.sm,
+                          );
+                        },
+                        itemBuilder: (context, index) {
+                          final CustomerStore store =
+                              filteredRecommendedStores[index];
 
-                    return _RankingStoreCard(
-                      rank: index + 1,
-                      store: store,
-                      onTap: () {
-                        context.push(
-                          '${CustomerRoutes.stores}/'
-                              '${store.storeId}',
-                        );
-                      },
-                    );
-                  },
-                )
+                          return _RankingStoreCard(
+                            rank: index + 1,
+                            store: store,
+                            onTap: () {
+                              context.push(
+                                '${CustomerRoutes.stores}/'
+                                '${store.storeId}',
+                              );
+                            },
+                          );
+                        },
+                      )
                     : _RegionContentEmptyCard(
-                  regionLabel: snapshot.regionLabel,
-                  message: '등록된 인기 매장이 아직 없어요.',
-                ),
+                        regionLabel: snapshot.regionLabel,
+                        message: _selectedCategoryIndex == 0
+                            ? '등록된 인기 매장이 아직 없어요.'
+                            : '$selectedCategoryLabel 카테고리 매장이 아직 없어요.',
+                      ),
               ),
 
               const SizedBox(

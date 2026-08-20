@@ -41,7 +41,10 @@ class CustomerHomeSnapshot {
   /// 현재 탐색 좌표 주변의 EVENT_COMMERCE 매장입니다.
   final List<CustomerStore> eventStores;
 
-  /// 홈 홍보 매장을 제외한 현재 탐색 좌표 주변 LOCAL_STORE 목록입니다.
+  /// 홈 홍보 매장을 제외한 현재 탐색 좌표 주변 매장 전체 목록입니다.
+  ///
+  /// 일반 매장과 행사·팝업 판매점을 함께 담고, 홈 화면에서 선택한
+  /// 대표 카테고리로 필터링한 뒤 최대 5개를 표시합니다.
   final List<CustomerStore> recommendedStores;
 
   /// 회원 혜택 또는 서비스 안내 배너입니다.
@@ -301,10 +304,8 @@ class CustomerHomeController extends ChangeNotifier {
     final List<CustomerStore> recommendedStores = stores
         .where(
           (CustomerStore store) =>
-              store.storeType == 'LOCAL_STORE' &&
               store.storeId != featuredStore?.storeId,
         )
-        .take(5)
         .toList(growable: false);
 
     final String locationLabel = _searchLocationController.displayLabel.trim();
