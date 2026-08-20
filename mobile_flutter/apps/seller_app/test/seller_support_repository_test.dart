@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_seller_app/src/features/support/seller_support_api_repository.dart';
 import 'package:popq_seller_app/src/features/support/seller_support_repository.dart';
 import 'package:popq_seller_app/src/features/support/seller_support_types.dart';
 
@@ -13,8 +14,9 @@ void main() {
       expect(
         request.url.toString(),
         'https://api.popq.test/api/v1/public/content/faqs'
-        '?audience=SELLER_APP',
+            '?audience=SELLER_APP',
       );
+
       return _successResponse(<Object?>[
         <String, Object?>{
           'faqId': 3,
@@ -27,6 +29,7 @@ void main() {
         },
       ]);
     });
+
     final repository = _repository(client);
 
     final faqs = await repository.getPopularFaqs();
@@ -38,23 +41,34 @@ void main() {
   test('판매자 문의 생성 요청을 통합 지원 API 계약으로 보낸다', () async {
     final client = MockClient((request) async {
       expect(request.method, 'POST');
+
       expect(
         request.url.toString(),
         'https://api.popq.test/api/v1/support/tickets',
       );
-      expect(request.headers['authorization'], 'Bearer seller-token');
-      expect(jsonDecode(request.body), <String, Object?>{
-        'requesterType': 'SELLER',
-        'category': 'APP',
-        'subject': '앱 문의',
-        'content': '알림이 오지 않습니다.',
-      });
+
+      expect(
+        request.headers['authorization'],
+        'Bearer seller-token',
+      );
+
+      expect(
+        jsonDecode(request.body),
+        <String, Object?>{
+          'requesterType': 'SELLER',
+          'category': 'OTHER',
+          'subject': '앱 문의',
+          'content': '알림이 오지 않습니다.',
+        },
+      );
+
       return _successResponse(_ticketDetailJson());
     });
+
     final repository = _repository(client);
 
     final detail = await repository.createTicket(
-      category: SellerSupportCategory.app,
+      category: SellerSupportCategory.other,
       subject: ' 앱 문의 ',
       content: ' 알림이 오지 않습니다. ',
     );
@@ -69,8 +83,11 @@ void main() {
         request.url.toString(),
         'https://api.popq.test/api/v1/support/tickets?page=0&size=100',
       );
+
       return _successResponse(<String, Object?>{
-        'content': <Object?>[_ticketSummaryJson()],
+        'content': <Object?>[
+          _ticketSummaryJson(),
+        ],
         'page': 0,
         'size': 100,
         'totalElements': 1,
@@ -79,6 +96,7 @@ void main() {
         'last': true,
       });
     });
+
     final repository = _repository(client);
 
     final tickets = await repository.getMyTickets();
@@ -121,7 +139,7 @@ Map<String, Object?> _ticketSummaryJson() {
     'requesterName': '판매자',
     'requesterEmail': 'seller@popq.test',
     'requesterType': 'SELLER',
-    'category': 'APP',
+    'category': 'OTHER',
     'subject': '앱 문의',
     'status': 'RECEIVED',
     'lastMessageAt': '2026-08-14T00:00:00Z',
@@ -131,7 +149,13 @@ Map<String, Object?> _ticketSummaryJson() {
 
 http.Response _successResponse(Object? data) {
   return http.Response(
-    jsonEncode(<String, Object?>{'success': true, 'data': data, 'error': null}),
+    jsonEncode(
+      <String, Object?>{
+        'success': true,
+        'data': data,
+        'error': null,
+      },
+    ),
     200,
     headers: const <String, String>{
       'content-type': 'application/json; charset=utf-8',
