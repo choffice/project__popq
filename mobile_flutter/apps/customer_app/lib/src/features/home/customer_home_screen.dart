@@ -172,16 +172,25 @@ class _CustomerHomeScreenState
 
         final String selectedCategoryLabel =
             _homeCategoryLabels[_selectedCategoryIndex];
-        final List<CustomerStore> filteredRecommendedStores = snapshot
-            .recommendedStores
-            .where(
-              (CustomerStore store) => matchesStoreCategoryLabel(
-                store.representativeCategory,
-                selectedCategoryLabel,
-              ),
-            )
-            .take(5)
-            .toList(growable: false);
+        final Map<int, CustomerStore> popularityCandidateMap =
+            <int, CustomerStore>{
+          if (snapshot.featuredStore != null)
+            snapshot.featuredStore!.storeId: snapshot.featuredStore!,
+          for (final CustomerStore store in snapshot.recommendedStores)
+            store.storeId: store,
+        };
+        final List<CustomerStore> popularityCandidates =
+            popularityCandidateMap.values
+                .where(
+                  (CustomerStore store) => matchesStoreCategoryLabel(
+                    store.representativeCategory,
+                    selectedCategoryLabel,
+                  ),
+                )
+                .toList(growable: true)
+              ..sort(_compareStorePopularity);
+        final List<CustomerStore> filteredRecommendedStores =
+            popularityCandidates.take(5).toList(growable: false);
 
         return RefreshIndicator(
           onRefresh: _controller.refresh,
@@ -232,7 +241,7 @@ class _CustomerHomeScreenState
                 eyebrow: 'RANKING',
                 title: '인기 랭킹 TOP 5',
                 description:
-                '${snapshot.regionLabel}에서 지금 가장 인기 있는 곳을 모았어요.',
+                '${snapshot.regionLabel}의 완료 주문·리뷰·찜 데이터를 기준으로 정렬했어요.',
               ),
 
               const SizedBox(
@@ -2141,10 +2150,17 @@ class _RankingStoreCard
                 Text(
                   _storeCategoryLabel(store),
                   maxLines: 1,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _popularitySummary(store),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -2153,6 +2169,51 @@ class _RankingStoreCard
       ),
     );
   }
+}
+
+int _compareStorePopularity(CustomerStore left, CustomerStore right) {
+  int compared = right.completedOrderCount.compareTo(left.completedOrderCount);
+  if (compared != 0) {
+    return compared;
+  }
+
+  compared = right.reviewCount.compareTo(left.reviewCount);
+  if (compared != 0) {
+    return compared;
+  }
+
+  compared = right.favoriteCount.compareTo(left.favoriteCount);
+  if (compared != 0) {
+    return compared;
+  }
+
+  compared = right.averageRating.compareTo(left.averageRating);
+  if (compared != 0) {
+    return compared;
+  }
+
+  final int leftDistance = left.distanceMeters ?? 1 << 30;
+  final int rightDistance = right.distanceMeters ?? 1 << 30;
+  compared = leftDistance.compareTo(rightDistance);
+  if (compared != 0) {
+    return compared;
+  }
+
+  return left.storeId.compareTo(right.storeId);
+}
+
+String _popularitySummary(CustomerStore store) {
+  final List<String> parts = <String>[
+    '주문 ${store.completedOrderCount}',
+    '리뷰 ${store.reviewCount}',
+    '찜 ${store.favoriteCount}',
+  ];
+
+  if (store.reviewCount > 0) {
+    parts.add('★ ${store.averageRating.toStringAsFixed(1)}');
+  }
+
+  return parts.join(' · ');
 }
 
 class _DDayBadge extends StatelessWidget {
