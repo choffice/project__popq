@@ -1,11 +1,20 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SellerAuth } from "./SellerAuth";
 
+const { renderGoogleSellerButtonMock } = vi.hoisted(() => ({
+  renderGoogleSellerButtonMock: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("./googleSellerAuth", () => ({
+  renderGoogleSellerButton: renderGoogleSellerButtonMock,
+}));
+
+import { SellerAuth } from "./SellerAuth";
 describe("판매자 웹 인증", () => {
   afterEach(() => {
     cleanup();
+    vi.clearAllMocks();
     vi.restoreAllMocks();
   });
 
@@ -225,6 +234,191 @@ describe("판매자 웹 인증", () => {
     );
     expect(onAuthenticated).toHaveBeenCalledWith(
       expect.objectContaining({ storeId: 21, storeName: "첫 카페" }),
+    );
+  });
+
+  it("Google ID Token으로 판매자 로그인한다", async () => {
+    const onAuthenticated = vi.fn();
+
+    const fetchMock = vi
+      .spyOn(window, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessToken: "google-seller-token",
+              tokenType: "Bearer",
+              expiresIn: 3600,
+              user: {
+                userId: 12,
+                email: "google-seller@popq.test",
+                name: "Google 판매자",
+                role: "SELLER",
+                status: "ACTIVE",
+              },
+            },
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [
+              {
+                storeId: 31,
+                storeType: "LOCAL_STORE",
+                name: "Google 매장",
+                description: null,
+                status: "ACTIVE",
+                businessStatus: "OPEN",
+                myRole: "OWNER",
+              },
+            ],
+          }),
+          {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          },
+        ),
+      );
+
+    render(
+      <SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(renderGoogleSellerButtonMock).toHaveBeenCalled();
+    });
+
+    const onIdToken = renderGoogleSellerButtonMock.mock.calls[0][1];
+
+    await act(async () => {
+      onIdToken("google-id-token");
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/auth/social/login",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          provider: "GOOGLE",
+          providerToken: "google-id-token",
+          role: "SELLER",
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/seller/stores",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer google-seller-token",
+        }),
+      }),
+    );
+
+    expect(onAuthenticated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: 31,
+        accessToken: "google-seller-token",
+        storeName: "Google 매장",
+      }),
+    );
+  });
+
+  it("관리자 탭에서는 소셜 로그인을 표시하지 않는다", async () => {
+    const user = userEvent.setup();
+
+    render(<SellerAuth onAuthenticated={vi.fn()} onUseDemo={vi.fn()} />);
+
+    expect(
+      screen.getByRole("region", {
+        name: "판매자 소셜 로그인",
+      }),
+    ).toBeVisible();
+
+    await user.click(
+      screen.getByRole("tab", {
+        name: "관리자",
+      }),
+    );
+
+    expect(
+      screen.queryByRole("region", {
+        name: "판매자 소셜 로그인",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("Google 소셜 로그인 실패 메시지를 표시한다", async () => {
+    const fetchMock = vi.spyOn(window, "fetch").mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          success: false,
+          data: null,
+          error: {
+            code: "INVALID_SOCIAL_TOKEN",
+            message: "유효하지 않은 소셜 로그인 정보입니다.",
+          },
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      ),
+    );
+
+    render(<SellerAuth onAuthenticated={vi.fn()} onUseDemo={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(renderGoogleSellerButtonMock).toHaveBeenCalled();
+    });
+
+    const onIdToken = renderGoogleSellerButtonMock.mock.calls[0][1];
+
+    await act(async () => {
+      onIdToken("invalid-google-token");
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/auth/social/login",
+      expect.objectContaining({
+        body: JSON.stringify({
+          provider: "GOOGLE",
+          providerToken: "invalid-google-token",
+          role: "SELLER",
+        }),
+      }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "유효하지 않은 소셜 로그인 정보입니다.",
+    );
+  });
+
+  it("Google SDK를 불러오지 못하면 오류를 표시한다", async () => {
+    renderGoogleSellerButtonMock.mockRejectedValueOnce(
+      new Error("Google 로그인 SDK를 불러오지 못했습니다."),
+    );
+
+    render(<SellerAuth onAuthenticated={vi.fn()} onUseDemo={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Google 로그인 SDK를 불러오지 못했습니다.",
     );
   });
 

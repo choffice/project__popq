@@ -32,11 +32,11 @@ import type {
   SellerReview,
   SellerReviewReplyTemplate,
   StoreDetail,
+  StoreOptionTemplate,
+  StoreOptionTemplateUsage,
   StoreSavePayload,
   StoreSummary,
   StoreTable,
-  StoreOptionTemplate,
-  StoreOptionTemplateUsage,
   SupportCategory,
   SupportInquiryDetail,
   SupportInquiryStatus,
@@ -49,6 +49,8 @@ import type {
 } from "../types";
 
 type TransitionAction = "accept" | "reject" | "prepare" | "ready" | "complete";
+
+export type SellerSocialProvider = "GOOGLE" | "KAKAO" | "NAVER";
 
 async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -73,6 +75,20 @@ export function loginAccount(
   return publicRequest<SellerAuthResult>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password, role }),
+  });
+}
+
+export function loginSellerSocial(
+  provider: SellerSocialProvider,
+  providerToken: string,
+) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/login", {
+    method: "POST",
+    body: JSON.stringify({
+      provider,
+      providerToken,
+      role: "SELLER",
+    }),
   });
 }
 
@@ -525,22 +541,22 @@ export function getSellerOrders(
   filter?:
     | OrderStatus
     | {
-        status?: OrderStatus
-        statuses?: OrderStatus[]
-        date?: string
+        status?: OrderStatus;
+        statuses?: OrderStatus[];
+        date?: string;
       },
 ) {
-  const params = new URLSearchParams()
-  if (typeof filter === 'string') {
-    params.set('status', filter)
+  const params = new URLSearchParams();
+  if (typeof filter === "string") {
+    params.set("status", filter);
   } else if (filter) {
-    if (filter.status) params.set('status', filter.status)
+    if (filter.status) params.set("status", filter.status);
     if (filter.statuses?.length) {
-      params.set('statuses', filter.statuses.join(','))
+      params.set("statuses", filter.statuses.join(","));
     }
-    if (filter.date) params.set('date', filter.date)
+    if (filter.date) params.set("date", filter.date);
   }
-  const query = params.size ? `?${params.toString()}` : ''
+  const query = params.size ? `?${params.toString()}` : "";
   return request<SellerOrder[]>(`${orderPath(connection)}${query}`, connection);
 }
 
