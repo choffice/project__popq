@@ -14,8 +14,28 @@ public record StoreScheduleResponse(
         List<BusinessHour> businessHours,
         List<ClosureRule> closureRules,
         List<ScheduleException> scheduleExceptions,
-        boolean publicHolidayAutoCalculationAvailable
+        boolean publicHolidayAutoCalculationAvailable,
+        LocalDate publicHolidayEvaluationDate,
+        Boolean publicHoliday,
+        String publicHolidayName
 ) {
+    public StoreScheduleResponse(
+            List<BusinessHour> businessHours,
+            List<ClosureRule> closureRules,
+            List<ScheduleException> scheduleExceptions,
+            boolean publicHolidayAutoCalculationAvailable
+    ) {
+        this(
+                businessHours,
+                closureRules,
+                scheduleExceptions,
+                publicHolidayAutoCalculationAvailable,
+                null,
+                null,
+                null
+        );
+    }
+
     public record BusinessHour(
             DayOfWeek dayOfWeek,
             boolean closed,

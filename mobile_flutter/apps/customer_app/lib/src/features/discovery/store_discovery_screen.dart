@@ -164,7 +164,7 @@ List<CustomerStore> filterStoreSearchSuggestions({
     if (favoritesOnly && !favoriteStoreIds.contains(store.storeId)) {
       return false;
     }
-    if (openOnly && store.businessStatus != 'OPEN') {
+    if (openOnly && !_isStoreOpenNow(store)) {
       return false;
     }
     return true;
@@ -576,7 +576,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
     }
 
     return stores
-        .where((store) => store.businessStatus == 'OPEN')
+        .where(_isStoreOpenNow)
         .toList(growable: false);
   }
 
@@ -885,7 +885,7 @@ class _StoreDiscoveryScreenState extends State<StoreDiscoveryScreen> {
      */
       if (_openOnly &&
           _selectedStore != null &&
-          _selectedStore!.businessStatus != 'OPEN') {
+          !_isStoreOpenNow(_selectedStore!)) {
         _clearSelectedStoreState();
       }
     });
@@ -2455,6 +2455,10 @@ String _storeTypeLabel(String storeType) {
     'EVENT_COMMERCE' => '행사·이벤트',
     _ => '등록 업체',
   };
+}
+
+bool _isStoreOpenNow(CustomerStore store) {
+  return store.businessStatus == 'OPEN' && store.resolvedSchedule.isOpenAt();
 }
 
 String _searchSuggestionSubtitle(CustomerStore store) {

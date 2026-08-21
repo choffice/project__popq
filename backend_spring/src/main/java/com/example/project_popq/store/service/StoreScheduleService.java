@@ -37,6 +37,7 @@ public class StoreScheduleService {
     private final StoreBusinessHourRepository businessHourRepository;
     private final StoreClosureRuleRepository closureRuleRepository;
     private final StoreScheduleExceptionRepository exceptionRepository;
+    private final PublicHolidayService publicHolidayService;
 
     public void createInitialSchedule(Store store, StoreScheduleRequest request) {
         if (request == null) {
@@ -83,12 +84,14 @@ public class StoreScheduleService {
     }
 
     public StoreScheduleResponse find(Store store) {
+        PublicHolidayService.Evaluation holidayEvaluation =
+                publicHolidayService.evaluate(LocalDate.now(BUSINESS_ZONE));
         List<StoreBusinessHour> hours =
                 businessHourRepository.findAllByStoreIdOrderByDayOfWeekAsc(store.getId());
         if (hours.isEmpty()) {
-            return legacyResponse(store);
+            return legacyResponse(store, holidayEvaluation);
         }
-        return new StoreScheduleResponse(
+        return scheduleResponse(
                 hours.stream()
                         .sorted((a, b) -> a.getDayOfWeek().compareTo(b.getDayOfWeek()))
                         .map(StoreScheduleResponse.BusinessHour::from).toList(),
@@ -96,7 +99,7 @@ public class StoreScheduleService {
                         .stream().map(StoreScheduleResponse.ClosureRule::from).toList(),
                 exceptionRepository.findAllByStoreIdOrderByStartDateAscIdAsc(store.getId())
                         .stream().map(StoreScheduleResponse.ScheduleException::from).toList(),
-                false
+                holidayEvaluation
         );
     }
 
@@ -107,6 +110,8 @@ public class StoreScheduleService {
         if (stores.isEmpty()) return Map.of();
         List<Long> ids = stores.stream().map(Store::getId).toList();
         LocalDate today = instant.atZone(BUSINESS_ZONE).toLocalDate();
+        PublicHolidayService.Evaluation holidayEvaluation =
+                publicHolidayService.evaluate(today);
         Map<Long, List<StoreBusinessHour>> hours = businessHourRepository
                 .findAllByStoreIdIn(ids).stream()
                 .collect(Collectors.groupingBy(value -> value.getStore().getId()));
@@ -122,10 +127,10 @@ public class StoreScheduleService {
         for (Store store : stores) {
             List<StoreBusinessHour> storeHours = hours.getOrDefault(store.getId(), List.of());
             if (storeHours.isEmpty()) {
-                result.put(store.getId(), legacyResponse(store));
+                result.put(store.getId(), legacyResponse(store, holidayEvaluation));
                 continue;
             }
-            result.put(store.getId(), new StoreScheduleResponse(
+            result.put(store.getId(), scheduleResponse(
                     storeHours.stream()
                             .sorted((a, b) -> a.getDayOfWeek().compareTo(b.getDayOfWeek()))
                             .map(StoreScheduleResponse.BusinessHour::from).toList(),
@@ -134,7 +139,7 @@ public class StoreScheduleService {
                     exceptions.getOrDefault(store.getId(), List.of()).stream()
                             .sorted((a, b) -> a.getStartDate().compareTo(b.getStartDate()))
                             .map(StoreScheduleResponse.ScheduleException::from).toList(),
-                    false
+                    holidayEvaluation
             ));
         }
         return Map.copyOf(result);
@@ -157,7 +162,10 @@ public class StoreScheduleService {
                 .toList());
     }
 
-    private StoreScheduleResponse legacyResponse(Store store) {
+    private StoreScheduleResponse legacyResponse(
+            Store store,
+            PublicHolidayService.Evaluation holidayEvaluation
+    ) {
         Set<String> closed = legacyClosedDays(store);
         List<StoreScheduleResponse.BusinessHour> hours =
                 EnumSet.allOf(DayOfWeek.class).stream()
@@ -170,7 +178,31 @@ public class StoreScheduleService {
                                 closed.contains(day.name()) ? null : store.getCloseTime()
                         ))
                         .toList();
-        return new StoreScheduleResponse(hours, List.of(), List.of(), false);
+        return scheduleResponse(
+                hours,
+                List.of(),
+                List.of(),
+                holidayEvaluation
+        );
+    }
+
+    private StoreScheduleResponse scheduleResponse(
+            List<StoreScheduleResponse.BusinessHour> hours,
+            List<StoreScheduleResponse.ClosureRule> rules,
+            List<StoreScheduleResponse.ScheduleException> exceptions,
+            PublicHolidayService.Evaluation holidayEvaluation
+    ) {
+        return new StoreScheduleResponse(
+                hours,
+                rules,
+                exceptions,
+                holidayEvaluation.available(),
+                holidayEvaluation.evaluationDate(),
+                holidayEvaluation.available()
+                        ? holidayEvaluation.publicHoliday()
+                        : null,
+                holidayEvaluation.holidayName()
+        );
     }
 
     private void validateBusinessHours(List<StoreBusinessHourRequest> values) {
