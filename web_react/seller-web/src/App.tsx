@@ -61,6 +61,139 @@ type TransitionOptions = {
   applyAsStoreDefault?: boolean
 }
 
+type SidebarIconName =
+  | 'customers'
+  | 'sellerVerification'
+  | 'store'
+  | 'announcement'
+  | 'support'
+  | 'faq'
+  | 'orders'
+  | 'products'
+  | 'qr'
+  | 'analytics'
+  | 'messages'
+  | 'reviews'
+  | 'settings'
+
+function SidebarIcon({ name }: { name: SidebarIconName }) {
+  const commonProps = {
+    width: 20,
+    height: 20,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.8,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  }
+
+  switch (name) {
+    case 'customers':
+      return (
+        <svg {...commonProps}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      )
+    case 'sellerVerification':
+      return (
+        <svg {...commonProps}>
+          <circle cx="9" cy="8" r="4" />
+          <path d="M3 21v-2a6 6 0 0 1 10.2-4.3" />
+          <path d="m16 19 2 2 4-5" />
+        </svg>
+      )
+    case 'store':
+      return (
+        <svg {...commonProps}>
+          <path d="M3 9l1.7-5h14.6L21 9" />
+          <path d="M5 13v7h14v-7" />
+          <path d="M9 20v-6h6v6" />
+          <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+        </svg>
+      )
+    case 'announcement':
+      return (
+        <svg {...commonProps}>
+          <path d="m3 11 14-5v12L3 13z" />
+          <path d="M11.6 16.1 13 21H8l-1.5-6" />
+          <path d="M21 9v6" />
+        </svg>
+      )
+    case 'support':
+      return (
+        <svg {...commonProps}>
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a7 7 0 0 1-1-3.6A7.4 7.4 0 0 1 9.5 4h5A6.5 6.5 0 0 1 21 10.5z" />
+          <path d="M8 11h.01M12 11h.01M16 11h.01" />
+        </svg>
+      )
+    case 'faq':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.8 9a2.4 2.4 0 1 1 3.8 1.95c-.95.67-1.6 1.2-1.6 2.55" />
+          <path d="M12 17h.01" />
+        </svg>
+      )
+    case 'orders':
+      return (
+        <svg {...commonProps}>
+          <path d="M9 5h6" />
+          <path d="M9 3h6a2 2 0 0 1 2 2v1h2v15H5V6h2V5a2 2 0 0 1 2-2z" />
+          <path d="M8 11h8M8 15h8" />
+        </svg>
+      )
+    case 'products':
+      return (
+        <svg {...commonProps}>
+          <path d="m12 3 8 4.5-8 4.5-8-4.5z" />
+          <path d="m4 7.5 8 4.5 8-4.5V17l-8 4-8-4z" />
+          <path d="M12 12v9" />
+        </svg>
+      )
+    case 'qr':
+      return (
+        <svg {...commonProps}>
+          <rect x="3" y="3" width="6" height="6" rx="1" />
+          <rect x="15" y="3" width="6" height="6" rx="1" />
+          <rect x="3" y="15" width="6" height="6" rx="1" />
+          <path d="M15 15h2v2h-2zM19 15h2M19 19h2v2h-2M15 19v2" />
+        </svg>
+      )
+    case 'analytics':
+      return (
+        <svg {...commonProps}>
+          <path d="M4 20V10M10 20V4M16 20v-7M22 20V7" />
+          <path d="M2 20h20" />
+        </svg>
+      )
+    case 'messages':
+      return (
+        <svg {...commonProps}>
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a7 7 0 0 1-1-3.6A7.4 7.4 0 0 1 9.5 4h5A6.5 6.5 0 0 1 21 10.5z" />
+          <path d="M8 11h8M8 14h5" />
+        </svg>
+      )
+    case 'reviews':
+      return (
+        <svg {...commonProps}>
+          <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+        </svg>
+      )
+    case 'settings':
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15.03 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15z" />
+        </svg>
+      )
+  }
+}
+
 const CONNECTION_KEY = 'popq:seller:connection'
 const DEMO_KEY = 'popq:seller:demo'
 
@@ -736,13 +869,13 @@ function App() {
           {isAdmin ? (
             <>
               <small className="sidebar-section-label">회원 관리</small>
-              <button className={activeView === 'admin-customers' ? 'active' : ''} onClick={() => setActiveView('admin-customers')}><span>◎</span>구매자 회원</button>
-              <button className={activeView === 'admin-sellers' ? 'active' : ''} onClick={() => setActiveView('admin-sellers')}><span>◇</span>판매자 · 인증</button>
-              <button className={activeView === 'admin-stores' ? 'active' : ''} onClick={() => setActiveView('admin-stores')}><span>□</span>스토어 관리</button>
+              <button className={activeView === 'admin-customers' ? 'active' : ''} onClick={() => setActiveView('admin-customers')}><span className="sidebar-nav-icon"><SidebarIcon name="customers" /></span>구매자 회원</button>
+              <button className={activeView === 'admin-sellers' ? 'active' : ''} onClick={() => setActiveView('admin-sellers')}><span className="sidebar-nav-icon"><SidebarIcon name="sellerVerification" /></span>판매자 · 인증</button>
+              <button className={activeView === 'admin-stores' ? 'active' : ''} onClick={() => setActiveView('admin-stores')}><span className="sidebar-nav-icon"><SidebarIcon name="store" /></span>스토어 관리</button>
               <small className="sidebar-section-label">콘텐츠 · 지원</small>
-              <button className={activeView === 'admin-announcements' ? 'active' : ''} onClick={() => setActiveView('admin-announcements')}><span>◉</span>플랫폼 공지</button>
-              <button className={activeView === 'admin-support' ? 'active' : ''} onClick={() => setActiveView('admin-support')}><span>◌</span>문의 관리</button>
-              <button className={activeView === 'admin-faqs' ? 'active' : ''} onClick={() => setActiveView('admin-faqs')}><span>?</span>FAQ 관리</button>
+              <button className={activeView === 'admin-announcements' ? 'active' : ''} onClick={() => setActiveView('admin-announcements')}><span className="sidebar-nav-icon"><SidebarIcon name="announcement" /></span>플랫폼 공지</button>
+              <button className={activeView === 'admin-support' ? 'active' : ''} onClick={() => setActiveView('admin-support')}><span className="sidebar-nav-icon"><SidebarIcon name="support" /></span>문의 관리</button>
+              <button className={activeView === 'admin-faqs' ? 'active' : ''} onClick={() => setActiveView('admin-faqs')}><span className="sidebar-nav-icon"><SidebarIcon name="faq" /></span>FAQ 관리</button>
             </>
           ) : (
             <>
@@ -750,7 +883,7 @@ function App() {
                 className={activeView === 'orders' ? 'active' : ''}
                 onClick={() => setActiveView('orders')}
               >
-                <span>⌁</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="orders" /></span>
                 주문 운영
                 {newOrderCount > 0 && <b>{newOrderCount}</b>}
               </button>
@@ -758,35 +891,35 @@ function App() {
                 className={activeView === 'products' ? 'active' : ''}
                 onClick={() => setActiveView('products')}
               >
-                <span>□</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="products" /></span>
                 상품 관리
               </button>
               <button
                 className={activeView === 'qr' ? 'active' : ''}
                 onClick={() => setActiveView('qr')}
               >
-                <span>⌗</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="qr" /></span>
                 QR 관리
               </button>
               <button
                 className={activeView === 'analytics' ? 'active' : ''}
                 onClick={() => setActiveView('analytics')}
               >
-                <span>↗</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="analytics" /></span>
                 매출 분석
               </button>
               <button
                 className={activeView === 'announcements' ? 'active' : ''}
                 onClick={() => setActiveView('announcements')}
               >
-                <span>📢</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="announcement" /></span>
                 공지사항
               </button>
               <button
                 className={activeView === 'messages' ? 'active' : ''}
                 onClick={() => setActiveView('messages')}
               >
-                <span>💬</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="messages" /></span>
                 고객 문의
                 {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
               </button>
@@ -794,14 +927,14 @@ function App() {
                 className={activeView === 'reviews' ? 'active' : ''}
                 onClick={() => setActiveView('reviews')}
               >
-                <span>★</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="reviews" /></span>
                 리뷰 관리
               </button>
               <button
                 className={activeView === 'settings' ? 'active' : ''}
                 onClick={() => setActiveView('settings')}
               >
-                <span>⚙</span>
+                <span className="sidebar-nav-icon"><SidebarIcon name="settings" /></span>
                 스토어 설정
               </button>
             </>

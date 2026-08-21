@@ -1573,8 +1573,19 @@ button:disabled {
   font-weight: 600;
 }
 
-.sidebar nav button span {
-  font-size: 18px;
+.sidebar nav button .sidebar-nav-icon {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.sidebar nav button .sidebar-nav-icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .sidebar nav button b {
@@ -6035,8 +6046,9 @@ main {
     font-size: 0;
   }
 
-  .sidebar nav button span {
-    font-size: 18px;
+  .sidebar nav button .sidebar-nav-icon {
+    width: 22px;
+    height: 22px;
   }
 
   .sidebar nav button b {
