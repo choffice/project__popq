@@ -21,6 +21,24 @@ MODEL_PATH = (
 
 
 # ============================================================
+# 판매자 주문 접수에서 현재 허용하는 준비시간
+#
+# Spring Boot의 SellerOrderManagementService에서 허용하는 값과
+# 동일하게 유지한다.
+# ============================================================
+
+ALLOWED_RECOMMENDATION_MINUTES = (
+    5,
+    10,
+    15,
+    20,
+    30,
+    40,
+    50,
+)
+
+
+# ============================================================
 # FastAPI
 # ============================================================
 
@@ -121,19 +139,15 @@ _model_bundle = None
 def load_model() -> dict:
     global _model_bundle
 
-    # 이미 한 번 불러왔다면
-    # 매 요청마다 다시 파일을 읽지 않는다.
     if _model_bundle is not None:
         return _model_bundle
 
-    # 모델 파일 존재 여부 확인
     if not MODEL_PATH.exists():
         raise RuntimeError(
             "학습된 AI 모델이 없습니다. "
             "먼저 'python train_model.py'를 실행하세요."
         )
 
-    # joblib 파일에서 학습된 모델 불러오기
     _model_bundle = joblib.load(
         MODEL_PATH,
     )
@@ -142,32 +156,28 @@ def load_model() -> dict:
 
 
 # ============================================================
-# 5분 단위 추천시간 변환
+# 판매자 앱에서 실제 사용할 수 있는 준비시간으로 변환
 # ============================================================
 
-def round_to_five_minutes(
-    minutes: float,
+def recommend_supported_minutes(
+    predicted_minutes: float,
 ) -> int:
     """
-    AI가 예측한 시간을 판매자가 사용하기 편하도록
-    가장 가까운 5분 단위로 변환한다.
+    AI가 예측한 실수 값을 현재 POPQ 주문 접수에서
+    실제로 사용할 수 있는 준비시간 중 가장 가까운 값으로 변환한다.
 
     예:
-        22.8분 -> 25분
-        26.1분 -> 25분
-        28.7분 -> 30분
+        22.0분 -> 20분
+        26.0분 -> 30분
+        34.0분 -> 30분
+        37.0분 -> 40분
+        55.0분 -> 50분
     """
 
-    rounded = int(
-        round(minutes / 5.0) * 5
-    )
-
-    # 최소 5분 / 최대 120분
-    return max(
-        5,
-        min(
-            rounded,
-            120,
+    return min(
+        ALLOWED_RECOMMENDATION_MINUTES,
+        key=lambda allowed: abs(
+            allowed - predicted_minutes
         ),
     )
 
@@ -199,10 +209,7 @@ def predict_wait_time(
     request: WaitTimePredictionRequest,
 ) -> WaitTimePredictionResponse:
 
-    # --------------------------------------------------------
-    # 1. 학습 모델 불러오기
-    # --------------------------------------------------------
-
+    # 1. 학습 모델 로드
     try:
         bundle = load_model()
 
@@ -214,14 +221,7 @@ def predict_wait_time(
 
     model = bundle["model"]
 
-    # --------------------------------------------------------
-    # 2. API 요청값을
-    #    AI가 학습했던 Feature 순서로 구성
-    #
-    # 반드시 train_model.py의 FEATURE_NAMES 순서와
-    # 동일해야 한다.
-    # --------------------------------------------------------
-
+    # 2. 학습 당시와 동일한 Feature 순서로 구성
     features = np.array(
         [
             [
@@ -238,37 +238,25 @@ def predict_wait_time(
         dtype=float,
     )
 
-    # --------------------------------------------------------
     # 3. AI 예측
-    # --------------------------------------------------------
-
     predicted_minutes = float(
         model.predict(features)[0]
     )
 
-    # --------------------------------------------------------
-    # 4. 판매자가 사용하기 편하도록
-    #    5분 단위 추천값 생성
-    # --------------------------------------------------------
-
+    # 4. 판매자가 실제 적용 가능한 값으로 변환
     recommended_minutes = (
-        round_to_five_minutes(
+        recommend_supported_minutes(
             predicted_minutes,
         )
     )
 
-    # --------------------------------------------------------
-    # 5. 결과 반환
-    # --------------------------------------------------------
-
+    # 5. 반환
     return WaitTimePredictionResponse(
         predicted_minutes=round(
             predicted_minutes,
             1,
         ),
-        recommended_minutes=(
-            recommended_minutes
-        ),
+        recommended_minutes=recommended_minutes,
         source="AI",
         model_version=(
             bundle["model_version"]

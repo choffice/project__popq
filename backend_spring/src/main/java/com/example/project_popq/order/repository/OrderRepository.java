@@ -21,8 +21,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByOrderPublicId(String orderPublicId);
 
     Optional<Order> findByOrderPublicIdAndUserId(
-            String orderPublicId,
-            Long userId
+        String orderPublicId,
+        Long userId
     );
 
     @EntityGraph(attributePaths = {"store", "items"})
@@ -30,41 +30,69 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @EntityGraph(attributePaths = {"store", "items"})
     Optional<Order> findDetailedByOrderPublicIdAndStoreId(
-            String orderPublicId,
-            Long storeId
+        String orderPublicId,
+        Long storeId
     );
 
     List<Order> findAllByStoreIdAndStatusOrderByCreatedAtAsc(
-            Long storeId,
-            OrderStatus status
+        Long storeId,
+        OrderStatus status
     );
 
-    List<Order> findAllByStoreIdOrderByCreatedAtAsc(Long storeId);
+    List<Order> findAllByStoreIdOrderByCreatedAtAsc(
+        Long storeId
+    );
 
     List<Order> findAllByStoreIdAndStatusOrderByCreatedAtDesc(
-            Long storeId,
-            OrderStatus status
+        Long storeId,
+        OrderStatus status
     );
 
     List<Order> findAllByStoreIdAndStatusInOrderByCreatedAtDesc(
-            Long storeId,
-            List<OrderStatus> statuses
+        Long storeId,
+        List<OrderStatus> statuses
     );
 
-    List<Order> findAllByStoreIdOrderByCreatedAtDesc(Long storeId);
+    List<Order> findAllByStoreIdOrderByCreatedAtDesc(
+        Long storeId
+    );
 
     List<Order> findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
-            Long storeId,
-            List<OrderStatus> statuses,
-            Instant fromInclusive,
-            Instant toExclusive
+        Long storeId,
+        List<OrderStatus> statuses,
+        Instant fromInclusive,
+        Instant toExclusive
     );
 
     @EntityGraph(attributePaths = {"store", "items"})
     List<Order> findAllByStoreIdInAndStatusOrderByCreatedAtDesc(
-            List<Long> storeIds,
-            OrderStatus status,
-            org.springframework.data.domain.Pageable pageable
+        List<Long> storeIds,
+        OrderStatus status,
+        org.springframework.data.domain.Pageable pageable
+    );
+
+    /*
+     * AI 예상 준비시간 계산에 사용한다.
+     *
+     * 해당 매장의 특정 상태 주문 개수를 DB에서 직접 COUNT한다.
+     *
+     * 예:
+     * PLACED 주문 수 = 아직 판매자가 처리하지 않은 대기 주문
+     */
+    long countByStoreIdAndStatus(
+        Long storeId,
+        OrderStatus status
+    );
+
+    /*
+     * 여러 상태를 묶어서 개수를 계산한다.
+     *
+     * AI에서는 ACCEPTED / PREPARING 상태를
+     * 현재 처리 중인 주문으로 계산할 때 사용한다.
+     */
+    long countByStoreIdAndStatusIn(
+        Long storeId,
+        List<OrderStatus> statuses
     );
 
     @Query("""
@@ -75,13 +103,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             group by o.store.id, o.status
             """)
     List<Object[]> countByStoreIdsAndStatuses(
-            @Param("storeIds") List<Long> storeIds,
-            @Param("statuses") List<OrderStatus> statuses
+        @Param("storeIds") List<Long> storeIds,
+        @Param("statuses") List<OrderStatus> statuses
     );
 
-    List<Order> findAllByUserIdOrderByCreatedAtDesc(Long userId);
+    List<Order> findAllByUserIdOrderByCreatedAtDesc(
+        Long userId
+    );
 
-    long countByUserId(Long userId);
+    long countByUserId(
+        Long userId
+    );
 
     @EntityGraph(attributePaths = "statusHistories")
     @Query("""
@@ -106,11 +138,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             order by o.createdAt asc
             """)
     List<Order> findCompletedForAnalytics(
-            @Param("storeId") Long storeId,
-            @Param("status") OrderStatus status,
-            @Param("paymentStatus") PaymentStatus paymentStatus,
-            @Param("fromInclusive") Instant fromInclusive,
-            @Param("toExclusive") Instant toExclusive
+        @Param("storeId") Long storeId,
+        @Param("status") OrderStatus status,
+        @Param("paymentStatus") PaymentStatus paymentStatus,
+        @Param("fromInclusive") Instant fromInclusive,
+        @Param("toExclusive") Instant toExclusive
     );
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -120,7 +152,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             where o.orderPublicId = :orderPublicId
             """)
     Optional<Order> findForUpdateByOrderPublicId(
-            @Param("orderPublicId") String orderPublicId
+        @Param("orderPublicId") String orderPublicId
     );
 
     /**
@@ -143,7 +175,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             order by max(p.approvedAt) desc
             """)
     List<VisitedStoreResponse> findVisitedStoresByUserId(
-            @Param("userId") Long userId,
-            @Param("paymentStatus") PaymentStatus paymentStatus
+        @Param("userId") Long userId,
+        @Param("paymentStatus") PaymentStatus paymentStatus
     );
 }
