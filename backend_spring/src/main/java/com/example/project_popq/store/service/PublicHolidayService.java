@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class PublicHolidayService {
     private final Map<Integer, CachedYear> cache = new ConcurrentHashMap<>();
     private final Object cacheLock = new Object();
 
+    @Autowired
     public PublicHolidayService(
             @Value("${popq.public-holiday.base-url}") String baseUrl,
             @Value("${popq.public-holiday.service-key:}") String serviceKey
