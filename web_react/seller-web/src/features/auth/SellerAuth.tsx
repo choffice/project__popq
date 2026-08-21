@@ -4,6 +4,7 @@ import {
   getInactiveSellerStores,
   getSellerStores,
   loginAccount,
+  loginPresentationSeller,
   reopenSellerStore,
   signUpSeller,
 } from '../../services/api'
@@ -23,6 +24,8 @@ type SellerAuthProps = {
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const PRESENTATION_LOGIN_ID = 'aaaa'
+const PRESENTATION_LOGIN_PASSWORD = '1'
 const PASSWORD_PATTERN = /^(?=.*[A-Za-z])(?=.*\d).+$/
 const PHONE_PATTERN = /^01[0-9]-?\d{3,4}-?\d{4}$/
 const NICKNAME_PATTERN = /^[A-Za-z0-9 \u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7A3\u3131-\u318E]+$/u
@@ -95,7 +98,13 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     setError(null)
     setNotice(null)
 
-    if (!EMAIL_PATTERN.test(email.trim())) {
+    const normalizedEmail = email.trim()
+    const isPresentationLogin =
+      mode === 'seller-login' &&
+      normalizedEmail === PRESENTATION_LOGIN_ID &&
+      password === PRESENTATION_LOGIN_PASSWORD
+
+    if (!isPresentationLogin && !EMAIL_PATTERN.test(normalizedEmail)) {
       setError('올바른 이메일 주소를 입력해 주세요.')
       return
     }
@@ -107,7 +116,9 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     setBusy(true)
     try {
       const expectedRole = mode === 'admin-login' ? 'ADMIN' : 'SELLER'
-      const auth = await loginAccount(email.trim(), password, expectedRole)
+      const auth = isPresentationLogin
+        ? await loginPresentationSeller()
+        : await loginAccount(normalizedEmail, password, expectedRole)
       if (auth.user.role !== expectedRole) {
         throw new Error(
           expectedRole === 'ADMIN'
@@ -539,6 +550,12 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
               : mode === 'signup' ? '회원가입' : '로그인'}
           </button>
         </form>
+
+        {mode === 'seller-login' && (
+          <p className="auth-notice" role="note">
+            시연용 로그인: <strong>aaaa</strong> / <strong>1</strong>
+          </p>
+        )}
 
         {mode !== 'admin-login' && (
           <div className="auth-demo">

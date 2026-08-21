@@ -228,6 +228,89 @@ describe("판매자 웹 인증", () => {
     );
   });
 
+  it("시연용 aaaa / 1 로그인은 실제 개발용 판매자 토큰과 매장을 사용한다", async () => {
+    const user = userEvent.setup();
+    const onAuthenticated = vi.fn();
+    const fetchMock = vi
+      .spyOn(window, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessToken: "presentation-token",
+              refreshToken: "presentation-refresh-token",
+              tokenType: "Bearer",
+              expiresIn: 3600,
+              user: {
+                userId: 1,
+                email: "seller@popq.local",
+                name: "POPQ 테스트 판매자",
+                role: "SELLER",
+                status: "ACTIVE",
+              },
+            },
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [
+              {
+                storeId: 1,
+                storeType: "LOCAL_STORE",
+                name: "POPQ 테스트 카페",
+                description: null,
+                status: "ACTIVE",
+                businessStatus: "OPEN",
+                myRole: "OWNER",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    render(
+      <SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />,
+    );
+    await user.type(screen.getByLabelText("이메일"), "aaaa");
+    await user.type(screen.getByLabelText("비밀번호"), "1");
+    await user.click(screen.getByRole("button", { name: "로그인" }));
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/dev/auth/login",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          email: "seller@popq.local",
+          name: "POPQ 테스트 판매자",
+          role: "SELLER",
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/seller/stores",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer presentation-token",
+        }),
+      }),
+    );
+    expect(onAuthenticated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: 1,
+        accessToken: "presentation-token",
+        storeName: "POPQ 테스트 카페",
+      }),
+    );
+  });
+
   it("관리자 로그인은 스토어 선택 없이 관리자 세션을 만든다", async () => {
     const user = userEvent.setup();
     const onAuthenticated = vi.fn();

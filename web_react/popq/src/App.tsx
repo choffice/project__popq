@@ -83,7 +83,7 @@ const STATUS_COPY: Record<
     description: '잠시 후 정성껏 준비를 시작합니다.',
   },
   PREPARING: {
-    title: '맛있게 준비 중이에요',
+    title: '주문을 준비 중이에요',
     description: '완성까지 조금만 기다려 주세요.',
   },
   READY: {
@@ -92,7 +92,7 @@ const STATUS_COPY: Record<
   },
   COMPLETED: {
     title: '이용해 주셔서 고마워요',
-    description: '오늘의 메뉴가 즐거운 순간이었길 바랍니다.',
+    description: '오늘의 주문이 좋은 경험이었길 바랍니다.',
   },
   CANCELED: {
     title: '주문이 취소됐어요',
@@ -104,7 +104,7 @@ const STATUS_COPY: Record<
   },
   EXPIRED: {
     title: '결제 시간이 지났어요',
-    description: '메뉴를 다시 담아 주문해 주세요.',
+    description: '상품을 다시 담아 주문해 주세요.',
   },
 }
 
@@ -337,7 +337,7 @@ function App() {
       } catch (caught) {
         if (isStaleOrderError(caught)) {
           discardStoredOrder(
-            '이전 QR 세션의 주문 정보가 정리되었습니다. 메뉴에서 새 주문을 진행해 주세요.',
+            '이전 QR 세션의 주문 정보가 정리되었습니다. 상품 목록에서 새 주문을 진행해 주세요.',
           )
         } else {
           setConnected(false)
@@ -427,7 +427,7 @@ function App() {
           setError(
             caught instanceof Error
               ? caught.message
-              : 'QR 메뉴를 불러오지 못했습니다.',
+              : 'QR 상품 목록을 불러오지 못했습니다.',
           )
         }
       } finally {
@@ -453,7 +453,7 @@ function App() {
       } catch (caught) {
         if (isStaleOrderError(caught)) {
           discardStoredOrder(
-            '이전 QR 세션의 주문이라 더 이상 조회할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+            '이전 QR 세션의 주문이라 더 이상 조회할 수 없습니다. 상품 목록에서 새 주문을 진행해 주세요.',
           )
         } else {
           setConnected(false)
@@ -693,7 +693,7 @@ function App() {
     } catch (caught) {
       if (isStaleOrderError(caught)) {
         discardStoredOrder(
-          '이전 QR 세션의 주문이라 취소할 수 없습니다. 메뉴에서 새 주문을 진행해 주세요.',
+          '이전 QR 세션의 주문이라 취소할 수 없습니다. 상품 목록에서 새 주문을 진행해 주세요.',
         )
       } else {
         setError(
@@ -735,10 +735,10 @@ function App() {
       <main className="error-screen">
         <div className="error-orbit">!</div>
         <p className="eyebrow">POPQ QR ORDER</p>
-        <h1>메뉴를 열 수 없어요</h1>
+        <h1>상품 목록을 열 수 없어요</h1>
         <p>{error ?? '유효한 QR인지 다시 확인해 주세요.'}</p>
         <button className="primary-button" onClick={useDemo}>
-          데모 메뉴 둘러보기
+          데모 상품 둘러보기
         </button>
       </main>
     )
@@ -811,19 +811,19 @@ function App() {
             <div>
               <p className="eyebrow">ORDER AT YOUR PACE</p>
               <h1>
-                오늘의 한 잔,
+                빠르게 고르고,
                 <br />
-                가볍게 골라보세요.
+                편하게 주문하세요.
               </h1>
               <p className="hero-copy">
-                QR로 주문하고 자리에서 편하게 기다리세요.
+                QR로 상품을 확인하고 간편하게 주문하세요.
               </p>
             </div>
             <div className="hero-art" aria-hidden="true">
               <span className="hero-ring" />
-              <span className="hero-cup" />
-              <span className="hero-bean one" />
-              <span className="hero-bean two" />
+              <span className="hero-order-card" />
+              <span className="hero-accent one" />
+              <span className="hero-accent two" />
             </div>
           </section>
 
@@ -853,7 +853,7 @@ function App() {
             </section>
           )}
 
-          <nav className="category-tabs" aria-label="메뉴 카테고리">
+          <nav className="category-tabs" aria-label="상품 카테고리">
             {categories.map((item) => (
               <button
                 key={item}
@@ -869,7 +869,7 @@ function App() {
             <div className="section-heading">
               <div>
                 <p className="eyebrow">CURATED MENU</p>
-                <h2>{category === '전체' ? '모든 메뉴' : category}</h2>
+                <h2>{category === '전체' ? '모든 상품' : category}</h2>
               </div>
               <span>{visibleProducts.length} items</span>
             </div>
@@ -889,7 +889,7 @@ function App() {
                     ) : (
                       <>
                         <span className="visual-disc" />
-                        <span className="visual-cup" />
+                        <span className="visual-product" />
                       </>
                     )}
                     {product.badge && <b>{product.badge}</b>}
@@ -968,14 +968,14 @@ function App() {
               </div>
               {cart.length === 0 ? (
                 <div className="empty-state">
-                  <div className="empty-cup" />
-                  <h2>아직 담긴 메뉴가 없어요</h2>
-                  <p>오늘 마음에 드는 한 잔을 골라보세요.</p>
+                  <div className="empty-bag" />
+                  <h2>아직 담긴 상품이 없어요</h2>
+                  <p>마음에 드는 상품을 골라 장바구니에 담아보세요.</p>
                   <button
                     className="secondary-button"
                     onClick={() => setScreen('menu')}
                   >
-                    메뉴 보러 가기
+                    상품 보러 가기
                   </button>
                 </div>
               ) : (
@@ -1013,7 +1013,7 @@ function App() {
                     ))}
                   </div>
                   <button className="add-more" onClick={() => setScreen('menu')}>
-                    + 메뉴 더 담기
+                    + 상품 더 담기
                   </button>
                   <section className="price-summary">
                     <div>
@@ -1114,7 +1114,7 @@ function App() {
             </button>
           )}
           <button className="text-button" onClick={() => setScreen('menu')}>
-            메뉴로 돌아가기
+            상품 목록으로 돌아가기
           </button>
         </main>
       )}
@@ -1146,7 +1146,7 @@ function App() {
               className={`sheet-visual ${selectedDetail.product.visual ?? ''}`}
             >
               <span className="visual-disc" />
-              <span className="visual-cup" />
+              <span className="visual-product" />
             </div>
             <div className="sheet-content">
               <p className="eyebrow">{selectedDetail.product.categoryName}</p>

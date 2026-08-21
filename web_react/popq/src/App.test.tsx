@@ -26,7 +26,7 @@ describe('POPQ QR order demo', () => {
     render(<App />)
 
     expect(
-      screen.getByRole('heading', { name: /오늘의 한 잔/ }),
+      screen.getByRole('heading', { name: /빠르게 고르고/ }),
     ).toBeInTheDocument()
 
     await user.click(
@@ -154,19 +154,19 @@ describe('POPQ QR order demo', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+      await screen.findByRole('heading', { name: /빠르게 고르고/ }),
     ).toBeInTheDocument()
     expect(
-      screen.queryByRole('heading', { name: '맛있게 준비 중이에요' }),
+      screen.queryByRole('heading', { name: '주문을 준비 중이에요' }),
     ).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: '진행 중 주문' })).toHaveTextContent(
-      '맛있게 준비 중이에요',
+      '주문을 준비 중이에요',
     )
 
     await user.click(screen.getByRole('button', { name: /주문 현황 보기/ }))
 
     expect(
-      screen.getByRole('heading', { name: '맛있게 준비 중이에요' }),
+      screen.getByRole('heading', { name: '주문을 준비 중이에요' }),
     ).toBeInTheDocument()
   })
 
@@ -207,7 +207,7 @@ describe('POPQ QR order demo', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+      await screen.findByRole('heading', { name: /빠르게 고르고/ }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('region', { name: '진행 중 주문' }),
@@ -251,7 +251,7 @@ describe('POPQ QR order demo', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+      await screen.findByRole('heading', { name: /빠르게 고르고/ }),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('region', { name: '진행 중 주문' }),
@@ -443,7 +443,7 @@ describe('POPQ QR order demo', () => {
     render(<App />)
 
     expect(
-      await screen.findByRole('heading', { name: /오늘의 한 잔/ }),
+      await screen.findByRole('heading', { name: /빠르게 고르고/ }),
     ).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent(
       '이전 QR 세션의 주문 정보가 정리되었습니다.',

@@ -76,6 +76,17 @@ export function loginAccount(
   });
 }
 
+export function loginPresentationSeller() {
+  return publicRequest<SellerAuthResult>("/api/v1/dev/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "seller@popq.local",
+      name: "POPQ 테스트 판매자",
+      role: "SELLER",
+    }),
+  });
+}
+
 export function signUpSeller(payload: {
   email: string;
   password: string;
@@ -525,22 +536,22 @@ export function getSellerOrders(
   filter?:
     | OrderStatus
     | {
-        status?: OrderStatus
-        statuses?: OrderStatus[]
-        date?: string
+        status?: OrderStatus;
+        statuses?: OrderStatus[];
+        date?: string;
       },
 ) {
-  const params = new URLSearchParams()
-  if (typeof filter === 'string') {
-    params.set('status', filter)
+  const params = new URLSearchParams();
+  if (typeof filter === "string") {
+    params.set("status", filter);
   } else if (filter) {
-    if (filter.status) params.set('status', filter.status)
+    if (filter.status) params.set("status", filter.status);
     if (filter.statuses?.length) {
-      params.set('statuses', filter.statuses.join(','))
+      params.set("statuses", filter.statuses.join(","));
     }
-    if (filter.date) params.set('date', filter.date)
+    if (filter.date) params.set("date", filter.date);
   }
-  const query = params.size ? `?${params.toString()}` : ''
+  const query = params.size ? `?${params.toString()}` : "";
   return request<SellerOrder[]>(`${orderPath(connection)}${query}`, connection);
 }
 
