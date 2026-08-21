@@ -760,6 +760,7 @@ GoRouter createCustomerRouter({
                 repository: engagementRepository,
                 activitySummaryListenable: activitySummaryListenable,
                 messageRepository: orderMessageRepository,
+                searchLocationController: searchLocationController,
                 onSignOut: sessionController.signOut,
                 onConnectSellerAccess: onConnectSellerAccess,
                 onWithdraw: onWithdraw,
