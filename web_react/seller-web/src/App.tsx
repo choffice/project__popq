@@ -1,1273 +1,1877 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { freshDemoOrders } from "./data/demo";
 import {
-  createDemoOrder,
-  demoContext,
-  demoProductDetail,
-  demoProducts,
-} from "./data/demo";
-import {
-  ApiError,
-  cancelOrder,
-  confirmPayment,
-  createOrder,
-  getProductDetail,
-  getProducts,
-  openQrSession,
-  syncOrder,
+  getSellerPaymentSummary,
+  getSellerOrders,
+  getSellerStores,
+  getSellerUnreadConversationCount,
+  refundSellerOrder,
+  transitionSellerOrder,
 } from "./services/api";
-import { connectOrderRealtime } from "./services/realtime";
-import {
-  clearTossPaymentReturn,
-  readTossPaymentReturn,
-  requestTossPayment,
-} from "./services/tossPayment";
+import { connectSellerRealtime } from "./services/realtime";
 import { useThemePreference } from "./theme";
-import { createClientId } from "./utils/clientId";
+import { ProductManagement } from "./features/catalog/ProductManagement";
+import { QrManagement } from "./features/qr/QrManagement";
+import { SalesAnalytics } from "./features/analytics/SalesAnalytics";
+import { StoreSettings } from "./features/store/StoreSettings";
+import { AdminManagement } from "./features/admin/AdminManagement";
+import { AdminContentManagement } from "./features/admin/AdminContentManagement";
+import { AdminSupportHub } from "./features/admin/AdminSupportHub";
+import { AnnouncementManagement } from "./features/announcements/AnnouncementManagement";
+import { SellerAuth } from "./features/auth/SellerAuth";
+import { MessageManagement } from "./features/messages/MessageManagement";
+import { ReviewManagement } from "./features/reviews/ReviewManagement";
+import { PastOrderSearch } from "./features/orders/PastOrderSearch";
 import type {
-  CartItem,
+  BusinessStatus,
   OrderRealtimeEvent,
-  OrderResponse,
   OrderStatus,
-  OrderType,
-  ProductDetail,
-  ProductOption,
-  ProductSummary,
-  QrContext,
+  SellerConnection,
+  SellerOrder,
+  SellerPaymentSummary,
+  StoreSummary,
 } from "./types";
 
-type Screen = "menu" | "cart" | "tracking";
-type PaymentConfirmationState = "idle" | "confirming" | "retry";
-type CheckoutAttempt = {
-  orderKey: string;
-  paymentKey: string;
-  order?: OrderResponse;
+type OrderFilter = "ACTIVE" | OrderStatus;
+type SellerView =
+  | "orders"
+  | "products"
+  | "qr"
+  | "analytics"
+  | "announcements"
+  | "messages"
+  | "reviews"
+  | "settings"
+  | "admin-customers"
+  | "admin-sellers"
+  | "admin-stores"
+  | "admin-announcements"
+  | "admin-support"
+  | "admin-faqs";
+type TransitionAction = "accept" | "reject" | "prepare" | "ready" | "complete";
+type TransitionOptions = {
+  reason?: string;
+  preparationMinutes?: number;
+  applyAsStoreDefault?: boolean;
 };
 
-const STATUS_SEQUENCE: OrderStatus[] = [
-  "PLACED",
-  "ACCEPTED",
-  "PREPARING",
-  "READY",
-  "COMPLETED",
-];
+type SidebarIconName =
+  | "customers"
+  | "sellerVerification"
+  | "store"
+  | "announcement"
+  | "support"
+  | "faq"
+  | "orders"
+  | "products"
+  | "qr"
+  | "analytics"
+  | "messages"
+  | "reviews"
+  | "settings";
 
-const DEMO_MODE_ENABLED =
-  (
-    import.meta.env.VITE_POPQ_ENABLE_DEMO ??
-    (import.meta.env.DEV ? "true" : "false")
-  )
-    .trim()
-    .toLowerCase() === "true";
-
-const TERMINAL_ORDER_STATUSES: OrderStatus[] = [
-  "COMPLETED",
-  "CANCELED",
-  "REJECTED",
-  "EXPIRED",
-];
-
-const STALE_ORDER_ERROR_CODES = new Set([
-  "ORDER_ACCESS_DENIED",
-  "ORDER_NOT_FOUND",
-  "GUEST_SESSION_INVALID",
-  "GUEST_SESSION_EXPIRED",
-]);
-
-const STATUS_COPY: Record<OrderStatus, { title: string; description: string }> =
-  {
-    CREATED: {
-      title: "주문을 확인하고 있어요",
-      description: "결제가 완료되면 매장으로 주문이 전달됩니다.",
-    },
-    PLACED: {
-      title: "주문이 전달됐어요",
-      description: "매장에서 주문을 확인하고 있습니다.",
-    },
-    ACCEPTED: {
-      title: "주문을 접수했어요",
-      description: "잠시 후 정성껏 준비를 시작합니다.",
-    },
-    PREPARING: {
-      title: "주문을 준비 중이에요",
-      description: "완성까지 조금만 기다려 주세요.",
-    },
-    READY: {
-      title: "주문이 준비됐어요",
-      description: "픽업대에서 주문 번호를 확인해 주세요.",
-    },
-    COMPLETED: {
-      title: "이용해 주셔서 고마워요",
-      description: "오늘의 주문이 좋은 경험이었길 바랍니다.",
-    },
-    CANCELED: {
-      title: "주문이 취소됐어요",
-      description: "결제 취소 내역은 잠시 후 확인할 수 있습니다.",
-    },
-    REJECTED: {
-      title: "주문을 준비할 수 없어요",
-      description: "결제 금액은 자동으로 취소됩니다.",
-    },
-    EXPIRED: {
-      title: "결제 시간이 지났어요",
-      description: "상품을 다시 담아 주문해 주세요.",
-    },
+function SidebarIcon({ name }: { name: SidebarIconName }) {
+  const commonProps = {
+    width: 20,
+    height: 20,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
   };
+
+  switch (name) {
+    case "customers":
+      return (
+        <svg {...commonProps}>
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+        </svg>
+      );
+    case "sellerVerification":
+      return (
+        <svg {...commonProps}>
+          <circle cx="9" cy="8" r="4" />
+          <path d="M3 21v-2a6 6 0 0 1 10.2-4.3" />
+          <path d="m16 19 2 2 4-5" />
+        </svg>
+      );
+    case "store":
+      return (
+        <svg {...commonProps}>
+          <path d="M3 9l1.7-5h14.6L21 9" />
+          <path d="M5 13v7h14v-7" />
+          <path d="M9 20v-6h6v6" />
+          <path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0" />
+        </svg>
+      );
+    case "announcement":
+      return (
+        <svg {...commonProps}>
+          <path d="m3 11 14-5v12L3 13z" />
+          <path d="M11.6 16.1 13 21H8l-1.5-6" />
+          <path d="M21 9v6" />
+        </svg>
+      );
+    case "support":
+      return (
+        <svg {...commonProps}>
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a7 7 0 0 1-1-3.6A7.4 7.4 0 0 1 9.5 4h5A6.5 6.5 0 0 1 21 10.5z" />
+          <path d="M8 11h.01M12 11h.01M16 11h.01" />
+        </svg>
+      );
+    case "faq":
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.8 9a2.4 2.4 0 1 1 3.8 1.95c-.95.67-1.6 1.2-1.6 2.55" />
+          <path d="M12 17h.01" />
+        </svg>
+      );
+    case "orders":
+      return (
+        <svg {...commonProps}>
+          <path d="M9 5h6" />
+          <path d="M9 3h6a2 2 0 0 1 2 2v1h2v15H5V6h2V5a2 2 0 0 1 2-2z" />
+          <path d="M8 11h8M8 15h8" />
+        </svg>
+      );
+    case "products":
+      return (
+        <svg {...commonProps}>
+          <path d="m12 3 8 4.5-8 4.5-8-4.5z" />
+          <path d="m4 7.5 8 4.5 8-4.5V17l-8 4-8-4z" />
+          <path d="M12 12v9" />
+        </svg>
+      );
+    case "qr":
+      return (
+        <svg {...commonProps}>
+          <rect x="3" y="3" width="6" height="6" rx="1" />
+          <rect x="15" y="3" width="6" height="6" rx="1" />
+          <rect x="3" y="15" width="6" height="6" rx="1" />
+          <path d="M15 15h2v2h-2zM19 15h2M19 19h2v2h-2M15 19v2" />
+        </svg>
+      );
+    case "analytics":
+      return (
+        <svg {...commonProps}>
+          <path d="M4 20V10M10 20V4M16 20v-7M22 20V7" />
+          <path d="M2 20h20" />
+        </svg>
+      );
+    case "messages":
+      return (
+        <svg {...commonProps}>
+          <path d="M21 15a4 4 0 0 1-4 4H8l-5 3v-7a7 7 0 0 1-1-3.6A7.4 7.4 0 0 1 9.5 4h5A6.5 6.5 0 0 1 21 10.5z" />
+          <path d="M8 11h8M8 14h5" />
+        </svg>
+      );
+    case "reviews":
+      return (
+        <svg {...commonProps}>
+          <path d="m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" />
+        </svg>
+      );
+    case "settings":
+      return (
+        <svg {...commonProps}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15.03 1.7 1.7 0 0 0 3.08 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15z" />
+        </svg>
+      );
+  }
+}
+
+const CONNECTION_KEY = "popq:seller:connection";
+const DEMO_KEY = "popq:seller:demo";
+
+const STATUS_COPY: Record<OrderStatus, { label: string; short: string }> = {
+  CREATED: { label: "결제 대기", short: "대기" },
+  PLACED: { label: "신규 주문", short: "신규" },
+  ACCEPTED: { label: "접수 완료", short: "접수" },
+  PREPARING: { label: "준비 중", short: "준비" },
+  READY: { label: "픽업 대기", short: "픽업" },
+  COMPLETED: { label: "완료", short: "완료" },
+  CANCELED: { label: "고객 취소", short: "취소" },
+  REJECTED: { label: "주문 거절", short: "거절" },
+  EXPIRED: { label: "시간 만료", short: "만료" },
+};
+
+const LANES: {
+  title: string;
+  description: string;
+  statuses: OrderStatus[];
+  tone: string;
+}[] = [
+  {
+    title: "새 주문",
+    description: "결제 완료 · 접수 필요",
+    statuses: ["PLACED"],
+    tone: "new",
+  },
+  {
+    title: "준비 중",
+    description: "접수부터 제조까지",
+    statuses: ["ACCEPTED", "PREPARING"],
+    tone: "making",
+  },
+  {
+    title: "전달 대기",
+    description: "픽업 또는 테이블 전달",
+    statuses: ["READY"],
+    tone: "ready",
+  },
+];
+
+const ACTIONS: Partial<
+  Record<
+    OrderStatus,
+    {
+      primary: { action: TransitionAction; label: string };
+      secondary?: { action: TransitionAction; label: string };
+    }
+  >
+> = {
+  PLACED: {
+    primary: { action: "accept", label: "주문 접수" },
+    secondary: { action: "reject", label: "주문 거절" },
+  },
+  ACCEPTED: {
+    primary: { action: "prepare", label: "준비 시작" },
+  },
+  PREPARING: {
+    primary: { action: "ready", label: "준비 완료" },
+  },
+  READY: {
+    primary: { action: "complete", label: "전달 완료" },
+  },
+};
+
+const TARGET_STATUS: Record<TransitionAction, OrderStatus> = {
+  accept: "ACCEPTED",
+  reject: "REJECTED",
+  prepare: "PREPARING",
+  ready: "READY",
+  complete: "COMPLETED",
+};
+
+const VIEW_COPY: Record<SellerView, { eyebrow: string; title: string }> = {
+  orders: { eyebrow: "LIVE ORDER DESK", title: "오늘의 주문 운영" },
+  products: { eyebrow: "CATALOG CONTROL", title: "상품 관리" },
+  qr: { eyebrow: "TABLE ACCESS", title: "QR 관리" },
+  analytics: { eyebrow: "SALES PULSE", title: "매출 분석" },
+  announcements: { eyebrow: "STORE ANNOUNCEMENTS", title: "공지사항" },
+  messages: { eyebrow: "CUSTOMER CONVERSATIONS", title: "고객 문의" },
+  reviews: { eyebrow: "CUSTOMER REVIEWS", title: "리뷰 관리" },
+  settings: { eyebrow: "STORE OPERATIONS", title: "스토어 설정" },
+  "admin-customers": { eyebrow: "MEMBER CONTROL", title: "구매자 회원 관리" },
+  "admin-sellers": { eyebrow: "SELLER CONTROL", title: "판매자 회원 · 인증" },
+  "admin-stores": { eyebrow: "STORE CONTROL", title: "스토어 관리" },
+  "admin-announcements": { eyebrow: "PLATFORM CONTENT", title: "플랫폼 공지" },
+  "admin-support": { eyebrow: "CUSTOMER SUPPORT", title: "문의 관리" },
+  "admin-faqs": { eyebrow: "PLATFORM CONTENT", title: "FAQ 관리" },
+};
 
 function money(value: number) {
   return `${value.toLocaleString("ko-KR")}원`;
 }
 
-function findQrToken() {
-  const match = window.location.pathname.match(/^\/q\/([^/]+)$/);
-  return match ? decodeURIComponent(match[1]) : null;
+function shortOrderId(orderPublicId: string) {
+  return orderPublicId.slice(-4).toUpperCase();
 }
 
-function itemPrice(item: CartItem) {
-  const optionPrice = item.options.reduce(
-    (total, option) => total + option.additionalPrice,
+function readConnection(): SellerConnection | null {
+  try {
+    const value = window.sessionStorage.getItem(CONNECTION_KEY);
+    return value ? (JSON.parse(value) as SellerConnection) : null;
+  } catch {
+    return null;
+  }
+}
+
+function readDemoMode() {
+  return window.sessionStorage.getItem(DEMO_KEY) === "true";
+}
+
+function connectionScope(connection: SellerConnection | null) {
+  if (!connection) return null;
+  return `${connection.user?.userId ?? "anonymous"}:${connection.storeId ?? "admin"}:${connection.accessToken}`;
+}
+
+function lastChangedAt(order: SellerOrder) {
+  const last = order.statusHistory.at(-1)?.changedAt;
+  return last ? new Date(last) : new Date();
+}
+
+function elapsedMinutes(order: SellerOrder, now: Date) {
+  return Math.max(
     0,
+    Math.floor((now.getTime() - lastChangedAt(order).getTime()) / 60_000),
   );
-  return (item.product.basePrice + optionPrice) * item.quantity;
 }
 
-function orderName(order: OrderResponse) {
-  const first = order.items[0]?.productName ?? "POPQ 주문";
-  return order.items.length > 1
-    ? `${first} 외 ${order.items.length - 1}건`
-    : first;
-}
-
-function markOrderAsPlaced(order: OrderResponse): OrderResponse {
-  if (order.status !== "CREATED") return order;
-
+function demoPaymentSummary(order: SellerOrder): SellerPaymentSummary {
+  const refunded = ["CANCELED", "REJECTED"].includes(order.status);
   return {
-    ...order,
-    status: "PLACED",
-    version: order.version + 1,
-    statusHistory: [
-      ...order.statusHistory,
-      {
-        previousStatus: "CREATED",
-        currentStatus: "PLACED",
-        actorType: "SYSTEM",
-        actorId: null,
-        reason: "결제 승인",
-        changedAt: new Date().toISOString(),
-      },
-    ],
+    orderPublicId: order.orderPublicId,
+    paymentStatus: refunded ? "CANCELED" : "PAID",
+    paymentMethod: "CARD",
+    approvedAmount: order.totalAmount,
+    refundedAmount: refunded ? order.totalAmount : 0,
+    refundableAmount: refunded ? 0 : order.totalAmount,
+    refunds: refunded
+      ? [
+          {
+            refundId: order.version,
+            amount: order.totalAmount,
+            reason:
+              order.status === "REJECTED"
+                ? "판매자 주문 거절"
+                : "고객 주문 취소",
+            requesterType: order.status === "REJECTED" ? "SELLER" : "GUEST",
+            status: "SUCCEEDED",
+            requestedAt:
+              order.statusHistory.at(-1)?.changedAt ?? new Date().toISOString(),
+            completedAt:
+              order.statusHistory.at(-1)?.changedAt ?? new Date().toISOString(),
+            failureCode: null,
+            failureMessage: null,
+          },
+        ]
+      : [],
   };
-}
-
-function readStored<T>(storage: Storage, key: string, fallback: T): T {
-  try {
-    const value = storage.getItem(key);
-    return value ? (JSON.parse(value) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function persistStored(storage: Storage, key: string, value: unknown) {
-  try {
-    if (value === null) storage.removeItem(key);
-    else storage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Private browsing or storage quota errors must not block ordering.
-  }
-}
-
-function isTerminalOrder(order: OrderResponse | null) {
-  return Boolean(order && TERMINAL_ORDER_STATUSES.includes(order.status));
-}
-
-function isStaleOrderError(caught: unknown) {
-  return (
-    caught instanceof ApiError &&
-    Boolean(caught.code && STALE_ORDER_ERROR_CODES.has(caught.code))
-  );
 }
 
 function App() {
   const { theme, toggleTheme } = useThemePreference();
-  const qrToken = findQrToken();
-  const startsInDemo = !qrToken && DEMO_MODE_ENABLED;
-  const initialScope = qrToken ?? (startsInDemo ? "demo" : "no-qr");
-  const [isDemo, setIsDemo] = useState(startsInDemo);
-  const [context, setContext] = useState<QrContext | null>(
-    startsInDemo ? demoContext : null,
+  const [activeView, setActiveView] = useState<SellerView>(() =>
+    readConnection()?.user?.role === "ADMIN" ? "admin-customers" : "orders",
   );
-  const [products, setProducts] = useState<ProductSummary[]>(
-    startsInDemo ? demoProducts : [],
+  const [connection, setConnection] = useState<SellerConnection | null>(
+    readConnection,
   );
-  const [category, setCategory] = useState("전체");
-  const [selectedDetail, setSelectedDetail] = useState<ProductDetail | null>(
+  const [authenticated, setAuthenticated] = useState(
+    () => Boolean(readConnection()) || readDemoMode(),
+  );
+  const [orders, setOrders] = useState<SellerOrder[]>(() =>
+    readConnection() ? [] : freshDemoOrders(),
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => freshDemoOrders()[0]?.orderPublicId ?? null,
+  );
+  const [selectedPastOrder, setSelectedPastOrder] =
+    useState<SellerOrder | null>(null);
+  const [filter, setFilter] = useState<OrderFilter>("ACTIVE");
+  const [now, setNow] = useState(new Date());
+  const [businessStatus, setBusinessStatus] = useState<BusinessStatus>("OPEN");
+  const [connected, setConnected] = useState(false);
+  const [loading, setLoading] = useState(Boolean(readConnection()));
+  const [processing, setProcessing] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentSummary, setPaymentSummary] =
+    useState<SellerPaymentSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showConnection, setShowConnection] = useState(false);
+  const [accountStores, setAccountStores] = useState<StoreSummary[]>([]);
+  const [accountStoresLoading, setAccountStoresLoading] = useState(false);
+  const [accountStoresError, setAccountStoresError] = useState<string | null>(
     null,
   );
-  const [selectedOptions, setSelectedOptions] = useState<
-    Record<number, number[]>
-  >({});
-  const [quantity, setQuantity] = useState(1);
-  const [cart, setCart] = useState<CartItem[]>(() =>
-    readStored(window.localStorage, `popq:cart:${initialScope}`, []),
-  );
-  const [orderType, setOrderType] = useState<OrderType>(
-    startsInDemo && demoContext.storeTableId ? "DINE_IN" : "TAKEOUT",
-  );
-  const [order, setOrder] = useState<OrderResponse | null>(() => {
-    const storedOrder = readStored<OrderResponse | null>(
-      window.localStorage,
-      `popq:order:${initialScope}`,
-      null,
-    );
-    return qrToken && isTerminalOrder(storedOrder) ? null : storedOrder;
-  });
-  const [screen, setScreen] = useState<Screen>(() => {
-    if (qrToken) return "menu";
-    return readStored<OrderResponse | null>(
-      window.localStorage,
-      `popq:order:${initialScope}`,
-      null,
-    )
-      ? "tracking"
-      : "menu";
-  });
-  const [checkoutAttempt, setCheckoutAttempt] =
-    useState<CheckoutAttempt | null>(() =>
-      readStored(window.sessionStorage, `popq:checkout:${initialScope}`, null),
-    );
-  const orderRef = useRef<OrderResponse | null>(null);
-  const [loading, setLoading] = useState(Boolean(qrToken));
-  const [processing, setProcessing] = useState(false);
-  const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [paymentReturn] = useState(() =>
-    readTossPaymentReturn(window.location.search),
-  );
-  const [paymentConfirmation, setPaymentConfirmation] =
-    useState<PaymentConfirmationState>(paymentReturn ? "confirming" : "idle");
-  const [paymentConfirmationAttempt, setPaymentConfirmationAttempt] =
-    useState(0);
-  const paymentReturnHandled = useRef(false);
-  const trackedOrderPublicId = order?.orderPublicId;
-  const storageScope = isDemo ? "demo" : (qrToken ?? "no-qr");
-  const cartStorageKey = `popq:cart:${storageScope}`;
-  const orderStorageKey = `popq:order:${storageScope}`;
-  const checkoutStorageKey = `popq:checkout:${storageScope}`;
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const seenEvents = useRef(new Set<string>());
+  const accountRequestId = useRef(0);
+  const activeConnectionScope = useRef(connectionScope(connection));
+  const isDemo = authenticated && !connection;
+  const isAdmin = connection?.user?.role === "ADMIN";
+  const resolvedStoreRole =
+    connection?.storeRole ??
+    accountStores.find((store) => store.storeId === connection?.storeId)
+      ?.myRole;
+  const canManageStore =
+    isDemo || resolvedStoreRole === "OWNER" || resolvedStoreRole === "MANAGER";
+  const storeScopeKey = isDemo
+    ? "demo"
+    : `store-${connection?.storeId ?? "none"}`;
 
-  const discardStoredOrder = useCallback(
-    (message?: string) => {
-      orderRef.current = null;
-      setOrder(null);
-      persistStored(window.localStorage, orderStorageKey, null);
-      setConnected(false);
-      setScreen("menu");
-      if (message) setError(message);
-    },
-    [orderStorageKey],
-  );
-
-  useEffect(() => {
-    orderRef.current = order;
-  }, [order]);
-
-  useEffect(() => {
-    persistStored(window.localStorage, cartStorageKey, cart);
-  }, [cart, cartStorageKey]);
-
-  useEffect(() => {
-    persistStored(window.localStorage, orderStorageKey, order);
-  }, [order, orderStorageKey]);
-
-  useEffect(() => {
-    persistStored(window.sessionStorage, checkoutStorageKey, checkoutAttempt);
-  }, [checkoutAttempt, checkoutStorageKey]);
-
-  useEffect(() => {
-    if (
-      !paymentReturn ||
-      !qrToken ||
-      isDemo ||
-      (paymentReturnHandled.current && paymentConfirmationAttempt === 0)
-    ) {
-      return;
-    }
-    const paymentResult = paymentReturn;
-    paymentReturnHandled.current = true;
-    setPaymentConfirmation("confirming");
-    setProcessing(true);
-    setScreen("cart");
-    setError(null);
-
-    async function finishPayment() {
-      if (paymentResult.status === "fail") {
-        clearTossPaymentReturn();
-        setPaymentConfirmation("idle");
-        throw new Error(paymentResult.message);
-      }
-
-      const pendingOrder = checkoutAttempt?.order;
-      if (!pendingOrder || !checkoutAttempt) {
-        clearTossPaymentReturn();
-        throw new Error(
-          "진행 중인 주문 정보를 찾지 못했습니다. 다시 주문해 주세요.",
-        );
-      }
-      if (
-        paymentResult.orderId !== pendingOrder.orderPublicId ||
-        paymentResult.amount !== pendingOrder.totalAmount
-      ) {
-        clearTossPaymentReturn();
-        throw new Error("결제 인증 정보가 주문 정보와 일치하지 않습니다.");
-      }
-
-      await confirmPayment(
-        pendingOrder.orderPublicId,
-        checkoutAttempt.paymentKey,
-        paymentResult.paymentKey,
-      );
-
-      // 결제 승인이 성공한 시점부터는 후속 동기화 실패를 결제 실패로
-      // 취급하지 않는다. 서버 상태 조회는 추적 화면에서 계속 복구한다.
-      const placedOrder = markOrderAsPlaced(pendingOrder);
-      setOrder(placedOrder);
-      setCart([]);
-      setCheckoutAttempt(null);
-      setScreen("tracking");
-      setPaymentConfirmation("idle");
-      clearTossPaymentReturn();
-
-      try {
-        const synced = await syncOrder(
-          pendingOrder.orderPublicId,
-          pendingOrder.version,
-        );
-        if (synced.order) setOrder(synced.order);
-      } catch (caught) {
-        if (isStaleOrderError(caught)) {
-          discardStoredOrder(
-            "이전 QR 세션의 주문 정보가 정리되었습니다. 상품 목록에서 새 주문을 진행해 주세요.",
-          );
-        } else {
-          setConnected(false);
-        }
-      }
-    }
-
-    void finishPayment()
-      .catch((caught) => {
-        const message =
-          caught instanceof Error
-            ? caught.message
-            : "결제를 완료하지 못했습니다.";
-        const pendingOrder = checkoutAttempt?.order;
-        const canRetryConfirmation =
-          paymentResult.status === "success" &&
-          pendingOrder !== undefined &&
-          paymentResult.orderId === pendingOrder.orderPublicId &&
-          paymentResult.amount === pendingOrder.totalAmount;
-        if (canRetryConfirmation) {
-          setPaymentConfirmation("retry");
-          setError(`결제 결과 확인을 마무리하지 못했습니다. ${message}`);
-        } else {
-          setPaymentConfirmation("idle");
-          setError(message);
-        }
-      })
-      .finally(() => setProcessing(false));
-  }, [
-    checkoutAttempt,
-    isDemo,
-    paymentConfirmationAttempt,
-    paymentReturn,
-    qrToken,
-    discardStoredOrder,
-  ]);
-
-  useEffect(() => {
-    if (!selectedDetail) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelectedDetail(null);
-    }
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedDetail]);
-
-  useEffect(() => {
-    if (!qrToken || isDemo) return;
-    let active = true;
-    async function loadLiveStore() {
-      try {
-        const opened = await openQrSession(qrToken as string);
-        const menu = await getProducts();
-        if (!active) return;
-        setContext(opened);
-        setProducts(menu);
-        setOrderType(opened.storeTableId ? "DINE_IN" : "TAKEOUT");
-
-        const restoredOrder = orderRef.current;
-        if (restoredOrder) {
-          try {
-            const synced = await syncOrder(
-              restoredOrder.orderPublicId,
-              restoredOrder.version,
-            );
-            if (!active) return;
-            const latestOrder = synced.order ?? restoredOrder;
-            if (isTerminalOrder(latestOrder)) {
-              discardStoredOrder();
-            } else if (synced.order) {
-              orderRef.current = synced.order;
-              setOrder(synced.order);
-            }
-          } catch (caught) {
-            if (!active) return;
-            if (isStaleOrderError(caught)) {
-              discardStoredOrder();
-            } else {
-              setError(
-                caught instanceof Error
-                  ? `이전 주문 상태를 확인하지 못했습니다. ${caught.message}`
-                  : "이전 주문 상태를 확인하지 못했습니다.",
-              );
-            }
-          }
-        }
-      } catch (caught) {
-        if (active) {
-          setError(
-            caught instanceof Error
-              ? caught.message
-              : "QR 상품 목록을 불러오지 못했습니다.",
-          );
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-    void loadLiveStore();
-    return () => {
-      active = false;
-    };
-  }, [discardStoredOrder, isDemo, qrToken]);
-
-  useEffect(() => {
-    if (isDemo || screen !== "tracking" || !trackedOrderPublicId) return;
-    const orderPublicId = trackedOrderPublicId;
-
-    async function recover() {
-      const current = orderRef.current;
-      if (!current) return;
-      try {
-        const synced = await syncOrder(orderPublicId, current.version);
-        if (synced.refreshRequired && synced.order) setOrder(synced.order);
-      } catch (caught) {
-        if (isStaleOrderError(caught)) {
-          discardStoredOrder(
-            "이전 QR 세션의 주문이라 더 이상 조회할 수 없습니다. 상품 목록에서 새 주문을 진행해 주세요.",
-          );
-        } else {
-          setConnected(false);
-        }
-      }
-    }
-
-    async function handleEvent(event: OrderRealtimeEvent) {
-      const current = orderRef.current;
-      if (!current || event.version <= current.version) return;
-      if (event.version > current.version + 1) {
-        await recover();
-        return;
-      }
-      setOrder({
-        ...current,
-        status: event.currentStatus,
-        version: event.version,
-        statusHistory: [
-          ...current.statusHistory,
-          {
-            previousStatus: event.previousStatus,
-            currentStatus: event.currentStatus,
-            actorType: "REALTIME",
-            actorId: null,
-            reason: null,
-            changedAt: event.occurredAt,
-          },
-        ],
-      });
-    }
-
-    return connectOrderRealtime(
-      orderPublicId,
-      (event) => void handleEvent(event),
-      (nextConnected) => {
-        setConnected(nextConnected);
-        if (nextConnected) void recover();
-      },
-    );
-  }, [discardStoredOrder, isDemo, screen, trackedOrderPublicId]);
-
-  const categories = useMemo(
-    () => ["전체", ...new Set(products.map((product) => product.categoryName))],
-    [products],
-  );
-  const visibleProducts =
-    category === "전체"
-      ? products
-      : products.filter((product) => product.categoryName === category);
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const cartTotal = cart.reduce((total, item) => total + itemPrice(item), 0);
-  const hasActiveOrder = Boolean(order && !isTerminalOrder(order));
-  const hasOrderShortcut = Boolean(
-    hasActiveOrder && screen === "menu" && cartCount === 0,
-  );
-
-  async function openProduct(product: ProductSummary) {
-    if (!product.availableForQr) return;
-    setError(null);
+  const loadOrders = useCallback(async () => {
+    if (!connection || connection.user?.role === "ADMIN") return;
+    const requestScope = connectionScope(connection);
+    setLoading(true);
     try {
-      const detail = isDemo
-        ? demoProductDetail(product)
-        : await getProductDetail(product.productId);
-      const defaults: Record<number, number[]> = {};
-      detail.optionGroups.forEach((group) => {
-        if (group.minSelect > 0 && group.options[0]) {
-          defaults[group.optionGroupId] = [group.options[0].optionId];
-        }
-      });
-      setSelectedDetail(detail);
-      setSelectedOptions(defaults);
-      setQuantity(1);
+      const nextOrders = await getSellerOrders(connection);
+      if (activeConnectionScope.current !== requestScope) return;
+      setOrders(nextOrders);
+      setSelectedId((current) =>
+        current && nextOrders.some((order) => order.orderPublicId === current)
+          ? current
+          : (nextOrders[0]?.orderPublicId ?? null),
+      );
+      setError(null);
     } catch (caught) {
+      if (activeConnectionScope.current !== requestScope) return;
       setError(
         caught instanceof Error
           ? caught.message
-          : "상품을 불러오지 못했습니다.",
-      );
-    }
-  }
-
-  function toggleOption(groupId: number, maxSelect: number, optionId: number) {
-    setSelectedOptions((current) => {
-      const selected = current[groupId] ?? [];
-      if (selected.includes(optionId)) {
-        return {
-          ...current,
-          [groupId]: selected.filter((id) => id !== optionId),
-        };
-      }
-      return {
-        ...current,
-        [groupId]:
-          maxSelect === 1
-            ? [optionId]
-            : [...selected, optionId].slice(-maxSelect),
-      };
-    });
-  }
-
-  function addToCart() {
-    if (!selectedDetail) return;
-    const valid = selectedDetail.optionGroups.every((group) => {
-      const count = selectedOptions[group.optionGroupId]?.length ?? 0;
-      return count >= group.minSelect && count <= group.maxSelect;
-    });
-    if (!valid) {
-      setError("필수 옵션을 선택해 주세요.");
-      return;
-    }
-    const options = selectedDetail.optionGroups.flatMap((group) =>
-      group.options.filter((option) =>
-        selectedOptions[group.optionGroupId]?.includes(option.optionId),
-      ),
-    );
-    setCart((current) => [
-      ...current,
-      {
-        cartId: createClientId(),
-        product: selectedDetail.product,
-        quantity,
-        options,
-      },
-    ]);
-    setCheckoutAttempt(null);
-    setSelectedDetail(null);
-    setError(null);
-  }
-
-  function changeCartQuantity(cartId: string, delta: number) {
-    setCheckoutAttempt(null);
-    setCart((current) =>
-      current.flatMap((item) => {
-        if (item.cartId !== cartId) return [item];
-        const nextQuantity = item.quantity + delta;
-        return nextQuantity > 0 ? [{ ...item, quantity: nextQuantity }] : [];
-      }),
-    );
-  }
-
-  async function checkout() {
-    if (!cart.length) return;
-    setProcessing(true);
-    setError(null);
-    const attempt = checkoutAttempt ?? {
-      orderKey: `order_${createClientId()}`,
-      paymentKey: `payment_${createClientId()}`,
-    };
-    if (!checkoutAttempt) setCheckoutAttempt(attempt);
-    try {
-      if (isDemo) {
-        await new Promise((resolve) => window.setTimeout(resolve, 650));
-        setOrder(createDemoOrder(cartTotal, orderType));
-      } else {
-        const created =
-          attempt.order ??
-          (await createOrder(cart, orderType, attempt.orderKey));
-        const preparedAttempt = { ...attempt, order: created };
-        setCheckoutAttempt(preparedAttempt);
-        persistStored(
-          window.sessionStorage,
-          checkoutStorageKey,
-          preparedAttempt,
-        );
-        await requestTossPayment({
-          clientKey: import.meta.env.VITE_POPQ_TOSS_CLIENT_KEY ?? "",
-          orderId: created.orderPublicId,
-          orderName: orderName(created),
-          amount: created.totalAmount,
-        });
-        return;
-      }
-      setCart([]);
-      setCheckoutAttempt(null);
-      setScreen("tracking");
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "주문에 실패했습니다.",
+          : "주문 목록을 불러오지 못했습니다.",
       );
     } finally {
-      setProcessing(false);
+      if (activeConnectionScope.current === requestScope) {
+        setLoading(false);
+      }
     }
+  }, [connection]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!connection || connection.user?.role === "ADMIN") return;
+    const initialLoad = window.setTimeout(() => void loadOrders(), 0);
+    const disconnect = connectSellerRealtime(
+      connection,
+      (event: OrderRealtimeEvent) => {
+        if (seenEvents.current.has(event.eventId)) return;
+        seenEvents.current.add(event.eventId);
+        void loadOrders();
+      },
+      () => {
+        setConnected(true);
+        void loadOrders();
+      },
+      () => setConnected(false),
+    );
+    return () => {
+      window.clearTimeout(initialLoad);
+      disconnect();
+    };
+  }, [connection, loadOrders]);
+
+  useEffect(() => {
+    if (!connection || isAdmin) {
+      return;
+    }
+    let active = true;
+    const refreshAccount = async () => {
+      try {
+        const [stores, unread] = await Promise.all([
+          getSellerStores(connection),
+          getSellerUnreadConversationCount(connection),
+        ]);
+        if (!active) return;
+        setUnreadMessageCount(unread);
+        setAccountStores(stores);
+        const currentStore = stores.find(
+          (store) => store.storeId === connection.storeId,
+        );
+        if (
+          currentStore &&
+          (connection.storeRole !== currentStore.myRole ||
+            connection.storeName !== currentStore.name)
+        ) {
+          const next = {
+            ...connection,
+            storeName: currentStore.name,
+            storeRole: currentStore.myRole,
+          };
+          window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next));
+        }
+      } catch {
+        // Feature screens surface request failures when the user opens them.
+      }
+    };
+    void refreshAccount();
+    const timer = window.setInterval(() => {
+      void getSellerUnreadConversationCount(connection)
+        .then((count) => {
+          if (active) setUnreadMessageCount(count);
+        })
+        .catch(() => undefined);
+    }, 30_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [connection, isAdmin]);
+
+  function openAccount() {
+    setShowConnection(true);
+    if (!connection || isAdmin) return;
+    const requestId = accountRequestId.current + 1;
+    accountRequestId.current = requestId;
+    setAccountStoresLoading(true);
+    setAccountStoresError(null);
+    void getSellerStores(connection)
+      .then((stores) => {
+        if (accountRequestId.current === requestId) setAccountStores(stores);
+      })
+      .catch((caught: unknown) => {
+        if (accountRequestId.current !== requestId) return;
+        setAccountStoresError(
+          caught instanceof Error
+            ? caught.message
+            : "스토어 목록을 불러오지 못했습니다.",
+        );
+      })
+      .finally(() => {
+        if (accountRequestId.current === requestId) {
+          setAccountStoresLoading(false);
+        }
+      });
   }
 
-  function advanceDemoOrder() {
-    if (!order || !isDemo) return;
-    const currentIndex = STATUS_SEQUENCE.indexOf(order.status);
-    if (currentIndex < 0) return;
-    const next =
-      STATUS_SEQUENCE[Math.min(currentIndex + 1, STATUS_SEQUENCE.length - 1)];
-    if (!next || next === order.status) return;
-    setOrder({
-      ...order,
-      status: next,
-      version: order.version + 1,
-      statusHistory: [
-        ...order.statusHistory,
-        {
-          previousStatus: order.status,
-          currentStatus: next,
-          actorType: "SELLER",
-          actorId: 1,
-          reason: "데모 상태 진행",
-          changedAt: new Date().toISOString(),
-        },
-      ],
-    });
-  }
+  const visibleOrders = useMemo(() => {
+    if (filter === "ACTIVE") {
+      return orders.filter((order) =>
+        ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(order.status),
+      );
+    }
+    return orders.filter((order) => order.status === filter);
+  }, [filter, orders]);
 
-  async function cancelCurrentOrder() {
-    if (!order || order.status !== "PLACED") return;
+  const selectedOrder =
+    orders.find((order) => order.orderPublicId === selectedId) ??
+    (selectedPastOrder?.orderPublicId === selectedId
+      ? selectedPastOrder
+      : null);
+
+  useEffect(() => {
+    let active = true;
+    const timer = window.setTimeout(() => {
+      if (!selectedOrder) {
+        setPaymentSummary(null);
+        setPaymentLoading(false);
+        return;
+      }
+      if (!connection) {
+        setPaymentSummary((current) =>
+          current?.orderPublicId === selectedOrder.orderPublicId
+            ? current
+            : demoPaymentSummary(selectedOrder),
+        );
+        setPaymentLoading(false);
+        return;
+      }
+      setPaymentLoading(true);
+      void getSellerPaymentSummary(connection, selectedOrder.orderPublicId)
+        .then((summary) => {
+          if (!active) return;
+          setPaymentSummary(summary);
+          setError(null);
+        })
+        .catch((caught: unknown) => {
+          if (!active) return;
+          setPaymentSummary(null);
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "결제 정보를 불러오지 못했습니다.",
+          );
+        })
+        .finally(() => {
+          if (active) setPaymentLoading(false);
+        });
+    }, 0);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [connection, selectedOrder]);
+
+  const openOrders = orders.filter((order) =>
+    ["PLACED", "ACCEPTED", "PREPARING", "READY"].includes(order.status),
+  );
+  const newOrderCount = orders.filter(
+    (order) => order.status === "PLACED",
+  ).length;
+  const readyCount = orders.filter((order) => order.status === "READY").length;
+  const completedSales = orders
+    .filter((order) => order.status === "COMPLETED")
+    .reduce((total, order) => total + order.totalAmount, 0);
+
+  async function changeStatus(
+    order: SellerOrder,
+    action: TransitionAction,
+    options?: TransitionOptions,
+  ) {
     setProcessing(true);
-    setError(null);
     try {
+      let updated: SellerOrder;
       if (isDemo) {
-        setOrder({
+        const target = TARGET_STATUS[action];
+        updated = {
           ...order,
-          status: "CANCELED",
+          status: target,
           version: order.version + 1,
+          preparationMinutes:
+            action === "accept"
+              ? (options?.preparationMinutes ?? 0)
+              : order.preparationMinutes,
+          estimatedReadyAt:
+            action === "accept"
+              ? new Date(
+                  Date.now() + (options?.preparationMinutes ?? 0) * 60_000,
+                ).toISOString()
+              : order.estimatedReadyAt,
           statusHistory: [
             ...order.statusHistory,
             {
               previousStatus: order.status,
-              currentStatus: "CANCELED",
-              actorType: "GUEST",
+              currentStatus: target,
+              actorType: "SELLER",
               actorId: 1,
-              reason: "고객 주문 취소",
+              reason:
+                options?.reason ??
+                (action === "reject" ? "데모 주문 거절" : "데모 상태 변경"),
               changedAt: new Date().toISOString(),
             },
           ],
-        });
+        };
       } else {
-        setOrder(await cancelOrder(order.orderPublicId));
+        updated = await transitionSellerOrder(
+          connection!,
+          order.orderPublicId,
+          action,
+          options,
+        );
       }
+      setOrders((current) =>
+        current.map((item) =>
+          item.orderPublicId === updated.orderPublicId ? updated : item,
+        ),
+      );
+      if (isDemo && action === "reject") {
+        setPaymentSummary(demoPaymentSummary(updated));
+      }
+      setSelectedId(updated.orderPublicId);
+      setError(null);
     } catch (caught) {
-      if (isStaleOrderError(caught)) {
-        discardStoredOrder(
-          "이전 QR 세션의 주문이라 취소할 수 없습니다. 상품 목록에서 새 주문을 진행해 주세요.",
-        );
-      } else {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "주문을 취소하지 못했습니다.",
-        );
-      }
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "주문 상태를 변경하지 못했습니다.",
+      );
     } finally {
       setProcessing(false);
     }
   }
 
-  function startNewOrder() {
-    setOrder(null);
-    setCategory("전체");
-    setScreen("menu");
+  async function refundOrder(
+    order: SellerOrder,
+    amount: number,
+    reason: string,
+  ) {
+    if (
+      !paymentSummary ||
+      amount <= 0 ||
+      amount > paymentSummary.refundableAmount
+    )
+      return;
+    setProcessing(true);
+    try {
+      let updated: SellerPaymentSummary;
+      if (isDemo) {
+        const completedAt = new Date().toISOString();
+        updated = {
+          ...paymentSummary,
+          paymentStatus:
+            amount === paymentSummary.refundableAmount
+              ? "REFUNDED"
+              : "PARTIALLY_REFUNDED",
+          refundedAmount: paymentSummary.refundedAmount + amount,
+          refundableAmount: paymentSummary.refundableAmount - amount,
+          refunds: [
+            ...paymentSummary.refunds,
+            {
+              refundId: paymentSummary.refunds.length + 1,
+              amount,
+              reason,
+              requesterType: "SELLER",
+              status: "SUCCEEDED",
+              requestedAt: completedAt,
+              completedAt,
+              failureCode: null,
+              failureMessage: null,
+            },
+          ],
+        };
+      } else {
+        updated = await refundSellerOrder(
+          connection!,
+          order.orderPublicId,
+          amount,
+          reason,
+        );
+      }
+      setPaymentSummary(updated);
+      setError(null);
+    } catch (caught) {
+      if (connection) {
+        try {
+          setPaymentSummary(
+            await getSellerPaymentSummary(connection, order.orderPublicId),
+          );
+        } catch {
+          // Preserve the original refund error if recovery refresh also fails.
+        }
+      }
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "환불을 처리하지 못했습니다.",
+      );
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function authenticate(nextConnection: SellerConnection) {
+    window.sessionStorage.setItem(
+      CONNECTION_KEY,
+      JSON.stringify(nextConnection),
+    );
+    window.sessionStorage.removeItem(DEMO_KEY);
+    activeConnectionScope.current = connectionScope(nextConnection);
+    setConnection(nextConnection);
+    setAuthenticated(true);
+    setActiveView(
+      nextConnection.user?.role === "ADMIN" ? "admin-customers" : "orders",
+    );
+    setOrders([]);
+    setSelectedId(null);
+    setSelectedPastOrder(null);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setError(null);
+    setShowConnection(false);
   }
 
   function useDemo() {
-    if (!DEMO_MODE_ENABLED) return;
-    setIsDemo(true);
-    setContext(demoContext);
-    setProducts(demoProducts);
-    setOrderType("DINE_IN");
+    window.sessionStorage.removeItem(CONNECTION_KEY);
+    window.sessionStorage.setItem(DEMO_KEY, "true");
+    activeConnectionScope.current = null;
+    setConnection(null);
+    setAuthenticated(true);
+    setActiveView("orders");
+    const demo = freshDemoOrders();
+    setOrders(demo);
+    setSelectedId(demo[0]?.orderPublicId ?? null);
+    setSelectedPastOrder(null);
+    setConnected(false);
+    setUnreadMessageCount(0);
     setError(null);
-    setLoading(false);
+    setShowConnection(false);
   }
 
-  if (loading) {
-    return (
-      <main className="loading-screen">
-        <div className="brand-mark">P</div>
-        <p>테이블을 확인하고 있어요</p>
-        <span className="loading-line" />
-      </main>
+  function signOut() {
+    window.sessionStorage.removeItem(CONNECTION_KEY);
+    window.sessionStorage.removeItem(DEMO_KEY);
+    activeConnectionScope.current = null;
+    setConnection(null);
+    setAuthenticated(false);
+    setActiveView("orders");
+    setOrders([]);
+    setSelectedId(null);
+    setSelectedPastOrder(null);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setError(null);
+    setShowConnection(false);
+  }
+
+  function switchStore(store: StoreSummary) {
+    if (!connection || connection.storeId === store.storeId) return;
+    const nextConnection: SellerConnection = {
+      ...connection,
+      storeId: store.storeId,
+      storeName: store.name,
+      storeRole: store.myRole,
+    };
+    window.sessionStorage.setItem(
+      CONNECTION_KEY,
+      JSON.stringify(nextConnection),
     );
+    activeConnectionScope.current = connectionScope(nextConnection);
+    seenEvents.current.clear();
+    setConnection(nextConnection);
+    setOrders([]);
+    setSelectedId(null);
+    setSelectedPastOrder(null);
+    setFilter("ACTIVE");
+    setPaymentSummary(null);
+    setPaymentLoading(false);
+    setProcessing(false);
+    setConnected(false);
+    setUnreadMessageCount(0);
+    setLoading(true);
+    setBusinessStatus(store.businessStatus);
+    setError(null);
+    setShowConnection(false);
   }
 
-  if (!context) {
+  const updateCurrentStore = useCallback((store: StoreSummary) => {
+    setConnection((current) => {
+      if (!current || current.storeId !== store.storeId) return current;
+      if (
+        current.storeName === store.name &&
+        current.storeRole === store.myRole
+      )
+        return current;
+      const next = {
+        ...current,
+        storeName: store.name,
+        storeRole: store.myRole,
+      };
+      window.sessionStorage.setItem(CONNECTION_KEY, JSON.stringify(next));
+      return next;
+    });
+    setBusinessStatus(store.businessStatus);
+  }, []);
+
+  if (!authenticated) {
     return (
-      <main className="error-screen">
-        <div className="error-orbit">!</div>
-        <p className="eyebrow">POPQ QR ORDER</p>
-        <h1>상품 목록을 열 수 없어요</h1>
-        <p>{error ?? "유효한 QR인지 다시 확인해 주세요."}</p>
-        {DEMO_MODE_ENABLED && (
-          <button className="primary-button" onClick={useDemo}>
-            데모 상품 둘러보기
-          </button>
-        )}
-      </main>
+      <>
+        <SellerAuth onAuthenticated={authenticate} onUseDemo={useDemo} />
+        <button
+          className="theme-toggle auth-theme-toggle"
+          type="button"
+          aria-label={
+            theme === "dark" ? "기본 모드로 전환" : "다크 모드로 전환"
+          }
+          aria-pressed={theme === "dark"}
+          onClick={toggleTheme}
+        >
+          <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+        </button>
+      </>
     );
   }
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <button
-          className="icon-button"
-          aria-label="이전 화면"
-          onClick={() => setScreen(screen === "menu" ? "menu" : "menu")}
-        >
-          {screen === "menu" ? "P" : "←"}
-        </button>
-        <div className="store-heading">
-          <strong>{context.storeName}</strong>
-          <span>
-            {context.tableName ?? "Pickup"} · {isDemo ? "Demo" : "Live"}
-          </span>
+    <div className="seller-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark">P</span>
+          <div>
+            <strong>POPQ</strong>
+            <small>{isAdmin ? "ADMIN" : "SELLER"}</small>
+          </div>
         </div>
-        <div className="topbar-tools">
-          <button
-            className="icon-button theme-toggle"
-            type="button"
-            aria-label={
-              theme === "dark" ? "기본 모드로 전환" : "다크 모드로 전환"
-            }
-            aria-pressed={theme === "dark"}
-            onClick={toggleTheme}
-          >
-            <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
-          </button>
-          <button
-            className="icon-button bag-button"
-            aria-label={
-              hasOrderShortcut ? "진행 중 주문 보기" : `장바구니 ${cartCount}개`
-            }
-            onClick={() => setScreen(hasOrderShortcut ? "tracking" : "cart")}
-          >
-            {hasOrderShortcut ? (
-              "◎"
-            ) : (
-              <svg
-                className="cart-icon"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path d="M3.5 4.5h2l1.6 8.9a2 2 0 0 0 2 1.65h8.4a2 2 0 0 0 1.95-1.55l1.25-5.45H6.15" />
-                <circle cx="9.25" cy="19" r="1.25" />
-                <circle cx="17.5" cy="19" r="1.25" />
-              </svg>
-            )}
-            {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
-          </button>
-        </div>
-      </header>
-
-      {error && (
-        <div className="toast" role="alert">
-          <span>{error}</span>
-          <button onClick={() => setError(null)}>닫기</button>
-        </div>
-      )}
-
-      {screen === "menu" && (
-        <main>
-          <section className="hero-panel">
-            <div>
-              <p className="eyebrow">ORDER AT YOUR PACE</p>
-              <h1>
-                빠르게 고르고,
-                <br />
-                편하게 주문하세요.
-              </h1>
-              <p className="hero-copy">
-                QR로 상품을 확인하고 간편하게 주문하세요.
-              </p>
-            </div>
-            <div className="hero-art" aria-hidden="true">
-              <span className="hero-ring" />
-              <span className="hero-order-card" />
-              <span className="hero-accent one" />
-              <span className="hero-accent two" />
-            </div>
-          </section>
-
-          {isDemo && (
-            <div className="demo-note">
-              <span>DEMO</span>
-              백엔드 없이 전체 주문 흐름을 체험할 수 있어요.
-            </div>
-          )}
-
-          {hasActiveOrder && order && (
-            <section className="active-order-card" aria-label="진행 중 주문">
-              <div className="active-order-mark" aria-hidden="true">
-                {order.version}
-              </div>
-              <div className="active-order-copy">
-                <span>진행 중 주문</span>
-                <strong>{STATUS_COPY[order.status].title}</strong>
-                <small>
-                  ORDER {order.orderPublicId.slice(-8).toUpperCase()}
-                </small>
-              </div>
-              <button type="button" onClick={() => setScreen("tracking")}>
-                주문 현황 보기
-                <span aria-hidden="true">→</span>
-              </button>
-            </section>
-          )}
-
-          <nav className="category-tabs" aria-label="상품 카테고리">
-            {categories.map((item) => (
-              <button
-                key={item}
-                className={category === item ? "active" : ""}
-                onClick={() => setCategory(item)}
-              >
-                {item}
-              </button>
-            ))}
-          </nav>
-
-          <section className="menu-section">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">CURATED MENU</p>
-                <h2>{category === "전체" ? "모든 상품" : category}</h2>
-              </div>
-              <span>{visibleProducts.length} items</span>
-            </div>
-            <div className="product-grid">
-              {visibleProducts.map((product, index) => (
-                <button
-                  className="product-card"
-                  key={product.productId}
-                  disabled={!product.availableForQr}
-                  onClick={() => void openProduct(product)}
-                >
-                  <div
-                    className={`product-visual ${product.visual ?? `tone-${index % 4}`}`}
-                  >
-                    {product.imageUrl ? (
-                      <img src={product.imageUrl} alt="" />
-                    ) : (
-                      <>
-                        <span className="visual-disc" />
-                        <span className="visual-product" />
-                      </>
-                    )}
-                    {product.badge && <b>{product.badge}</b>}
-                    {!product.availableForQr && (
-                      <span className="sold-out">SOLD OUT</span>
-                    )}
-                  </div>
-                  <div className="product-copy">
-                    <span>{product.categoryName}</span>
-                    <h3>{product.name}</h3>
-                    <p>{product.description}</p>
-                    <strong>{money(product.basePrice)}</strong>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-        </main>
-      )}
-
-      {screen === "cart" && (
-        <main className="page-content cart-page">
-          <p className="eyebrow">YOUR SELECTION</p>
-          <h1>장바구니</h1>
-          {paymentConfirmation !== "idle" && (
-            <section className="payment-confirmation" aria-live="polite">
-              <span className="payment-confirmation-mark" aria-hidden="true">
-                {paymentConfirmation === "confirming" ? "…" : "!"}
-              </span>
-              <div>
-                <h2>
-                  {paymentConfirmation === "confirming"
-                    ? "결제 결과를 확인하고 있어요"
-                    : "결제 결과 확인이 필요해요"}
-                </h2>
-                <p>
-                  {paymentConfirmation === "confirming"
-                    ? "창을 닫지 마세요. 주문 화면으로 곧 이동합니다."
-                    : "중복 결제를 막기 위해 결제 버튼 대신 기존 결제 결과를 다시 확인해 주세요."}
-                </p>
-                {paymentConfirmation === "retry" && (
-                  <button
-                    className="secondary-button"
-                    disabled={processing}
-                    onClick={() =>
-                      setPaymentConfirmationAttempt((value) => value + 1)
-                    }
-                  >
-                    결제 결과 다시 확인하기
-                  </button>
-                )}
-              </div>
-            </section>
-          )}
-          {paymentConfirmation === "idle" && (
+        <nav aria-label={isAdmin ? "관리자 메뉴" : "판매자 메뉴"}>
+          {isAdmin ? (
             <>
-              <div className="order-type">
-                {context.storeTableId && (
-                  <button
-                    className={orderType === "DINE_IN" ? "active" : ""}
-                    onClick={() => {
-                      setOrderType("DINE_IN");
-                      setCheckoutAttempt(null);
-                    }}
-                  >
-                    매장에서
-                  </button>
-                )}
-                <button
-                  className={orderType === "TAKEOUT" ? "active" : ""}
-                  onClick={() => {
-                    setOrderType("TAKEOUT");
-                    setCheckoutAttempt(null);
-                  }}
-                >
-                  포장해서
-                </button>
-              </div>
-              {cart.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-bag" />
-                  <h2>아직 담긴 상품이 없어요</h2>
-                  <p>마음에 드는 상품을 골라 장바구니에 담아보세요.</p>
-                  <button
-                    className="secondary-button"
-                    onClick={() => setScreen("menu")}
-                  >
-                    상품 보러 가기
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <div className="cart-list">
-                    {cart.map((item) => (
-                      <article className="cart-item" key={item.cartId}>
-                        <div
-                          className={`cart-thumb ${item.product.visual ?? ""}`}
-                        >
-                          <span />
-                        </div>
-                        <div className="cart-item-copy">
-                          <h3>{item.product.name}</h3>
-                          <p>
-                            {item.options
-                              .map((option) => option.name)
-                              .join(" · ") || "기본 옵션"}
-                          </p>
-                          <strong>{money(itemPrice(item))}</strong>
-                        </div>
-                        <div className="stepper">
-                          <button
-                            aria-label="수량 줄이기"
-                            onClick={() => changeCartQuantity(item.cartId, -1)}
-                          >
-                            −
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button
-                            aria-label="수량 늘리기"
-                            onClick={() => changeCartQuantity(item.cartId, 1)}
-                          >
-                            +
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-                  <button
-                    className="add-more"
-                    onClick={() => setScreen("menu")}
-                  >
-                    + 상품 더 담기
-                  </button>
-                  <section className="price-summary">
-                    <div>
-                      <span>상품 금액</span>
-                      <span>{money(cartTotal)}</span>
-                    </div>
-                    <div>
-                      <span>할인</span>
-                      <span>0원</span>
-                    </div>
-                    <div className="total">
-                      <strong>결제할 금액</strong>
-                      <strong>{money(cartTotal)}</strong>
-                    </div>
-                  </section>
-                  <button
-                    className="primary-button checkout-button"
-                    disabled={processing}
-                    onClick={() => void checkout()}
-                  >
-                    {processing
-                      ? "주문을 전송하는 중…"
-                      : `${money(cartTotal)} 결제하기`}
-                  </button>
-                </>
-              )}
+              <small className="sidebar-section-label">회원 관리</small>
+              <button
+                className={activeView === "admin-customers" ? "active" : ""}
+                onClick={() => setActiveView("admin-customers")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="customers" />
+                </span>
+                구매자 회원
+              </button>
+              <button
+                className={activeView === "admin-sellers" ? "active" : ""}
+                onClick={() => setActiveView("admin-sellers")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="sellerVerification" />
+                </span>
+                판매자 · 인증
+              </button>
+              <button
+                className={activeView === "admin-stores" ? "active" : ""}
+                onClick={() => setActiveView("admin-stores")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="store" />
+                </span>
+                스토어 관리
+              </button>
+              <small className="sidebar-section-label">콘텐츠 · 지원</small>
+              <button
+                className={activeView === "admin-announcements" ? "active" : ""}
+                onClick={() => setActiveView("admin-announcements")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="announcement" />
+                </span>
+                플랫폼 공지
+              </button>
+              <button
+                className={activeView === "admin-support" ? "active" : ""}
+                onClick={() => setActiveView("admin-support")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="support" />
+                </span>
+                문의 관리
+              </button>
+              <button
+                className={activeView === "admin-faqs" ? "active" : ""}
+                onClick={() => setActiveView("admin-faqs")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="faq" />
+                </span>
+                FAQ 관리
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className={activeView === "orders" ? "active" : ""}
+                onClick={() => setActiveView("orders")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="orders" />
+                </span>
+                주문 운영
+                {newOrderCount > 0 && <b>{newOrderCount}</b>}
+              </button>
+              <button
+                className={activeView === "products" ? "active" : ""}
+                onClick={() => setActiveView("products")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="products" />
+                </span>
+                상품 관리
+              </button>
+              <button
+                className={activeView === "qr" ? "active" : ""}
+                onClick={() => setActiveView("qr")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="qr" />
+                </span>
+                QR 관리
+              </button>
+              <button
+                className={activeView === "analytics" ? "active" : ""}
+                onClick={() => setActiveView("analytics")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="analytics" />
+                </span>
+                매출 분석
+              </button>
+              <button
+                className={activeView === "announcements" ? "active" : ""}
+                onClick={() => setActiveView("announcements")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="announcement" />
+                </span>
+                공지사항
+              </button>
+              <button
+                className={activeView === "messages" ? "active" : ""}
+                onClick={() => setActiveView("messages")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="messages" />
+                </span>
+                고객 문의
+                {unreadMessageCount > 0 && <b>{unreadMessageCount}</b>}
+              </button>
+              <button
+                className={activeView === "reviews" ? "active" : ""}
+                onClick={() => setActiveView("reviews")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="reviews" />
+                </span>
+                리뷰 관리
+              </button>
+              <button
+                className={activeView === "settings" ? "active" : ""}
+                onClick={() => setActiveView("settings")}
+              >
+                <span className="sidebar-nav-icon">
+                  <SidebarIcon name="settings" />
+                </span>
+                스토어 설정
+              </button>
             </>
           )}
-        </main>
-      )}
-
-      {screen === "tracking" && order && (
-        <main className="page-content tracking-page">
-          <div className="tracking-hero">
-            <p className="eyebrow">ORDER STATUS</p>
-            <span className={`connection ${connected || isDemo ? "on" : ""}`}>
-              <i />
-              {isDemo ? "Demo live" : connected ? "실시간 연결됨" : "재연결 중"}
-            </span>
-            <div className={`status-orb status-${order.status.toLowerCase()}`}>
-              <span>{order.status === "COMPLETED" ? "✓" : order.version}</span>
+        </nav>
+        <div className="sidebar-bottom">
+          <button className="profile-button" onClick={openAccount}>
+            <span>{isAdmin ? "AD" : "SL"}</span>
+            <div>
+              <strong>
+                {isDemo ? "데모 운영자" : (connection?.user?.name ?? "판매자")}
+              </strong>
+              <small>
+                {isDemo
+                  ? "데모 스토어"
+                  : isAdmin
+                    ? "플랫폼 관리자"
+                    : (connection?.storeName ??
+                      `스토어 ${connection?.storeId}`)}
+              </small>
             </div>
-            <h1>{STATUS_COPY[order.status].title}</h1>
-            <p>{STATUS_COPY[order.status].description}</p>
-            <div className="order-number">
-              ORDER{" "}
-              <strong>{order.orderPublicId.slice(-8).toUpperCase()}</strong>
-            </div>
-          </div>
-
-          <ol className="status-timeline">
-            {STATUS_SEQUENCE.map((status, index) => {
-              const currentIndex = STATUS_SEQUENCE.indexOf(order.status);
-              const complete = currentIndex >= index;
-              return (
-                <li className={complete ? "complete" : ""} key={status}>
-                  <span>{complete ? "✓" : index + 1}</span>
-                  <div>
-                    <strong>{STATUS_COPY[status].title}</strong>
-                    <p>
-                      {status === order.status
-                        ? "현재 상태"
-                        : STATUS_COPY[status].description}
-                    </p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-
-          <div className="tracking-card">
-            <span>
-              {order.orderType === "DINE_IN" ? "이용 위치" : "수령 방법"}
-            </span>
-            <strong>
-              {order.orderType === "DINE_IN"
-                ? context.tableName
-                : "매장 픽업대"}
-            </strong>
-            <span>결제 금액</span>
-            <strong>{money(order.totalAmount)}</strong>
-          </div>
-
-          {isDemo &&
-            STATUS_SEQUENCE.includes(order.status) &&
-            order.status !== "COMPLETED" && (
-              <button className="primary-button" onClick={advanceDemoOrder}>
-                데모 상태 다음으로
-              </button>
-            )}
-          {order.status === "PLACED" && (
-            <button
-              className="cancel-button"
-              disabled={processing}
-              onClick={() => void cancelCurrentOrder()}
-            >
-              {processing ? "취소 처리 중…" : "주문 취소"}
-            </button>
-          )}
-          {["COMPLETED", "CANCELED", "REJECTED", "EXPIRED"].includes(
-            order.status,
-          ) && (
-            <button className="primary-button" onClick={startNewOrder}>
-              새 주문 시작하기
-            </button>
-          )}
-          <button className="text-button" onClick={() => setScreen("menu")}>
-            상품 목록으로 돌아가기
+            <b>···</b>
           </button>
-        </main>
-      )}
+        </div>
+      </aside>
 
-      {screen === "menu" && cartCount > 0 && (
-        <button className="floating-cart" onClick={() => setScreen("cart")}>
-          <span>{cartCount}</span>
-          <strong>장바구니 보기</strong>
-          <b>{money(cartTotal)}</b>
-        </button>
-      )}
+      <div className="workspace">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">{VIEW_COPY[activeView].eyebrow}</p>
+            <h1>{VIEW_COPY[activeView].title}</h1>
+          </div>
+          <div className="topbar-actions">
+            <button
+              className="icon-button theme-toggle"
+              type="button"
+              aria-label={
+                theme === "dark" ? "기본 모드로 전환" : "다크 모드로 전환"
+              }
+              aria-pressed={theme === "dark"}
+              onClick={toggleTheme}
+            >
+              <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+            </button>
+            {!isAdmin && (
+              <>
+                <span
+                  className={`live-state ${connected || isDemo ? "on" : ""}`}
+                >
+                  <i />
+                  {isDemo
+                    ? "Demo live"
+                    : connected
+                      ? "실시간 연결"
+                      : "재연결 중"}
+                </span>
+                <button
+                  className={`store-toggle ${
+                    businessStatus === "OPEN" ? "open" : ""
+                  }`}
+                  onClick={() => setActiveView("settings")}
+                  aria-pressed={businessStatus === "OPEN"}
+                >
+                  <span />
+                  {businessStatus === "OPEN" ? "영업 중" : "준비중"}
+                </button>
+              </>
+            )}
+            <button
+              className="icon-button"
+              aria-label="계정 설정"
+              onClick={openAccount}
+            >
+              ⚙
+            </button>
+          </div>
+        </header>
 
-      {selectedDetail && (
-        <div className="sheet-backdrop" role="presentation">
+        {error && (
+          <div className="alert" role="alert">
+            <span>{error}</span>
+            <button onClick={() => setError(null)}>닫기</button>
+          </div>
+        )}
+
+        {activeView === "orders" && (
+          <main>
+            <section className="pulse-strip" aria-label="오늘 운영 현황">
+              <div className="pulse-intro">
+                <span>
+                  {now.toLocaleDateString("ko-KR", {
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </span>
+                <strong>
+                  {now.toLocaleTimeString("ko-KR", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </strong>
+                <p>
+                  {isDemo
+                    ? "데모 스토어"
+                    : (connection?.storeName ??
+                      `스토어 ${connection?.storeId}`)}
+                  의 주문 흐름이 안정적입니다.
+                </p>
+              </div>
+              <article>
+                <span className="metric-icon coral">↘</span>
+                <div>
+                  <small>진행 주문</small>
+                  <strong>{openOrders.length}</strong>
+                  <p>지금 처리할 주문</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon lime">!</span>
+                <div>
+                  <small>신규 접수</small>
+                  <strong>{newOrderCount}</strong>
+                  <p>평균 대기 5분</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon violet">✓</span>
+                <div>
+                  <small>전달 대기</small>
+                  <strong>{readyCount}</strong>
+                  <p>픽업 확인 필요</p>
+                </div>
+              </article>
+              <article>
+                <span className="metric-icon cream">₩</span>
+                <div>
+                  <small>완료 매출</small>
+                  <strong>{money(completedSales)}</strong>
+                  <p>현재 세션 기준</p>
+                </div>
+              </article>
+            </section>
+
+            <PastOrderSearch
+              connection={connection}
+              demoOrders={orders}
+              selectedId={selectedId}
+              onSelect={(order) => {
+                setSelectedPastOrder(order);
+                setSelectedId(order.orderPublicId);
+              }}
+              onError={setError}
+            />
+
+            <section className="orders-section">
+              <div className="section-head">
+                <div>
+                  <p className="eyebrow">ORDER FLOW</p>
+                  <h2>주문 보드</h2>
+                </div>
+                <div className="filters" aria-label="주문 필터">
+                  {(
+                    [
+                      ["ACTIVE", "진행 중"],
+                      ["PLACED", "신규"],
+                      ["READY", "전달 대기"],
+                      ["COMPLETED", "완료"],
+                    ] as [OrderFilter, string][]
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      className={filter === value ? "active" : ""}
+                      onClick={() => setFilter(value)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="refresh-button"
+                  onClick={() =>
+                    isDemo ? setOrders(freshDemoOrders()) : void loadOrders()
+                  }
+                  disabled={loading}
+                >
+                  {loading ? "불러오는 중…" : "↻ 새로고침"}
+                </button>
+              </div>
+
+              {filter === "ACTIVE" ? (
+                <div className="order-board">
+                  {LANES.map((lane) => {
+                    const laneOrders = visibleOrders.filter((order) =>
+                      lane.statuses.includes(order.status),
+                    );
+                    return (
+                      <section
+                        className={`lane lane-${lane.tone}`}
+                        key={lane.title}
+                      >
+                        <header>
+                          <div>
+                            <span />
+                            <strong>{lane.title}</strong>
+                            <b>{laneOrders.length}</b>
+                          </div>
+                          <small>{lane.description}</small>
+                        </header>
+                        <div className="lane-list">
+                          {laneOrders.map((order) => (
+                            <OrderCard
+                              key={order.orderPublicId}
+                              order={order}
+                              now={now}
+                              selected={order.orderPublicId === selectedId}
+                              onSelect={() =>
+                                setSelectedId(order.orderPublicId)
+                              }
+                            />
+                          ))}
+                          {laneOrders.length === 0 && (
+                            <div className="lane-empty">
+                              <span>✓</span>
+                              <p>대기 중인 주문이 없습니다.</p>
+                            </div>
+                          )}
+                        </div>
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="filtered-list">
+                  {visibleOrders.map((order) => (
+                    <OrderCard
+                      key={order.orderPublicId}
+                      order={order}
+                      now={now}
+                      selected={order.orderPublicId === selectedId}
+                      onSelect={() => setSelectedId(order.orderPublicId)}
+                    />
+                  ))}
+                  {visibleOrders.length === 0 && (
+                    <div className="list-empty">
+                      해당 상태의 주문이 없습니다.
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+          </main>
+        )}
+        {activeView === "products" && (
+          <ProductManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {activeView === "qr" && (
+          <QrManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {activeView === "analytics" && (
+          <SalesAnalytics
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+          />
+        )}
+        {activeView === "settings" && (
+          <StoreSettings
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+            onBusinessStatusChange={setBusinessStatus}
+            onStoreSelected={switchStore}
+            onStoreUpdated={updateCurrentStore}
+            onStoreDeleted={(remaining) => {
+              if (remaining.length > 0) switchStore(remaining[0]);
+              else signOut();
+            }}
+          />
+        )}
+        {activeView === "announcements" && (
+          <AnnouncementManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {activeView === "messages" && (
+          <MessageManagement
+            key={storeScopeKey}
+            connection={connection}
+            onError={setError}
+            onUnreadChange={setUnreadMessageCount}
+          />
+        )}
+        {activeView === "reviews" && (
+          <ReviewManagement
+            key={storeScopeKey}
+            connection={connection}
+            storeRole={resolvedStoreRole}
+            onError={setError}
+          />
+        )}
+        {isAdmin && activeView === "admin-customers" && (
+          <AdminManagement
+            connection={connection}
+            section="customers"
+            onError={setError}
+          />
+        )}
+        {isAdmin && activeView === "admin-sellers" && (
+          <AdminManagement
+            connection={connection}
+            section="sellers"
+            onError={setError}
+          />
+        )}
+        {isAdmin && activeView === "admin-stores" && (
+          <AdminManagement
+            connection={connection}
+            section="stores"
+            onError={setError}
+          />
+        )}
+        {isAdmin && activeView === "admin-announcements" && (
+          <AdminContentManagement
+            connection={connection}
+            kind="announcements"
+            onError={setError}
+          />
+        )}
+        {isAdmin && activeView === "admin-support" && (
+          <AdminSupportHub connection={connection} onError={setError} />
+        )}
+        {isAdmin && activeView === "admin-faqs" && (
+          <AdminContentManagement
+            connection={connection}
+            kind="faqs"
+            onError={setError}
+          />
+        )}
+      </div>
+
+      <aside
+        className={`detail-panel ${
+          selectedOrder && activeView === "orders" ? "open" : ""
+        }`}
+      >
+        {selectedOrder && activeView === "orders" && (
+          <OrderDetail
+            key={selectedOrder.orderPublicId}
+            order={selectedOrder}
+            processing={processing}
+            paymentLoading={paymentLoading}
+            paymentSummary={paymentSummary}
+            onClose={() => setSelectedId(null)}
+            onAction={(action, options) =>
+              void changeStatus(selectedOrder, action, options)
+            }
+            canRefund={canManageStore}
+            onRefund={(amount, reason) =>
+              void refundOrder(selectedOrder, amount, reason)
+            }
+          />
+        )}
+      </aside>
+
+      {showConnection && (
+        <div className="modal-backdrop" role="presentation">
           <section
-            className="product-sheet"
+            className="connection-modal"
             role="dialog"
             aria-modal="true"
-            aria-label={`${selectedDetail.product.name} 옵션 선택`}
+            aria-labelledby="connection-title"
           >
             <button
-              className="sheet-close"
+              className="modal-close"
               aria-label="닫기"
-              onClick={() => setSelectedDetail(null)}
+              onClick={() => setShowConnection(false)}
             >
               ×
             </button>
-            <div
-              className={`sheet-visual ${selectedDetail.product.visual ?? ""}`}
-            >
-              <span className="visual-disc" />
-              <span className="visual-product" />
-            </div>
-            <div className="sheet-content">
-              <p className="eyebrow">{selectedDetail.product.categoryName}</p>
-              <h2>{selectedDetail.product.name}</h2>
-              <p className="sheet-description">
-                {selectedDetail.product.description}
-              </p>
-              <strong className="sheet-price">
-                {money(selectedDetail.product.basePrice)}
-              </strong>
-
-              {selectedDetail.optionGroups.map((group) => (
-                <fieldset key={group.optionGroupId}>
-                  <legend>
-                    {group.name}
-                    <span>{group.required ? "필수" : "선택"}</span>
-                  </legend>
-                  {group.options.map((option) => {
-                    const checked = selectedOptions[
-                      group.optionGroupId
-                    ]?.includes(option.optionId);
-                    return (
-                      <label className="option-row" key={option.optionId}>
-                        <input
-                          type={group.maxSelect === 1 ? "radio" : "checkbox"}
-                          name={`group-${group.optionGroupId}`}
-                          checked={checked}
-                          onChange={() =>
-                            toggleOption(
-                              group.optionGroupId,
-                              group.maxSelect,
-                              option.optionId,
-                            )
-                          }
-                        />
-                        <span>{option.name}</span>
-                        <b>
-                          {option.additionalPrice
-                            ? `+${money(option.additionalPrice)}`
-                            : "추가금 없음"}
-                        </b>
-                      </label>
-                    );
-                  })}
-                </fieldset>
-              ))}
-
-              <div className="sheet-action">
-                <div className="stepper large">
-                  <button
-                    aria-label="수량 줄이기"
-                    onClick={() =>
-                      setQuantity((value) => Math.max(1, value - 1))
-                    }
-                  >
-                    −
-                  </button>
-                  <span>{quantity}</span>
-                  <button
-                    aria-label="수량 늘리기"
-                    onClick={() =>
-                      setQuantity((value) => Math.min(99, value + 1))
-                    }
-                  >
-                    +
-                  </button>
+            <p className="eyebrow">ACCOUNT</p>
+            <h2 id="connection-title">
+              {isAdmin ? "관리자 계정" : "판매자 계정"}
+            </h2>
+            <p>
+              {isDemo
+                ? "현재 데모 데이터로 판매자 웹을 체험하고 있습니다."
+                : isAdmin
+                  ? `${connection?.user?.email ?? "관리자 계정"} · 플랫폼 관리자`
+                  : `${connection?.user?.email ?? "판매자 계정"} · ${connection?.storeName ?? `스토어 ${connection?.storeId}`}`}
+            </p>
+            {!isDemo && !isAdmin && (
+              <div className="account-store-switcher">
+                <div className="account-store-heading">
+                  <strong>운영 스토어</strong>
+                  <small>
+                    전환하면 스토어별 운영 데이터가 새로 연결됩니다.
+                  </small>
                 </div>
-                <button className="primary-button" onClick={addToCart}>
-                  {money(
-                    (selectedDetail.product.basePrice +
-                      selectedDetail.optionGroups
-                        .flatMap((group) => group.options)
-                        .filter((option: ProductOption) =>
-                          Object.values(selectedOptions)
-                            .flat()
-                            .includes(option.optionId),
-                        )
-                        .reduce(
-                          (total, option) => total + option.additionalPrice,
-                          0,
-                        )) *
-                      quantity,
-                  )}{" "}
-                  담기
-                </button>
+                {accountStoresLoading ? (
+                  <p className="account-store-status">스토어를 불러오는 중…</p>
+                ) : accountStoresError ? (
+                  <p className="account-store-error" role="alert">
+                    {accountStoresError}
+                  </p>
+                ) : (
+                  <div className="account-store-list">
+                    {accountStores.map((store) => {
+                      const current = store.storeId === connection?.storeId;
+                      return (
+                        <button
+                          key={store.storeId}
+                          type="button"
+                          className={current ? "current" : ""}
+                          disabled={current}
+                          aria-label={
+                            current
+                              ? `${store.name} 현재 스토어`
+                              : `${store.name}로 전환`
+                          }
+                          onClick={() => switchStore(store)}
+                        >
+                          <span>{store.name.slice(0, 1)}</span>
+                          <div>
+                            <strong>{store.name}</strong>
+                            <small>
+                              {store.myRole} · {store.businessStatus}
+                            </small>
+                          </div>
+                          <b>{current ? "현재" : "전환"}</b>
+                        </button>
+                      );
+                    })}
+                    {accountStores.length === 0 && (
+                      <p className="account-store-status">
+                        전환할 수 있는 스토어가 없습니다.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+            <button className="primary-action" onClick={signOut}>
+              {isDemo ? "로그인 화면으로 이동" : "로그아웃"}
+            </button>
           </section>
         </div>
       )}
     </div>
+  );
+}
+
+function OrderCard({
+  order,
+  now,
+  selected,
+  onSelect,
+}: {
+  order: SellerOrder;
+  now: Date;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const itemCount = order.items.reduce(
+    (total, item) => total + item.quantity,
+    0,
+  );
+  return (
+    <button
+      className={`order-card ${selected ? "selected" : ""}`}
+      onClick={onSelect}
+      aria-label={`주문 ${shortOrderId(order.orderPublicId)} 상세 보기`}
+    >
+      <div className="card-top">
+        <div>
+          <span className={`type-badge ${order.orderType.toLowerCase()}`}>
+            {order.orderType === "DINE_IN" ? "매장" : "포장"}
+          </span>
+          <strong>#{shortOrderId(order.orderPublicId)}</strong>
+        </div>
+        <time>{elapsedMinutes(order, now)}분 전</time>
+      </div>
+      <div className="card-items">
+        {order.items.slice(0, 2).map((item) => (
+          <p key={item.orderItemId}>
+            <span>{item.productName}</span>
+            <b>×{item.quantity}</b>
+          </p>
+        ))}
+        {order.items.length > 2 && <small>외 {order.items.length - 2}개</small>}
+      </div>
+      <div className="card-bottom">
+        <span>{itemCount}개 메뉴</span>
+        <strong>{money(order.totalAmount)}</strong>
+      </div>
+    </button>
+  );
+}
+
+function OrderDetail({
+  order,
+  processing,
+  paymentLoading,
+  paymentSummary,
+  canRefund: canIssueRefund,
+  onClose,
+  onAction,
+  onRefund,
+}: {
+  order: SellerOrder;
+  processing: boolean;
+  paymentLoading: boolean;
+  paymentSummary: SellerPaymentSummary | null;
+  canRefund: boolean;
+  onClose: () => void;
+  onAction: (action: TransitionAction, options?: TransitionOptions) => void;
+  onRefund: (amount: number, reason: string) => void;
+}) {
+  const [showRefundForm, setShowRefundForm] = useState(false);
+  const [refundReason, setRefundReason] = useState("");
+  const [actionDialog, setActionDialog] = useState<"accept" | "reject" | null>(
+    null,
+  );
+  const [preparationMinutes, setPreparationMinutes] = useState(10);
+  const [applyAsStoreDefault, setApplyAsStoreDefault] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const actions = ACTIONS[order.status];
+  const canRefund =
+    canIssueRefund &&
+    order.status === "COMPLETED" &&
+    (paymentSummary?.paymentStatus === "PAID" ||
+      paymentSummary?.paymentStatus === "PARTIALLY_REFUNDED") &&
+    paymentSummary.refundableAmount > 0;
+  const paymentStatus =
+    paymentSummary?.paymentStatus === "REFUNDED"
+      ? "환불 완료"
+      : paymentSummary?.paymentStatus === "PARTIALLY_REFUNDED"
+        ? "부분 환불"
+        : paymentSummary?.paymentStatus === "CANCELED"
+          ? "결제 취소"
+          : paymentSummary?.paymentStatus === "PAID"
+            ? "결제 완료"
+            : "확인 중";
+  return (
+    <>
+      <header className="detail-head">
+        <div>
+          <p className="eyebrow">ORDER DETAIL</p>
+          <h2>#{shortOrderId(order.orderPublicId)}</h2>
+        </div>
+        <button aria-label="상세 닫기" onClick={onClose}>
+          ×
+        </button>
+      </header>
+      <div className="detail-status">
+        <span className={`status-dot status-${order.status.toLowerCase()}`} />
+        <div>
+          <small>현재 상태</small>
+          <strong>{STATUS_COPY[order.status].label}</strong>
+        </div>
+        <b>v{order.version}</b>
+      </div>
+      <div className="detail-meta">
+        <div>
+          <small>주문 유형</small>
+          <strong>
+            {order.orderType === "DINE_IN" ? "매장 이용" : "포장 주문"}
+          </strong>
+        </div>
+        <div>
+          <small>주문 시각</small>
+          <strong>
+            {lastChangedAt(order).toLocaleTimeString("ko-KR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </strong>
+        </div>
+      </div>
+      <section className="detail-items">
+        <h3>주문 메뉴</h3>
+        {order.items.map((item) => (
+          <article key={item.orderItemId}>
+            <span>{item.quantity}</span>
+            <div>
+              <strong>{item.productName}</strong>
+              <p>
+                {item.options.map((option) => option.optionName).join(" · ") ||
+                  "기본 옵션"}
+              </p>
+            </div>
+            <b>{money(item.itemTotalPrice)}</b>
+          </article>
+        ))}
+      </section>
+      <div className="detail-total">
+        <span>결제 금액</span>
+        <strong>{money(order.totalAmount)}</strong>
+      </div>
+      <section className="payment-refund">
+        <header>
+          <div>
+            <small>PAYMENT</small>
+            <h3>결제·환불</h3>
+          </div>
+          <span
+            className={`payment-status ${
+              paymentSummary?.paymentStatus.toLowerCase() ?? "loading"
+            }`}
+          >
+            {paymentLoading ? "불러오는 중" : paymentStatus}
+          </span>
+        </header>
+        {paymentSummary && (
+          <>
+            <div className="payment-amounts">
+              <p>
+                <span>승인 금액</span>
+                <strong>{money(paymentSummary.approvedAmount)}</strong>
+              </p>
+              <p>
+                <span>환불 금액</span>
+                <strong>{money(paymentSummary.refundedAmount)}</strong>
+              </p>
+            </div>
+            {paymentSummary.refunds.length > 0 && (
+              <div className="refund-history">
+                {paymentSummary.refunds.map((refund) => (
+                  <article key={refund.refundId}>
+                    <div>
+                      <strong>{refund.reason}</strong>
+                      <small>
+                        {refund.requesterType === "SELLER"
+                          ? "판매자 요청"
+                          : "고객 요청"}
+                      </small>
+                    </div>
+                    <p>
+                      <b>{money(refund.amount)}</b>
+                      <span>
+                        {refund.status === "SUCCEEDED"
+                          ? "완료"
+                          : refund.status === "FAILED"
+                            ? "실패"
+                            : "처리 중"}
+                      </span>
+                    </p>
+                    {refund.status === "FAILED" && (
+                      <div className="refund-failure-recovery">
+                        <small>
+                          {refund.failureMessage ?? "환불 처리에 실패했습니다."}
+                        </small>
+                      </div>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+            {canRefund && !showRefundForm && (
+              <button
+                className="refund-open"
+                onClick={() => {
+                  setShowRefundForm(true);
+                }}
+              >
+                전액 환불
+              </button>
+            )}
+            {canRefund && showRefundForm && (
+              <div className="refund-form">
+                <strong>
+                  {money(paymentSummary.refundableAmount)} 전액 환불
+                </strong>
+                <label>
+                  환불 사유
+                  <textarea
+                    rows={3}
+                    value={refundReason}
+                    placeholder="고객에게 안내할 환불 사유"
+                    onChange={(event) => setRefundReason(event.target.value)}
+                  />
+                </label>
+                <p>
+                  환불 가능한 금액 전액을 처리합니다. 승인 후에는 되돌릴 수
+                  없습니다.
+                </p>
+                <div>
+                  <button
+                    className="secondary-action"
+                    onClick={() => setShowRefundForm(false)}
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="refund-confirm"
+                    disabled={processing || !refundReason.trim()}
+                    onClick={() =>
+                      onRefund(
+                        paymentSummary.refundableAmount,
+                        refundReason.trim(),
+                      )
+                    }
+                  >
+                    {processing ? "환불 처리 중…" : "전액 환불 확정"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+      <section className="history">
+        <h3>최근 처리</h3>
+        {order.statusHistory
+          .slice(-2)
+          .reverse()
+          .map((entry) => (
+            <div key={`${entry.currentStatus}-${entry.changedAt}`}>
+              <span />
+              <p>
+                <strong>{STATUS_COPY[entry.currentStatus].short}</strong>
+                <small>{entry.reason ?? "상태가 변경되었습니다."}</small>
+              </p>
+              <time>
+                {new Date(entry.changedAt).toLocaleTimeString("ko-KR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </time>
+            </div>
+          ))}
+      </section>
+      {actions ? (
+        <div className="detail-actions">
+          {actions.secondary && (
+            <button
+              className="reject-action"
+              disabled={processing}
+              onClick={() => {
+                if (actions.secondary!.action === "reject")
+                  setActionDialog("reject");
+                else onAction(actions.secondary!.action);
+              }}
+            >
+              {actions.secondary.label}
+            </button>
+          )}
+          <button
+            className="primary-action"
+            disabled={processing}
+            onClick={() => {
+              if (actions.primary.action === "accept")
+                setActionDialog("accept");
+              else onAction(actions.primary.action);
+            }}
+          >
+            {processing ? "처리 중…" : actions.primary.label}
+          </button>
+        </div>
+      ) : (
+        <div className="terminal-note">이 주문의 처리가 종료되었습니다.</div>
+      )}
+      {actionDialog === "accept" && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="connection-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="accept-order-title"
+          >
+            <button
+              className="modal-close"
+              aria-label="닫기"
+              onClick={() => setActionDialog(null)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">ACCEPT ORDER</p>
+            <h2 id="accept-order-title">준비시간 선택</h2>
+            <div
+              className="status-options"
+              role="radiogroup"
+              aria-label="준비시간"
+            >
+              {[0, 5, 10, 15, 20, 30, 40, 50].map((minutes) => (
+                <button
+                  key={minutes}
+                  type="button"
+                  role="radio"
+                  aria-checked={preparationMinutes === minutes}
+                  className={preparationMinutes === minutes ? "active" : ""}
+                  onClick={() => setPreparationMinutes(minutes)}
+                >
+                  {minutes === 0 ? "즉시" : `${minutes}분`}
+                </button>
+              ))}
+            </div>
+            <label className="required-check">
+              <input
+                type="checkbox"
+                checked={applyAsStoreDefault}
+                onChange={(event) =>
+                  setApplyAsStoreDefault(event.target.checked)
+                }
+              />
+              이 시간을 사업장 기본 준비시간으로 사용
+            </label>
+            <button
+              className="primary-action"
+              disabled={processing}
+              onClick={() => {
+                onAction("accept", { preparationMinutes, applyAsStoreDefault });
+                setActionDialog(null);
+              }}
+            >
+              주문 접수
+            </button>
+          </section>
+        </div>
+      )}
+      {actionDialog === "reject" && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="connection-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reject-order-title"
+          >
+            <button
+              className="modal-close"
+              aria-label="닫기"
+              onClick={() => setActionDialog(null)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">REJECT ORDER</p>
+            <h2 id="reject-order-title">주문 거절 사유</h2>
+            <label>
+              고객 안내 사유
+              <textarea
+                maxLength={500}
+                rows={4}
+                value={rejectReason}
+                onChange={(event) => setRejectReason(event.target.value)}
+                placeholder="재료 소진, 운영 종료 등 사유를 입력해 주세요."
+              />
+            </label>
+            <button
+              className="danger-action"
+              disabled={processing || !rejectReason.trim()}
+              onClick={() => {
+                onAction("reject", { reason: rejectReason.trim() });
+                setActionDialog(null);
+              }}
+            >
+              주문 거절 확정
+            </button>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
 
