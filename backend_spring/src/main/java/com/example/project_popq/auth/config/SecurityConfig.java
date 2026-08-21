@@ -62,6 +62,7 @@ public class SecurityConfig {
                 "/api/v1/auth/refresh",
                 "/api/v1/auth/social/login",
                 "/api/v1/auth/social/kakao/code",
+                "/api/v1/auth/social/naver/code",
                 "/api/v1/auth/find-id",
                 "/api/v1/auth/password-reset/verify",
                 "/api/v1/auth/password-reset/confirm"

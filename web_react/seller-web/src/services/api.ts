@@ -99,6 +99,13 @@ export function loginSellerWithKakaoCode(code: string) {
   });
 }
 
+export function loginSellerWithNaverCode(code: string, state: string) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/naver/code", {
+    method: "POST",
+    body: JSON.stringify({ code, state }),
+  });
+}
+
 export function signUpSeller(payload: {
   email: string;
   password: string;

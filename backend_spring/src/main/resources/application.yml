@@ -94,6 +94,10 @@ popq:
       seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID:0}
     naver:
       api-base-url: ${POPQ_NAVER_API_BASE_URL:https://openapi.naver.com}
+      auth-base-url: ${POPQ_NAVER_AUTH_BASE_URL:https://nid.naver.com}
+      client-id: ${POPQ_NAVER_CLIENT_ID:}
+      client-secret: ${POPQ_NAVER_CLIENT_SECRET:}
+      seller-redirect-uri: ${POPQ_NAVER_SELLER_REDIRECT_URI:}
 
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}

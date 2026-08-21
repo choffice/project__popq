@@ -6,6 +6,7 @@ import {
   loginAccount,
   loginSellerSocial,
   loginSellerWithKakaoCode,
+  loginSellerWithNaverCode,
   reopenSellerStore,
   signUpSeller,
 } from "../../services/api";
@@ -18,6 +19,10 @@ import type {
 } from "../../types";
 import { renderGoogleSellerButton } from "./googleSellerAuth";
 import { startKakaoSellerLogin } from "./kakaoSellerAuth";
+import {
+  consumeNaverSellerState,
+  startNaverSellerLogin,
+} from "./naverSellerAuth";
 
 type AuthMode = "seller-login" | "admin-login" | "signup";
 
@@ -77,6 +82,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [mode, setMode] = useState<AuthMode>("seller-login");
   const googleButtonRef = useRef<HTMLDivElement>(null);
   const kakaoCodeHandledRef = useRef(false);
+  const naverCodeHandledRef = useRef(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -185,6 +191,23 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     }
   }
 
+  function handleNaverLogin() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+
+    try {
+      startNaverSellerLogin();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "네이버 로그인을 시작하지 못했습니다.",
+      );
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (mode !== "seller-login" || !googleButtonRef.current) {
       return;
@@ -254,6 +277,58 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       .finally(() => setBusy(false));
 
     // 카카오 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const redirectUri = import.meta.env.VITE_NAVER_REDIRECT_URI?.trim();
+    if (!redirectUri || naverCodeHandledRef.current) {
+      return;
+    }
+
+    const callbackUrl = new URL(redirectUri, window.location.origin);
+    if (window.location.pathname !== callbackUrl.pathname) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const authorizationCode = params.get("code");
+    const receivedState = params.get("state");
+    const oauthError = params.get("error_description") ?? params.get("error");
+
+    naverCodeHandledRef.current = true;
+    window.history.replaceState({}, document.title, "/");
+
+    if (oauthError) {
+      setError(`네이버 로그인이 취소되었거나 실패했습니다: ${oauthError}`);
+      return;
+    }
+
+    if (!authorizationCode || !receivedState) {
+      setError("네이버 인증코드 또는 state를 받지 못했습니다.");
+      return;
+    }
+
+    if (!consumeNaverSellerState(receivedState)) {
+      setError("네이버 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+
+    void loginSellerWithNaverCode(authorizationCode, receivedState)
+      .then((auth) => completeSellerAuthentication(auth))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "네이버 로그인에 실패했습니다.",
+        );
+      })
+      .finally(() => setBusy(false));
+
+    // 네이버 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -946,7 +1021,8 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
                 type="button"
                 className="seller-social-button"
                 aria-label="네이버로 판매자 로그인"
-                disabled
+                onClick={handleNaverLogin}
+                disabled={busy}
               >
                 <img src="/images/social/naver_n.png" alt="" />
               </button>

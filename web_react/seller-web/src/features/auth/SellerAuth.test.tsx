@@ -17,6 +17,7 @@ describe("판매자 웹 인증", () => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    window.sessionStorage.clear();
     window.history.replaceState({}, "", "/");
   });
 
@@ -451,6 +452,119 @@ describe("판매자 웹 인증", () => {
     );
     expect(window.location.pathname).toBe("/");
     expect(window.location.search).toBe("");
+  });
+
+  it("일치하는 네이버 state로 판매자 로그인을 완료한다", async () => {
+    vi.stubEnv(
+      "VITE_NAVER_REDIRECT_URI",
+      "http://localhost:5174/auth/naver/callback",
+    );
+    window.sessionStorage.setItem(
+      "popq.naver.seller.state",
+      "expected-naver-state",
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/naver/callback?code=naver-code&state=expected-naver-state",
+    );
+
+    const onAuthenticated = vi.fn();
+    const fetchMock = vi
+      .spyOn(window, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessToken: "naver-seller-token",
+              tokenType: "Bearer",
+              expiresIn: 3600,
+              user: {
+                userId: 51,
+                email: "naver-seller@popq.test",
+                name: "네이버 판매자",
+                role: "SELLER",
+                status: "ACTIVE",
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [
+              {
+                storeId: 52,
+                storeType: "LOCAL_STORE",
+                name: "네이버 매장",
+                description: null,
+                status: "ACTIVE",
+                businessStatus: "OPEN",
+                myRole: "OWNER",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    render(
+      <SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(onAuthenticated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storeId: 52,
+          accessToken: "naver-seller-token",
+          storeName: "네이버 매장",
+        }),
+      );
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/auth/social/naver/code",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          code: "naver-code",
+          state: "expected-naver-state",
+        }),
+      }),
+    );
+    expect(window.sessionStorage.getItem("popq.naver.seller.state")).toBeNull();
+    expect(window.location.pathname).toBe("/");
+    expect(window.location.search).toBe("");
+  });
+
+  it("일치하지 않는 네이버 state는 백엔드 호출 없이 차단한다", async () => {
+    vi.stubEnv(
+      "VITE_NAVER_REDIRECT_URI",
+      "http://localhost:5174/auth/naver/callback",
+    );
+    window.sessionStorage.setItem(
+      "popq.naver.seller.state",
+      "expected-naver-state",
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/naver/callback?code=naver-code&state=changed-state",
+    );
+    const fetchMock = vi.spyOn(window, "fetch");
+
+    render(<SellerAuth onAuthenticated={vi.fn()} onUseDemo={vi.fn()} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "네이버 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem("popq.naver.seller.state")).toBeNull();
   });
 
   it("Google 소셜 로그인 실패 메시지를 표시한다", async () => {

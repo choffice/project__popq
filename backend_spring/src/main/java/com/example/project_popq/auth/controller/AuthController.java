@@ -11,6 +11,7 @@ import com.example.project_popq.auth.dto.FindIdRequest;
 import com.example.project_popq.auth.dto.FindIdResponse;
 import com.example.project_popq.auth.dto.LoginRequest;
 import com.example.project_popq.auth.dto.KakaoCodeLoginRequest;
+import com.example.project_popq.auth.dto.NaverCodeLoginRequest;
 import com.example.project_popq.auth.dto.PasswordResetConfirmRequest;
 import com.example.project_popq.auth.dto.PasswordResetVerifyRequest;
 import com.example.project_popq.auth.dto.SignupRequest;
@@ -112,6 +113,15 @@ public class AuthController {
     ) {
         return ApiResponse.success(
             socialAuthService.loginWithKakaoCode(request)
+        );
+    }
+
+    @PostMapping("/social/naver/code")
+    public ApiResponse<AuthTokenResponse> naverCodeLogin(
+        @Valid @RequestBody NaverCodeLoginRequest request
+    ) {
+        return ApiResponse.success(
+            socialAuthService.loginWithNaverCode(request)
         );
     }
 

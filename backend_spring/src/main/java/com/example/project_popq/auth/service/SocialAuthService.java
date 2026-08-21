@@ -3,6 +3,7 @@ package com.example.project_popq.auth.service;
 import com.example.project_popq.auth.dto.AuthTokenResponse;
 import com.example.project_popq.auth.dto.AuthUserResponse;
 import com.example.project_popq.auth.dto.KakaoCodeLoginRequest;
+import com.example.project_popq.auth.dto.NaverCodeLoginRequest;
 import com.example.project_popq.auth.dto.SocialLoginRequest;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedAccessToken;
 import com.example.project_popq.auth.social.GoogleIdTokenVerifier;
@@ -26,6 +27,7 @@ import com.example.project_popq.auth.social.KakaoAccessTokenVerifier;
 import com.example.project_popq.auth.social.KakaoAuthorizationCodeClient;
 import com.example.project_popq.auth.social.KakaoIdentity;
 import com.example.project_popq.auth.social.NaverAccessTokenVerifier;
+import com.example.project_popq.auth.social.NaverAuthorizationCodeClient;
 import com.example.project_popq.auth.social.NaverIdentity;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedRefreshToken;
 
@@ -39,6 +41,7 @@ public class SocialAuthService {
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
   private final KakaoAuthorizationCodeClient kakaoAuthorizationCodeClient;
   private final KakaoAccessTokenVerifier kakaoAccessTokenVerifier;
+  private final NaverAuthorizationCodeClient naverAuthorizationCodeClient;
   private final NaverAccessTokenVerifier naverAccessTokenVerifier;
   private final JwtTokenService jwtTokenService;
 
@@ -90,6 +93,22 @@ public class SocialAuthService {
 
     return login(new SocialLoginRequest(
         SocialProvider.KAKAO,
+        accessToken,
+        PlatformRole.SELLER
+    ));
+  }
+
+  @Transactional
+  public AuthTokenResponse loginWithNaverCode(
+      NaverCodeLoginRequest request
+  ) {
+    String accessToken = naverAuthorizationCodeClient.exchange(
+        request.code(),
+        request.state()
+    );
+
+    return login(new SocialLoginRequest(
+        SocialProvider.NAVER,
         accessToken,
         PlatformRole.SELLER
     ));
