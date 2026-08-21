@@ -65,6 +65,10 @@ popq:
     rest-api-base-url: ${POPQ_KAKAO_REST_API_BASE_URL:https://dapi.kakao.com}
     rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
 
+  public-holiday:
+    base-url: ${POPQ_PUBLIC_HOLIDAY_BASE_URL:https://apis.data.go.kr}
+    service-key: ${POPQ_PUBLIC_HOLIDAY_SERVICE_KEY:}
+
   security:
     jwt:
       issuer: ${POPQ_JWT_ISSUER:popq}

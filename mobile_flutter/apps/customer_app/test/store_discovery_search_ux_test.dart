@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:popq_customer_app/src/features/discovery/customer_store_schedule.dart';
 import 'package:popq_customer_app/src/features/discovery/store_discovery_controller.dart';
 import 'package:popq_customer_app/src/features/discovery/store_discovery_repository.dart';
 import 'package:popq_customer_app/src/features/discovery/store_discovery_screen.dart';
@@ -124,11 +125,7 @@ void main() {
           debounceDuration: Duration.zero,
         );
     addTearDown(loadedController.dispose);
-    loadedController.schedule(
-      query: '지우기',
-      location: _location,
-      radiusKm: 10,
-    );
+    loadedController.schedule(query: '지우기', location: _location, radiusKm: 10);
     await tester.pump();
     expect(loadedController.results, isNotEmpty);
 
@@ -231,6 +228,28 @@ void main() {
     );
   });
 
+  test('영업중 필터는 OPEN 상태여도 공휴일 휴무인 업체를 제외한다', () {
+    final CustomerStore holidayStore = _store(
+      id: 54,
+      name: '공휴일 휴무 매장',
+      type: 'LOCAL_STORE',
+      schedule: _publicHolidaySchedule(),
+    );
+    final CustomerStore ordinaryStore = _store(
+      id: 55,
+      name: '정상 영업 매장',
+      type: 'LOCAL_STORE',
+    );
+
+    expect(
+      filterStoreSearchSuggestions(
+        stores: <CustomerStore>[holidayStore, ordinaryStore],
+        openOnly: true,
+      ).map((store) => store.storeId),
+      <int>[55],
+    );
+  });
+
   testWidgets('EVENT 추천은 스토어명과 행사명을 서로 구분해 표시한다', (tester) async {
     tester.view.physicalSize = const Size(390, 720);
     tester.view.devicePixelRatio = 1;
@@ -273,6 +292,7 @@ CustomerStore _store({
   required String type,
   String status = 'OPEN',
   String? eventName,
+  CustomerStoreSchedule? schedule,
 }) {
   return CustomerStore(
     storeId: id,
@@ -280,8 +300,47 @@ CustomerStore _store({
     name: name,
     eventName: eventName,
     businessStatus: status,
+    openTime: '00:00:00',
+    closeTime: '00:00:00',
     tags: const <String>[],
+    schedule: schedule,
   );
+}
+
+CustomerStoreSchedule _publicHolidaySchedule() {
+  const List<String> weekdays = <String>[
+    'MONDAY',
+    'TUESDAY',
+    'WEDNESDAY',
+    'THURSDAY',
+    'FRIDAY',
+    'SATURDAY',
+    'SUNDAY',
+  ];
+  final DateTime koreaToday = DateTime.now().toUtc().add(
+    const Duration(hours: 9),
+  );
+  final String evaluationDate =
+      '${koreaToday.year.toString().padLeft(4, '0')}-'
+      '${koreaToday.month.toString().padLeft(2, '0')}-'
+      '${koreaToday.day.toString().padLeft(2, '0')}';
+  return CustomerStoreSchedule.fromJson(<String, Object?>{
+    'businessHours': <Object?>[
+      for (final String day in weekdays)
+        <String, Object?>{
+          'dayOfWeek': day,
+          'closed': false,
+          'open24Hours': true,
+        },
+    ],
+    'closureRules': const <Object?>[
+      <String, Object?>{'ruleType': 'PUBLIC_HOLIDAY'},
+    ],
+    'scheduleExceptions': const <Object?>[],
+    'publicHolidayAutoCalculationAvailable': true,
+    'publicHolidayEvaluationDate': evaluationDate,
+    'publicHoliday': true,
+  });
 }
 
 class _SearchRepository implements StoreDiscoveryRepository {

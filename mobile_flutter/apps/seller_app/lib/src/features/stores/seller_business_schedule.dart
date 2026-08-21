@@ -353,7 +353,11 @@ class _SellerBusinessScheduleEditorState
         CheckboxListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('공휴일 휴무'),
-          subtitle: const Text('정책은 저장되지만 현재 자동 공휴일 판정 데이터는 없습니다.'),
+          subtitle: Text(
+            _publicHolidayAutoCalculationAvailable
+                ? '대한민국 공휴일에는 자동으로 휴무 처리됩니다.'
+                : '정책은 저장되지만 현재 자동 공휴일 판정 데이터는 없습니다.',
+          ),
           value: _rules.any((value) => value.ruleType == 'PUBLIC_HOLIDAY'),
           onChanged: widget.enabled ? _togglePublicHoliday : null,
         ),

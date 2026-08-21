@@ -76,6 +76,8 @@ class CustomerStoreSchedule {
     List<CustomerStoreClosureRule> closureRules = const [],
     List<CustomerStoreScheduleException> scheduleExceptions = const [],
     this.publicHolidayAutoCalculationAvailable = false,
+    this.publicHolidayEvaluationDate,
+    this.publicHoliday = false,
   }) : businessHours = List.unmodifiable(businessHours),
        closureRules = List.unmodifiable(closureRules),
        scheduleExceptions = List.unmodifiable(scheduleExceptions);
@@ -115,6 +117,9 @@ class CustomerStoreSchedule {
                   .toList(growable: false),
           publicHolidayAutoCalculationAvailable:
               json['publicHolidayAutoCalculationAvailable'] as bool? ?? false,
+          publicHolidayEvaluationDate:
+              _parseDate(json['publicHolidayEvaluationDate']),
+          publicHoliday: json['publicHoliday'] as bool? ?? false,
         );
       }
     }
@@ -145,6 +150,8 @@ class CustomerStoreSchedule {
   final List<CustomerStoreClosureRule> closureRules;
   final List<CustomerStoreScheduleException> scheduleExceptions;
   final bool publicHolidayAutoCalculationAvailable;
+  final DateTime? publicHolidayEvaluationDate;
+  final bool publicHoliday;
 
   bool isOpenAt({DateTime? now}) {
     final koreaNow = (now ?? DateTime.now()).toUtc().add(
@@ -195,6 +202,8 @@ class CustomerStoreSchedule {
         !date.isAfter(_dateOnly(value.endDate)));
     if (exceptionClosed) return true;
 
+    if (_isPublicHoliday(date)) return true;
+
     final day = _weekdayFor(date.weekday);
     final week = ((date.day - 1) ~/ 7) + 1;
     return closureRules.any((value) =>
@@ -214,6 +223,8 @@ class CustomerStoreSchedule {
       final memo = exception.memo?.trim() ?? '';
       return memo.isEmpty ? '오늘 임시휴무' : '오늘 임시휴무 · $memo';
     }
+
+    if (_isPublicHoliday(date)) return '오늘 공휴일 휴무';
 
     final day = _weekdayFor(date.weekday);
     final week = ((date.day - 1) ~/ 7) + 1;
@@ -276,6 +287,15 @@ class CustomerStoreSchedule {
     }
     return lines;
   }
+
+  bool _isPublicHoliday(DateTime date) {
+    final evaluationDate = publicHolidayEvaluationDate;
+    return publicHolidayAutoCalculationAvailable &&
+        publicHoliday &&
+        evaluationDate != null &&
+        _sameDate(date, evaluationDate) &&
+        closureRules.any((value) => value.ruleType == 'PUBLIC_HOLIDAY');
+  }
 }
 
 const _weekdays = <String>[
@@ -309,6 +329,10 @@ bool _sameDays(List<String> left, List<String> right) =>
 bool _sameDate(DateTime left, DateTime right) =>
     left.year == right.year && left.month == right.month && left.day == right.day;
 DateTime _dateOnly(DateTime value) => DateTime(value.year, value.month, value.day);
+DateTime? _parseDate(Object? value) {
+  if (value is! String || value.trim().isEmpty) return null;
+  return DateTime.tryParse(value.trim());
+}
 String _dateText(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-'
     '${value.month.toString().padLeft(2, '0')}-'
