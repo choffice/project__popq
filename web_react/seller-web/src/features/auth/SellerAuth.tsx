@@ -5,6 +5,7 @@ import {
   getSellerStores,
   loginAccount,
   loginSellerSocial,
+  loginSellerWithKakaoCode,
   reopenSellerStore,
   signUpSeller,
 } from "../../services/api";
@@ -16,6 +17,7 @@ import type {
   StoreType,
 } from "../../types";
 import { renderGoogleSellerButton } from "./googleSellerAuth";
+import { startKakaoSellerLogin } from "./kakaoSellerAuth";
 
 type AuthMode = "seller-login" | "admin-login" | "signup";
 
@@ -74,6 +76,7 @@ const EMPTY_FIRST_STORE: FirstStoreDraft = {
 export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [mode, setMode] = useState<AuthMode>("seller-login");
   const googleButtonRef = useRef<HTMLDivElement>(null);
+  const kakaoCodeHandledRef = useRef(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -165,6 +168,23 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     }
   }
 
+  async function handleKakaoLogin() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+
+    try {
+      await startKakaoSellerLogin();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "카카오 로그인을 시작하지 못했습니다.",
+      );
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (mode !== "seller-login" || !googleButtonRef.current) {
       return;
@@ -197,6 +217,45 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     // 판매자 탭에 진입할 때 Google 버튼을 다시 렌더링합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
+
+  useEffect(() => {
+    const redirectUri = import.meta.env.VITE_KAKAO_REDIRECT_URI?.trim();
+    if (!redirectUri || kakaoCodeHandledRef.current) {
+      return;
+    }
+
+    const callbackUrl = new URL(redirectUri, window.location.origin);
+    if (window.location.pathname !== callbackUrl.pathname) {
+      return;
+    }
+
+    const authorizationCode = new URLSearchParams(window.location.search).get(
+      "code",
+    );
+    if (!authorizationCode) {
+      setError("카카오 인증코드를 받지 못했습니다.");
+      return;
+    }
+
+    kakaoCodeHandledRef.current = true;
+    setBusy(true);
+    setError(null);
+    window.history.replaceState({}, document.title, "/");
+
+    void loginSellerWithKakaoCode(authorizationCode)
+      .then((auth) => completeSellerAuthentication(auth))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "카카오 로그인에 실패했습니다.",
+        );
+      })
+      .finally(() => setBusy(false));
+
+    // 카카오 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -877,7 +936,8 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
                 type="button"
                 className="seller-social-button"
                 aria-label="카카오로 판매자 로그인"
-                disabled
+                onClick={() => void handleKakaoLogin()}
+                disabled={busy}
               >
                 <img src="/images/social/kakao_k.png" alt="" />
               </button>

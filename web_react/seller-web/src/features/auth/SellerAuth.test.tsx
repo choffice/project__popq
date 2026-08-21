@@ -16,6 +16,8 @@ describe("판매자 웹 인증", () => {
     cleanup();
     vi.clearAllMocks();
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    window.history.replaceState({}, "", "/");
   });
 
   it("판매자 앱과 같은 회원가입 계약을 사용한다", async () => {
@@ -360,6 +362,95 @@ describe("판매자 웹 인증", () => {
         name: "판매자 소셜 로그인",
       }),
     ).not.toBeInTheDocument();
+  });
+
+  it("카카오 콜백 인증코드로 판매자 로그인을 완료한다", async () => {
+    vi.stubEnv(
+      "VITE_KAKAO_REDIRECT_URI",
+      "http://localhost:5174/auth/kakao/callback",
+    );
+    window.history.replaceState(
+      {},
+      "",
+      "/auth/kakao/callback?code=kakao-authorization-code",
+    );
+
+    const onAuthenticated = vi.fn();
+    const fetchMock = vi
+      .spyOn(window, "fetch")
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              accessToken: "kakao-seller-token",
+              tokenType: "Bearer",
+              expiresIn: 3600,
+              user: {
+                userId: 41,
+                email: "kakao-seller@popq.test",
+                name: "카카오 판매자",
+                role: "SELLER",
+                status: "ACTIVE",
+              },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            success: true,
+            data: [
+              {
+                storeId: 42,
+                storeType: "LOCAL_STORE",
+                name: "카카오 매장",
+                description: null,
+                status: "ACTIVE",
+                businessStatus: "OPEN",
+                myRole: "OWNER",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    render(
+      <SellerAuth onAuthenticated={onAuthenticated} onUseDemo={vi.fn()} />,
+    );
+
+    await waitFor(() => {
+      expect(onAuthenticated).toHaveBeenCalledWith(
+        expect.objectContaining({
+          storeId: 42,
+          accessToken: "kakao-seller-token",
+          storeName: "카카오 매장",
+        }),
+      );
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/auth/social/kakao/code",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ code: "kakao-authorization-code" }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/seller/stores",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Bearer kakao-seller-token",
+        }),
+      }),
+    );
+    expect(window.location.pathname).toBe("/");
+    expect(window.location.search).toBe("");
   });
 
   it("Google 소셜 로그인 실패 메시지를 표시한다", async () => {

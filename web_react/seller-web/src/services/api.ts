@@ -92,6 +92,13 @@ export function loginSellerSocial(
   });
 }
 
+export function loginSellerWithKakaoCode(code: string) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/kakao/code", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
 export function signUpSeller(payload: {
   email: string;
   password: string;

@@ -86,6 +86,10 @@ popq:
       client-id: ${POPQ_GOOGLE_CLIENT_ID}
     kakao:
       api-base-url: ${POPQ_KAKAO_API_BASE_URL:https://kapi.kakao.com}
+      auth-base-url: ${POPQ_KAKAO_AUTH_BASE_URL:https://kauth.kakao.com}
+      rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
+      client-secret: ${POPQ_KAKAO_CLIENT_SECRET:}
+      seller-redirect-uri: ${POPQ_KAKAO_SELLER_REDIRECT_URI:}
       customer-app-id: ${POPQ_KAKAO_CUSTOMER_APP_ID:0}
       seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID:0}
     naver:
