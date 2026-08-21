@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'seller_support_faq.dart';
@@ -24,7 +26,11 @@ class SellerSupportScreen extends StatefulWidget {
 class _SellerSupportScreenState extends State<SellerSupportScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  Timer? _faqPollingTimer;
+  bool _faqPollingInProgress = false;
+
   List<SellerSupportFaq> _faqs = const [];
+
   bool _loading = true;
   String? _errorMessage;
   int? _expandedFaqId;
@@ -33,10 +39,12 @@ class _SellerSupportScreenState extends State<SellerSupportScreen> {
   void initState() {
     super.initState();
     _loadPopularFaqs();
+    _startFaqPolling();
   }
 
   @override
   void dispose() {
+    _faqPollingTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -68,6 +76,49 @@ class _SellerSupportScreenState extends State<SellerSupportScreen> {
         _loading = false;
         _errorMessage = '자주 묻는 질문을 불러오지 못했어요.';
       });
+    }
+  }
+
+  void _startFaqPolling() {
+    _faqPollingTimer?.cancel();
+
+    _faqPollingTimer = Timer.periodic(
+      const Duration(seconds: 5),
+          (_) => unawaited(_refreshFaqsSilently()),
+    );
+  }
+
+  Future<void> _refreshFaqsSilently() async {
+    if (!mounted || _faqPollingInProgress) {
+      return;
+    }
+
+    _faqPollingInProgress = true;
+
+    try {
+      final keyword = _searchController.text.trim();
+
+      final faqs = keyword.isEmpty
+          ? await widget.repository.getPopularFaqs()
+          : await widget.repository.getFaqs(keyword: keyword);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _faqs = faqs;
+        _errorMessage = null;
+
+        if (_expandedFaqId != null &&
+            !faqs.any((faq) => faq.faqId == _expandedFaqId)) {
+          _expandedFaqId = null;
+        }
+      });
+    } catch (_) {
+      // 자동 갱신 실패 시 기존 FAQ를 그대로 유지합니다.
+    } finally {
+      _faqPollingInProgress = false;
     }
   }
 

@@ -10,6 +10,11 @@ import org.springframework.data.repository.query.Param;
 
 public interface FaqRepository extends JpaRepository<Faq, Long>, JpaSpecificationExecutor<Faq> {
 
+    boolean existsByAudienceAndQuestion(
+        AppAudience audience,
+        String question
+    );
+
     @Query("""
             select faq
             from Faq faq
@@ -18,4 +23,5 @@ public interface FaqRepository extends JpaRepository<Faq, Long>, JpaSpecificatio
             order by faq.displayOrder asc, faq.id asc
             """)
     List<Faq> findPublished(@Param("audience") AppAudience audience);
+
 }

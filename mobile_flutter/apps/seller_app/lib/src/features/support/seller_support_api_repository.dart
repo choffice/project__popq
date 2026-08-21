@@ -6,26 +6,42 @@ import 'seller_support_ticket.dart';
 import 'seller_support_types.dart';
 
 class ApiSellerSupportRepository implements SellerSupportRepository {
-  ApiSellerSupportRepository(
-    this._apiClient, {
-    required SellerSupportRepository faqRepository,
-  }) : _faqRepository = faqRepository;
+  ApiSellerSupportRepository(this._apiClient);
 
   static const String _ticketPath = '/api/v1/support/tickets';
+  static const String _faqPath = '/api/v1/public/content/faqs';
 
   final PopqApiClient _apiClient;
 
-  /// FAQ 공통 API가 연결되기 전까지 기존 메모리 FAQ를 사용합니다.
-  final SellerSupportRepository _faqRepository;
-
   @override
   Future<List<SellerSupportFaq>> getPopularFaqs() {
-    return _faqRepository.getPopularFaqs();
+    return getFaqs();
   }
 
   @override
-  Future<List<SellerSupportFaq>> getFaqs({String? keyword}) {
-    return _faqRepository.getFaqs(keyword: keyword);
+  Future<List<SellerSupportFaq>> getFaqs({String? keyword}) async {
+    final faqs = await _apiClient.get(
+      _faqPath,
+      query: const <String, Object?>{
+        'audience': 'SELLER_APP',
+      },
+      decode: _decodeFaqList,
+    );
+
+    final normalizedKeyword = keyword?.trim().toLowerCase();
+
+    if (normalizedKeyword == null || normalizedKeyword.isEmpty) {
+      return faqs;
+    }
+
+    return faqs
+        .where(
+          (faq) =>
+          faq.question.toLowerCase().contains(normalizedKeyword) ||
+          faq.answer.toLowerCase().contains(normalizedKeyword) ||
+          faq.category.toLowerCase().contains(normalizedKeyword),
+    )
+        .toList(growable: false);
   }
 
   @override
@@ -107,6 +123,16 @@ class ApiSellerSupportRepository implements SellerSupportRepository {
     // 현재 공통 티켓 백엔드에는 읽음 처리 API가 없습니다.
     // 상세 내용을 다시 조회해 현재 서버 상태를 반환합니다.
     return getMyTicket(supportTicketId);
+  }
+
+  List<SellerSupportFaq> _decodeFaqList(Object? value) {
+    return (value as List<Object?>)
+        .map(
+          (item) => SellerSupportFaq.fromJson(
+        Map<String, Object?>.from(item as Map),
+      ),
+    )
+        .toList(growable: false);
   }
 
   SellerSupportTicketDetail _decodeTicketDetail(Object? value) {
