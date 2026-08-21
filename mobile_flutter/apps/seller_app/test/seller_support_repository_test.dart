@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:popq_app_core/popq_app_core.dart';
-import 'package:popq_seller_app/src/features/support/seller_support_repository.dart';
+import 'package:popq_seller_app/src/features/support/seller_support_api_repository.dart';
 import 'package:popq_seller_app/src/features/support/seller_support_types.dart';
 
 void main() {
