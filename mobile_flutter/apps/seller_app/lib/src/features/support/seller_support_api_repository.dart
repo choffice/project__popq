@@ -37,10 +37,10 @@ class ApiSellerSupportRepository implements SellerSupportRepository {
     return faqs
         .where(
           (faq) =>
-          faq.question.toLowerCase().contains(normalizedKeyword) ||
-          faq.answer.toLowerCase().contains(normalizedKeyword) ||
-          faq.category.toLowerCase().contains(normalizedKeyword),
-    )
+              faq.question.toLowerCase().contains(normalizedKeyword) ||
+              faq.answer.toLowerCase().contains(normalizedKeyword) ||
+              faq.category.toLowerCase().contains(normalizedKeyword),
+        )
         .toList(growable: false);
   }
 
@@ -75,7 +75,6 @@ class ApiSellerSupportRepository implements SellerSupportRepository {
       query: const <String, Object?>{'page': 0, 'size': 100},
       decode: (value) {
         final page = Map<String, Object?>.from(value as Map);
-
         final content = page['content'] as List<Object?>;
 
         return content
@@ -120,18 +119,19 @@ class ApiSellerSupportRepository implements SellerSupportRepository {
   Future<SellerSupportTicketDetail> markTicketAsRead(int supportTicketId) {
     _validateTicketId(supportTicketId);
 
-    // 현재 공통 티켓 백엔드에는 읽음 처리 API가 없습니다.
-    // 상세 내용을 다시 조회해 현재 서버 상태를 반환합니다.
-    return getMyTicket(supportTicketId);
+    return _apiClient.post(
+      '$_ticketPath/$supportTicketId/read',
+      decode: _decodeTicketDetail,
+    );
   }
 
   List<SellerSupportFaq> _decodeFaqList(Object? value) {
     return (value as List<Object?>)
         .map(
           (item) => SellerSupportFaq.fromJson(
-        Map<String, Object?>.from(item as Map),
-      ),
-    )
+            Map<String, Object?>.from(item as Map),
+          ),
+        )
         .toList(growable: false);
   }
 

@@ -113,6 +113,21 @@ class _SellerSupportTicketListScreenState
     }
   }
 
+
+  Future<void> _markTicketAsReadAndRefresh(int supportTicketId) async {
+    try {
+      await widget.repository.markTicketAsRead(supportTicketId);
+
+      if (!mounted) {
+        return;
+      }
+
+      await _loadTickets();
+    } catch (_) {
+      // 읽음 처리 실패가 문의 상세 진입을 막지 않도록 합니다.
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -170,6 +185,12 @@ class _SellerSupportTicketListScreenState
             ticket: ticket,
             onTap: () {
               widget.onTicketTap(ticket.supportTicketId);
+
+              if (ticket.hasUnreadMessages) {
+                unawaited(
+                  _markTicketAsReadAndRefresh(ticket.supportTicketId),
+                );
+              }
             },
           );
         },
