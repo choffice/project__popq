@@ -42,6 +42,7 @@ type QrArtifact = Pick<
 
 type ArtifactMode = 'issued' | 'stored' | 'reissued'
 type ListMode = 'current' | 'archived'
+type QrConfirmation = { kind: 'reissue' | 'archive' | 'revoke'; code: QrCodeSummary } | null
 
 const STATUS_LABEL = {
   ACTIVE: '사용 중',
@@ -75,6 +76,7 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
   const [artifactMode, setArtifactMode] = useState<ArtifactMode>('stored')
   const [qrImage, setQrImage] = useState('')
   const [listMode, setListMode] = useState<ListMode>('current')
+  const [confirmation, setConfirmation] = useState<QrConfirmation>(null)
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -271,13 +273,6 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
   }
 
   async function reissue(code: QrCodeSummary) {
-    if (
-      !window.confirm(
-        '기존 QR은 즉시 폐기되고 새 QR로 교체됩니다. 계속할까요?',
-      )
-    ) {
-      return
-    }
     const expiration =
       code.expiresAt && isFutureExpiration(code.expiresAt)
         ? code.expiresAt
@@ -399,13 +394,6 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
   }
 
   async function archiveCode(code: QrCodeSummary) {
-    if (
-      !window.confirm(
-        '폐기된 QR을 현재 목록에서 제거하고 폐기함으로 이동할까요?',
-      )
-    ) {
-      return
-    }
     setProcessingId(code.qrCodeId)
     try {
       const updated = isDemo
@@ -455,12 +443,6 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
     code: QrCodeSummary,
     action: 'activate' | 'deactivate' | 'revoke',
   ) {
-    if (
-      action === 'revoke' &&
-      !window.confirm('이 QR을 폐기하면 다시 활성화할 수 없습니다. 계속할까요?')
-    ) {
-      return
-    }
     setProcessingId(code.qrCodeId)
     try {
       let updated: QrCodeSummary
@@ -614,7 +596,7 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
                       <button
                         className="vault-action needs-reissue"
                         disabled={processingId === code.qrCodeId}
-                        onClick={() => void reissue(code)}
+                        onClick={() => setConfirmation({ kind: 'reissue', code })}
                       >
                         재발급 필요
                       </button>
@@ -639,7 +621,7 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
                       <button
                         className="archive-action"
                         disabled={processingId === code.qrCodeId}
-                        onClick={() => void archiveCode(code)}
+                        onClick={() => setConfirmation({ kind: 'archive', code })}
                       >
                         목록에서 제거
                       </button>
@@ -648,7 +630,7 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
                       <button
                         className="danger-text"
                         disabled={processingId === code.qrCodeId}
-                        onClick={() => void changeStatus(code, 'revoke')}
+                        onClick={() => setConfirmation({ kind: 'revoke', code })}
                       >
                         폐기
                       </button>
@@ -659,6 +641,30 @@ export function QrManagement({ connection, storeRole, onError }: Props) {
             </article>
           ))}
         </section>
+      )}
+
+
+      {confirmation && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="qr-confirm-title">
+            <button className="modal-close" aria-label="닫기" onClick={() => setConfirmation(null)}>×</button>
+            <p className="eyebrow">QR ACTION</p>
+            <h2 id="qr-confirm-title">
+              {confirmation.kind === 'reissue' ? 'QR 재발급' : confirmation.kind === 'archive' ? 'QR 목록에서 제거' : 'QR 폐기'}
+            </h2>
+            <p>
+              {confirmation.kind === 'reissue'
+                ? '기존 QR은 즉시 폐기되고 새 QR로 교체됩니다. 계속할까요?'
+                : confirmation.kind === 'archive'
+                  ? '폐기된 QR을 현재 목록에서 제거하고 폐기함으로 이동할까요?'
+                  : '이 QR을 폐기하면 다시 활성화할 수 없습니다. 계속할까요?'}
+            </p>
+            <button className="secondary-action" disabled={processingId != null} onClick={() => setConfirmation(null)}>취소</button>
+            <button className="reject-action" style={{ width: '100%', marginTop: 8 }} disabled={processingId != null} onClick={() => { const target = confirmation; setConfirmation(null); if (target.kind === 'reissue') void reissue(target.code); else if (target.kind === 'archive') void archiveCode(target.code); else void changeStatus(target.code, 'revoke') }}>
+              {confirmation.kind === 'reissue' ? '재발급하기' : confirmation.kind === 'archive' ? '목록에서 제거' : '폐기하기'}
+            </button>
+          </section>
+        </div>
       )}
 
       {showIssue && (

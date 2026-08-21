@@ -15,6 +15,11 @@ import type {
   StoreRole,
 } from '../../types'
 
+type ReviewConfirmation =
+  | { kind: 'reply'; review: SellerReview }
+  | { kind: 'template'; templateId: number }
+  | null
+
 type Props = {
   connection: SellerConnection | null
   storeRole?: StoreRole
@@ -54,6 +59,7 @@ export function ReviewManagement({ connection, storeRole, onError }: Props) {
   const [showTemplates, setShowTemplates] = useState(false)
   const [templateContent, setTemplateContent] = useState('')
   const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null)
+  const [confirmation, setConfirmation] = useState<ReviewConfirmation>(null)
 
   const load = useCallback(async () => {
     if (!connection) {
@@ -111,7 +117,7 @@ export function ReviewManagement({ connection, storeRole, onError }: Props) {
   }
 
   async function removeReply(review: SellerReview) {
-    if (!canReply || !window.confirm('등록한 리뷰 답글을 삭제할까요?')) return
+    if (!canReply) return
     setProcessing(true)
     try {
       const saved = isDemo
@@ -148,7 +154,7 @@ export function ReviewManagement({ connection, storeRole, onError }: Props) {
   }
 
   async function removeTemplate(templateId: number) {
-    if (!connection || !window.confirm('이 답글 템플릿을 삭제할까요?')) return
+    if (!connection) return
     setProcessing(true)
     try {
       await deleteSellerReviewReplyTemplate(connection, templateId)
@@ -180,12 +186,14 @@ export function ReviewManagement({ connection, storeRole, onError }: Props) {
           <header><div><strong>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</strong><span>{review.authorName}</span></div><time>{new Date(review.createdAt).toLocaleDateString('ko-KR')}</time></header>
           <p>{review.content?.trim() || '작성된 리뷰 내용이 없습니다.'}</p>
           <small>주문 #{review.orderPublicId.slice(-8)}</small>
-          {review.sellerReply ? <div className="seller-review-reply"><strong>판매자 답글</strong><p>{review.sellerReply}</p>{canReply && <div><button className="secondary-action" onClick={() => openReply(review)}>수정</button><button className="danger-action" disabled={processing} onClick={() => void removeReply(review)}>삭제</button></div>}</div> : canReply && <button className="primary-action" onClick={() => openReply(review)}>답글 작성</button>}
+          {review.sellerReply ? <div className="seller-review-reply"><strong>판매자 답글</strong><p>{review.sellerReply}</p>{canReply && <div><button className="secondary-action" onClick={() => openReply(review)}>수정</button><button className="danger-action" disabled={processing} onClick={() => setConfirmation({ kind: 'reply', review })}>삭제</button></div>}</div> : canReply && <button className="primary-action" onClick={() => openReply(review)}>답글 작성</button>}
         </article>)}
         {reviews.length === 0 && <div className="management-empty">조건에 맞는 리뷰가 없습니다.</div>}
       </section>}
       {editingReview && <div className="modal-backdrop" role="presentation"><section className="connection-modal review-reply-modal" role="dialog" aria-modal="true" aria-labelledby="review-reply-title"><button className="modal-close" aria-label="닫기" onClick={() => setEditingReview(null)}>×</button><p className="eyebrow">REVIEW REPLY</p><h2 id="review-reply-title">{editingReview.sellerReply ? '답글 수정' : '답글 작성'}</h2>{templates.length > 0 && <label>템플릿<select value="" onChange={(event) => { const template = templates.find((item) => item.templateId === Number(event.target.value)); if (template) setReply(template.content) }}><option value="">템플릿 선택</option>{templates.map((template) => <option key={template.templateId} value={template.templateId}>{template.content}</option>)}</select></label>}<label>답글<textarea maxLength={1000} rows={6} value={reply} onChange={(event) => setReply(event.target.value)} /></label><button className="primary-action" disabled={processing || !reply.trim()} onClick={() => void saveReply()}>{processing ? '저장 중…' : '답글 저장'}</button></section></div>}
-      {showTemplates && <div className="modal-backdrop" role="presentation"><section className="connection-modal review-reply-modal" role="dialog" aria-modal="true" aria-labelledby="review-template-title"><button className="modal-close" aria-label="닫기" onClick={() => setShowTemplates(false)}>×</button><p className="eyebrow">REPLY TEMPLATES</p><h2 id="review-template-title">답글 템플릿</h2><div className="reply-template-list">{templates.map((template) => <article key={template.templateId}><p>{template.content}</p><div><button className="secondary-action" onClick={() => { setEditingTemplateId(template.templateId); setTemplateContent(template.content) }}>수정</button><button className="danger-action" onClick={() => void removeTemplate(template.templateId)}>삭제</button></div></article>)}</div>{isDemo ? <p>체험 모드에서는 템플릿을 저장할 수 없습니다.</p> : <><label>템플릿 내용<textarea maxLength={1000} rows={4} value={templateContent} onChange={(event) => setTemplateContent(event.target.value)} /></label><button className="primary-action" disabled={processing || !templateContent.trim()} onClick={() => void saveTemplate()}>{editingTemplateId == null ? '템플릿 추가' : '템플릿 수정'}</button></>}</section></div>}
+      {showTemplates && <div className="modal-backdrop" role="presentation"><section className="connection-modal review-reply-modal" role="dialog" aria-modal="true" aria-labelledby="review-template-title"><button className="modal-close" aria-label="닫기" onClick={() => setShowTemplates(false)}>×</button><p className="eyebrow">REPLY TEMPLATES</p><h2 id="review-template-title">답글 템플릿</h2><div className="reply-template-list">{templates.map((template) => <article key={template.templateId}><p>{template.content}</p><div><button className="secondary-action" onClick={() => { setEditingTemplateId(template.templateId); setTemplateContent(template.content) }}>수정</button><button className="danger-action" onClick={() => setConfirmation({ kind: 'template', templateId: template.templateId })}>삭제</button></div></article>)}</div>{isDemo ? <p>체험 모드에서는 템플릿을 저장할 수 없습니다.</p> : <><label>템플릿 내용<textarea maxLength={1000} rows={4} value={templateContent} onChange={(event) => setTemplateContent(event.target.value)} /></label><button className="primary-action" disabled={processing || !templateContent.trim()} onClick={() => void saveTemplate()}>{editingTemplateId == null ? '템플릿 추가' : '템플릿 수정'}</button></>}</section></div>}
+
+      {confirmation && <div className="modal-backdrop" role="presentation"><section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="review-confirm-title"><button className="modal-close" aria-label="닫기" onClick={() => setConfirmation(null)}>×</button><p className="eyebrow">CONFIRM ACTION</p><h2 id="review-confirm-title">삭제 확인</h2><p>{confirmation.kind === 'reply' ? '등록한 리뷰 답글을 삭제할까요?' : '이 답글 템플릿을 삭제할까요?'}</p><button className="secondary-action" disabled={processing} onClick={() => setConfirmation(null)}>취소</button><button className="reject-action" style={{ width: '100%', marginTop: 8 }} disabled={processing} onClick={() => { const target = confirmation; setConfirmation(null); if (target.kind === 'reply') void removeReply(target.review); else void removeTemplate(target.templateId) }}>삭제하기</button></section></div>}
     </main>
   )
 }

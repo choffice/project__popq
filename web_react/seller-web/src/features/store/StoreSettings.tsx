@@ -33,6 +33,8 @@ import {
   scheduleValidationMessage,
 } from "./BusinessScheduleEditor";
 
+type StoreConfirmAction = "suspend" | "delete" | null;
+
 type Props = {
   connection: SellerConnection | null;
   onError: (message: string | null) => void;
@@ -189,6 +191,7 @@ export function StoreSettings({
   const [editor, setEditor] = useState<EditorState>(blankEditor);
   const [showTableForm, setShowTableForm] = useState(false);
   const [showInactiveStores, setShowInactiveStores] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<StoreConfirmAction>(null);
   const [inactiveStores, setInactiveStores] = useState<StoreSummary[]>([]);
   const [inactiveLoading, setInactiveLoading] = useState(false);
   const [tableCode, setTableCode] = useState("");
@@ -343,12 +346,6 @@ export function StoreSettings({
 
   async function removeStore() {
     if (!connection || !canDelete) return;
-    if (
-      !window.confirm(
-        `'${store.name}' 사업장을 폐업할까요? 기존 주문과 결제 기록은 보존되며 직접 재개할 수 없습니다.`,
-      )
-    )
-      return;
     setProcessing(true);
     try {
       await deleteSellerStore(connection);
@@ -381,12 +378,6 @@ export function StoreSettings({
 
   async function suspendStore() {
     if (!connection || !canDelete) return;
-    if (
-      !window.confirm(
-        `'${store.name}' 사업장을 휴업할까요? 고객 노출과 신규 주문 접수가 중지됩니다.`,
-      )
-    )
-      return;
     setProcessing(true);
     try {
       const suspended = await suspendSellerStore(connection);
@@ -530,7 +521,7 @@ export function StoreSettings({
             <button
               className="secondary-action"
               disabled={processing}
-              onClick={() => void suspendStore()}
+              onClick={() => setConfirmAction("suspend")}
             >
               사업장 휴업
             </button>
@@ -539,7 +530,7 @@ export function StoreSettings({
             <button
               className="danger-action"
               disabled={processing}
-              onClick={() => void removeStore()}
+              onClick={() => setConfirmAction("delete")}
             >
               사업장 폐업
             </button>
@@ -987,6 +978,55 @@ export function StoreSettings({
           </section>
         </div>
       )}
+
+      {confirmAction && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="connection-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="store-confirm-title"
+          >
+            <button
+              className="modal-close"
+              aria-label="닫기"
+              onClick={() => setConfirmAction(null)}
+            >
+              ×
+            </button>
+            <p className="eyebrow">STORE ACTION</p>
+            <h2 id="store-confirm-title">
+              {confirmAction === "delete" ? "사업장 폐업" : "사업장 휴업"}
+            </h2>
+            <p>
+              {confirmAction === "delete"
+                ? `'${store.name}' 사업장을 폐업할까요? 기존 주문과 결제 기록은 보존되며 직접 재개할 수 없습니다.`
+                : `'${store.name}' 사업장을 휴업할까요? 고객 노출과 신규 주문 접수가 중지됩니다.`}
+            </p>
+            <button
+              className="secondary-action"
+              disabled={processing}
+              onClick={() => setConfirmAction(null)}
+            >
+              취소
+            </button>
+            <button
+              className={confirmAction === "delete" ? "reject-action" : "primary-action"}
+              style={{ width: "100%", marginTop: 8 }}
+              disabled={processing}
+              onClick={() => {
+                const action = confirmAction;
+                setConfirmAction(null);
+                if (action === "delete") void removeStore();
+                else void suspendStore();
+              }}
+            >
+              {confirmAction === "delete" ? "폐업하기" : "휴업하기"}
+            </button>
+          </section>
+        </div>
+      )}
+
       {showInactiveStores && (
         <div className="modal-backdrop" role="presentation">
           <section
