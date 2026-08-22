@@ -27,273 +27,369 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class SellerOrderManagementService {
 
-  private static final Set<Integer> PREPARATION_MINUTES = Set.of(
-      0,
-      5,
-      10,
-      15,
-      20,
-      30,
-      40,
-      50
-  );
+  private static final Set<Integer> PREPARATION_MINUTES =
+          Set.of(
+                  0,
+                  5,
+                  10,
+                  15,
+                  20,
+                  30,
+                  40,
+                  50
+          );
 
   private static final ZoneId BUSINESS_ZONE =
-      ZoneId.of("Asia/Seoul");
+          ZoneId.of(
+                  "Asia/Seoul"
+          );
 
   private static final Set<OrderStatus> TERMINAL_STATUSES =
-      Set.of(
-          OrderStatus.COMPLETED,
-          OrderStatus.CANCELED,
-          OrderStatus.REJECTED,
-          OrderStatus.EXPIRED
-      );
+          Set.of(
+                  OrderStatus.COMPLETED,
+                  OrderStatus.CANCELED,
+                  OrderStatus.REJECTED,
+                  OrderStatus.EXPIRED
+          );
 
-  private final StoreAuthorizationService storeAuthorizationService;
+  private final StoreAuthorizationService
+          storeAuthorizationService;
 
-  private final OrderRepository orderRepository;
+  private final OrderRepository
+          orderRepository;
 
-  private final OrderDomainEventPublisher orderEventPublisher;
+  private final OrderDomainEventPublisher
+          orderEventPublisher;
 
-  /*
-   * 이번 AI 기능에서 새로 추가된 Service.
-   *
-   * 실제 주문 데이터를 Feature로 변환하고
-   * FastAPI에 요청해서 추천 준비시간을 가져온다.
-   */
   private final WaitTimeRecommendationService
-      waitTimeRecommendationService;
+          waitTimeRecommendationService;
 
   @Transactional(readOnly = true)
   public List<OrderResponse> findSellerOrders(
-      User user,
-      Long storeId,
-      OrderStatus status,
-      List<OrderStatus> statuses,
-      LocalDate date
+          User user,
+          Long storeId,
+          OrderStatus status,
+          List<OrderStatus> statuses,
+          LocalDate date
   ) {
     requireStoreMember(
-        user.getId(),
-        storeId
+            user.getId(),
+            storeId
     );
 
     List<Order> orders;
 
     if (date != null) {
       List<OrderStatus> requestedStatuses =
-          status != null
-              ? List.of(status)
-              : statuses == null
-              || statuses.isEmpty()
-                ? List.copyOf(
-              TERMINAL_STATUSES
-          )
-                : statuses;
+              status != null
+                      ? List.of(
+                      status
+              )
+                      : statuses == null ||
+                      statuses.isEmpty()
+                      ? List.copyOf(
+                      TERMINAL_STATUSES
+              )
+                      : statuses;
 
-      if (!TERMINAL_STATUSES.containsAll(
-          requestedStatuses
-      )) {
+      if (
+              !TERMINAL_STATUSES
+                      .containsAll(
+                              requestedStatuses
+                      )
+      ) {
         throw new BusinessException(
-            ErrorCode.INVALID_REQUEST
+                ErrorCode.INVALID_REQUEST
         );
       }
 
       Instant fromInclusive =
-          date.atStartOfDay(
-              BUSINESS_ZONE
-          ).toInstant();
+              date.atStartOfDay(
+                              BUSINESS_ZONE
+                      )
+                      .toInstant();
 
       Instant toExclusive =
-          date.plusDays(1)
-              .atStartOfDay(
-                  BUSINESS_ZONE
-              )
-              .toInstant();
+              date.plusDays(1)
+                      .atStartOfDay(
+                              BUSINESS_ZONE
+                      )
+                      .toInstant();
 
-      orders = orderRepository
-          .findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
-              storeId,
-              requestedStatuses,
-              fromInclusive,
-              toExclusive
-          );
+      orders =
+              orderRepository
+                      .findAllByStoreIdAndStatusInAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+                              storeId,
+                              requestedStatuses,
+                              fromInclusive,
+                              toExclusive
+                      );
 
     } else if (status != null) {
-      orders = orderRepository
-          .findAllByStoreIdAndStatusOrderByCreatedAtDesc(
-              storeId,
-              status
-          );
+      orders =
+              orderRepository
+                      .findAllByStoreIdAndStatusOrderByCreatedAtDesc(
+                              storeId,
+                              status
+                      );
 
     } else if (
-        statuses != null
-            && !statuses.isEmpty()
+            statuses != null &&
+                    !statuses.isEmpty()
     ) {
-      orders = orderRepository
-          .findAllByStoreIdAndStatusInOrderByCreatedAtDesc(
-              storeId,
-              statuses
-          );
+      orders =
+              orderRepository
+                      .findAllByStoreIdAndStatusInOrderByCreatedAtDesc(
+                              storeId,
+                              statuses
+                      );
 
     } else {
-      orders = orderRepository
-          .findAllByStoreIdOrderByCreatedAtDesc(
-              storeId
-          );
+      orders =
+              orderRepository
+                      .findAllByStoreIdOrderByCreatedAtDesc(
+                              storeId
+                      );
     }
 
     return orders.stream()
-        .map(OrderResponse::from)
-        .toList();
+            .map(
+                    OrderResponse::from
+            )
+            .toList();
   }
 
-  /*
-   * ========================================================
-   * AI 예상 준비시간 조회
-   * ========================================================
-   *
-   * 판매자가 주문을 접수하기 전에 호출한다.
-   *
-   * 예:
-   *
-   * PLACED 주문
-   * ↓
-   * AI 추천 준비시간 조회
-   * ↓
-   * "추천 30분"
-   * ↓
-   * 판매자가 30분 또는 다른 시간을 선택
-   * ↓
-   * 기존 accept API 호출
-   */
   @Transactional(readOnly = true)
   public WaitTimeRecommendation recommendPreparationTime(
-      User user,
-      Long storeId,
-      String orderPublicId
+          User user,
+          Long storeId,
+          String orderPublicId
   ) {
-    /*
-     * 먼저 이 판매자가 해당 매장을
-     * 관리할 수 있는 사람인지 확인한다.
-     */
     requireStoreMember(
-        user.getId(),
-        storeId
+            user.getId(),
+            storeId
     );
 
-    /*
-     * items까지 같이 불러오는 Repository 메서드를 사용한다.
-     *
-     * AI Feature 중:
-     *
-     * - 상품 전체 수량
-     * - 메뉴 종류 수
-     *
-     * 를 계산해야 하기 때문이다.
-     */
-    Order order = orderRepository
-        .findDetailedByOrderPublicIdAndStoreId(
-            orderPublicId,
-            storeId
-        )
-        .orElseThrow(
-            () -> new BusinessException(
-                ErrorCode.ORDER_NOT_FOUND
-            )
-        );
+    Order order =
+            orderRepository
+                    .findDetailedByOrderPublicIdAndStoreId(
+                            orderPublicId,
+                            storeId
+                    )
+                    .orElseThrow(
+                            () ->
+                                    new BusinessException(
+                                            ErrorCode.ORDER_NOT_FOUND
+                                    )
+                    );
 
-    /*
-     * 현재 단계에서는
-     * 판매자가 아직 접수하지 않은 주문에 대해서만
-     * AI 추천값을 제공한다.
-     *
-     * 이미 완료/취소된 주문에서 추천시간을
-     * 다시 계산할 이유가 없기 때문이다.
-     */
-    if (order.getStatus() != OrderStatus.PLACED) {
+    if (
+            order.getStatus() !=
+                    OrderStatus.PLACED
+    ) {
       throw new BusinessException(
-          ErrorCode.INVALID_ORDER_STATUS
+              ErrorCode.INVALID_ORDER_STATUS
       );
     }
 
     return waitTimeRecommendationService
-        .recommend(order);
+            .recommend(
+                    order
+            );
   }
 
   @Transactional
   public OrderResponse acceptBySeller(
-      User user,
-      Long storeId,
-      String orderPublicId,
-      int preparationMinutes,
-      boolean applyAsStoreDefault,
-      String reason
+          User user,
+          Long storeId,
+          String orderPublicId,
+          int preparationMinutes,
+          boolean applyAsStoreDefault,
+          String reason
   ) {
     requireStoreMember(
-        user.getId(),
-        storeId
+            user.getId(),
+            storeId
     );
 
-    if (!PREPARATION_MINUTES.contains(
-        preparationMinutes
-    )) {
-      throw new BusinessException(
-          ErrorCode.INVALID_REQUEST
-      );
-    }
-
-    Order order = lockedSellerOrder(
-        storeId,
-        orderPublicId
+    validatePreparationMinutes(
+            preparationMinutes
     );
 
-    Instant now = Instant.now();
+    Order order =
+            lockedSellerOrder(
+                    storeId,
+                    orderPublicId
+            );
+
+    Instant now =
+            Instant.now();
 
     OrderTransition transition =
-        order.accept(
-            preparationMinutes,
-            OrderActorType.SELLER,
-            user.getId(),
-            reason,
-            now
-        );
+            order.accept(
+                    preparationMinutes,
+                    OrderActorType.SELLER,
+                    user.getId(),
+                    reason,
+                    now
+            );
 
     if (applyAsStoreDefault) {
       order.getStore()
-          .changeDefaultPreparationMinutes(
-              preparationMinutes
-          );
+              .changeDefaultPreparationMinutes(
+                      preparationMinutes
+              );
     }
 
     orderRepository.flush();
 
     orderEventPublisher.publish(
-        order,
-        transition
+            order,
+            transition
     );
 
-    return OrderResponse.from(order);
+    return OrderResponse.from(
+            order
+    );
+  }
+
+  /*
+   * ========================================================
+   * 접수 후 준비시간 수정
+   * ========================================================
+   *
+   * 판매자가 주문을 접수한 뒤
+   * 상황에 따라 예상 준비시간을 다시 바꿀 수 있다.
+   *
+   * 변경 가능한 상태:
+   *
+   * ACCEPTED
+   * PREPARING
+   *
+   * READY 이후에는 이미 준비가 끝난 상태이므로
+   * 변경할 수 없다.
+   */
+  @Transactional
+  public OrderResponse updatePreparationTimeBySeller(
+          User user,
+          Long storeId,
+          String orderPublicId,
+          int preparationMinutes,
+          boolean applyAsStoreDefault
+  ) {
+    requireStoreMember(
+            user.getId(),
+            storeId
+    );
+
+    validatePreparationMinutes(
+            preparationMinutes
+    );
+
+    Order order =
+            lockedSellerOrder(
+                    storeId,
+                    orderPublicId
+            );
+
+    /*
+     * updatePreparationTime 내부에서도
+     * ACCEPTED / PREPARING 상태 여부를 검증한다.
+     */
+    OrderStatus currentStatus =
+            order.getStatus();
+
+    Instant now =
+            Instant.now();
+
+    order.updatePreparationTime(
+            preparationMinutes
+    );
+
+    if (applyAsStoreDefault) {
+      order.getStore()
+              .changeDefaultPreparationMinutes(
+                      preparationMinutes
+              );
+    }
+
+    /*
+     * JPA @Version 값을 실제로 증가시키기 위해
+     * 실시간 이벤트 생성 전에 flush 한다.
+     */
+    orderRepository.flush();
+
+    /*
+     * 주문 상태 자체는 변하지 않았지만
+     * preparationMinutes / estimatedReadyAt가 변경됐다.
+     *
+     * 기존 주문 실시간 구조를 그대로 활용하기 위해
+     * 현재 상태 → 현재 상태 형태의 이벤트를 발행한다.
+     *
+     * 예:
+     *
+     * PREPARING → PREPARING
+     *
+     * 하지만 version 값은 증가하기 때문에
+     * 판매자/구매자 앱에서 새 이벤트로 인식한다.
+     *
+     * 앱은 이벤트를 받은 뒤 REST sync를 수행해서
+     * 변경된 preparationMinutes,
+     * estimatedReadyAt 값을 가져오게 된다.
+     */
+    orderEventPublisher.publish(
+            order,
+            new OrderTransition(
+                    currentStatus,
+                    currentStatus,
+                    now
+            )
+    );
+
+    return OrderResponse.from(
+            order
+    );
+  }
+
+  private void validatePreparationMinutes(
+          int preparationMinutes
+  ) {
+    if (
+            !PREPARATION_MINUTES.contains(
+                    preparationMinutes
+            )
+    ) {
+      throw new BusinessException(
+              ErrorCode.INVALID_REQUEST
+      );
+    }
   }
 
   private Order lockedSellerOrder(
-      Long storeId,
-      String orderPublicId
+          Long storeId,
+          String orderPublicId
   ) {
-    Order order = orderRepository
-        .findForUpdateByOrderPublicId(
-            orderPublicId
-        )
-        .orElseThrow(
-            () -> new BusinessException(
-                ErrorCode.ORDER_NOT_FOUND
-            )
-        );
+    Order order =
+            orderRepository
+                    .findForUpdateByOrderPublicId(
+                            orderPublicId
+                    )
+                    .orElseThrow(
+                            () ->
+                                    new BusinessException(
+                                            ErrorCode.ORDER_NOT_FOUND
+                                    )
+                    );
 
-    if (!order.getStore()
-        .getId()
-        .equals(storeId)) {
+    if (
+            !order.getStore()
+                    .getId()
+                    .equals(
+                            storeId
+                    )
+    ) {
       throw new BusinessException(
-          ErrorCode.ORDER_NOT_FOUND
+              ErrorCode.ORDER_NOT_FOUND
       );
     }
 
@@ -301,15 +397,16 @@ public class SellerOrderManagementService {
   }
 
   private void requireStoreMember(
-      Long userId,
-      Long storeId
+          Long userId,
+          Long storeId
   ) {
-    storeAuthorizationService.requireAnyRole(
-        userId,
-        storeId,
-        StoreRole.OWNER,
-        StoreRole.MANAGER,
-        StoreRole.STAFF
-    );
+    storeAuthorizationService
+            .requireAnyRole(
+                    userId,
+                    storeId,
+                    StoreRole.OWNER,
+                    StoreRole.MANAGER,
+                    StoreRole.STAFF
+            );
   }
 }

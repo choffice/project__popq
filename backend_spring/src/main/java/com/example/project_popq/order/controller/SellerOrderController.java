@@ -8,6 +8,7 @@ import com.example.project_popq.order.dto.AcceptOrderRequest;
 import com.example.project_popq.order.dto.OrderCommandRequest;
 import com.example.project_popq.order.dto.OrderResponse;
 import com.example.project_popq.order.dto.OrderSyncResponse;
+import com.example.project_popq.order.dto.UpdatePreparationTimeRequest;
 import com.example.project_popq.order.service.OrderCommandService;
 import com.example.project_popq.order.service.SellerOrderManagementService;
 import com.example.project_popq.payment.dto.CreateSellerRefundRequest;
@@ -21,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -30,293 +32,416 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(
-    "/api/v1/seller/stores/{storeId}/orders"
+        "/api/v1/seller/stores/{storeId}/orders"
 )
 @RequiredArgsConstructor
 @PreAuthorize(
-    "hasAnyRole('SELLER', 'ADMIN')"
+        "hasAnyRole('SELLER', 'ADMIN')"
 )
 public class SellerOrderController {
 
-    private final CurrentUserService currentUserService;
+    private final CurrentUserService
+            currentUserService;
 
-    private final OrderCommandService orderCommandService;
+    private final OrderCommandService
+            orderCommandService;
 
     private final SellerOrderManagementService
-        sellerOrderManagementService;
+            sellerOrderManagementService;
 
-    private final SellerRefundService sellerRefundService;
+    private final SellerRefundService
+            sellerRefundService;
 
     @GetMapping
     public ApiResponse<List<OrderResponse>> findAll(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @RequestParam(required = false)
-        OrderStatus status,
-        @RequestParam(required = false)
-        List<OrderStatus> statuses,
-        @RequestParam(required = false)
-        LocalDate date
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @RequestParam(required = false)
+            OrderStatus status,
+
+            @RequestParam(required = false)
+            List<OrderStatus> statuses,
+
+            @RequestParam(required = false)
+            LocalDate date
     ) {
         return ApiResponse.success(
-            sellerOrderManagementService
-                .findSellerOrders(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    status,
-                    statuses,
-                    date
-                )
+                sellerOrderManagementService
+                        .findSellerOrders(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                status,
+                                statuses,
+                                date
+                        )
         );
     }
 
-    @GetMapping("/{orderPublicId}")
+    @GetMapping(
+            "/{orderPublicId}"
+    )
     public ApiResponse<OrderResponse> findOne(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId
     ) {
         return ApiResponse.success(
-            orderCommandService.findSellerOrder(
-                currentUserService
-                    .getRequired(jwt),
-                storeId,
-                orderPublicId
-            )
+                orderCommandService
+                        .findSellerOrder(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId
+                        )
+        );
+    }
+
+    @GetMapping(
+            "/{orderPublicId}/wait-time-recommendation"
+    )
+    public ApiResponse<WaitTimeRecommendation>
+    recommendWaitTime(
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId
+    ) {
+        return ApiResponse.success(
+                sellerOrderManagementService
+                        .recommendPreparationTime(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId
+                        )
+        );
+    }
+
+    @GetMapping(
+            "/{orderPublicId}/sync"
+    )
+    public ApiResponse<OrderSyncResponse> sync(
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @RequestParam
+            long knownVersion
+    ) {
+        return ApiResponse.success(
+                orderCommandService
+                        .syncSellerOrder(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId,
+                                knownVersion
+                        )
+        );
+    }
+
+    @PostMapping(
+            "/{orderPublicId}/accept"
+    )
+    public ApiResponse<OrderResponse> accept(
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            AcceptOrderRequest request
+    ) {
+        return ApiResponse.success(
+                sellerOrderManagementService
+                        .acceptBySeller(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId,
+                                request.preparationMinutes(),
+                                request.applyAsStoreDefault(),
+                                request.reasonOr(
+                                        "주문 접수"
+                                )
+                        )
         );
     }
 
     /*
      * ========================================================
-     * AI 예상 준비시간 추천 API
+     * 접수 후 준비시간 수정
      * ========================================================
      *
-     * 예:
+     * PATCH
      *
-     * GET
-     * /api/v1/seller/stores/1/orders/ORD-ABC/wait-time-recommendation
+     * /api/v1/seller/stores/{storeId}/orders/
+     * {orderPublicId}/preparation-time
      *
-     * 이 API 자체는 주문 상태를 바꾸지 않는다.
+     * body:
      *
-     * AI에게 추천시간만 물어보는 조회 API다.
+     * {
+     *   "preparationMinutes": 40,
+     *   "applyAsStoreDefault": false
+     * }
      */
-    @GetMapping(
-        "/{orderPublicId}/wait-time-recommendation"
+    @PatchMapping(
+            "/{orderPublicId}/preparation-time"
     )
-    public ApiResponse<WaitTimeRecommendation>
-    recommendWaitTime(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId
-    ) {
-        return ApiResponse.success(
-            sellerOrderManagementService
-                .recommendPreparationTime(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    orderPublicId
-                )
-        );
-    }
+    public ApiResponse<OrderResponse>
+    updatePreparationTime(
+            @AuthenticationPrincipal
+            Jwt jwt,
 
-    @GetMapping(
-        "/{orderPublicId}/sync"
-    )
-    public ApiResponse<OrderSyncResponse> sync(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @RequestParam long knownVersion
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            UpdatePreparationTimeRequest request
     ) {
         return ApiResponse.success(
-            orderCommandService
-                .syncSellerOrder(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    orderPublicId,
-                    knownVersion
-                )
+                sellerOrderManagementService
+                        .updatePreparationTimeBySeller(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId,
+                                request.preparationMinutes(),
+                                request.applyAsStoreDefault()
+                        )
         );
     }
 
     @PostMapping(
-        "/{orderPublicId}/accept"
-    )
-    public ApiResponse<OrderResponse> accept(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        AcceptOrderRequest request
-    ) {
-        return ApiResponse.success(
-            sellerOrderManagementService
-                .acceptBySeller(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    orderPublicId,
-                    request.preparationMinutes(),
-                    request.applyAsStoreDefault(),
-                    request.reasonOr(
-                        "주문 접수"
-                    )
-                )
-        );
-    }
-
-    @PostMapping(
-        "/{orderPublicId}/reject"
+            "/{orderPublicId}/reject"
     )
     public ApiResponse<OrderResponse> reject(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        OrderCommandRequest request
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            OrderCommandRequest request
     ) {
         return transition(
-            jwt,
-            storeId,
-            orderPublicId,
-            OrderStatus.REJECTED,
-            request.reasonOr(
-                "판매자 주문 거절"
-            )
+                jwt,
+                storeId,
+                orderPublicId,
+                OrderStatus.REJECTED,
+                request.reasonOr(
+                        "판매자 주문 거절"
+                )
         );
     }
 
     @PostMapping(
-        "/{orderPublicId}/prepare"
+            "/{orderPublicId}/prepare"
     )
     public ApiResponse<OrderResponse> prepare(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        OrderCommandRequest request
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            OrderCommandRequest request
     ) {
         return transition(
-            jwt,
-            storeId,
-            orderPublicId,
-            OrderStatus.PREPARING,
-            request.reasonOr(
-                "조리 시작"
-            )
+                jwt,
+                storeId,
+                orderPublicId,
+                OrderStatus.PREPARING,
+                request.reasonOr(
+                        "조리 시작"
+                )
         );
     }
 
     @PostMapping(
-        "/{orderPublicId}/ready"
+            "/{orderPublicId}/ready"
     )
     public ApiResponse<OrderResponse> ready(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        OrderCommandRequest request
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            OrderCommandRequest request
     ) {
         return transition(
-            jwt,
-            storeId,
-            orderPublicId,
-            OrderStatus.READY,
-            request.reasonOr(
-                "상품 준비 완료"
-            )
+                jwt,
+                storeId,
+                orderPublicId,
+                OrderStatus.READY,
+                request.reasonOr(
+                        "상품 준비 완료"
+                )
         );
     }
 
     @PostMapping(
-        "/{orderPublicId}/complete"
+            "/{orderPublicId}/complete"
     )
     public ApiResponse<OrderResponse> complete(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        OrderCommandRequest request
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            OrderCommandRequest request
     ) {
         return transition(
-            jwt,
-            storeId,
-            orderPublicId,
-            OrderStatus.COMPLETED,
-            request.reasonOr(
-                "주문 완료"
-            )
+                jwt,
+                storeId,
+                orderPublicId,
+                OrderStatus.COMPLETED,
+                request.reasonOr(
+                        "주문 완료"
+                )
         );
     }
 
     @GetMapping(
-        "/{orderPublicId}/payment"
+            "/{orderPublicId}/payment"
     )
     public ApiResponse<SellerPaymentSummaryResponse>
     payment(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId
     ) {
         return ApiResponse.success(
-            sellerRefundService.findSummary(
-                currentUserService
-                    .getRequired(jwt),
-                storeId,
-                orderPublicId
-            )
+                sellerRefundService
+                        .findSummary(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId
+                        )
         );
     }
 
     @PostMapping(
-        "/{orderPublicId}/refunds"
+            "/{orderPublicId}/refunds"
     )
     public ApiResponse<SellerPaymentSummaryResponse>
     refund(
-        @AuthenticationPrincipal Jwt jwt,
-        @PathVariable Long storeId,
-        @PathVariable String orderPublicId,
-        @Valid
-        @RequestBody
-        CreateSellerRefundRequest request
+            @AuthenticationPrincipal
+            Jwt jwt,
+
+            @PathVariable
+            Long storeId,
+
+            @PathVariable
+            String orderPublicId,
+
+            @Valid
+            @RequestBody
+            CreateSellerRefundRequest request
     ) {
         return ApiResponse.success(
-            sellerRefundService
-                .refundCompletedOrder(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    orderPublicId,
-                    request
-                )
+                sellerRefundService
+                        .refundCompletedOrder(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId,
+                                request
+                        )
         );
     }
 
     private ApiResponse<OrderResponse> transition(
-        Jwt jwt,
-        Long storeId,
-        String orderPublicId,
-        OrderStatus targetStatus,
-        String reason
+            Jwt jwt,
+            Long storeId,
+            String orderPublicId,
+            OrderStatus targetStatus,
+            String reason
     ) {
         return ApiResponse.success(
-            orderCommandService
-                .transitionBySeller(
-                    currentUserService
-                        .getRequired(jwt),
-                    storeId,
-                    orderPublicId,
-                    targetStatus,
-                    reason
-                )
+                orderCommandService
+                        .transitionBySeller(
+                                currentUserService
+                                        .getRequired(
+                                                jwt
+                                        ),
+                                storeId,
+                                orderPublicId,
+                                targetStatus,
+                                reason
+                        )
         );
     }
 }
