@@ -6885,6 +6885,18 @@ main {
   object-fit: contain;
 }
 
+.seller-google-button-host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+}
+
+.seller-google-button-host iframe {
+  transform: scale(1.3);
+  transform-origin: center;
+}
+
 .seller-social-button:disabled {
   opacity: 1;
 }

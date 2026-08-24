@@ -365,6 +365,33 @@ describe("판매자 웹 인증", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("외부 소셜 로그인에서 뒤로가면 소셜 버튼을 다시 활성화한다", async () => {
+    const user = userEvent.setup();
+
+    render(<SellerAuth onAuthenticated={vi.fn()} onUseDemo={vi.fn()} />);
+
+    const kakaoButton = screen.getByRole("button", {
+      name: "카카오로 판매자 로그인",
+    });
+    const naverButton = screen.getByRole("button", {
+      name: "네이버로 판매자 로그인",
+    });
+
+    await user.click(kakaoButton);
+
+    expect(kakaoButton).toBeDisabled();
+    expect(naverButton).toBeDisabled();
+
+    act(() => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", {
+        persisted: true,
+      }));
+    });
+
+    expect(kakaoButton).toBeEnabled();
+    expect(naverButton).toBeEnabled();
+  });
+
   it("카카오 콜백 인증코드로 판매자 로그인을 완료한다", async () => {
     vi.stubEnv(
       "VITE_KAKAO_REDIRECT_URI",

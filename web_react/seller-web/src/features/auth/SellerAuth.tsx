@@ -242,6 +242,15 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   }, [mode]);
 
   useEffect(() => {
+    function handlePageShow() {
+      setBusy(false);
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  useEffect(() => {
     const redirectUri = import.meta.env.VITE_KAKAO_REDIRECT_URI?.trim();
     if (!redirectUri || kakaoCodeHandledRef.current) {
       return;
