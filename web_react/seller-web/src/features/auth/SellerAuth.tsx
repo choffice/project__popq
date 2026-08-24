@@ -1,20 +1,29 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   createSellerStore,
   getInactiveSellerStores,
   getSellerStores,
   loginAccount,
   loginPresentationSeller,
+  loginSellerSocial,
+  loginSellerWithKakaoCode,
+  loginSellerWithNaverCode,
   reopenSellerStore,
   signUpSeller,
 } from "../../services/api";
 import type {
   SellerAuthResult,
   SellerConnection,
-  StoreSummary,
   StoreSavePayload,
+  StoreSummary,
   StoreType,
 } from "../../types";
+import { renderGoogleSellerButton } from "./googleSellerAuth";
+import { startKakaoSellerLogin } from "./kakaoSellerAuth";
+import {
+  consumeNaverSellerState,
+  startNaverSellerLogin,
+} from "./naverSellerAuth";
 
 type AuthMode = "seller-login" | "admin-login" | "signup";
 
@@ -81,6 +90,9 @@ const EMPTY_FIRST_STORE: FirstStoreDraft = {
 
 export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
   const [mode, setMode] = useState<AuthMode>("seller-login");
+  const googleButtonRef = useRef<HTMLDivElement>(null);
+  const kakaoCodeHandledRef = useRef(false);
+  const naverCodeHandledRef = useRef(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
@@ -114,6 +126,230 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       user: auth.user,
     });
   }
+  async function completeSellerAuthentication(auth: SellerAuthResult) {
+    if (auth.user.role !== "SELLER") {
+      throw new Error("판매자 권한이 있는 계정으로 로그인해 주세요.");
+    }
+
+    const connection = {
+      storeId: 0,
+      accessToken: auth.accessToken,
+    };
+
+    const ownedStores = await getSellerStores(connection);
+
+    if (ownedStores.length === 0) {
+      const inactiveStores = await getInactiveSellerStores(connection);
+
+      setPendingAuth(auth);
+      setStores(inactiveStores);
+
+      const hasSuspendedStore = inactiveStores.some(
+        (store) => store.status === "SUSPENDED",
+      );
+
+      setNeedsStoreRecovery(hasSuspendedStore);
+      setNeedsFirstStore(!hasSuspendedStore);
+      return;
+    }
+
+    if (ownedStores.length === 1) {
+      completeAuthentication(auth, ownedStores[0]);
+      return;
+    }
+
+    setPendingAuth(auth);
+    setStores(ownedStores);
+    setNeedsFirstStore(false);
+    setNeedsStoreRecovery(false);
+  }
+
+  async function handleGoogleIdToken(idToken: string) {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+
+    try {
+      const auth = await loginSellerSocial("GOOGLE", idToken);
+
+      await completeSellerAuthentication(auth);
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Google 로그인에 실패했습니다.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleKakaoLogin() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+
+    try {
+      await startKakaoSellerLogin();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "카카오 로그인을 시작하지 못했습니다.",
+      );
+      setBusy(false);
+    }
+  }
+
+  function handleNaverLogin() {
+    setError(null);
+    setNotice(null);
+    setBusy(true);
+
+    try {
+      startNaverSellerLogin();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "네이버 로그인을 시작하지 못했습니다.",
+      );
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== "seller-login" || !googleButtonRef.current) {
+      return;
+    }
+
+    let active = true;
+
+    void renderGoogleSellerButton(googleButtonRef.current, (idToken) => {
+      if (!active) {
+        return;
+      }
+
+      void handleGoogleIdToken(idToken);
+    }).catch((caught) => {
+      if (!active) {
+        return;
+      }
+
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Google 로그인 버튼을 준비하지 못했습니다.",
+      );
+    });
+
+    return () => {
+      active = false;
+    };
+
+    // 판매자 탭에 진입할 때 Google 버튼을 다시 렌더링합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  useEffect(() => {
+    function handlePageShow() {
+      setBusy(false);
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    return () => window.removeEventListener("pageshow", handlePageShow);
+  }, []);
+
+  useEffect(() => {
+    const redirectUri = import.meta.env.VITE_KAKAO_REDIRECT_URI?.trim();
+    if (!redirectUri || kakaoCodeHandledRef.current) {
+      return;
+    }
+
+    const callbackUrl = new URL(redirectUri, window.location.origin);
+    if (window.location.pathname !== callbackUrl.pathname) {
+      return;
+    }
+
+    const authorizationCode = new URLSearchParams(window.location.search).get(
+      "code",
+    );
+    if (!authorizationCode) {
+      setError("카카오 인증코드를 받지 못했습니다.");
+      return;
+    }
+
+    kakaoCodeHandledRef.current = true;
+    setBusy(true);
+    setError(null);
+    window.history.replaceState({}, document.title, "/");
+
+    void loginSellerWithKakaoCode(authorizationCode)
+      .then((auth) => completeSellerAuthentication(auth))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "카카오 로그인에 실패했습니다.",
+        );
+      })
+      .finally(() => setBusy(false));
+
+    // 카카오 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const redirectUri = import.meta.env.VITE_NAVER_REDIRECT_URI?.trim();
+    if (!redirectUri || naverCodeHandledRef.current) {
+      return;
+    }
+
+    const callbackUrl = new URL(redirectUri, window.location.origin);
+    if (window.location.pathname !== callbackUrl.pathname) {
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const authorizationCode = params.get("code");
+    const receivedState = params.get("state");
+    const oauthError = params.get("error_description") ?? params.get("error");
+
+    naverCodeHandledRef.current = true;
+    window.history.replaceState({}, document.title, "/");
+
+    if (oauthError) {
+      setError(`네이버 로그인이 취소되었거나 실패했습니다: ${oauthError}`);
+      return;
+    }
+
+    if (!authorizationCode || !receivedState) {
+      setError("네이버 인증코드 또는 state를 받지 못했습니다.");
+      return;
+    }
+
+    if (!consumeNaverSellerState(receivedState)) {
+      setError("네이버 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+
+    void loginSellerWithNaverCode(authorizationCode, receivedState)
+      .then((auth) => completeSellerAuthentication(auth))
+      .catch((caught) => {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : "네이버 로그인에 실패했습니다.",
+        );
+      })
+      .finally(() => setBusy(false));
+
+    // 네이버 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -181,6 +417,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       setStores(ownedStores);
       setNeedsFirstStore(false);
       setNeedsStoreRecovery(false);
+      await completeSellerAuthentication(auth);
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -806,6 +1043,51 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
         )}
 
         {DEMO_MODE_ENABLED && mode !== "admin-login" && (
+        {mode === "seller-login" && (
+          <section
+            className="seller-social-login"
+            aria-label="판매자 소셜 로그인"
+          >
+            <div className="seller-social-divider">
+              <span>또는 소셜 계정으로 로그인</span>
+            </div>
+
+            <div className="seller-social-buttons">
+              <div
+                ref={googleButtonRef}
+                className={`seller-social-button seller-google-button-host${
+                  busy ? " is-disabled" : ""
+                }`}
+                aria-label="Google로 판매자 로그인"
+                aria-busy={busy}
+              >
+                <img src="/images/social/google_g.png" alt="" />
+              </div>
+
+              <button
+                type="button"
+                className="seller-social-button"
+                aria-label="카카오로 판매자 로그인"
+                onClick={() => void handleKakaoLogin()}
+                disabled={busy}
+              >
+                <img src="/images/social/kakao_k.png" alt="" />
+              </button>
+
+              <button
+                type="button"
+                className="seller-social-button"
+                aria-label="네이버로 판매자 로그인"
+                onClick={handleNaverLogin}
+                disabled={busy}
+              >
+                <img src="/images/social/naver_n.png" alt="" />
+              </button>
+            </div>
+          </section>
+        )}
+
+        {mode !== "admin-login" && (
           <div className="auth-demo">
             <span>백엔드 없이 화면을 둘러보고 싶다면</span>
             <button type="button" onClick={onUseDemo}>

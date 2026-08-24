@@ -32,11 +32,11 @@ import type {
   SellerReview,
   SellerReviewReplyTemplate,
   StoreDetail,
+  StoreOptionTemplate,
+  StoreOptionTemplateUsage,
   StoreSavePayload,
   StoreSummary,
   StoreTable,
-  StoreOptionTemplate,
-  StoreOptionTemplateUsage,
   SupportCategory,
   SupportInquiryDetail,
   SupportInquiryStatus,
@@ -49,6 +49,8 @@ import type {
 } from "../types";
 
 type TransitionAction = "accept" | "reject" | "prepare" | "ready" | "complete";
+
+export type SellerSocialProvider = "GOOGLE" | "KAKAO" | "NAVER";
 
 async function publicRequest<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(path, {
@@ -84,6 +86,34 @@ export function loginPresentationSeller() {
       name: "POPQ 테스트 판매자",
       role: "SELLER",
     }),
+  });
+}
+
+export function loginSellerSocial(
+  provider: SellerSocialProvider,
+  providerToken: string,
+) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/login", {
+    method: "POST",
+    body: JSON.stringify({
+      provider,
+      providerToken,
+      role: "SELLER",
+    }),
+  });
+}
+
+export function loginSellerWithKakaoCode(code: string) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/kakao/code", {
+    method: "POST",
+    body: JSON.stringify({ code }),
+  });
+}
+
+export function loginSellerWithNaverCode(code: string, state: string) {
+  return publicRequest<SellerAuthResult>("/api/v1/auth/social/naver/code", {
+    method: "POST",
+    body: JSON.stringify({ code, state }),
   });
 }
 
