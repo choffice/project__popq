@@ -275,25 +275,30 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
       "code",
     );
     if (!authorizationCode) {
-      setError("카카오 인증코드를 받지 못했습니다.");
+      window.setTimeout(() => {
+        setError("카카오 인증코드를 받지 못했습니다.");
+      }, 0);
       return;
     }
 
     kakaoCodeHandledRef.current = true;
-    setBusy(true);
-    setError(null);
     window.history.replaceState({}, document.title, "/");
 
-    void loginSellerWithKakaoCode(authorizationCode)
-      .then((auth) => completeSellerAuthentication(auth))
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "카카오 로그인에 실패했습니다.",
-        );
-      })
-      .finally(() => setBusy(false));
+    window.setTimeout(() => {
+      setBusy(true);
+      setError(null);
+
+      void loginSellerWithKakaoCode(authorizationCode)
+        .then((auth) => completeSellerAuthentication(auth))
+        .catch((caught) => {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "카카오 로그인에 실패했습니다.",
+          );
+        })
+        .finally(() => setBusy(false));
+    }, 0);
 
     // 카카오 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -319,33 +324,41 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
     window.history.replaceState({}, document.title, "/");
 
     if (oauthError) {
-      setError(`네이버 로그인이 취소되었거나 실패했습니다: ${oauthError}`);
+      window.setTimeout(() => {
+        setError(`네이버 로그인이 취소되었거나 실패했습니다: ${oauthError}`);
+      }, 0);
       return;
     }
 
     if (!authorizationCode || !receivedState) {
-      setError("네이버 인증코드 또는 state를 받지 못했습니다.");
+      window.setTimeout(() => {
+        setError("네이버 인증코드 또는 state를 받지 못했습니다.");
+      }, 0);
       return;
     }
 
     if (!consumeNaverSellerState(receivedState)) {
-      setError("네이버 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.");
+      window.setTimeout(() => {
+        setError("네이버 로그인 요청을 확인할 수 없습니다. 다시 시도해 주세요.");
+      }, 0);
       return;
     }
 
-    setBusy(true);
-    setError(null);
+    window.setTimeout(() => {
+      setBusy(true);
+      setError(null);
 
-    void loginSellerWithNaverCode(authorizationCode, receivedState)
-      .then((auth) => completeSellerAuthentication(auth))
-      .catch((caught) => {
-        setError(
-          caught instanceof Error
-            ? caught.message
-            : "네이버 로그인에 실패했습니다.",
-        );
-      })
-      .finally(() => setBusy(false));
+      void loginSellerWithNaverCode(authorizationCode, receivedState)
+        .then((auth) => completeSellerAuthentication(auth))
+        .catch((caught) => {
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : "네이버 로그인에 실패했습니다.",
+          );
+        })
+        .finally(() => setBusy(false));
+    }, 0);
 
     // 네이버 콜백 인증코드는 최초 마운트에서 한 번만 처리합니다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1042,7 +1055,6 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
           </p>
         )}
 
-        {DEMO_MODE_ENABLED && mode !== "admin-login" && (
         {mode === "seller-login" && (
           <section
             className="seller-social-login"
@@ -1087,7 +1099,7 @@ export function SellerAuth({ onAuthenticated, onUseDemo }: SellerAuthProps) {
           </section>
         )}
 
-        {mode !== "admin-login" && (
+        {DEMO_MODE_ENABLED && mode !== "admin-login" && (
           <div className="auth-demo">
             <span>백엔드 없이 화면을 둘러보고 싶다면</span>
             <button type="button" onClick={onUseDemo}>

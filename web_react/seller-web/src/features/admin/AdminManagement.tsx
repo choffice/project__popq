@@ -252,7 +252,10 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
       setUpdating(`user-${action.user.userId}`)
       try {
         if (connection) await updateAdminUserStatus(connection, action.user.userId, action.status, trimmedReason)
-        else action.user.status = action.status
+        else {
+          const index = demoUsers.findIndex((item) => item.userId === action.user.userId)
+          if (index >= 0) demoUsers[index] = { ...demoUsers[index], status: action.status }
+        }
         await load()
       } catch (caught) {
         onError(caught instanceof Error ? caught.message : '사용자 상태를 변경하지 못했습니다.')
@@ -264,7 +267,10 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
       setUpdating(`seller-${action.seller.sellerProfileId}`)
       try {
         if (connection) await updateAdminSellerVerification(connection, action.seller.sellerProfileId, action.status, trimmedReason)
-        else action.seller.verificationStatus = action.status
+        else {
+          const index = demoSellers.findIndex((item) => item.sellerProfileId === action.seller.sellerProfileId)
+          if (index >= 0) demoSellers[index] = { ...demoSellers[index], verificationStatus: action.status }
+        }
         await load()
       } catch (caught) {
         onError(caught instanceof Error ? caught.message : '판매자 인증 상태를 변경하지 못했습니다.')
@@ -276,7 +282,10 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
       setUpdating(`seller-user-${action.seller.userId}`)
       try {
         if (connection) await updateAdminUserStatus(connection, action.seller.userId, action.status, trimmedReason)
-        else action.seller.userStatus = action.status
+        else {
+          const index = demoSellers.findIndex((item) => item.sellerProfileId === action.seller.sellerProfileId)
+          if (index >= 0) demoSellers[index] = { ...demoSellers[index], userStatus: action.status }
+        }
         await load()
       } catch (caught) {
         onError(caught instanceof Error ? caught.message : '판매자 계정 상태를 변경하지 못했습니다.')
@@ -287,7 +296,10 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
     setUpdating(`store-${action.store.storeId}`)
     try {
       if (connection) await updateAdminStoreStatus(connection, action.store.storeId, action.status, trimmedReason)
-      else action.store.status = action.status
+      else {
+        const index = demoStores.findIndex((item) => item.storeId === action.store.storeId)
+        if (index >= 0) demoStores[index] = { ...demoStores[index], status: action.status }
+      }
       await load()
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : '스토어 상태를 변경하지 못했습니다.')
