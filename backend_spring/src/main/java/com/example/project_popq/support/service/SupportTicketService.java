@@ -22,6 +22,9 @@ import com.example.project_popq.support.repository.SupportTicketRepository;
 import com.example.project_popq.user.domain.PlatformRole;
 import com.example.project_popq.user.domain.User;
 import java.time.Instant;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -57,10 +60,10 @@ public class SupportTicketService {
         ));
         ticket.messageAdded(SupportSenderType.REQUESTER, now);
         realtimeEventPublisher.publish(
-            ticket,
-            SupportTicketRealtimeEventType.TICKET_CREATED,
-            SupportSenderType.REQUESTER,
-            now
+                ticket,
+                SupportTicketRealtimeEventType.TICKET_CREATED,
+                SupportSenderType.REQUESTER,
+                now
         );
         return SupportTicketDetailResponse.of(
                 ticket,
@@ -76,9 +79,34 @@ public class SupportTicketService {
     ) {
         Specification<SupportTicket> specification = (root, ignored, builder) ->
                 builder.equal(root.get("requester").get("id"), requester.getId());
+        var ticketPage = ticketRepository.findAll(
+                specification,
+                pageRequest(page, size)
+        );
+        var ticketIds = ticketPage.getContent()
+                .stream()
+                .map(SupportTicket::getId)
+                .toList();
+        Map<Long, SupportMessageRepository.TicketUnreadCount> unreadCounts =
+                ticketIds.isEmpty()
+                        ? Map.of()
+                        : messageRepository.countUnreadByTickets(
+                                        ticketIds,
+                                        SupportSenderType.ADMIN
+                                )
+                                .stream()
+                                .collect(Collectors.toMap(
+                                        SupportMessageRepository.TicketUnreadCount::getTicketId,
+                                        Function.identity()
+                                ));
+
         return PageResponse.from(
-                ticketRepository.findAll(specification, pageRequest(page, size))
-                        .map(SupportTicketSummaryResponse::from)
+                ticketPage.map(ticket -> SupportTicketSummaryResponse.from(
+                        ticket,
+                        unreadCounts.containsKey(ticket.getId())
+                                ? unreadCounts.get(ticket.getId()).getUnreadMessageCount()
+                                : 0L
+                ))
         );
     }
 
@@ -88,7 +116,7 @@ public class SupportTicketService {
                 ticketId,
                 requester.getId()
         ).orElseThrow(() -> new BusinessException(ErrorCode.SUPPORT_TICKET_NOT_FOUND));
-        return detail(ticket);
+        return requesterDetail(ticket);
     }
 
     @Transactional
@@ -108,12 +136,25 @@ public class SupportTicketService {
         Instant now = Instant.now();
         ticket.messageAdded(SupportSenderType.REQUESTER, now);
         realtimeEventPublisher.publish(
-            ticket,
-            SupportTicketRealtimeEventType.MESSAGE_ADDED,
-            SupportSenderType.REQUESTER,
-            now
+                ticket,
+                SupportTicketRealtimeEventType.MESSAGE_ADDED,
+                SupportSenderType.REQUESTER,
+                now
         );
-        return detail(ticket);
+        return requesterDetail(ticket);
+    }
+
+    @Transactional
+    public SupportTicketDetailResponse markRequesterRead(
+            User requester,
+            Long ticketId
+    ) {
+        SupportTicket ticket = ticketRepository.findByIdAndRequesterId(
+                ticketId,
+                requester.getId()
+        ).orElseThrow(() -> new BusinessException(ErrorCode.SUPPORT_TICKET_NOT_FOUND));
+        ticket.markRequesterRead(Instant.now());
+        return requesterDetail(ticket);
     }
 
     @Transactional(readOnly = true)
@@ -183,14 +224,14 @@ public class SupportTicketService {
         Instant now = Instant.now();
         ticket.messageAdded(SupportSenderType.ADMIN, now);
         auditLogRepository.save(AdminAuditLog.create(
-            admin, "SUPPORT_TICKET", ticketId, "REPLY",
-            before, ticket.getStatus(), "고객지원 답변"
+                admin, "SUPPORT_TICKET", ticketId, "REPLY",
+                before, ticket.getStatus(), "고객지원 답변"
         ));
         realtimeEventPublisher.publish(
-            ticket,
-            SupportTicketRealtimeEventType.MESSAGE_ADDED,
-            SupportSenderType.ADMIN,
-            now
+                ticket,
+                SupportTicketRealtimeEventType.MESSAGE_ADDED,
+                SupportSenderType.ADMIN,
+                now
         );
         return detail(ticket);
     }
@@ -207,16 +248,26 @@ public class SupportTicketService {
         Instant now = Instant.now();
         ticket.changeStatus(request.status());
         auditLogRepository.save(AdminAuditLog.create(
-            admin, "SUPPORT_TICKET", ticketId, "CHANGE_STATUS",
-            before, request.status(), "문의 상태 변경"
+                admin, "SUPPORT_TICKET", ticketId, "CHANGE_STATUS",
+                before, request.status(), "문의 상태 변경"
         ));
         realtimeEventPublisher.publish(
-            ticket,
-            SupportTicketRealtimeEventType.STATUS_CHANGED,
-            SupportSenderType.ADMIN,
-            now
+                ticket,
+                SupportTicketRealtimeEventType.STATUS_CHANGED,
+                SupportSenderType.ADMIN,
+                now
         );
         return detail(ticket);
+    }
+
+    private SupportTicketDetailResponse requesterDetail(SupportTicket ticket) {
+        return new SupportTicketDetailResponse(
+                requesterSummary(ticket),
+                messageRepository.findAllByTicketIdOrderByIdAsc(ticket.getId())
+                        .stream()
+                        .map(SupportMessageResponse::from)
+                        .toList()
+        );
     }
 
     private SupportTicketDetailResponse detail(SupportTicket ticket) {
@@ -226,6 +277,20 @@ public class SupportTicketService {
                         .stream()
                         .map(SupportMessageResponse::from)
                         .toList()
+        );
+    }
+
+    private SupportTicketSummaryResponse requesterSummary(SupportTicket ticket) {
+        return SupportTicketSummaryResponse.from(
+                ticket,
+                unreadAdminMessageCount(ticket)
+        );
+    }
+
+    private long unreadAdminMessageCount(SupportTicket ticket) {
+        return messageRepository.countUnreadByTicket(
+                ticket.getId(),
+                SupportSenderType.ADMIN
         );
     }
 

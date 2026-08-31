@@ -18,6 +18,12 @@ import type {
   UserStatus,
 } from '../../types'
 
+type AdminReasonAction =
+  | { kind: 'user'; user: AdminUser; status: UserStatus; message: string; confirmLabel: string }
+  | { kind: 'seller-verification'; seller: AdminSeller; status: AdminSeller['verificationStatus']; message: string; confirmLabel: string }
+  | { kind: 'seller-user'; seller: AdminSeller; status: UserStatus; message: string; confirmLabel: string }
+  | { kind: 'store'; store: AdminStore; status: AdminStore['status']; message: string; confirmLabel: string }
+
 export type AdminManagementSection = 'customers' | 'sellers' | 'stores'
 
 type Props = {
@@ -91,6 +97,8 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
   const [page, setPage] = useState(0)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState<string | null>(null)
+  const [reasonAction, setReasonAction] = useState<AdminReasonAction | null>(null)
+  const [reason, setReason] = useState('')
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim()), 300)
@@ -184,56 +192,114 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
       ? '판매자 계정과 사업자 인증 상태를 함께 점검합니다.'
       : '플랫폼에 등록된 스토어의 운영 상태를 관리합니다.'
 
-  async function toggleUser(user: AdminUser) {
+  function openReasonDialog(action: AdminReasonAction) {
+    setReason('')
+    setReasonAction(action)
+  }
+
+  function toggleUser(user: AdminUser) {
     const status: UserStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-    const reason = window.prompt(`${user.name} 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`)
-    if (!reason?.trim()) return
-    setUpdating(`user-${user.userId}`)
-    try {
-      if (connection) await updateAdminUserStatus(connection, user.userId, status, reason)
-      else user.status = status
-      await load()
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : '사용자 상태를 변경하지 못했습니다.')
-    } finally { setUpdating(null) }
+    openReasonDialog({
+      kind: 'user',
+      user,
+      status,
+      message: `${user.name} 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`,
+      confirmLabel: status === 'SUSPENDED' ? '이용 정지' : '활성화',
+    })
   }
 
-  async function verifySeller(seller: AdminSeller, status: AdminSeller['verificationStatus']) {
-    const reason = window.prompt(`${seller.name} 판매자를 ${status === 'VERIFIED' ? '승인' : '반려'}하는 사유를 입력해 주세요.`)
-    if (!reason?.trim()) return
-    setUpdating(`seller-${seller.sellerProfileId}`)
-    try {
-      if (connection) await updateAdminSellerVerification(connection, seller.sellerProfileId, status, reason)
-      else seller.verificationStatus = status
-      await load()
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : '판매자 인증 상태를 변경하지 못했습니다.')
-    } finally { setUpdating(null) }
+  function verifySeller(seller: AdminSeller, status: AdminSeller['verificationStatus']) {
+    openReasonDialog({
+      kind: 'seller-verification',
+      seller,
+      status,
+      message: `${seller.name} 판매자를 ${status === 'VERIFIED' ? '승인' : '반려'}하는 사유를 입력해 주세요.`,
+      confirmLabel: status === 'VERIFIED' ? '승인' : '반려',
+    })
   }
 
-  async function toggleSellerUser(seller: AdminSeller) {
+  function toggleSellerUser(seller: AdminSeller) {
     if (!['ACTIVE', 'SUSPENDED'].includes(seller.userStatus)) return
     const status: UserStatus = seller.userStatus === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-    const reason = window.prompt(`${seller.name} 판매자 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`)
-    if (!reason?.trim()) return
-    setUpdating(`seller-user-${seller.userId}`)
-    try {
-      if (connection) await updateAdminUserStatus(connection, seller.userId, status, reason)
-      else seller.userStatus = status
-      await load()
-    } catch (caught) {
-      onError(caught instanceof Error ? caught.message : '판매자 계정 상태를 변경하지 못했습니다.')
-    } finally { setUpdating(null) }
+    openReasonDialog({
+      kind: 'seller-user',
+      seller,
+      status,
+      message: `${seller.name} 판매자 계정을 ${userStatusLabel[status]} 상태로 변경하는 사유를 입력해 주세요.`,
+      confirmLabel: status === 'SUSPENDED' ? '계정 정지' : '계정 활성화',
+    })
   }
 
-  async function toggleStore(store: AdminStore) {
+  function toggleStore(store: AdminStore) {
     const status: AdminStore['status'] = store.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-    const reason = window.prompt(`${store.name} 스토어를 ${status === 'ACTIVE' ? '활성' : '운영정지'} 상태로 변경하는 사유를 입력해 주세요.`)
-    if (!reason?.trim()) return
-    setUpdating(`store-${store.storeId}`)
+    openReasonDialog({
+      kind: 'store',
+      store,
+      status,
+      message: `${store.name} 스토어를 ${status === 'ACTIVE' ? '활성' : '운영정지'} 상태로 변경하는 사유를 입력해 주세요.`,
+      confirmLabel: status === 'ACTIVE' ? '재활성화' : '운영 정지',
+    })
+  }
+
+  async function submitReasonAction() {
+    const action = reasonAction
+    const trimmedReason = reason.trim()
+    if (!action || !trimmedReason) return
+
+    setReasonAction(null)
+
+    if (action.kind === 'user') {
+      setUpdating(`user-${action.user.userId}`)
+      try {
+        if (connection) await updateAdminUserStatus(connection, action.user.userId, action.status, trimmedReason)
+        else {
+          const index = demoUsers.findIndex((item) => item.userId === action.user.userId)
+          if (index >= 0) demoUsers[index] = { ...demoUsers[index], status: action.status }
+        }
+        await load()
+      } catch (caught) {
+        onError(caught instanceof Error ? caught.message : '사용자 상태를 변경하지 못했습니다.')
+      } finally { setUpdating(null) }
+      return
+    }
+
+    if (action.kind === 'seller-verification') {
+      setUpdating(`seller-${action.seller.sellerProfileId}`)
+      try {
+        if (connection) await updateAdminSellerVerification(connection, action.seller.sellerProfileId, action.status, trimmedReason)
+        else {
+          const index = demoSellers.findIndex((item) => item.sellerProfileId === action.seller.sellerProfileId)
+          if (index >= 0) demoSellers[index] = { ...demoSellers[index], verificationStatus: action.status }
+        }
+        await load()
+      } catch (caught) {
+        onError(caught instanceof Error ? caught.message : '판매자 인증 상태를 변경하지 못했습니다.')
+      } finally { setUpdating(null) }
+      return
+    }
+
+    if (action.kind === 'seller-user') {
+      setUpdating(`seller-user-${action.seller.userId}`)
+      try {
+        if (connection) await updateAdminUserStatus(connection, action.seller.userId, action.status, trimmedReason)
+        else {
+          const index = demoSellers.findIndex((item) => item.sellerProfileId === action.seller.sellerProfileId)
+          if (index >= 0) demoSellers[index] = { ...demoSellers[index], userStatus: action.status }
+        }
+        await load()
+      } catch (caught) {
+        onError(caught instanceof Error ? caught.message : '판매자 계정 상태를 변경하지 못했습니다.')
+      } finally { setUpdating(null) }
+      return
+    }
+
+    setUpdating(`store-${action.store.storeId}`)
     try {
-      if (connection) await updateAdminStoreStatus(connection, store.storeId, status, reason)
-      else store.status = status
+      if (connection) await updateAdminStoreStatus(connection, action.store.storeId, action.status, trimmedReason)
+      else {
+        const index = demoStores.findIndex((item) => item.storeId === action.store.storeId)
+        if (index >= 0) demoStores[index] = { ...demoStores[index], status: action.status }
+      }
       await load()
     } catch (caught) {
       onError(caught instanceof Error ? caught.message : '스토어 상태를 변경하지 못했습니다.')
@@ -291,6 +357,23 @@ export function AdminManagement({ connection, section = 'customers', onError }: 
         <button disabled={currentPage.last || loading} onClick={() => setPage((value) => value + 1)}>다음</button>
       </footer>
       <p className="source-note">탈퇴 대기와 탈퇴 상태는 개인정보 정리 절차 보호를 위해 조회만 가능합니다.</p>
+
+      {reasonAction && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="connection-modal" role="dialog" aria-modal="true" aria-labelledby="admin-reason-title">
+            <button className="modal-close" aria-label="닫기" onClick={() => setReasonAction(null)}>×</button>
+            <p className="eyebrow">ADMIN ACTION</p>
+            <h2 id="admin-reason-title">변경 사유 입력</h2>
+            <p>{reasonAction.message}</p>
+            <label>
+              변경 사유
+              <textarea rows={4} maxLength={500} autoFocus value={reason} onChange={(event) => setReason(event.target.value)} placeholder="사유를 입력해 주세요." />
+            </label>
+            <button className="secondary-action" onClick={() => setReasonAction(null)}>취소</button>
+            <button className={reasonAction.confirmLabel.includes('정지') || reasonAction.confirmLabel === '반려' ? 'reject-action' : 'primary-action'} style={{ width: '100%', marginTop: 8 }} disabled={!reason.trim()} onClick={() => void submitReasonAction()}>{reasonAction.confirmLabel}</button>
+          </section>
+        </div>
+      )}
     </main>
   )
 }

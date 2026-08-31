@@ -60,7 +60,12 @@ public class Order extends BaseTimeEntity {
     @Column(name = "order_id")
     private Long id;
 
-    @Column(name = "order_public_id", nullable = false, length = 40, unique = true)
+    @Column(
+            name = "order_public_id",
+            nullable = false,
+            length = 40,
+            unique = true
+    )
     private String orderPublicId;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -71,43 +76,87 @@ public class Order extends BaseTimeEntity {
     @JoinColumn(name = "guest_session_id")
     private GuestSession guestSession;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "store_id", nullable = false)
+    @ManyToOne(
+            fetch = FetchType.LAZY,
+            optional = false
+    )
+    @JoinColumn(
+            name = "store_id",
+            nullable = false
+    )
     private Store store;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "order_type", nullable = false, length = 30)
+    @Column(
+            name = "order_type",
+            nullable = false,
+            length = 30
+    )
     private OrderType orderType;
 
-    @Column(name = "request_message", length = 100)
+    @Column(
+            name = "request_message",
+            length = 100
+    )
     private String requestMessage;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
+    @Column(
+            name = "status",
+            nullable = false,
+            length = 30
+    )
     private OrderStatus status;
 
-    @Column(name = "subtotal_amount", nullable = false)
+    @Column(
+            name = "subtotal_amount",
+            nullable = false
+    )
     private long subtotalAmount;
 
-    @Column(name = "discount_amount", nullable = false)
+    @Column(
+            name = "discount_amount",
+            nullable = false
+    )
     private long discountAmount;
 
-    @Column(name = "tax_amount", nullable = false)
+    @Column(
+            name = "tax_amount",
+            nullable = false
+    )
     private long taxAmount;
 
-    @Column(name = "service_fee_amount", nullable = false)
+    @Column(
+            name = "service_fee_amount",
+            nullable = false
+    )
     private long serviceFeeAmount;
 
-    @Column(name = "total_amount", nullable = false)
+    @Column(
+            name = "total_amount",
+            nullable = false
+    )
     private long totalAmount;
 
-    @Column(name = "idempotency_key", nullable = false, length = 100, unique = true)
+    @Column(
+            name = "idempotency_key",
+            nullable = false,
+            length = 100,
+            unique = true
+    )
     private String idempotencyKey;
 
-    @Column(name = "request_hash", nullable = false, length = 64)
+    @Column(
+            name = "request_hash",
+            nullable = false,
+            length = 64
+    )
     private String requestHash;
 
-    @Column(name = "expires_at", nullable = false)
+    @Column(
+            name = "expires_at",
+            nullable = false
+    )
     private Instant expiresAt;
 
     @Column(name = "preparation_minutes")
@@ -120,7 +169,10 @@ public class Order extends BaseTimeEntity {
     private Instant estimatedReadyAt;
 
     @Version
-    @Column(name = "version", nullable = false)
+    @Column(
+            name = "version",
+            nullable = false
+    )
     private long version;
 
     @OneToMany(
@@ -129,7 +181,8 @@ public class Order extends BaseTimeEntity {
             orphanRemoval = true
     )
     @OrderBy("id ASC")
-    private List<OrderItem> items = new ArrayList<>();
+    private List<OrderItem> items =
+            new ArrayList<>();
 
     @OneToMany(
             mappedBy = "order",
@@ -137,7 +190,8 @@ public class Order extends BaseTimeEntity {
             orphanRemoval = true
     )
     @OrderBy("changedAt ASC, id ASC")
-    private List<OrderStatusHistory> statusHistories = new ArrayList<>();
+    private List<OrderStatusHistory> statusHistories =
+            new ArrayList<>();
 
     private Order(
             String orderPublicId,
@@ -158,13 +212,22 @@ public class Order extends BaseTimeEntity {
         this.guestSession = guestSession;
         this.store = store;
         this.orderType = orderType;
-        this.requestMessage = normalizeRequestMessage(requestMessage);
+        this.requestMessage =
+                normalizeRequestMessage(
+                        requestMessage
+                );
         this.status = OrderStatus.CREATED;
         this.idempotencyKey = idempotencyKey;
         this.requestHash = requestHash;
         this.expiresAt = expiresAt;
+
         this.statusHistories.add(
-                OrderStatusHistory.initial(this, actorType, actorId, now)
+                OrderStatusHistory.initial(
+                        this,
+                        actorType,
+                        actorId,
+                        now
+                )
         );
     }
 
@@ -221,12 +284,19 @@ public class Order extends BaseTimeEntity {
         );
     }
 
-    public void addItem(OrderItem item) {
+    public void addItem(
+            OrderItem item
+    ) {
         items.add(item);
+
         try {
             recalculateAmounts();
-        } catch (ArithmeticException exception) {
+
+        } catch (
+                ArithmeticException exception
+        ) {
             items.remove(item);
+
             throw new BusinessException(
                     ErrorCode.INVALID_REQUEST,
                     "주문 금액이 허용 범위를 초과했습니다."
@@ -241,12 +311,28 @@ public class Order extends BaseTimeEntity {
             String reason,
             Instant now
     ) {
-        EnumSet<OrderStatus> allowed = ALLOWED_TRANSITIONS.get(status);
-        if (allowed == null || !allowed.contains(nextStatus)) {
-            throw new BusinessException(ErrorCode.INVALID_ORDER_STATUS);
+        EnumSet<OrderStatus> allowed =
+                ALLOWED_TRANSITIONS.get(
+                        status
+                );
+
+        if (
+                allowed == null ||
+                        !allowed.contains(
+                                nextStatus
+                        )
+        ) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_ORDER_STATUS
+            );
         }
-        OrderStatus previous = status;
-        status = nextStatus;
+
+        OrderStatus previous =
+                status;
+
+        status =
+                nextStatus;
+
         statusHistories.add(
                 OrderStatusHistory.change(
                         this,
@@ -258,7 +344,12 @@ public class Order extends BaseTimeEntity {
                         now
                 )
         );
-        return new OrderTransition(previous, nextStatus, now);
+
+        return new OrderTransition(
+                previous,
+                nextStatus,
+                now
+        );
     }
 
     public OrderTransition accept(
@@ -268,52 +359,151 @@ public class Order extends BaseTimeEntity {
             String reason,
             Instant now
     ) {
-        OrderTransition transition = transitionTo(
-                OrderStatus.PREPARING,
-                actorType,
-                actorId,
-                reason,
-                now
-        );
-        this.preparationMinutes = preparationMinutes;
-        this.acceptedAt = now;
-        this.estimatedReadyAt = now.plusSeconds(
-                Math.multiplyExact((long) preparationMinutes, 60L)
-        );
+        OrderTransition transition =
+                transitionTo(
+                        OrderStatus.PREPARING,
+                        actorType,
+                        actorId,
+                        reason,
+                        now
+                );
+
+        this.preparationMinutes =
+                preparationMinutes;
+
+        this.acceptedAt =
+                now;
+
+        this.estimatedReadyAt =
+                now.plusSeconds(
+                        Math.multiplyExact(
+                                (long) preparationMinutes,
+                                60L
+                        )
+                );
+
         return transition;
     }
 
-    public boolean isPaymentExpired(Instant now) {
-        return status == OrderStatus.CREATED && now.isAfter(expiresAt);
+    /*
+     * ========================================================
+     * 접수 후 예상 준비시간 수정
+     * ========================================================
+     *
+     * 예:
+     *
+     * 최초 접수 시 30분
+     * acceptedAt = 18:00
+     * estimatedReadyAt = 18:30
+     *
+     * 이후 판매자가 40분으로 수정
+     * estimatedReadyAt = 18:40
+     *
+     * 즉, preparationMinutes는
+     * "접수 시점부터 총 예상 준비시간"을 의미한다.
+     */
+    public void updatePreparationTime(
+            int preparationMinutes
+    ) {
+        if (
+                status != OrderStatus.ACCEPTED &&
+                        status != OrderStatus.PREPARING
+        ) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_ORDER_STATUS
+            );
+        }
+
+        if (acceptedAt == null) {
+            throw new BusinessException(
+                    ErrorCode.INVALID_ORDER_STATUS
+            );
+        }
+
+        this.preparationMinutes =
+                preparationMinutes;
+
+        this.estimatedReadyAt =
+                acceptedAt.plusSeconds(
+                        Math.multiplyExact(
+                                (long) preparationMinutes,
+                                60L
+                        )
+                );
     }
 
-    public boolean belongsToGuestSession(Long guestSessionId) {
-        return guestSession != null && guestSession.getId().equals(guestSessionId);
+    public boolean isPaymentExpired(
+            Instant now
+    ) {
+        return status ==
+                OrderStatus.CREATED &&
+                now.isAfter(
+                        expiresAt
+                );
     }
 
-    public boolean belongsToUser(Long userId) {
-        return user != null && user.getId().equals(userId);
+    public boolean belongsToGuestSession(
+            Long guestSessionId
+    ) {
+        return guestSession != null &&
+                guestSession
+                        .getId()
+                        .equals(
+                                guestSessionId
+                        );
     }
 
-    private static String normalizeRequestMessage(String requestMessage) {
+    public boolean belongsToUser(
+            Long userId
+    ) {
+        return user != null &&
+                user
+                        .getId()
+                        .equals(
+                                userId
+                        );
+    }
+
+    private static String normalizeRequestMessage(
+            String requestMessage
+    ) {
         if (requestMessage == null) {
             return null;
         }
 
-        String normalized = requestMessage.trim();
-        return normalized.isEmpty() ? null : normalized;
+        String normalized =
+                requestMessage.trim();
+
+        return normalized.isEmpty()
+                ? null
+                : normalized;
     }
 
     private void recalculateAmounts() {
-        subtotalAmount = items.stream()
-                .mapToLong(OrderItem::getItemTotalPrice)
-                .reduce(0L, Math::addExact);
+        subtotalAmount =
+                items.stream()
+                        .mapToLong(
+                                OrderItem::getItemTotalPrice
+                        )
+                        .reduce(
+                                0L,
+                                Math::addExact
+                        );
+
         discountAmount = 0;
         taxAmount = 0;
         serviceFeeAmount = 0;
-        totalAmount = Math.addExact(
-                Math.subtractExact(subtotalAmount, discountAmount),
-                Math.addExact(taxAmount, serviceFeeAmount)
-        );
+
+        totalAmount =
+                Math.addExact(
+                        Math.subtractExact(
+                                subtotalAmount,
+                                discountAmount
+                        ),
+                        Math.addExact(
+                                taxAmount,
+                                serviceFeeAmount
+                        )
+                );
     }
 }

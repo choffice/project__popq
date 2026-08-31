@@ -51,6 +51,9 @@ public class SupportTicket extends BaseTimeEntity {
     @Column(name = "last_message_at", nullable = false)
     private Instant lastMessageAt;
 
+    @Column(name = "requester_read_at")
+    private Instant requesterReadAt;
+
     private SupportTicket(
             User requester,
             SupportRequesterType requesterType,
@@ -64,6 +67,7 @@ public class SupportTicket extends BaseTimeEntity {
         this.subject = subject.trim();
         this.status = SupportTicketStatus.RECEIVED;
         this.lastMessageAt = now;
+        this.requesterReadAt = now;
     }
 
     public static SupportTicket create(
@@ -81,6 +85,10 @@ public class SupportTicket extends BaseTimeEntity {
         this.status = senderType == SupportSenderType.ADMIN
                 ? SupportTicketStatus.WAITING_REQUESTER
                 : SupportTicketStatus.WAITING_ADMIN;
+    }
+
+    public void markRequesterRead(Instant now) {
+        this.requesterReadAt = now;
     }
 
     public void changeStatus(SupportTicketStatus status) {

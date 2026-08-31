@@ -84,6 +84,51 @@ class SupportTicketIntegrationTests {
                 );
     }
 
+    @Test
+    void sellerUnreadCountIsClearedWhenTicketIsMarkedAsRead() {
+        User seller = createUser(PlatformRole.SELLER, "문의 판매자");
+        User admin = createUser(PlatformRole.ADMIN, "문의 관리자");
+        var created = service.create(seller, new SupportTicketRequest.Create(
+                SupportRequesterType.SELLER,
+                SupportCategory.OTHER,
+                "앱 문의",
+                "알림이 오지 않습니다."
+        ));
+        Long ticketId = created.ticket().supportTicketId();
+
+        var initialTickets = service.myTickets(seller, 0, 20).content();
+        assertThat(initialTickets).hasSize(1);
+        assertThat(initialTickets.get(0).unreadMessageCount()).isZero();
+
+        service.addAdminMessage(
+                admin,
+                ticketId,
+                new SupportTicketRequest.Message("알림 설정을 확인해 주세요.")
+        );
+
+        assertThat(service.myTicket(seller, ticketId).ticket().unreadMessageCount())
+                .isEqualTo(1L);
+        var unreadTickets = service.myTickets(seller, 0, 20).content();
+        assertThat(unreadTickets).hasSize(1);
+        assertThat(unreadTickets.get(0).unreadMessageCount()).isEqualTo(1L);
+
+        var read = service.markRequesterRead(seller, ticketId);
+        assertThat(read.ticket().unreadMessageCount()).isZero();
+        var readTickets = service.myTickets(seller, 0, 20).content();
+        assertThat(readTickets).hasSize(1);
+        assertThat(readTickets.get(0).unreadMessageCount()).isZero();
+
+        service.addAdminMessage(
+                admin,
+                ticketId,
+                new SupportTicketRequest.Message("추가 안내드립니다.")
+        );
+
+        var nextUnreadTickets = service.myTickets(seller, 0, 20).content();
+        assertThat(nextUnreadTickets).hasSize(1);
+        assertThat(nextUnreadTickets.get(0).unreadMessageCount()).isEqualTo(1L);
+    }
+
     private User createUser(PlatformRole role, String name) {
         return userRepository.save(User.create(
                 UUID.randomUUID() + "@support.test",

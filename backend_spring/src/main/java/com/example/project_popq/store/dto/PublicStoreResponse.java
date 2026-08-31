@@ -34,13 +34,21 @@ public record PublicStoreResponse(
         boolean orderAcceptingEnabled,
         List<String> tags,
         Long distanceMeters,
-        StoreScheduleResponse schedule
+        StoreScheduleResponse schedule,
+        long completedOrderCount,
+        long reviewCount,
+        double averageRating,
+        long favoriteCount
 ) {
     public static PublicStoreResponse of(
             Store store,
             List<String> tags,
             Long distanceMeters,
-            StoreScheduleResponse schedule
+            StoreScheduleResponse schedule,
+            long completedOrderCount,
+            long reviewCount,
+            double averageRating,
+            long favoriteCount
     ) {
         return new PublicStoreResponse(
                 store.getId(),
@@ -66,7 +74,11 @@ public record PublicStoreResponse(
                 store.isOrderAcceptingEnabled(),
                 tags,
                 distanceMeters,
-                schedule
+                schedule,
+                completedOrderCount,
+                reviewCount,
+                averageRating,
+                favoriteCount
         );
     }
 

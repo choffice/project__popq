@@ -10,6 +10,7 @@ import '../cart/cart_controller.dart';
 import '../discovery/store_discovery_repository.dart';
 import '../orders/customer_order_repository.dart';
 import '../permissions/customer_permission_gateway.dart';
+import '../profile/store_category_filter.dart';
 import 'customer_home_content.dart';
 import 'customer_home_controller.dart';
 import 'customer_location_repository.dart';
@@ -53,7 +54,7 @@ class _CustomerHomeScreenState
 
   /// 현재 선택된 카테고리 필터입니다.
   ///
-  /// 백엔드 카테고리 필터 API가 아직 없어 화면 표시 용도로만 사용합니다.
+  /// 홈에서 이미 조회한 주변 매장 목록에 대표 카테고리 기준 필터를 적용합니다.
   int _selectedCategoryIndex = 0;
 
   @override
@@ -169,6 +170,28 @@ class _CustomerHomeScreenState
           );
         }
 
+        final String selectedCategoryLabel =
+            _homeCategoryLabels[_selectedCategoryIndex];
+        final Map<int, CustomerStore> popularityCandidateMap =
+            <int, CustomerStore>{
+          if (snapshot.featuredStore != null)
+            snapshot.featuredStore!.storeId: snapshot.featuredStore!,
+          for (final CustomerStore store in snapshot.recommendedStores)
+            store.storeId: store,
+        };
+        final List<CustomerStore> popularityCandidates =
+            popularityCandidateMap.values
+                .where(
+                  (CustomerStore store) => matchesStoreCategoryLabel(
+                    store.representativeCategory,
+                    selectedCategoryLabel,
+                  ),
+                )
+                .toList(growable: true)
+              ..sort(_compareStorePopularity);
+        final List<CustomerStore> filteredRecommendedStores =
+            popularityCandidates.take(5).toList(growable: false);
+
         return RefreshIndicator(
           onRefresh: _controller.refresh,
           child: ListView(
@@ -214,30 +237,11 @@ class _CustomerHomeScreenState
                 height: PopqSpacing.lg,
               ),
 
-              const _SectionHeader(
-                eyebrow: 'FEATURED',
-                title: '이번 주 추천 이벤트',
-                description:
-                '지금 놓치면 아쉬운 이벤트를 모았어요.',
-              ),
-
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
-
-              _FeatureEventCarousel(
-                banners: snapshot.featureBanners,
-              ),
-
-              const SizedBox(
-                height: PopqSpacing.xl,
-              ),
-
               _SectionHeader(
                 eyebrow: 'RANKING',
                 title: '인기 랭킹 TOP 5',
                 description:
-                '${snapshot.regionLabel}에서 지금 가장 인기 있는 곳을 모았어요.',
+                '${snapshot.regionLabel}의 완료 주문·리뷰·찜 데이터를 기준으로 정렬했어요.',
               ),
 
               const SizedBox(
@@ -261,61 +265,37 @@ class _CustomerHomeScreenState
 
               SizedBox(
                 height: 216,
-                child: snapshot.recommendedStores.isNotEmpty
+                child: filteredRecommendedStores.isNotEmpty
                     ? ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount:
-                  snapshot.recommendedStores.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    final store =
-                    snapshot
-                        .recommendedStores[index];
+                        scrollDirection: Axis.horizontal,
+                        itemCount: filteredRecommendedStores.length,
+                        separatorBuilder: (context, index) {
+                          return const SizedBox(
+                            width: PopqSpacing.sm,
+                          );
+                        },
+                        itemBuilder: (context, index) {
+                          final CustomerStore store =
+                              filteredRecommendedStores[index];
 
-                    return _RankingStoreCard(
-                      rank: index + 1,
-                      store: store,
-                      onTap: () {
-                        context.push(
-                          '${CustomerRoutes.stores}/'
-                              '${store.storeId}',
-                        );
-                      },
-                    );
-                  },
-                )
-                    : snapshot.regionLabel == '부산'
-                    ? ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount: snapshot
-                      .temporaryRecommendations.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    return _RankingTemporaryCard(
-                      rank: index + 1,
-                      item: snapshot
-                          .temporaryRecommendations[index],
-                    );
-                  },
-                )
+                          return _RankingStoreCard(
+                            rank: index + 1,
+                            store: store,
+                            onTap: () {
+                              context.push(
+                                '${CustomerRoutes.stores}/'
+                                '${store.storeId}',
+                              );
+                            },
+                          );
+                        },
+                      )
                     : _RegionContentEmptyCard(
-                  regionLabel: snapshot.regionLabel,
-                  message: '등록된 인기 매장이 아직 없어요.',
-                ),
+                        regionLabel: snapshot.regionLabel,
+                        message: _selectedCategoryIndex == 0
+                            ? '등록된 인기 매장이 아직 없어요.'
+                            : '$selectedCategoryLabel 카테고리 매장이 아직 없어요.',
+                      ),
               ),
 
               const SizedBox(
@@ -364,26 +344,6 @@ class _CustomerHomeScreenState
                     );
                   },
                 )
-                    : snapshot.regionLabel == '부산'
-                    ? ListView.separated(
-                  scrollDirection:
-                  Axis.horizontal,
-                  itemCount: snapshot
-                      .temporaryPopups.length,
-                  separatorBuilder:
-                      (context, index) {
-                    return const SizedBox(
-                      width: PopqSpacing.sm,
-                    );
-                  },
-                  itemBuilder:
-                      (context, index) {
-                    return _OngoingEventTemporaryCard(
-                      item: snapshot
-                          .temporaryPopups[index],
-                    );
-                  },
-                )
                     : _RegionContentEmptyCard(
                   regionLabel: snapshot.regionLabel,
                   message: '진행 중인 이벤트가 아직 없어요.',
@@ -411,7 +371,7 @@ class _CustomerHomeScreenState
                 ),
                 _LoadNotice(
                   message:
-                  '매장 정보를 불러오지 못해 임시 콘텐츠를 표시하고 있어요.',
+                  '매장 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
                   onRetry: _controller.refresh,
                 ),
               ],
@@ -2027,234 +1987,6 @@ class _CategoryTabButton extends StatelessWidget {
   }
 }
 
-class _FeatureEventCarousel
-    extends StatefulWidget {
-  const _FeatureEventCarousel({
-    required this.banners,
-  });
-
-  final List<CustomerHomeFeatureBanner> banners;
-
-  @override
-  State<_FeatureEventCarousel>
-  createState() =>
-      _FeatureEventCarouselState();
-}
-
-class _FeatureEventCarouselState
-    extends State<_FeatureEventCarousel> {
-  final _pageController = PageController();
-
-  int _page = 0;
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.banners.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    return Column(
-      children: [
-        SizedBox(
-          height: 240,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: widget.banners.length,
-            onPageChanged: (index) {
-              setState(() {
-                _page = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              return _FeatureBannerSlide(
-                banner: widget.banners[index],
-              );
-            },
-          ),
-        ),
-        const SizedBox(
-          height: PopqSpacing.sm,
-        ),
-        Row(
-          mainAxisAlignment:
-          MainAxisAlignment.center,
-          children: [
-            for (var index = 0;
-            index < widget.banners.length;
-            index++)
-              AnimatedContainer(
-                duration: const Duration(
-                  milliseconds: 200,
-                ),
-                margin:
-                const EdgeInsets.symmetric(
-                  horizontal: 3,
-                ),
-                width:
-                index == _page ? 20 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: index == _page
-                      ? (isDark
-                      ? PopqPalette.lime
-                      : PopqPalette.forest)
-                      : (isDark
-                      ? PopqPalette
-                      .nightBorder
-                      : PopqPalette
-                      .lightBorder),
-                  borderRadius:
-                  BorderRadius.circular(
-                    999,
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _FeatureBannerSlide
-    extends StatelessWidget {
-  const _FeatureBannerSlide({
-    required this.banner,
-  });
-
-  final CustomerHomeFeatureBanner banner;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(
-        PopqSpacing.lg,
-      ),
-      decoration: BoxDecoration(
-        borderRadius:
-        BorderRadius.circular(28),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: _temporaryVisualColors(
-            banner.visualKind,
-            isDark,
-          ),
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -18,
-            bottom: -22,
-            child: Icon(
-              _temporaryVisualIcon(
-                banner.visualKind,
-              ),
-              size: 140,
-              color: Colors.white.withValues(
-                alpha: 0.12,
-              ),
-            ),
-          ),
-          Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            mainAxisAlignment:
-            MainAxisAlignment.end,
-            children: [
-              Text(
-                banner.title,
-                style: theme
-                    .textTheme.headlineSmall
-                    ?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(
-                height: PopqSpacing.xs,
-              ),
-              Text(
-                banner.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(
-                  color: Colors.white
-                      .withValues(alpha: 0.85),
-                ),
-              ),
-              const SizedBox(
-                height: PopqSpacing.md,
-              ),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.event_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(
-                    width: PopqSpacing.xs,
-                  ),
-                  Text(
-                    banner.periodLabel,
-                    style: theme
-                        .textTheme.bodySmall
-                        ?.copyWith(
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(
-                    width: PopqSpacing.sm,
-                  ),
-                  const Icon(
-                    Icons.place_rounded,
-                    size: 16,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(
-                    width: PopqSpacing.xs,
-                  ),
-                  Expanded(
-                    child: Text(
-                      banner.locationLabel,
-                      maxLines: 1,
-                      overflow:
-                      TextOverflow.ellipsis,
-                      style: theme
-                          .textTheme.bodySmall
-                          ?.copyWith(
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _HomeStoreThumbnail extends StatelessWidget {
   const _HomeStoreThumbnail({
     required this.height,
@@ -2418,10 +2150,17 @@ class _RankingStoreCard
                 Text(
                   _storeCategoryLabel(store),
                   maxLines: 1,
-                  overflow:
-                  TextOverflow.ellipsis,
-                  style:
-                  theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  _popularitySummary(store),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -2432,132 +2171,49 @@ class _RankingStoreCard
   }
 }
 
-class _RankingTemporaryCard
-    extends StatelessWidget {
-  const _RankingTemporaryCard({
-    required this.rank,
-    required this.item,
-  });
-
-  final int rank;
-  final CustomerHomeRecommendedItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    return SizedBox(
-      width: 200,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Padding(
-          padding: const EdgeInsets.all(
-            PopqSpacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment:
-            CrossAxisAlignment.start,
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    height: 110,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors:
-                        _temporaryVisualColors(
-                          item.visualKind,
-                          isDark,
-                        ),
-                      ),
-                      borderRadius:
-                      BorderRadius.circular(
-                        16,
-                      ),
-                    ),
-                    child: Icon(
-                      _temporaryVisualIcon(
-                        item.visualKind,
-                      ),
-                      color: Colors.white,
-                      size: 30,
-                    ),
-                  ),
-                  Positioned(
-                    left: 6,
-                    top: 6,
-                    child: _RankBadge(
-                      rank: rank,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(
-                height: PopqSpacing.xs,
-              ),
-              Text(
-                item.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme
-                    .textTheme.titleMedium
-                    ?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              Text(
-                item.categoryLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                theme.textTheme.bodySmall,
-              ),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.star_rounded,
-                    size: 14,
-                    color: PopqPalette.coral,
-                  ),
-                  const SizedBox(width: 2),
-                  Text(
-                    item.rating
-                        .toStringAsFixed(1),
-                    style: theme
-                        .textTheme.bodySmall
-                        ?.copyWith(
-                      fontWeight:
-                      FontWeight.w800,
-                    ),
-                  ),
-                  if (item.visitLabel !=
-                      null) ...[
-                    const SizedBox(
-                      width: PopqSpacing.xs,
-                    ),
-                    Expanded(
-                      child: Text(
-                        item.visitLabel!,
-                        maxLines: 1,
-                        overflow:
-                        TextOverflow.ellipsis,
-                        style: theme
-                            .textTheme
-                            .bodySmall,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+int _compareStorePopularity(CustomerStore left, CustomerStore right) {
+  int compared = right.completedOrderCount.compareTo(left.completedOrderCount);
+  if (compared != 0) {
+    return compared;
   }
+
+  compared = right.reviewCount.compareTo(left.reviewCount);
+  if (compared != 0) {
+    return compared;
+  }
+
+  compared = right.favoriteCount.compareTo(left.favoriteCount);
+  if (compared != 0) {
+    return compared;
+  }
+
+  compared = right.averageRating.compareTo(left.averageRating);
+  if (compared != 0) {
+    return compared;
+  }
+
+  final int leftDistance = left.distanceMeters ?? 1 << 30;
+  final int rightDistance = right.distanceMeters ?? 1 << 30;
+  compared = leftDistance.compareTo(rightDistance);
+  if (compared != 0) {
+    return compared;
+  }
+
+  return left.storeId.compareTo(right.storeId);
+}
+
+String _popularitySummary(CustomerStore store) {
+  final List<String> parts = <String>[
+    '주문 ${store.completedOrderCount}',
+    '리뷰 ${store.reviewCount}',
+    '찜 ${store.favoriteCount}',
+  ];
+
+  if (store.reviewCount > 0) {
+    parts.add('★ ${store.averageRating.toStringAsFixed(1)}');
+  }
+
+  return parts.join(' · ');
 }
 
 class _DDayBadge extends StatelessWidget {
@@ -2699,138 +2355,6 @@ class _OngoingEventStoreCard
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OngoingEventTemporaryCard
-    extends StatelessWidget {
-  const _OngoingEventTemporaryCard({
-    required this.item,
-  });
-
-  final CustomerHomePopupItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark =
-        theme.brightness == Brightness.dark;
-
-    final mutedColor = isDark
-        ? PopqPalette.nightMutedText
-        : PopqPalette.lightMutedText;
-
-    return SizedBox(
-      width: 200,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment:
-          CrossAxisAlignment.start,
-          children: [
-            Stack(
-              children: [
-                Container(
-                  height: 110,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors:
-                      _temporaryVisualColors(
-                        item.visualKind,
-                        isDark,
-                      ),
-                    ),
-                  ),
-                  child: Icon(
-                    _temporaryVisualIcon(
-                      item.visualKind,
-                    ),
-                    size: 52,
-                    color: Colors.white,
-                  ),
-                ),
-                Positioned(
-                  left: PopqSpacing.sm,
-                  top: PopqSpacing.sm,
-                  child: _DDayBadge(
-                    label: item.dDayLabel ??
-                        item.badgeLabel,
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(
-                PopqSpacing.md,
-              ),
-              child: Column(
-                crossAxisAlignment:
-                CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow:
-                    TextOverflow.ellipsis,
-                    style: theme
-                        .textTheme.titleMedium
-                        ?.copyWith(
-                      fontWeight:
-                      FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(
-                    height: PopqSpacing.xs,
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.event_rounded,
-                        size: 16,
-                        color: mutedColor,
-                      ),
-                      const SizedBox(
-                        width: PopqSpacing.xs,
-                      ),
-                      Text(
-                        item.periodLabel,
-                        style: theme
-                            .textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.place_rounded,
-                        size: 16,
-                        color: mutedColor,
-                      ),
-                      const SizedBox(
-                        width: PopqSpacing.xs,
-                      ),
-                      Expanded(
-                        child: Text(
-                          item.locationLabel,
-                          maxLines: 1,
-                          overflow:
-                          TextOverflow.ellipsis,
-                          style: theme
-                              .textTheme
-                              .bodySmall,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -3001,9 +2525,7 @@ class _BenefitBanner
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  _temporaryVisualIcon(
-                    banner.visualKind,
-                  ),
+                  Icons.loyalty_rounded,
                   size: 38,
                   color: isDark
                       ? PopqPalette.lime
@@ -3183,115 +2705,3 @@ String _won(int amount) {
   return '$buffer원';
 }
 
-IconData _temporaryVisualIcon(
-    CustomerHomeVisualKind kind,
-    ) {
-  return switch (kind) {
-    CustomerHomeVisualKind.taco =>
-    Icons.lunch_dining_rounded,
-    CustomerHomeVisualKind.dessert =>
-    Icons.cake_rounded,
-    CustomerHomeVisualKind
-        .koreanFood =>
-    Icons.rice_bowl_rounded,
-    CustomerHomeVisualKind.steak =>
-    Icons.restaurant_rounded,
-    CustomerHomeVisualKind
-        .membership =>
-    Icons.loyalty_rounded,
-    CustomerHomeVisualKind
-        .popupMarket =>
-    Icons.storefront_rounded,
-    CustomerHomeVisualKind.cafe =>
-    Icons.local_cafe_rounded,
-  };
-}
-
-List<Color> _temporaryVisualColors(
-    CustomerHomeVisualKind kind,
-    bool isDark,
-    ) {
-  if (isDark) {
-    return switch (kind) {
-      CustomerHomeVisualKind.taco =>
-      const [
-        PopqPalette.purple,
-        PopqPalette.nightElevated,
-      ],
-      CustomerHomeVisualKind.dessert =>
-      const [
-        PopqPalette.coral,
-        PopqPalette.purple,
-      ],
-      CustomerHomeVisualKind
-          .koreanFood =>
-      const [
-        PopqPalette.forest,
-        PopqPalette.nightElevated,
-      ],
-      CustomerHomeVisualKind.steak =>
-      const [
-        Color(0xFF5F3B2F),
-        PopqPalette.nightElevated,
-      ],
-      CustomerHomeVisualKind
-          .membership =>
-      const [
-        PopqPalette.purple,
-        PopqPalette.nightElevated,
-      ],
-      CustomerHomeVisualKind
-          .popupMarket =>
-      const [
-        PopqPalette.purple,
-        Color(0xFF3A2159),
-      ],
-      CustomerHomeVisualKind.cafe =>
-      const [
-        Color(0xFF5F3B2F),
-        PopqPalette.nightElevated,
-      ],
-    };
-  }
-
-  return switch (kind) {
-    CustomerHomeVisualKind.taco =>
-    const [
-      PopqPalette.coral,
-      Color(0xFFFFB15C),
-    ],
-    CustomerHomeVisualKind.dessert =>
-    const [
-      Color(0xFFFF8DA1),
-      PopqPalette.coral,
-    ],
-    CustomerHomeVisualKind
-        .koreanFood =>
-    const [
-      PopqPalette.forest,
-      Color(0xFF4F8D73),
-    ],
-    CustomerHomeVisualKind.steak =>
-    const [
-      Color(0xFF7A4D3A),
-      Color(0xFFC67C58),
-    ],
-    CustomerHomeVisualKind
-        .membership =>
-    const [
-      PopqPalette.purple,
-      PopqPalette.coral,
-    ],
-    CustomerHomeVisualKind
-        .popupMarket =>
-    const [
-      PopqPalette.purple,
-      Color(0xFFB794F6),
-    ],
-    CustomerHomeVisualKind.cafe =>
-    const [
-      Color(0xFF7A4D3A),
-      Color(0xFFC67C58),
-    ],
-  };
-}

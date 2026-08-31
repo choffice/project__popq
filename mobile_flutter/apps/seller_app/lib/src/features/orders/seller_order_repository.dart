@@ -33,9 +33,9 @@ class SellerOrder {
       statusHistory: (json['statusHistory'] as List<Object?>? ?? const [])
           .map(
             (item) => SellerOrderStatusHistory.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
+          Map<String, Object?>.from(item as Map),
+        ),
+      )
           .toList(),
       subtotalAmount: (json['subtotalAmount'] as num).toInt(),
       discountAmount: (json['discountAmount'] as num).toInt(),
@@ -50,9 +50,9 @@ class SellerOrder {
       items: (json['items'] as List<Object?>? ?? const [])
           .map(
             (item) => SellerOrderItem.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
+          Map<String, Object?>.from(item as Map),
+        ),
+      )
           .toList(),
     );
   }
@@ -170,9 +170,9 @@ class SellerOrderItem {
       options: (json['options'] as List<Object?>? ?? const [])
           .map(
             (option) => SellerOrderItemOption.fromJson(
-              Map<String, Object?>.from(option as Map),
-            ),
-          )
+          Map<String, Object?>.from(option as Map),
+        ),
+      )
           .toList(),
     );
   }
@@ -266,9 +266,9 @@ class SellerPaymentSummary {
       refunds: (json['refunds'] as List<Object?>? ?? const [])
           .map(
             (item) => SellerRefund.fromJson(
-              Map<String, Object?>.from(item as Map),
-            ),
-          )
+          Map<String, Object?>.from(item as Map),
+        ),
+      )
           .toList(),
     );
   }
@@ -307,42 +307,82 @@ class SellerOrderSyncResult {
   final SellerOrder? order;
 }
 
+class SellerWaitTimeRecommendation {
+  const SellerWaitTimeRecommendation({
+    required this.recommendedMinutes,
+    required this.source,
+    this.predictedMinutes,
+    this.modelVersion,
+  });
+
+  factory SellerWaitTimeRecommendation.fromJson(Map<String, Object?> json) {
+    return SellerWaitTimeRecommendation(
+      recommendedMinutes: (json['recommendedMinutes'] as num).toInt(),
+      predictedMinutes: (json['predictedMinutes'] as num?)?.toDouble(),
+      source: json['source'] as String,
+      modelVersion: SellerOrder._nullableString(json['modelVersion']),
+    );
+  }
+
+  final int recommendedMinutes;
+  final double? predictedMinutes;
+  final String source;
+  final String? modelVersion;
+
+  bool get isAi => source.toUpperCase() == 'AI';
+}
+
 abstract interface class SellerOrderRepository {
   Future<List<SellerOrder>> findAll(
-    int storeId, {
-    String? status,
-    List<String>? statuses,
-    DateTime? date,
-  });
+      int storeId, {
+        String? status,
+        List<String>? statuses,
+        DateTime? date,
+      });
 
-  Future<SellerOrder> findOne(int storeId, String orderPublicId);
+  Future<SellerOrder> findOne(
+      int storeId,
+      String orderPublicId,
+      );
 
   Future<SellerOrderSyncResult> sync(
-    int storeId,
-    String orderPublicId,
-    int knownVersion,
-  );
+      int storeId,
+      String orderPublicId,
+      int knownVersion,
+      );
+
+  Future<SellerWaitTimeRecommendation> findWaitTimeRecommendation(
+      int storeId,
+      String orderPublicId,
+      );
 
   Future<SellerOrder> transition(
-    int storeId,
-    String orderPublicId,
-    SellerOrderCommand command, {
-    String? reason,
-    int? preparationMinutes,
-    bool applyAsStoreDefault = false,
-  });
+      int storeId,
+      String orderPublicId,
+      SellerOrderCommand command, {
+        String? reason,
+        int? preparationMinutes,
+        bool applyAsStoreDefault = false,
+      });
+
+  Future<SellerOrder> updatePreparationTime(
+      int storeId,
+      String orderPublicId, {
+        required int preparationMinutes,
+        bool applyAsStoreDefault = false,
+      });
 
   Future<SellerPaymentSummary> findPayment(
-    int storeId,
-    String orderPublicId,
-  );
+      int storeId,
+      String orderPublicId,
+      );
 
   Future<SellerPaymentSummary> refund(
-    int storeId,
-    String orderPublicId, {
-    required int amount,
-    required String reason,
-  });
+      int storeId,
+      String orderPublicId, {
+        required int amount,
+        required String reason,
+      });
 }
 
 class ApiSellerOrderRepository implements SellerOrderRepository {
@@ -350,343 +390,704 @@ class ApiSellerOrderRepository implements SellerOrderRepository {
 
   final PopqApiClient _apiClient;
 
-  String _basePath(int storeId) => '/api/v1/seller/stores/$storeId/orders';
+  String _basePath(int storeId) =>
+      '/api/v1/seller/stores/$storeId/orders';
 
   @override
   Future<List<SellerOrder>> findAll(
-    int storeId, {
-    String? status,
-    List<String>? statuses,
-    DateTime? date,
-  }) {
+      int storeId, {
+        String? status,
+        List<String>? statuses,
+        DateTime? date,
+      }) {
     final query = <String, Object?>{};
-    if (status != null) query['status'] = status;
-    if (status == null && statuses != null && statuses.isNotEmpty) {
+
+    if (status != null) {
+      query['status'] = status;
+    }
+
+    if (status == null &&
+        statuses != null &&
+        statuses.isNotEmpty) {
       query['statuses'] = statuses.join(',');
     }
-    if (date != null) query['date'] = _calendarDate(date);
+
+    if (date != null) {
+      query['date'] = _calendarDate(date);
+    }
+
     return _apiClient.get(
       _basePath(storeId),
       query: query,
-      decode: (value) => (value as List<Object?>)
-          .map(
-            (item) =>
-                SellerOrder.fromJson(Map<String, Object?>.from(item as Map)),
+      decode: (value) =>
+          (value as List<Object?>)
+              .map(
+                (item) => SellerOrder.fromJson(
+              Map<String, Object?>.from(
+                item as Map,
+              ),
+            ),
           )
-          .toList(),
+              .toList(),
     );
   }
 
   @override
-  Future<SellerOrder> findOne(int storeId, String orderPublicId) {
+  Future<SellerOrder> findOne(
+      int storeId,
+      String orderPublicId,
+      ) {
     return _apiClient.get(
       '${_basePath(storeId)}/$orderPublicId',
-      decode: (value) =>
-          SellerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => SellerOrder.fromJson(
+        Map<String, Object?>.from(
+          value as Map,
+        ),
+      ),
     );
   }
 
   @override
   Future<SellerOrderSyncResult> sync(
-    int storeId,
-    String orderPublicId,
-    int knownVersion,
-  ) {
+      int storeId,
+      String orderPublicId,
+      int knownVersion,
+      ) {
     return _apiClient.get(
       '${_basePath(storeId)}/$orderPublicId/sync',
-      query: {'knownVersion': knownVersion},
+      query: {
+        'knownVersion': knownVersion,
+      },
       decode: (value) {
-        final json = Map<String, Object?>.from(value as Map);
+        final json =
+        Map<String, Object?>.from(
+          value as Map,
+        );
+
         final order = json['order'];
+
         return SellerOrderSyncResult(
-          refreshRequired: json['refreshRequired'] as bool,
-          serverVersion: (json['serverVersion'] as num).toInt(),
+          refreshRequired:
+          json['refreshRequired'] as bool,
+          serverVersion:
+          (json['serverVersion'] as num)
+              .toInt(),
           order: order == null
               ? null
-              : SellerOrder.fromJson(Map<String, Object?>.from(order as Map)),
+              : SellerOrder.fromJson(
+            Map<String, Object?>.from(
+              order as Map,
+            ),
+          ),
         );
       },
     );
   }
 
   @override
+  Future<SellerWaitTimeRecommendation>
+  findWaitTimeRecommendation(
+      int storeId,
+      String orderPublicId,
+      ) {
+    return _apiClient.get(
+      '${_basePath(storeId)}/$orderPublicId/wait-time-recommendation',
+      decode: (value) =>
+          SellerWaitTimeRecommendation.fromJson(
+            Map<String, Object?>.from(
+              value as Map,
+            ),
+          ),
+    );
+  }
+
+  @override
   Future<SellerOrder> transition(
-    int storeId,
-    String orderPublicId,
-    SellerOrderCommand command, {
-    String? reason,
-    int? preparationMinutes,
-    bool applyAsStoreDefault = false,
-  }) {
-    final body = command == SellerOrderCommand.accept
+      int storeId,
+      String orderPublicId,
+      SellerOrderCommand command, {
+        String? reason,
+        int? preparationMinutes,
+        bool applyAsStoreDefault = false,
+      }) {
+    final body =
+    command == SellerOrderCommand.accept
         ? <String, Object?>{
-            'preparationMinutes': preparationMinutes ?? 0,
-            'applyAsStoreDefault': applyAsStoreDefault,
-            'reason': reason,
-          }
-        : <String, Object?>{'reason': reason};
+      'preparationMinutes':
+      preparationMinutes ?? 0,
+      'applyAsStoreDefault':
+      applyAsStoreDefault,
+      'reason': reason,
+    }
+        : <String, Object?>{
+      'reason': reason,
+    };
+
     return _apiClient.post(
       '${_basePath(storeId)}/$orderPublicId/${command.path}',
       body: body,
-      decode: (value) =>
-          SellerOrder.fromJson(Map<String, Object?>.from(value as Map)),
+      decode: (value) => SellerOrder.fromJson(
+        Map<String, Object?>.from(
+          value as Map,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Future<SellerOrder> updatePreparationTime(
+      int storeId,
+      String orderPublicId, {
+        required int preparationMinutes,
+        bool applyAsStoreDefault = false,
+      }) {
+    return _apiClient.patch(
+      '${_basePath(storeId)}/$orderPublicId/preparation-time',
+      body: <String, Object?>{
+        'preparationMinutes':
+        preparationMinutes,
+        'applyAsStoreDefault':
+        applyAsStoreDefault,
+      },
+      decode: (value) => SellerOrder.fromJson(
+        Map<String, Object?>.from(
+          value as Map,
+        ),
+      ),
     );
   }
 
   @override
   Future<SellerPaymentSummary> findPayment(
-    int storeId,
-    String orderPublicId,
-  ) {
+      int storeId,
+      String orderPublicId,
+      ) {
     return _apiClient.get(
       '${_basePath(storeId)}/$orderPublicId/payment',
-      decode: (value) => SellerPaymentSummary.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      decode: (value) =>
+          SellerPaymentSummary.fromJson(
+            Map<String, Object?>.from(
+              value as Map,
+            ),
+          ),
     );
   }
 
   @override
   Future<SellerPaymentSummary> refund(
-    int storeId,
-    String orderPublicId, {
-    required int amount,
-    required String reason,
-  }) {
+      int storeId,
+      String orderPublicId, {
+        required int amount,
+        required String reason,
+      }) {
     return _apiClient.post(
       '${_basePath(storeId)}/$orderPublicId/refunds',
-      body: {'amount': amount, 'reason': reason},
-      decode: (value) => SellerPaymentSummary.fromJson(
-        Map<String, Object?>.from(value as Map),
-      ),
+      body: {
+        'amount': amount,
+        'reason': reason,
+      },
+      decode: (value) =>
+          SellerPaymentSummary.fromJson(
+            Map<String, Object?>.from(
+              value as Map,
+            ),
+          ),
     );
   }
 }
 
-class MemorySellerOrderRepository implements SellerOrderRepository {
+class MemorySellerOrderRepository
+    implements SellerOrderRepository {
   MemorySellerOrderRepository({
     List<SellerOrder> orders = const [],
-    Map<String, SellerPaymentSummary> payments = const {},
-  }) : _orders = List.of(orders),
-       _payments = Map.of(payments);
+    Map<String, SellerPaymentSummary> payments =
+    const {},
+  })  : _orders = List.of(orders),
+        _payments = Map.of(payments);
 
   final List<SellerOrder> _orders;
   final Map<String, SellerPaymentSummary> _payments;
 
   @override
   Future<List<SellerOrder>> findAll(
-    int storeId, {
-    String? status,
-    List<String>? statuses,
-    DateTime? date,
-  }) async {
-    final DateTime? fromUtc = date == null
+      int storeId, {
+        String? status,
+        List<String>? statuses,
+        DateTime? date,
+      }) async {
+    final DateTime? fromUtc =
+    date == null
         ? null
-        : DateTime.utc(date.year, date.month, date.day)
-            .subtract(const Duration(hours: 9));
-    final DateTime? toUtc = fromUtc?.add(const Duration(days: 1));
+        : DateTime.utc(
+      date.year,
+      date.month,
+      date.day,
+    ).subtract(
+      const Duration(hours: 9),
+    );
+
+    final DateTime? toUtc =
+    fromUtc?.add(
+      const Duration(days: 1),
+    );
+
     final values =
-      _orders.where(
-        (order) =>
-            order.storeId == storeId &&
-            (status == null || order.status == status) &&
-            (statuses == null || statuses.contains(order.status)) &&
-            (fromUtc == null ||
-                order.createdAt != null &&
-                    !order.createdAt!.toUtc().isBefore(fromUtc) &&
-                    order.createdAt!.toUtc().isBefore(toUtc!)),
-      ).toList()
-        ..sort((left, right) {
-          final leftDate = left.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final rightDate = right.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-          return rightDate.compareTo(leftDate);
-        });
+    _orders
+        .where(
+          (order) =>
+      order.storeId == storeId &&
+          (status == null ||
+              order.status == status) &&
+          (statuses == null ||
+              statuses.contains(
+                order.status,
+              )) &&
+          (fromUtc == null ||
+              order.createdAt != null &&
+                  !order.createdAt!
+                      .toUtc()
+                      .isBefore(
+                    fromUtc,
+                  ) &&
+                  order.createdAt!
+                      .toUtc()
+                      .isBefore(
+                    toUtc!,
+                  )),
+    )
+        .toList()
+      ..sort(
+            (left, right) {
+          final leftDate =
+              left.createdAt ??
+                  DateTime
+                      .fromMillisecondsSinceEpoch(
+                    0,
+                  );
+
+          final rightDate =
+              right.createdAt ??
+                  DateTime
+                      .fromMillisecondsSinceEpoch(
+                    0,
+                  );
+
+          return rightDate.compareTo(
+            leftDate,
+          );
+        },
+      );
+
     return List.unmodifiable(values);
   }
 
   @override
-  Future<SellerOrder> findOne(int storeId, String orderPublicId) async {
-    final index = _findIndex(storeId, orderPublicId);
-    if (index < 0) throw StateError('order not found in selected store');
+  Future<SellerOrder> findOne(
+      int storeId,
+      String orderPublicId,
+      ) async {
+    final index =
+    _findIndex(
+      storeId,
+      orderPublicId,
+    );
+
+    if (index < 0) {
+      throw StateError(
+        'order not found in selected store',
+      );
+    }
+
     return _orders[index];
   }
 
   @override
   Future<SellerOrderSyncResult> sync(
-    int storeId,
-    String orderPublicId,
-    int knownVersion,
-  ) async {
-    final order = await findOne(storeId, orderPublicId);
-    final refreshRequired = order.version != knownVersion;
+      int storeId,
+      String orderPublicId,
+      int knownVersion,
+      ) async {
+    final order =
+    await findOne(
+      storeId,
+      orderPublicId,
+    );
+
+    final refreshRequired =
+        order.version != knownVersion;
+
     return SellerOrderSyncResult(
       refreshRequired: refreshRequired,
       serverVersion: order.version,
-      order: refreshRequired ? order : null,
+      order: refreshRequired
+          ? order
+          : null,
+    );
+  }
+
+  @override
+  Future<SellerWaitTimeRecommendation>
+  findWaitTimeRecommendation(
+      int storeId,
+      String orderPublicId,
+      ) async {
+    await findOne(
+      storeId,
+      orderPublicId,
+    );
+
+    return const SellerWaitTimeRecommendation(
+      recommendedMinutes: 10,
+      source: 'FALLBACK',
     );
   }
 
   @override
   Future<SellerOrder> transition(
-    int storeId,
-    String orderPublicId,
-    SellerOrderCommand command, {
-    String? reason,
-    int? preparationMinutes,
-    bool applyAsStoreDefault = false,
-  }) async {
-    final index = _findIndex(storeId, orderPublicId);
-    if (index < 0) throw StateError('order not found in selected store');
-    final order = _orders[index];
-    final expectedStatus = switch (command) {
-      SellerOrderCommand.accept || SellerOrderCommand.reject => 'PLACED',
-      SellerOrderCommand.prepare => 'ACCEPTED',
-      SellerOrderCommand.ready => 'PREPARING',
-      SellerOrderCommand.complete => 'READY',
-    };
-    if (order.status != expectedStatus) {
-      throw StateError('invalid seller order transition');
+      int storeId,
+      String orderPublicId,
+      SellerOrderCommand command, {
+        String? reason,
+        int? preparationMinutes,
+        bool applyAsStoreDefault = false,
+      }) async {
+    final index =
+    _findIndex(
+      storeId,
+      orderPublicId,
+    );
+
+    if (index < 0) {
+      throw StateError(
+        'order not found in selected store',
+      );
     }
-    final now = DateTime.now().toUtc();
-    final updated = order.copyWith(
+
+    final order = _orders[index];
+
+    final expectedStatus =
+    switch (command) {
+      SellerOrderCommand.accept ||
+      SellerOrderCommand.reject =>
+      'PLACED',
+      SellerOrderCommand.prepare =>
+      'ACCEPTED',
+      SellerOrderCommand.ready =>
+      'PREPARING',
+      SellerOrderCommand.complete =>
+      'READY',
+    };
+
+    if (order.status != expectedStatus) {
+      throw StateError(
+        'invalid seller order transition',
+      );
+    }
+
+    final now =
+    DateTime.now().toUtc();
+
+    final updated =
+    order.copyWith(
       status: command.targetStatus,
       version: order.version + 1,
       statusHistory: [
         ...order.statusHistory,
         SellerOrderStatusHistory(
-          previousStatus: order.status,
-          currentStatus: command.targetStatus,
+          previousStatus:
+          order.status,
+          currentStatus:
+          command.targetStatus,
           actorType: 'SELLER',
-          reason: reason == null || reason.trim().isEmpty ? null : reason.trim(),
+          reason:
+          reason == null ||
+              reason.trim().isEmpty
+              ? null
+              : reason.trim(),
           changedAt: now,
         ),
       ],
-      acceptedAt: command == SellerOrderCommand.accept ? now : null,
+      acceptedAt:
+      command ==
+          SellerOrderCommand.accept
+          ? now
+          : null,
       preparationMinutes:
-          command == SellerOrderCommand.accept ? preparationMinutes ?? 0 : null,
-      estimatedReadyAt: command == SellerOrderCommand.accept
-          ? now.add(Duration(minutes: preparationMinutes ?? 0))
+      command ==
+          SellerOrderCommand.accept
+          ? preparationMinutes ?? 0
+          : null,
+      estimatedReadyAt:
+      command ==
+          SellerOrderCommand.accept
+          ? now.add(
+        Duration(
+          minutes:
+          preparationMinutes ??
+              0,
+        ),
+      )
           : null,
     );
+
     _orders[index] = updated;
+
+    return updated;
+  }
+
+  @override
+  Future<SellerOrder> updatePreparationTime(
+      int storeId,
+      String orderPublicId, {
+        required int preparationMinutes,
+        bool applyAsStoreDefault = false,
+      }) async {
+    final index =
+    _findIndex(
+      storeId,
+      orderPublicId,
+    );
+
+    if (index < 0) {
+      throw StateError(
+        'order not found in selected store',
+      );
+    }
+
+    final order = _orders[index];
+
+    if (order.status != 'ACCEPTED' &&
+        order.status != 'PREPARING') {
+      throw StateError(
+        'preparation time cannot be changed in current status',
+      );
+    }
+
+    final acceptedAt =
+        order.acceptedAt;
+
+    if (acceptedAt == null) {
+      throw StateError(
+        'acceptedAt is missing',
+      );
+    }
+
+    final updated =
+    order.copyWith(
+      version: order.version + 1,
+      preparationMinutes:
+      preparationMinutes,
+      estimatedReadyAt:
+      acceptedAt.add(
+        Duration(
+          minutes:
+          preparationMinutes,
+        ),
+      ),
+    );
+
+    _orders[index] = updated;
+
     return updated;
   }
 
   @override
   Future<SellerPaymentSummary> findPayment(
-    int storeId,
-    String orderPublicId,
-  ) async {
-    final order = await findOne(storeId, orderPublicId);
-    final existing = _payments[orderPublicId];
-    if (existing != null) return existing;
+      int storeId,
+      String orderPublicId,
+      ) async {
+    final order =
+    await findOne(
+      storeId,
+      orderPublicId,
+    );
+
+    final existing =
+    _payments[orderPublicId];
+
+    if (existing != null) {
+      return existing;
+    }
 
     if (order.status == 'COMPLETED') {
-      final created = SellerPaymentSummary(
-        orderPublicId: orderPublicId,
+      final created =
+      SellerPaymentSummary(
+        orderPublicId:
+        orderPublicId,
         paymentStatus: 'PAID',
         paymentMethod: 'CARD',
-        approvedAmount: order.totalAmount,
+        approvedAmount:
+        order.totalAmount,
         refundedAmount: 0,
-        refundableAmount: order.totalAmount,
+        refundableAmount:
+        order.totalAmount,
         refunds: const [],
       );
-      _payments[orderPublicId] = created;
+
+      _payments[orderPublicId] =
+          created;
+
       return created;
     }
 
-    if (order.status == 'CANCELED' || order.status == 'REJECTED') {
-      SellerOrderStatusHistory? terminalHistory;
-      for (final history in order.statusHistory.reversed) {
-        if (history.currentStatus == order.status) {
+    if (order.status == 'CANCELED' ||
+        order.status == 'REJECTED') {
+      SellerOrderStatusHistory?
+      terminalHistory;
+
+      for (final history
+      in order.statusHistory.reversed) {
+        if (history.currentStatus ==
+            order.status) {
           terminalHistory = history;
           break;
         }
       }
 
-      final processedAt = terminalHistory?.changedAt ?? DateTime.now().toUtc();
-      final reason = terminalHistory?.reason ?? '주문 취소 환불';
-      final requesterType = switch (terminalHistory?.actorType) {
+      final processedAt =
+          terminalHistory?.changedAt ??
+              DateTime.now().toUtc();
+
+      final reason =
+          terminalHistory?.reason ??
+              '주문 취소 환불';
+
+      final requesterType =
+      switch (
+      terminalHistory?.actorType) {
         'CUSTOMER' => 'CUSTOMER',
         'ADMIN' => 'ADMIN',
         'GUEST' => 'GUEST',
         _ => 'SELLER',
       };
-      final created = SellerPaymentSummary(
-        orderPublicId: orderPublicId,
-        paymentStatus: 'REFUNDED',
+
+      final created =
+      SellerPaymentSummary(
+        orderPublicId:
+        orderPublicId,
+        paymentStatus:
+        'REFUNDED',
         paymentMethod: 'CARD',
-        approvedAmount: order.totalAmount,
-        refundedAmount: order.totalAmount,
+        approvedAmount:
+        order.totalAmount,
+        refundedAmount:
+        order.totalAmount,
         refundableAmount: 0,
         refunds: [
           SellerRefund(
             refundId: 1,
-            amount: order.totalAmount,
+            amount:
+            order.totalAmount,
             reason: reason,
-            requesterType: requesterType,
+            requesterType:
+            requesterType,
             status: 'SUCCEEDED',
-            requestedAt: processedAt,
-            completedAt: processedAt,
+            requestedAt:
+            processedAt,
+            completedAt:
+            processedAt,
           ),
         ],
       );
-      _payments[orderPublicId] = created;
+
+      _payments[orderPublicId] =
+          created;
+
       return created;
     }
 
-    throw StateError('payment summary is unavailable for this order');
+    throw StateError(
+      'payment summary is unavailable for this order',
+    );
   }
 
   @override
   Future<SellerPaymentSummary> refund(
-    int storeId,
-    String orderPublicId, {
-    required int amount,
-    required String reason,
-  }) async {
-    final order = await findOne(storeId, orderPublicId);
-    final payment = await findPayment(storeId, orderPublicId);
-    if (order.status != 'COMPLETED' ||
-        payment.paymentStatus != 'PAID' ||
-        amount != payment.approvedAmount ||
+      int storeId,
+      String orderPublicId, {
+        required int amount,
+        required String reason,
+      }) async {
+    final order =
+    await findOne(
+      storeId,
+      orderPublicId,
+    );
+
+    final payment =
+    await findPayment(
+      storeId,
+      orderPublicId,
+    );
+
+    if (order.status !=
+        'COMPLETED' ||
+        payment.paymentStatus !=
+            'PAID' ||
+        amount !=
+            payment.approvedAmount ||
         reason.trim().isEmpty) {
-      throw StateError('refund is not allowed');
+      throw StateError(
+        'refund is not allowed',
+      );
     }
-    final now = DateTime.now().toUtc();
-    final updated = SellerPaymentSummary(
-      orderPublicId: orderPublicId,
-      paymentStatus: 'REFUNDED',
-      paymentMethod: payment.paymentMethod,
-      approvedAmount: payment.approvedAmount,
-      refundedAmount: amount,
+
+    final now =
+    DateTime.now().toUtc();
+
+    final updated =
+    SellerPaymentSummary(
+      orderPublicId:
+      orderPublicId,
+      paymentStatus:
+      'REFUNDED',
+      paymentMethod:
+      payment.paymentMethod,
+      approvedAmount:
+      payment.approvedAmount,
+      refundedAmount:
+      amount,
       refundableAmount: 0,
       refunds: [
         ...payment.refunds,
         SellerRefund(
-          refundId: payment.refunds.length + 1,
+          refundId:
+          payment.refunds.length +
+              1,
           amount: amount,
           reason: reason.trim(),
-          requesterType: 'SELLER',
-          status: 'SUCCEEDED',
+          requesterType:
+          'SELLER',
+          status:
+          'SUCCEEDED',
           requestedAt: now,
           completedAt: now,
         ),
       ],
     );
-    _payments[orderPublicId] = updated;
+
+    _payments[orderPublicId] =
+        updated;
+
     return updated;
   }
 
-  int _findIndex(int storeId, String orderPublicId) {
+  int _findIndex(
+      int storeId,
+      String orderPublicId,
+      ) {
     return _orders.indexWhere(
-      (order) =>
-          order.storeId == storeId && order.orderPublicId == orderPublicId,
+          (order) =>
+      order.storeId == storeId &&
+          order.orderPublicId ==
+              orderPublicId,
     );
   }
 }
 
-String _calendarDate(DateTime date) {
+String _calendarDate(
+    DateTime date,
+    ) {
   return '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}-'
       '${date.day.toString().padLeft(2, '0')}';

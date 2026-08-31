@@ -27,6 +27,10 @@ class CustomerStore {
     this.takeoutAvailable = true,
     this.dineInAvailable = true,
     this.orderAcceptingEnabled = true,
+    this.completedOrderCount = 0,
+    this.reviewCount = 0,
+    this.averageRating = 0,
+    this.favoriteCount = 0,
     this.distanceMeters,
     this.schedule,
   });
@@ -63,6 +67,11 @@ class CustomerStore {
       dineInAvailable: json['dineInAvailable'] as bool? ?? true,
       orderAcceptingEnabled:
           json['orderAcceptingEnabled'] as bool? ?? true,
+      completedOrderCount:
+          (json['completedOrderCount'] as num?)?.toInt() ?? 0,
+      reviewCount: (json['reviewCount'] as num?)?.toInt() ?? 0,
+      averageRating: (json['averageRating'] as num?)?.toDouble() ?? 0,
+      favoriteCount: (json['favoriteCount'] as num?)?.toInt() ?? 0,
       tags: (json['tags'] as List<Object?>? ?? const [])
           .whereType<String>()
           .toList(),
@@ -99,6 +108,10 @@ class CustomerStore {
   final bool takeoutAvailable;
   final bool dineInAvailable;
   final bool orderAcceptingEnabled;
+  final int completedOrderCount;
+  final int reviewCount;
+  final double averageRating;
+  final int favoriteCount;
   final List<String> tags;
   final int? distanceMeters;
   final CustomerStoreSchedule? schedule;

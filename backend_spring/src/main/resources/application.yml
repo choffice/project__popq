@@ -65,6 +65,10 @@ popq:
     rest-api-base-url: ${POPQ_KAKAO_REST_API_BASE_URL:https://dapi.kakao.com}
     rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
 
+  public-holiday:
+    base-url: ${POPQ_PUBLIC_HOLIDAY_BASE_URL:https://apis.data.go.kr}
+    service-key: ${POPQ_PUBLIC_HOLIDAY_SERVICE_KEY:}
+
   security:
     jwt:
       issuer: ${POPQ_JWT_ISSUER:popq}
@@ -86,10 +90,18 @@ popq:
       client-id: ${POPQ_GOOGLE_CLIENT_ID}
     kakao:
       api-base-url: ${POPQ_KAKAO_API_BASE_URL:https://kapi.kakao.com}
+      auth-base-url: ${POPQ_KAKAO_AUTH_BASE_URL:https://kauth.kakao.com}
+      rest-api-key: ${POPQ_KAKAO_REST_API_KEY:}
+      client-secret: ${POPQ_KAKAO_CLIENT_SECRET:}
+      seller-redirect-uri: ${POPQ_KAKAO_SELLER_REDIRECT_URI:}
       customer-app-id: ${POPQ_KAKAO_CUSTOMER_APP_ID:0}
       seller-app-id: ${POPQ_KAKAO_SELLER_APP_ID:0}
     naver:
       api-base-url: ${POPQ_NAVER_API_BASE_URL:https://openapi.naver.com}
+      auth-base-url: ${POPQ_NAVER_AUTH_BASE_URL:https://nid.naver.com}
+      client-id: ${POPQ_NAVER_CLIENT_ID:}
+      client-secret: ${POPQ_NAVER_CLIENT_SECRET:}
+      seller-redirect-uri: ${POPQ_NAVER_SELLER_REDIRECT_URI:}
 
   qr:
     public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}

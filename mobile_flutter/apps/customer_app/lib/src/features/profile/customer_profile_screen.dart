@@ -9,6 +9,7 @@ import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../realtime/customer_realtime_scope.dart';
 import '../../routing/customer_router.dart';
+import '../discovery/customer_search_location_controller.dart';
 import '../inquiry/customer_order_message_repository.dart';
 import 'customer_engagement_repository.dart';
 
@@ -16,7 +17,6 @@ import 'customer_engagement_repository.dart';
 abstract final class _ProfileTemporaryStats {
   static const levelLabel = 'Lv.12';
   static const visitCount = 37;
-  static const locationLabel = '위치 정보를 설정해 보세요';
 }
 
 /// 가입일부터 오늘까지의 일수를 "팝큐와 함께한지 n일째"로 표시합니다.
@@ -36,6 +36,7 @@ class CustomerProfileScreen extends StatefulWidget {
     required this.repository,
     required this.activitySummaryListenable,
     required this.messageRepository,
+    this.searchLocationController,
     required this.onSignOut,
     required this.onConnectSellerAccess,
     required this.onWithdraw,
@@ -45,6 +46,7 @@ class CustomerProfileScreen extends StatefulWidget {
   final CustomerEngagementRepository repository;
   final ValueListenable<CustomerActivitySummary?> activitySummaryListenable;
   final CustomerOrderMessageRepository messageRepository;
+  final CustomerSearchLocationController? searchLocationController;
   final Future<void> Function() onSignOut;
   final Future<void> Function() onConnectSellerAccess;
   final Future<void> Function(String? confirmationPhrase) onWithdraw;
@@ -253,6 +255,7 @@ class _CustomerProfileScreenState
                 profile: profile,
                 onEditProfile: _editProfileImage,
                 isUploadingImage: _uploadingProfileImage,
+                searchLocationController: widget.searchLocationController,
               ),
 
               const SizedBox(
@@ -825,11 +828,13 @@ class _ProfileHeaderCard extends StatelessWidget {
     required this.profile,
     required this.onEditProfile,
     this.isUploadingImage = false,
+    this.searchLocationController,
   });
 
   final CustomerProfile profile;
   final VoidCallback onEditProfile;
   final bool isUploadingImage;
+  final CustomerSearchLocationController? searchLocationController;
 
   @override
   Widget build(BuildContext context) {
@@ -1031,18 +1036,10 @@ class _ProfileHeaderCard extends StatelessWidget {
                                 width: PopqSpacing.xs,
                               ),
                               Expanded(
-                                child: Text(
-                                  _ProfileTemporaryStats
-                                      .locationLabel,
-                                  maxLines: 1,
-                                  overflow: TextOverflow
-                                      .ellipsis,
-                                  style: theme
-                                      .textTheme
-                                      .bodySmall
-                                      ?.copyWith(
-                                    color: mutedColor,
-                                  ),
+                                child: _ProfileLocationLabel(
+                                  controller:
+                                      searchLocationController,
+                                  color: mutedColor,
                                 ),
                               ),
                             ],
@@ -1105,6 +1102,54 @@ class _ProfileHeaderCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ProfileLocationLabel extends StatelessWidget {
+  const _ProfileLocationLabel({
+    required this.controller,
+    required this.color,
+  });
+
+  final CustomerSearchLocationController? controller;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final locationController = controller;
+
+    if (locationController == null) {
+      return _buildText(
+        context,
+        '위치 정보를 설정해 보세요',
+      );
+    }
+
+    return AnimatedBuilder(
+      animation: locationController,
+      builder: (context, child) {
+        final label = locationController.displayLabel.trim();
+
+        return _buildText(
+          context,
+          label.isEmpty ? '위치 정보를 설정해 보세요' : label,
+        );
+      },
+    );
+  }
+
+  Widget _buildText(
+    BuildContext context,
+    String label,
+  ) {
+    return Text(
+      label,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+          ),
     );
   }
 }

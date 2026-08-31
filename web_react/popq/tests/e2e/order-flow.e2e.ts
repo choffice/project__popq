@@ -40,7 +40,7 @@ test('장바구니와 주문을 새로고침 후 복구하고 고객이 취소�
   ).toBeVisible()
   await page.getByRole('button', { name: '새 주문 시작하기' }).click()
   await expect(
-    page.getByRole('heading', { name: '오늘의 한 잔, 가볍게 골라보세요.' }),
+    page.getByRole('heading', { name: '빠르게 고르고, 편하게 주문하세요.' }),
   ).toBeVisible()
 })
 
@@ -58,7 +58,7 @@ test('데모 주문을 완료 상태까지 진행한다', async ({ page }) => {
   ).toBeVisible()
   await nextStatus.click()
   await expect(
-    page.getByRole('heading', { name: '맛있게 준비 중이에요' }),
+    page.getByRole('heading', { name: '주문을 준비 중이에요' }),
   ).toBeVisible()
   await nextStatus.click()
   await expect(

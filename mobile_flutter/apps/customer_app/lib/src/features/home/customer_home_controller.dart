@@ -21,11 +21,7 @@ class CustomerHomeSnapshot {
   const CustomerHomeSnapshot({
     required this.eventStores,
     required this.recommendedStores,
-    required this.temporaryPopups,
-    required this.temporaryRecommendations,
-    required this.featureBanners,
     required this.benefitBanners,
-    required this.region,
     required this.regionLabel,
     required this.currentLocationLabel,
     required this.storeLoadFailed,
@@ -45,29 +41,14 @@ class CustomerHomeSnapshot {
   /// 현재 탐색 좌표 주변의 EVENT_COMMERCE 매장입니다.
   final List<CustomerStore> eventStores;
 
-  /// 홈 홍보 매장을 제외한 현재 탐색 좌표 주변 LOCAL_STORE 목록입니다.
+  /// 홈 홍보 매장을 제외한 현재 탐색 좌표 주변 매장 전체 목록입니다.
+  ///
+  /// 일반 매장과 행사·팝업 판매점을 함께 담고, 홈 화면에서 선택한
+  /// 대표 카테고리로 필터링한 뒤 최대 5개를 표시합니다.
   final List<CustomerStore> recommendedStores;
-
-  /// 아직 API가 없는 부산 임시 팝업·부스 콘텐츠입니다.
-  ///
-  /// 탐색 위치가 부산이 아닌 경우에는 빈 목록으로 내려갑니다.
-  final List<CustomerHomePopupItem> temporaryPopups;
-
-  /// 실제 추천 매장이 부족할 때 사용하는 부산 임시 콘텐츠입니다.
-  ///
-  /// 탐색 위치가 부산이 아닌 경우에는 빈 목록으로 내려갑니다.
-  final List<CustomerHomeRecommendedItem> temporaryRecommendations;
-
-  /// 이번 주 추천 이벤트 캐러셀에 사용하는 임시 콘텐츠입니다.
-  final List<CustomerHomeFeatureBanner> featureBanners;
 
   /// 회원 혜택 또는 서비스 안내 배너입니다.
   final List<CustomerHomeBenefitBanner> benefitBanners;
-
-  /// 기존 홈 UI와의 호환을 위해 유지하는 임시 콘텐츠 권역입니다.
-  ///
-  /// 실제 업체 조회 범위는 이 값이 아니라 공통 탐색 위치의 위도/경도로 결정됩니다.
-  final CustomerHomeRegion region;
 
   /// 홈 섹션에 표시할 탐색 위치 라벨입니다.
   final String regionLabel;
@@ -323,13 +304,10 @@ class CustomerHomeController extends ChangeNotifier {
     final List<CustomerStore> recommendedStores = stores
         .where(
           (CustomerStore store) =>
-              store.storeType == 'LOCAL_STORE' &&
               store.storeId != featuredStore?.storeId,
         )
-        .take(5)
         .toList(growable: false);
 
-    final bool useBusanTemporaryContent = _shouldUseBusanTemporaryContent();
     final String locationLabel = _searchLocationController.displayLabel.trim();
     final String effectiveLabel = locationLabel.isEmpty ? '부산' : locationLabel;
 
@@ -338,19 +316,7 @@ class CustomerHomeController extends ChangeNotifier {
       featuredStore: featuredStore,
       eventStores: List<CustomerStore>.unmodifiable(eventStores),
       recommendedStores: List<CustomerStore>.unmodifiable(recommendedStores),
-      temporaryPopups: useBusanTemporaryContent
-          ? CustomerHomeTemporaryContent.popupItemsFor(CustomerHomeRegion.busan)
-          : const <CustomerHomePopupItem>[],
-      temporaryRecommendations: useBusanTemporaryContent
-          ? CustomerHomeTemporaryContent.recommendedItemsFor(
-              CustomerHomeRegion.busan,
-            )
-          : const <CustomerHomeRecommendedItem>[],
-      featureBanners: useBusanTemporaryContent
-          ? CustomerHomeTemporaryContent.featureBanners
-          : const <CustomerHomeFeatureBanner>[],
-      benefitBanners: CustomerHomeTemporaryContent.benefitBanners,
-      region: CustomerHomeRegion.busan,
+      benefitBanners: CustomerHomeContent.benefitBanners,
       regionLabel: effectiveLabel,
       currentLocationLabel: effectiveLabel,
       storeLoadFailed: storeLoadFailed,
@@ -447,19 +413,6 @@ class CustomerHomeController extends ChangeNotifier {
     _lastLocationLabel = _searchLocationController.displayLabel;
   }
 
-  bool _shouldUseBusanTemporaryContent() {
-    final CustomerSearchLocationSource source = _searchLocationController.source;
-
-    if (source == CustomerSearchLocationSource.busanDefault) {
-      return true;
-    }
-
-    final String label = _searchLocationController.displayLabel
-        .replaceAll('부산광역시', '부산')
-        .trim();
-
-    return label.startsWith('부산');
-  }
 
   Future<_HomeLoadResult<List<CustomerStore>>>
       _loadStoresAtCurrentSearchLocation() async {
@@ -576,11 +529,7 @@ class CustomerHomeController extends ChangeNotifier {
         featuredStore: currentSnapshot.featuredStore,
         eventStores: currentSnapshot.eventStores,
         recommendedStores: currentSnapshot.recommendedStores,
-        temporaryPopups: currentSnapshot.temporaryPopups,
-        temporaryRecommendations: currentSnapshot.temporaryRecommendations,
-        featureBanners: currentSnapshot.featureBanners,
         benefitBanners: currentSnapshot.benefitBanners,
-        region: currentSnapshot.region,
         regionLabel: currentSnapshot.regionLabel,
         currentLocationLabel: currentSnapshot.currentLocationLabel,
         storeLoadFailed: currentSnapshot.storeLoadFailed,

@@ -68,4 +68,14 @@ public class SupportTicketController {
                 currentUserService.getRequired(jwt), ticketId, request
         ));
     }
+
+    @PostMapping("/{ticketId}/read")
+    public ApiResponse<SupportTicketDetailResponse> markAsRead(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable Long ticketId
+    ) {
+        return ApiResponse.success(service.markRequesterRead(
+                currentUserService.getRequired(jwt), ticketId
+        ));
+    }
 }

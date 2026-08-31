@@ -16,9 +16,17 @@ public record SupportTicketSummaryResponse(
         String subject,
         SupportTicketStatus status,
         Instant lastMessageAt,
-        Instant createdAt
+        Instant createdAt,
+        long unreadMessageCount
 ) {
     public static SupportTicketSummaryResponse from(SupportTicket ticket) {
+        return from(ticket, 0L);
+    }
+
+    public static SupportTicketSummaryResponse from(
+            SupportTicket ticket,
+            long unreadMessageCount
+    ) {
         return new SupportTicketSummaryResponse(
                 ticket.getId(),
                 ticket.getRequester().getId(),
@@ -29,7 +37,8 @@ public record SupportTicketSummaryResponse(
                 ticket.getSubject(),
                 ticket.getStatus(),
                 ticket.getLastMessageAt(),
-                ticket.getCreatedAt()
+                ticket.getCreatedAt(),
+                Math.max(0L, unreadMessageCount)
         );
     }
 }
