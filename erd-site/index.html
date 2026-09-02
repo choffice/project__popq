@@ -1,0 +1,518 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>POPQ 데이터베이스 구성도</title>
+  <style>
+    :root {
+      --navy: #0d2c61;
+      --blue: #1764c0;
+      --sky: #eaf3ff;
+      --ink: #17233b;
+      --muted: #65738b;
+      --line: #b9c7da;
+      --paper: #ffffff;
+      --bg: #eef3f9;
+      --identity: #148b8b;
+      --store: #d87622;
+      --catalog: #2869c7;
+      --order: #7950bf;
+      --customer: #c24972;
+      --operation: #66758c;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 58px;
+      padding: 0 26px;
+      color: white;
+      background: #071d40;
+      box-shadow: 0 5px 18px rgb(7 29 64 / 18%);
+    }
+
+    .toolbar strong { font-size: 17px; letter-spacing: -.02em; }
+    .toolbar-actions { display: flex; align-items: center; gap: 9px; }
+
+    button {
+      border: 1px solid rgb(255 255 255 / 28%);
+      border-radius: 8px;
+      padding: 8px 13px;
+      color: white;
+      background: rgb(255 255 255 / 8%);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:hover, button.active { color: #071d40; background: white; }
+
+    .page-wrap { padding: 24px; }
+
+    .slide {
+      position: relative;
+      width: 1600px;
+      min-height: 900px;
+      margin: 0 auto;
+      overflow: hidden;
+      background:
+        linear-gradient(rgb(13 44 97 / 3%) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(13 44 97 / 3%) 1px, transparent 1px),
+        var(--paper);
+      background-size: 28px 28px;
+      border-radius: 12px;
+      box-shadow: 0 18px 55px rgb(31 53 86 / 17%);
+    }
+
+    header {
+      position: relative;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 34px 46px 19px;
+      border-bottom: 1px solid #dbe4ef;
+      background: rgb(255 255 255 / 94%);
+    }
+
+    h1 { margin: 0; color: var(--navy); font-size: 42px; line-height: 1; letter-spacing: -.045em; }
+    .subtitle { margin: 10px 0 0; color: var(--muted); font-size: 16px; }
+    .db-badge { color: var(--blue); font-size: 14px; font-weight: 800; }
+
+    .legend { display: flex; gap: 9px; }
+    .legend span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      color: #435169;
+      background: white;
+      border: 1px solid #dbe4ef;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .board {
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 21px 18px;
+      padding: 26px 42px 28px;
+    }
+
+    .table-card {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      min-height: 118px;
+      flex-direction: column;
+      justify-content: center;
+      padding: 18px 17px 16px;
+      border: 1.5px solid #cbd7e6;
+      border-top: 6px solid var(--tone);
+      border-radius: 12px;
+      background: rgb(255 255 255 / 97%);
+      box-shadow: 0 7px 16px rgb(40 68 107 / 9%);
+      text-align: center;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
+      transition: box-shadow .16s ease, border-color .16s ease;
+    }
+
+    .table-card:hover {
+      border-color: color-mix(in srgb, var(--tone) 55%, #cbd7e6);
+      box-shadow: 0 11px 24px rgb(40 68 107 / 15%);
+    }
+
+    .table-card.dragging {
+      z-index: 20;
+      cursor: grabbing;
+      box-shadow: 0 18px 38px rgb(24 49 86 / 24%);
+      transition: none;
+    }
+
+    .table-card::after {
+      position: absolute;
+      inset: 8px;
+      border: 1px solid color-mix(in srgb, var(--tone) 15%, transparent);
+      border-radius: 7px;
+      content: "";
+      pointer-events: none;
+    }
+
+    .table-name {
+      position: relative;
+      z-index: 1;
+      color: var(--navy);
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 17px;
+      font-weight: 850;
+      line-height: 1.18;
+      overflow-wrap: normal;
+      word-break: normal;
+      letter-spacing: -.01em;
+    }
+
+    .table-card.long .table-name { font-size: 14px; }
+    .table-card.very-long .table-name { font-size: 12.5px; line-height: 1.12; }
+
+    .table-desc {
+      position: relative;
+      z-index: 1;
+      margin-top: 10px;
+      color: #526078;
+      font-size: 13.5px;
+      font-weight: 650;
+      line-height: 1.4;
+      word-break: keep-all;
+    }
+
+    .identity { --tone: var(--identity); }
+    .store { --tone: var(--store); }
+    .catalog { --tone: var(--catalog); }
+    .order { --tone: var(--order); }
+    .customer { --tone: var(--customer); }
+    .operation { --tone: var(--operation); }
+
+    #relations {
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    .relation {
+      fill: none;
+      stroke: #7890ad;
+      stroke-width: 1.7;
+      opacity: .48;
+    }
+
+    .relation.logical { stroke: #8458c4; stroke-dasharray: 7 6; }
+    .arrow { fill: #7890ad; opacity: .7; }
+    .arrow.logical { fill: #8458c4; }
+
+    .note {
+      position: absolute;
+      z-index: 5;
+      right: 43px;
+      bottom: 20px;
+      color: #7c8799;
+      font-size: 11px;
+    }
+
+    body[data-view="all"] .slide { min-height: 900px; }
+    body[data-view="all"] .board { grid-template-columns: repeat(7, 1fr); gap: 10px 12px; padding-top: 18px; }
+    body[data-view="all"] .table-card { min-height: 88px; padding: 12px 10px 10px; }
+    body[data-view="all"] .table-name { font-size: 13px; }
+    body[data-view="all"] .table-card.long .table-name { font-size: 11.5px; }
+    body[data-view="all"] .table-card.very-long .table-name { font-size: 10px; }
+    body[data-view="all"] .table-desc { margin-top: 6px; font-size: 11px; line-height: 1.25; }
+
+    body.capture .toolbar { display: none; }
+    body.capture .page-wrap { padding: 0; }
+    body.capture .slide { border-radius: 0; box-shadow: none; }
+
+    @media print {
+      body { min-width: 0; background: white; }
+      .toolbar { display: none; }
+      .page-wrap { padding: 0; }
+      .slide { box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body data-view="core">
+  <div class="toolbar">
+    <strong>캡처 설정</strong>
+    <div class="toolbar-actions">
+      <button class="active" data-mode="core">핵심 관계도</button>
+      <button data-mode="all">전체 테이블</button>
+      <button id="toggle-lines">관계선 숨기기</button>
+      <button id="reset-layout">배치 초기화</button>
+      <button id="capture-mode">PPT 캡처 모드</button>
+      <button id="fullscreen">전체 화면</button>
+    </div>
+  </div>
+
+  <main class="page-wrap">
+    <section class="slide" id="slide">
+      <header>
+        <div>
+          <h1>POPQ ERD</h1>
+          <p class="subtitle" id="subtitle">서비스의 핵심 데이터와 연결 관계를 한눈에 보는 데이터베이스 구성도</p>
+        </div>
+        <div>
+          <div class="legend">
+            <span><i class="dot" style="background:var(--identity)"></i>회원·권한</span>
+            <span><i class="dot" style="background:var(--store)"></i>판매자·매장</span>
+            <span><i class="dot" style="background:var(--catalog)"></i>메뉴·QR</span>
+            <span><i class="dot" style="background:var(--order)"></i>주문·결제</span>
+            <span><i class="dot" style="background:var(--customer)"></i>고객 활동</span>
+            <span><i class="dot" style="background:var(--operation)"></i>운영·고객지원</span>
+          </div>
+          <div class="db-badge" style="text-align:right;margin-top:11px">MySQL 8.4 · Spring Data JPA · Flyway</div>
+        </div>
+      </header>
+
+      <svg id="relations" aria-hidden="true"></svg>
+      <div class="board" id="board"></div>
+      <div class="note">실선: JPA 연관관계 · 점선: 논리적 데이터 연결</div>
+    </section>
+  </main>
+
+  <script>
+    const tables = [
+      { id: 'users', desc: '고객·판매자·관리자 계정', group: 'identity', core: true },
+      { id: 'user_roles', desc: '사용자별 역할과 권한', group: 'identity', core: true },
+      { id: 'social_accounts', desc: '소셜 로그인 계정 연결', group: 'identity', core: true },
+      { id: 'email_verification_challenges', desc: '이메일 인증번호와 만료 정보', group: 'identity', core: false },
+      { id: 'seller_profiles', desc: '판매자 사업자 기본 정보', group: 'store', core: true },
+      { id: 'stores', desc: '팝업스토어 기본·운영 정보', group: 'store', core: true },
+      { id: 'store_members', desc: '매장 소속 직원과 권한', group: 'store', core: true },
+      { id: 'store_tables', desc: '매장 테이블과 좌석 정보', group: 'store', core: true },
+      { id: 'store_business_hours', desc: '요일별 매장 영업시간', group: 'store', core: false },
+      { id: 'store_closure_rules', desc: '매장 정기 휴무 규칙', group: 'store', core: false },
+      { id: 'store_schedule_exceptions', desc: '특정 날짜 영업 예외', group: 'store', core: false },
+      { id: 'product_categories', desc: '매장별 메뉴 카테고리', group: 'catalog', core: true },
+      { id: 'products', desc: '판매 메뉴와 가격 정보', group: 'catalog', core: true },
+      { id: 'product_option_groups', desc: '메뉴 선택 옵션 묶음', group: 'catalog', core: true },
+      { id: 'product_options', desc: '추가 선택 항목과 가격', group: 'catalog', core: true },
+      { id: 'product_availability', desc: '요일·시간별 판매 가능 여부', group: 'catalog', core: false },
+      { id: 'tags', desc: '매장과 메뉴 검색 태그', group: 'catalog', core: false },
+      { id: 'product_tags', desc: '메뉴와 태그의 연결', group: 'catalog', core: false },
+      { id: 'store_tags', desc: '매장과 태그의 연결', group: 'catalog', core: false },
+      { id: 'store_option_group_templates', desc: '매장 공통 옵션 그룹 틀', group: 'catalog', core: false },
+      { id: 'store_option_template_options', desc: '공통 옵션 그룹의 선택 항목', group: 'catalog', core: false },
+      { id: 'qr_codes', desc: '주문 진입용 QR 코드', group: 'catalog', core: true },
+      { id: 'guest_sessions', desc: '비회원 QR 주문 세션', group: 'catalog', core: true },
+      { id: 'orders', desc: '고객 주문과 진행 상태', group: 'order', core: true },
+      { id: 'order_items', desc: '주문에 담긴 메뉴 목록', group: 'order', core: true },
+      { id: 'order_item_options', desc: '주문 메뉴의 선택 옵션', group: 'order', core: true },
+      { id: 'order_status_histories', desc: '주문 상태 변경 이력', group: 'order', core: true },
+      { id: 'order_messages', desc: '주문 관련 고객·판매자 메시지', group: 'order', core: false },
+      { id: 'payments', desc: '주문 결제 상태와 금액', group: 'order', core: true },
+      { id: 'payment_transactions', desc: '결제 승인·취소 처리 이력', group: 'order', core: false },
+      { id: 'refunds', desc: '결제 환불 요청과 결과', group: 'order', core: true },
+      { id: 'store_interests', desc: '고객의 관심 매장 목록', group: 'customer', core: true },
+      { id: 'reviews', desc: '주문 기반 매장 리뷰', group: 'customer', core: true },
+      { id: 'seller_review_reply_templates', desc: '판매자 리뷰 답변 문구', group: 'customer', core: false },
+      { id: 'customer_activity_sources', desc: '고객 활동과 유입 출처', group: 'customer', core: false },
+      { id: 'customer_point_transactions', desc: '고객 포인트 적립·사용 내역', group: 'customer', core: false },
+      { id: 'monthly_raffle_rounds', desc: '월간 추첨 회차 정보', group: 'customer', core: false },
+      { id: 'monthly_raffle_entries', desc: '월간 추첨 참여 내역', group: 'customer', core: false },
+      { id: 'push_devices', desc: '사용자의 푸시 알림 기기', group: 'operation', core: false },
+      { id: 'notifications', desc: '사용자별 알림 발송 내역', group: 'operation', core: true },
+      { id: 'announcements', desc: '매장별 고객 공지사항', group: 'operation', core: true },
+      { id: 'support_faqs', desc: '고객용 자주 묻는 질문', group: 'operation', core: false },
+      { id: 'support_inquiries', desc: '고객의 일대일 문의', group: 'operation', core: true },
+      { id: 'support_inquiry_messages', desc: '문의에 이어진 답변 메시지', group: 'operation', core: true },
+      { id: 'admin_audit_logs', desc: '관리자 작업 감사 기록', group: 'operation', core: false },
+      { id: 'platform_announcements', desc: '플랫폼 전체 공지사항', group: 'operation', core: false },
+      { id: 'faqs', desc: '관리자가 운영하는 FAQ', group: 'operation', core: false },
+      { id: 'support_tickets', desc: '관리자 고객지원 티켓', group: 'operation', core: false },
+      { id: 'support_messages', desc: '지원 티켓의 대화 메시지', group: 'operation', core: false }
+    ];
+
+    const relations = [
+      ['user_roles','users'], ['social_accounts','users'], ['seller_profiles','users'],
+      ['store_members','stores'], ['store_members','users'], ['store_tables','stores'],
+      ['store_business_hours','stores'], ['store_closure_rules','stores'], ['store_schedule_exceptions','stores'],
+      ['product_categories','stores'], ['products','stores'], ['products','product_categories'],
+      ['product_option_groups','products'], ['product_options','product_option_groups'],
+      ['product_availability','products'], ['product_tags','products'], ['product_tags','tags'],
+      ['store_tags','stores'], ['store_tags','tags'], ['store_option_group_templates','stores'],
+      ['store_option_template_options','store_option_group_templates'],
+      ['qr_codes','stores'], ['qr_codes','store_tables'], ['guest_sessions','qr_codes'],
+      ['orders','users'], ['orders','guest_sessions'], ['orders','stores'],
+      ['order_items','orders'], ['order_items','products'], ['order_item_options','order_items'],
+      ['order_item_options','product_options'], ['order_status_histories','orders'],
+      ['order_messages','orders'], ['order_messages','users'], ['payments','orders'],
+      ['payment_transactions','payments'], ['refunds','payments'],
+      ['store_interests','users'], ['store_interests','stores'], ['reviews','orders'],
+      ['reviews','users'], ['reviews','stores'], ['seller_review_reply_templates','stores'],
+      ['customer_activity_sources','users'], ['customer_activity_sources','stores'],
+      ['customer_point_transactions','users'], ['monthly_raffle_entries','monthly_raffle_rounds'],
+      ['monthly_raffle_entries','users'], ['push_devices','users'], ['notifications','users'],
+      ['announcements','stores'], ['support_inquiries','users'],
+      ['support_inquiry_messages','support_inquiries'], ['support_inquiry_messages','users'],
+      ['admin_audit_logs','users'], ['platform_announcements','users'], ['faqs','users'],
+      ['support_tickets','users'], ['support_messages','support_tickets'], ['support_messages','users']
+    ];
+
+    const board = document.querySelector('#board');
+    const svg = document.querySelector('#relations');
+    let mode = 'core';
+    let linesVisible = true;
+    let dragState = null;
+
+    function storageKey() {
+      return `popq-erd-layout-${mode}`;
+    }
+
+    function readLayout() {
+      try { return JSON.parse(localStorage.getItem(storageKey()) || '{}'); }
+      catch { return {}; }
+    }
+
+    function saveLayout() {
+      const layout = {};
+      document.querySelectorAll('.table-card').forEach(card => {
+        layout[card.dataset.id] = {
+          x: Number(card.dataset.x || 0),
+          y: Number(card.dataset.y || 0)
+        };
+      });
+      localStorage.setItem(storageKey(), JSON.stringify(layout));
+    }
+
+    function applyPosition(card, x, y) {
+      card.dataset.x = String(Math.round(x));
+      card.dataset.y = String(Math.round(y));
+      card.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    }
+
+    function enableDrag(card) {
+      card.addEventListener('pointerdown', e => {
+        if (e.button !== 0) return;
+        card.setPointerCapture(e.pointerId);
+        dragState = {
+          card,
+          startX: e.clientX,
+          startY: e.clientY,
+          baseX: Number(card.dataset.x || 0),
+          baseY: Number(card.dataset.y || 0)
+        };
+        card.classList.add('dragging');
+      });
+
+      card.addEventListener('pointermove', e => {
+        if (!dragState || dragState.card !== card) return;
+        applyPosition(
+          card,
+          dragState.baseX + e.clientX - dragState.startX,
+          dragState.baseY + e.clientY - dragState.startY
+        );
+        drawRelations();
+      });
+
+      const finishDrag = () => {
+        if (!dragState || dragState.card !== card) return;
+        card.classList.remove('dragging');
+        dragState = null;
+        saveLayout();
+        drawRelations();
+      };
+      card.addEventListener('pointerup', finishDrag);
+      card.addEventListener('pointercancel', finishDrag);
+    }
+
+    function renderCards() {
+      board.innerHTML = '';
+      const visible = mode === 'core' ? tables.filter(t => t.core) : tables;
+      const savedLayout = readLayout();
+      visible.forEach(t => {
+        const card = document.createElement('article');
+        const lengthClass = t.id.length > 27 ? 'very-long' : t.id.length > 18 ? 'long' : '';
+        card.className = `table-card ${t.group} ${lengthClass}`;
+        card.dataset.id = t.id;
+        const readableName = t.id.replaceAll('_', '_<wbr>');
+        card.innerHTML = `<div class="table-name">${readableName}</div><div class="table-desc">${t.desc}</div>`;
+        const saved = savedLayout[t.id] || { x: 0, y: 0 };
+        applyPosition(card, saved.x, saved.y);
+        enableDrag(card);
+        board.appendChild(card);
+      });
+      document.querySelector('#subtitle').textContent = mode === 'core'
+        ? '서비스의 핵심 데이터와 연결 관계를 한눈에 보는 데이터베이스 구성도'
+        : `실제 엔티티 기준 전체 ${tables.length}개 테이블 요약`;
+      requestAnimationFrame(drawRelations);
+    }
+
+    function drawRelations() {
+      svg.innerHTML = '';
+      if (!linesVisible) return;
+      const slideRect = document.querySelector('#slide').getBoundingClientRect();
+      svg.setAttribute('viewBox', `0 0 ${slideRect.width} ${slideRect.height}`);
+      relations.forEach(([from, to, type]) => {
+        const a = document.querySelector(`[data-id="${from}"]`);
+        const b = document.querySelector(`[data-id="${to}"]`);
+        if (!a || !b) return;
+        const ar = a.getBoundingClientRect();
+        const br = b.getBoundingClientRect();
+        const ax = ar.left - slideRect.left + ar.width / 2;
+        const ay = ar.top - slideRect.top + ar.height / 2;
+        const bx = br.left - slideRect.left + br.width / 2;
+        const by = br.top - slideRect.top + br.height / 2;
+        const mx = (ax + bx) / 2;
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', `M ${ax} ${ay} C ${mx} ${ay}, ${mx} ${by}, ${bx} ${by}`);
+        path.setAttribute('class', `relation ${type || ''}`);
+        svg.appendChild(path);
+        const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
+        dot.setAttribute('cx', bx); dot.setAttribute('cy', by); dot.setAttribute('r', 3.4);
+        dot.setAttribute('class', `arrow ${type || ''}`);
+        svg.appendChild(dot);
+      });
+    }
+
+    document.querySelectorAll('[data-mode]').forEach(btn => btn.addEventListener('click', () => {
+      mode = btn.dataset.mode;
+      document.body.dataset.view = mode;
+      document.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('active', b === btn));
+      renderCards();
+    }));
+
+    document.querySelector('#toggle-lines').addEventListener('click', e => {
+      linesVisible = !linesVisible;
+      e.currentTarget.textContent = linesVisible ? '관계선 숨기기' : '관계선 보이기';
+      drawRelations();
+    });
+
+    document.querySelector('#reset-layout').addEventListener('click', () => {
+      localStorage.removeItem(storageKey());
+      document.querySelectorAll('.table-card').forEach(card => applyPosition(card, 0, 0));
+      drawRelations();
+    });
+
+    document.querySelector('#fullscreen').addEventListener('click', () => {
+      document.documentElement.requestFullscreen?.();
+    });
+
+    function toggleCaptureMode() {
+      document.body.classList.toggle('capture');
+      window.scrollTo(0, 0);
+      requestAnimationFrame(drawRelations);
+    }
+
+    document.querySelector('#capture-mode').addEventListener('click', toggleCaptureMode);
+    document.addEventListener('keydown', e => {
+      if (e.key.toLowerCase() === 'h') toggleCaptureMode();
+    });
+
+    window.addEventListener('resize', drawRelations);
+    renderCards();
+  </script>
+</body>
+</html>
