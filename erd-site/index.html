@@ -203,16 +203,14 @@
       pointer-events: none;
     }
 
-    .relation {
-      fill: none;
-      stroke: #7890ad;
-      stroke-width: 1.7;
-      opacity: .48;
-    }
-
-    .relation.logical { stroke: #8458c4; stroke-dasharray: 7 6; }
-    .arrow { fill: #7890ad; opacity: .7; }
-    .arrow.logical { fill: #8458c4; }
+    .relation-group { opacity: .62; transition: opacity .14s ease; }
+    .relation { fill: none; stroke: var(--relation-color); stroke-width: 2; transition: stroke-width .14s ease; }
+    .relation.logical { stroke-dasharray: 7 6; }
+    .arrow { fill: var(--relation-color); }
+    #relations.has-focus .relation-group { opacity: .08; }
+    #relations.has-focus .relation-group.is-connected { opacity: 1; }
+    #relations.has-focus .relation-group.is-connected .relation { stroke-width: 3.6; }
+    .table-card:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
 
     .note {
       position: absolute;
@@ -278,7 +276,7 @@
 
       <svg id="relations" aria-hidden="true"></svg>
       <div class="board" id="board"></div>
-      <div class="note">실선: JPA 연관관계 · 점선: 논리적 데이터 연결</div>
+      <div class="note">관계마다 선 색상 구분 · 카드에 마우스를 올리면 연결선 강조 · 점선은 논리적 연결</div>
     </section>
   </main>
 
@@ -437,11 +435,16 @@
         const lengthClass = t.id.length > 27 ? 'very-long' : t.id.length > 18 ? 'long' : '';
         card.className = `table-card ${t.group} ${lengthClass}`;
         card.dataset.id = t.id;
+        card.tabIndex = 0;
         const readableName = t.id.replaceAll('_', '_<wbr>');
         card.innerHTML = `<div class="table-name">${readableName}</div><div class="table-desc">${t.desc}</div>`;
         const saved = savedLayout[t.id] || { x: 0, y: 0 };
         applyPosition(card, saved.x, saved.y);
         enableDrag(card);
+        card.addEventListener('pointerenter', () => setConnectionFocus(t.id));
+        card.addEventListener('pointerleave', clearConnectionFocus);
+        card.addEventListener('focus', () => setConnectionFocus(t.id));
+        card.addEventListener('blur', clearConnectionFocus);
         board.appendChild(card);
       });
       document.querySelector('#subtitle').textContent = mode === 'core'
@@ -450,12 +453,29 @@
       requestAnimationFrame(drawRelations);
     }
 
+    function relationColor(index) {
+      const hue = Math.round((index * 137.508 + 212) % 360);
+      return `hsl(${hue} 72% 42%)`;
+    }
+
+    function setConnectionFocus(tableId) {
+      svg.classList.add('has-focus');
+      svg.querySelectorAll('.relation-group').forEach(group => {
+        group.classList.toggle('is-connected', group.dataset.from === tableId || group.dataset.to === tableId);
+      });
+    }
+
+    function clearConnectionFocus() {
+      svg.classList.remove('has-focus');
+      svg.querySelectorAll('.relation-group').forEach(group => group.classList.remove('is-connected'));
+    }
+
     function drawRelations() {
       svg.innerHTML = '';
       if (!linesVisible) return;
       const slideRect = document.querySelector('#slide').getBoundingClientRect();
       svg.setAttribute('viewBox', `0 0 ${slideRect.width} ${slideRect.height}`);
-      relations.forEach(([from, to, type]) => {
+      relations.forEach(([from, to, type], index) => {
         const a = document.querySelector(`[data-id="${from}"]`);
         const b = document.querySelector(`[data-id="${to}"]`);
         if (!a || !b) return;
@@ -466,14 +486,20 @@
         const bx = br.left - slideRect.left + br.width / 2;
         const by = br.top - slideRect.top + br.height / 2;
         const mx = (ax + bx) / 2;
+        const group = document.createElementNS('http://www.w3.org/2000/svg','g');
+        group.setAttribute('class', 'relation-group');
+        group.dataset.from = from;
+        group.dataset.to = to;
+        group.style.setProperty('--relation-color', relationColor(index));
         const path = document.createElementNS('http://www.w3.org/2000/svg','path');
         path.setAttribute('d', `M ${ax} ${ay} C ${mx} ${ay}, ${mx} ${by}, ${bx} ${by}`);
         path.setAttribute('class', `relation ${type || ''}`);
-        svg.appendChild(path);
+        group.appendChild(path);
         const dot = document.createElementNS('http://www.w3.org/2000/svg','circle');
         dot.setAttribute('cx', bx); dot.setAttribute('cy', by); dot.setAttribute('r', 3.4);
         dot.setAttribute('class', `arrow ${type || ''}`);
-        svg.appendChild(dot);
+        group.appendChild(dot);
+        svg.appendChild(group);
       });
     }
 
