@@ -2,6 +2,8 @@ package com.example.project_popq.auth.service;
 
 import com.example.project_popq.auth.dto.AuthTokenResponse;
 import com.example.project_popq.auth.dto.AuthUserResponse;
+import com.example.project_popq.auth.dto.KakaoCodeLoginRequest;
+import com.example.project_popq.auth.dto.NaverCodeLoginRequest;
 import com.example.project_popq.auth.dto.SocialLoginRequest;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedAccessToken;
 import com.example.project_popq.auth.social.GoogleIdTokenVerifier;
@@ -22,8 +24,10 @@ import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.example.project_popq.auth.social.KakaoAccessTokenVerifier;
+import com.example.project_popq.auth.social.KakaoAuthorizationCodeClient;
 import com.example.project_popq.auth.social.KakaoIdentity;
 import com.example.project_popq.auth.social.NaverAccessTokenVerifier;
+import com.example.project_popq.auth.social.NaverAuthorizationCodeClient;
 import com.example.project_popq.auth.social.NaverIdentity;
 import com.example.project_popq.auth.service.JwtTokenService.IssuedRefreshToken;
 
@@ -35,7 +39,9 @@ public class SocialAuthService {
   private final SocialAccountRepository socialAccountRepository;
   private final SellerProfileRepository sellerProfileRepository;
   private final GoogleIdTokenVerifier googleIdTokenVerifier;
+  private final KakaoAuthorizationCodeClient kakaoAuthorizationCodeClient;
   private final KakaoAccessTokenVerifier kakaoAccessTokenVerifier;
+  private final NaverAuthorizationCodeClient naverAuthorizationCodeClient;
   private final NaverAccessTokenVerifier naverAccessTokenVerifier;
   private final JwtTokenService jwtTokenService;
 
@@ -75,6 +81,37 @@ public class SocialAuthService {
     ensureSellerProfile(user, request.role());
 
     return issueToken(user, request.role());
+  }
+
+  @Transactional
+  public AuthTokenResponse loginWithKakaoCode(
+      KakaoCodeLoginRequest request
+  ) {
+    String accessToken = kakaoAuthorizationCodeClient.exchange(
+        request.code()
+    );
+
+    return login(new SocialLoginRequest(
+        SocialProvider.KAKAO,
+        accessToken,
+        PlatformRole.SELLER
+    ));
+  }
+
+  @Transactional
+  public AuthTokenResponse loginWithNaverCode(
+      NaverCodeLoginRequest request
+  ) {
+    String accessToken = naverAuthorizationCodeClient.exchange(
+        request.code(),
+        request.state()
+    );
+
+    return login(new SocialLoginRequest(
+        SocialProvider.NAVER,
+        accessToken,
+        PlatformRole.SELLER
+    ));
   }
 
   private AuthTokenResponse loginWithKakao(

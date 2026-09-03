@@ -194,14 +194,24 @@ describe('판매자 주문 운영', () => {
   })
 
   it('폐기된 QR을 현재 목록에서 제거하고 폐기함에서 복원한다', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(screen.getByRole('button', { name: /QR 관리/ }))
     await user.click(screen.getAllByRole('button', { name: '폐기' })[0])
     await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: '폐기하기',
+      }),
+    )
+
+    await user.click(
       await screen.findByRole('button', { name: '목록에서 제거' }),
+    )
+    await user.click(
+      within(await screen.findByRole('dialog')).getByRole('button', {
+        name: '목록에서 제거',
+      }),
     )
 
     expect(
