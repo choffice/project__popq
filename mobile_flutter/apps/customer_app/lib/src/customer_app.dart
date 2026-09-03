@@ -931,7 +931,8 @@ class _PopqCustomerAppState extends State<PopqCustomerApp>
         builder: (context, child) {
           return MaterialApp.router(
             title: 'POPQ',
-            debugShowCheckedModeBanner: !widget.environment.isProduction,
+            // debugShowCheckedModeBanner: !widget.environment.isProduction,
+            debugShowCheckedModeBanner: false,
             scaffoldMessengerKey: _scaffoldMessengerKey,
             theme: PopqTheme.light(),
             darkTheme: PopqTheme.dark(),

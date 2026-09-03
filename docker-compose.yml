@@ -52,7 +52,7 @@ services:
       POPQ_NAVER_SELLER_REDIRECT_URI: ${POPQ_NAVER_SELLER_REDIRECT_URI:-}
       POPQ_SEED_ENABLED: ${POPQ_SEED_ENABLED:-true}
       POPQ_UPLOAD_PATH: /app/uploads
-      POPQ_QR_PUBLIC_BASE_URL: ${POPQ_QR_PUBLIC_BASE_URL:-http://localhost:5173}
+      POPQ_QR_PUBLIC_BASE_URL: ${POPQ_QR_PUBLIC_BASE_URL:-http://10.100.105.14:5173}
       POPQ_QR_TOKEN_ENCRYPTION_KEY: ${POPQ_QR_TOKEN_ENCRYPTION_KEY:-${POPQ_JWT_SECRET}}
       POPQ_GUEST_SESSION_TTL: ${POPQ_GUEST_SESSION_TTL:-PT12H}
       POPQ_COOKIE_SECURE: ${POPQ_COOKIE_SECURE:-false}
@@ -62,7 +62,7 @@ services:
       POPQ_FIREBASE_ENABLED: ${POPQ_FIREBASE_ENABLED:-false}
       GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
       POPQ_REALTIME_ALLOWED_ORIGINS: ${POPQ_REALTIME_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
-      POPQ_WEB_ALLOWED_ORIGINS: ${POPQ_WEB_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
+      POPQ_WEB_ALLOWED_ORIGINS: ${POPQ_WEB_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173,http://10.100.105.14:5173}
       TZ: UTC
     ports:
       - "${POPQ_SERVER_PORT:-8082}:8082"

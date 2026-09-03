@@ -104,7 +104,7 @@ popq:
       seller-redirect-uri: ${POPQ_NAVER_SELLER_REDIRECT_URI:}
 
   qr:
-    public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://localhost:5173}
+    public-base-url: ${POPQ_QR_PUBLIC_BASE_URL:http://10.100.105.14:5173}
     guest-session-ttl: ${POPQ_GUEST_SESSION_TTL:PT12H}
     cookie-secure: ${POPQ_COOKIE_SECURE:true}
     token-encryption-key: ${POPQ_QR_TOKEN_ENCRYPTION_KEY:${POPQ_JWT_SECRET}}
@@ -119,8 +119,8 @@ popq:
       secret-key: ${POPQ_TOSS_SECRET_KEY:}
 
   realtime:
-    allowed-origin-patterns: ${POPQ_REALTIME_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
+    allowed-origin-patterns: ${POPQ_REALTIME_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173,http://10.100.105.14:5173}
 
   web:
-    allowed-origin-patterns: ${POPQ_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173}
+    allowed-origin-patterns: ${POPQ_WEB_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:5183,http://localhost:5184,http://10.0.2.2:5173,http://10.100.105.14:5173}
 
