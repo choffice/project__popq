@@ -668,44 +668,9 @@ GoRouter createCustomerRouter({
           GoRoute(
             path: CustomerRoutes.supportInquiryForm,
             builder: (context, state) {
-              return FutureBuilder<CustomerProfile>(
-                future: engagementRepository.getProfile(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState !=
-                      ConnectionState.done) {
-                    return const Scaffold(
-                      body: Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError ||
-                      snapshot.data == null) {
-                    return Scaffold(
-                      appBar: AppBar(
-                        title: const Text('1:1 문의하기'),
-                      ),
-                      body: const Center(
-                        child: Text(
-                          '회원 정보를 불러오지 못했어요.',
-                        ),
-                      ),
-                    );
-                  }
-
-                  return CustomerSupportInquiryFormScreen(
-                    repository: supportRepository,
-                    customerEmail: snapshot.data!.email,
-                    onCreated: (created) {
-                      context.pushReplacement(
-                        CustomerRoutes.supportInquiryDetail(
-                          created.inquiry.supportInquiryId,
-                        ),
-                      );
-                    },
-                  );
-                },
+              return _CustomerSupportInquiryFormLoader(
+                engagementRepository: engagementRepository,
+                supportRepository: supportRepository,
               );
             },
           ),
@@ -775,4 +740,62 @@ GoRouter createCustomerRouter({
   Timer(minSplashDuration, router.refresh);
 
   return router;
+}
+
+class _CustomerSupportInquiryFormLoader extends StatefulWidget {
+  const _CustomerSupportInquiryFormLoader({
+    required this.engagementRepository,
+    required this.supportRepository,
+  });
+
+  final CustomerEngagementRepository engagementRepository;
+  final CustomerSupportRepository supportRepository;
+
+  @override
+  State<_CustomerSupportInquiryFormLoader> createState() =>
+      _CustomerSupportInquiryFormLoaderState();
+}
+
+class _CustomerSupportInquiryFormLoaderState
+    extends State<_CustomerSupportInquiryFormLoader> {
+  late final Future<CustomerProfile> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = widget.engagementRepository.getProfile();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<CustomerProfile>(
+      future: _profileFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('1:1 문의하기')),
+            body: const Center(child: Text('회원 정보를 불러오지 못했어요.')),
+          );
+        }
+
+        return CustomerSupportInquiryFormScreen(
+          repository: widget.supportRepository,
+          customerEmail: snapshot.data!.email,
+          onCreated: (created) {
+            context.pushReplacement(
+              CustomerRoutes.supportInquiryDetail(
+                created.inquiry.supportInquiryId,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }

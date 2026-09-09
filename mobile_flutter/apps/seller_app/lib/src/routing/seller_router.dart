@@ -372,59 +372,9 @@ GoRouter createSellerRouter({
       GoRoute(
         path: SellerRoutes.supportTicketForm,
         builder: (context, state) {
-          return FutureBuilder<SellerIdentity>(
-            future: bootstrapController.identityRepository.getCurrent(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState != ConnectionState.done) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (snapshot.hasError || snapshot.data == null) {
-                return Scaffold(
-                  appBar: AppBar(
-                    title: const Text('1:1 문의하기'),
-                    centerTitle: true,
-                  ),
-                  body: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.error_outline_rounded, size: 48),
-                          const SizedBox(height: 14),
-                          const Text(
-                            '판매자 정보를 불러오지 못했어요.',
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: () {
-                              context.go(SellerRoutes.support);
-                            },
-                            child: const Text('고객센터로 돌아가기'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return SellerSupportTicketFormScreen(
-                repository: supportRepository,
-                sellerEmail: snapshot.data!.email,
-                onCreated: (created) {
-                  context.pushReplacement(
-                    SellerRoutes.supportTicketDetail(
-                      created.ticket.supportTicketId,
-                    ),
-                  );
-                },
-              );
-            },
+          return _SellerSupportTicketFormLoader(
+            identityRepository: bootstrapController.identityRepository,
+            supportRepository: supportRepository,
           );
         },
       ),
@@ -564,4 +514,83 @@ GoRouter createSellerRouter({
   Timer(minSplashDuration, router.refresh);
 
   return router;
+}
+
+class _SellerSupportTicketFormLoader extends StatefulWidget {
+  const _SellerSupportTicketFormLoader({
+    required this.identityRepository,
+    required this.supportRepository,
+  });
+
+  final SellerIdentityRepository identityRepository;
+  final SellerSupportRepository supportRepository;
+
+  @override
+  State<_SellerSupportTicketFormLoader> createState() =>
+      _SellerSupportTicketFormLoaderState();
+}
+
+class _SellerSupportTicketFormLoaderState
+    extends State<_SellerSupportTicketFormLoader> {
+  late final Future<SellerIdentity> _identityFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _identityFuture = widget.identityRepository.getCurrent();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<SellerIdentity>(
+      future: _identityFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError || snapshot.data == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('1:1 문의하기'),
+              centerTitle: true,
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error_outline_rounded, size: 48),
+                    const SizedBox(height: 14),
+                    const Text(
+                      '판매자 정보를 불러오지 못했어요.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    OutlinedButton(
+                      onPressed: () => context.go(SellerRoutes.support),
+                      child: const Text('고객센터로 돌아가기'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return SellerSupportTicketFormScreen(
+          repository: widget.supportRepository,
+          sellerEmail: snapshot.data!.email,
+          onCreated: (created) {
+            context.pushReplacement(
+              SellerRoutes.supportTicketDetail(created.ticket.supportTicketId),
+            );
+          },
+        );
+      },
+    );
+  }
 }

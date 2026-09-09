@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:popq_app_core/popq_app_core.dart';
+import 'package:popq_design_system/popq_design_system.dart';
 
 import '../../realtime/seller_realtime_scope.dart';
 import 'seller_support_repository.dart';
@@ -295,7 +296,7 @@ class _TicketHeader extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+            color: PopqPalette.forest.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
@@ -306,7 +307,7 @@ class _TicketHeader extends StatelessWidget {
                   Text(
                     ticket.category.label,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: colorScheme.primary,
+                      color: PopqPalette.forest,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -488,7 +489,7 @@ class _TicketReplyItem extends StatelessWidget {
         : Icons.support_agent_rounded;
 
     final accentColor =
-    sentBySeller ? colorScheme.tertiary : colorScheme.primary;
+    sentBySeller ? colorScheme.tertiary : PopqPalette.forest;
 
     final leftPadding = sentBySeller
         ? 20.0
